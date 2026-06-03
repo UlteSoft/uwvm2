@@ -73,9 +73,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--runtime-llvm-jit-call-stack"},
         .describe{u8"Select the runtime LLVM JIT call-stack tracking mode."},
 # if UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
-        .usage{u8"[instruction|none|unwind]"},
+        .usage{u8"[auto|instruction|none|unwind|unwind-uncheck]"},
 # else
-        .usage{u8"[instruction|none]"},
+        .usage{u8"[auto|instruction|none]"},
 # endif
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_call_stack_alias), 1uz}},
         .handle{::std::addressof(details::runtime_llvm_jit_call_stack_callback)},

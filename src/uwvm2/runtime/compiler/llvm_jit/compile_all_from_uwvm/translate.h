@@ -43,6 +43,7 @@
 #  include <llvm/IR/Constants.h>
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
+#  include <llvm/IR/InlineAsm.h>
 #  include <llvm/IR/LLVMContext.h>
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/Type.h>
@@ -85,7 +86,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         runtime_invariant_failure
     };
 
-    extern "C++" [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
+    extern "C++"
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+#endif
+        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
 
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 

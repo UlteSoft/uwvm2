@@ -23,7 +23,7 @@ Source focus:
 | `--runtime-llvm-jit-policy` | `-Rllvm-policy` | `[debug|default|fast-compile|balanced|max]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the high-level LLVM JIT strategy policy. |
 | `--runtime-llvm-jit-lazy-policy` | `-Rllvm-lazy-policy` | `[auto|debug|light|balanced]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the lazy/tier-1 LLVM JIT strategy. |
 | `--runtime-llvm-jit-full-policy` | `-Rllvm-full-policy` | `[auto|debug|legacy-light|pb-o1|pb-o2|pb-o3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the full/tier-2 LLVM JIT strategy. |
-| `--runtime-llvm-jit-call-stack` | `-Rllvm-call-stack` | `[instruction|none|unwind]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select LLVM-JIT call-stack tracking mode. |
+| `--runtime-llvm-jit-call-stack` | `-Rllvm-call-stack` | `[auto|instruction|none|unwind]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select LLVM-JIT call-stack tracking mode. |
 | `--runtime-llvm-jit-disable-ir-verifaction` | `-Rllvm-noverify` | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
@@ -62,6 +62,12 @@ Conflict rules enforced by callbacks:
 - `--runtime-custom-mode` conflicts with any shortcut already seen.
 - `--runtime-custom-compiler` conflicts with any shortcut already seen.
 - Parser-level duplicate guards also reject repeating the same shortcut.
+
+LLVM JIT policy defaults:
+
+- Effective `full_compile + llvm_jit_only` execution, including `--runtime-aot` and `--runtime-custom-mode full --runtime-custom-compiler jit`, defaults to the full/tier-2 max policy when no explicit LLVM JIT policy is supplied.
+- Tiered execution keeps its existing default tier-2 policy unless an LLVM JIT policy is explicitly supplied.
+- Explicit `--runtime-llvm-jit-policy` or `--runtime-llvm-jit-full-policy` still takes precedence.
 
 Valid:
 
@@ -208,7 +214,7 @@ Behavior:
 - `pb-o1`: use the tuned PassBuilder O1 full-module pipeline and LLVM codegen `less`.
 - `pb-o2`: use the tuned PassBuilder O2 full-module pipeline and LLVM codegen `default`.
 - `pb-o3`: use the tuned PassBuilder O3 full-module pipeline and LLVM codegen `aggressive`.
-- Runtime compiler logs include `policy=`, `pipeline=`, `codegen_opt=`, `call_stack=`, `unwind_backend=`, `unwind_usable=`, `unwind_replace_frames=`, and `call_stack_frames=` on `[llvm-jit-full] optimize-start` lines.
+- Runtime compiler logs include `policy=`, `pipeline=`, `codegen_opt=`, `call_stack=`, `unwind_backend=`, `unwind_check=`, `unwind_replace_frames=`, and `call_stack_frames=` on `[llvm-jit-full] optimize-start` lines.
 - This scoped policy can be combined with `--runtime-llvm-jit-lazy-policy`, but it conflicts with `--runtime-llvm-jit-policy`.
 
 ## `--runtime-llvm-jit-call-stack`
@@ -216,19 +222,27 @@ Behavior:
 Syntax:
 
 ```bash
+uwvm --runtime-llvm-jit-call-stack auto
 uwvm --runtime-llvm-jit-call-stack instruction
 uwvm --runtime-llvm-jit-call-stack none
 uwvm --runtime-llvm-jit-call-stack unwind
+uwvm --runtime-llvm-jit-call-stack unwind-uncheck
 uwvm -Rllvm-call-stack none
 ```
 
 Behavior:
 
-- `instruction`: emit per-function LLVM JIT call-stack push/pop instructions. This is the default and preserves current trap diagnostics.
+- `auto`: default. If an unwind backend is present, try `unwind`; if the generated-code live unwind probe fails, warn once and fall back to `instruction`. If runtime warnings are disabled, the fallback is silent; if runtime warnings are converted to fatal errors, the fallback warning is fatal.
+- `instruction`: emit per-function LLVM JIT call-stack push/pop instructions. This preserves trap diagnostics without relying on generated-code unwind metadata.
 - `none`: omit per-function LLVM JIT call-stack push/pop instructions. This can substantially improve hot Wasm-to-Wasm call workloads, but trap stack reports lose JIT body frames.
-- `unwind`: use the host unwinder for LLVM JIT frames at trap-report time. This value is only accepted when the build can see an unwind backend. At runtime, uwvm runs an unwind self-test and requires verified generated-code unwind-frame replacement; failure is fatal instead of falling back to `instruction`.
+- `unwind`: force generated-code unwind metadata for LLVM JIT frames at trap-report time. This value is only accepted when the build can see an unwind backend. At runtime, uwvm runs a tiny generated-code live unwind probe once before replacing instruction frames; failure is fatal instead of falling back to `instruction`.
+- `unwind-uncheck`: use the same generated-code unwind metadata as `unwind`, but skip the live unwind probe. This is intended for deployments that have already validated the JIT unwind path and want to avoid the check on startup.
+- `unwind-unchecked`: accepted as an alias for `unwind-uncheck`.
+- Default: `auto`.
+- uwvm itself may still be built without unwind tables. Host-runtime unwindability is not a requirement for JIT unwind mode, and uwvm does not warn when ordinary host-runtime frames cannot be walked.
+- On Apple targets, uwvm registers generated `.eh_frame` FDEs directly, matching WAVM's libunwind model.
 - This command is independent of `--runtime-llvm-jit-policy`, `--runtime-llvm-jit-lazy-policy`, and `--runtime-llvm-jit-full-policy`.
-- Runtime compiler logs report the selected mode as `call_stack=`, the selected unwind backend as `unwind_backend=`, whether basic native unwinding works as `unwind_usable=`, whether unwind is allowed to replace instruction frames as `unwind_replace_frames=`, and the actual instruction-frame emission as `call_stack_frames=`.
+- Runtime compiler logs report the selected mode as `call_stack=`, the selected unwind backend as `unwind_backend=`, the live-probe decision as `unwind_check=live-jit|skipped|off`, whether generated-code unwind metadata is allowed to replace instruction frames as `unwind_replace_frames=`, and the actual instruction-frame emission as `call_stack_frames=`.
 
 ## `--runtime-llvm-jit-disable-ir-verifaction`
 

@@ -29,6 +29,7 @@
 # include <cstring>
 # include <functional>
 # include <limits>
+# include <memory>
 # include <new>
 # include <type_traits>
 # include <utility>
@@ -51,12 +52,16 @@
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #  include <llvm/InitializePasses.h>
+#  include <llvm/IR/IRBuilder.h>
 #  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/IR/Module.h>
 #  include <llvm/IR/PassManager.h>
+#  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/PassRegistry.h>
 #  include <llvm/Passes/OptimizationLevel.h>
 #  include <llvm/Passes/PassBuilder.h>
+#  include <llvm/Support/DynamicLibrary.h>
 #  include <llvm/Support/SourceMgr.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
@@ -67,7 +72,14 @@
 #  include <llvm/Transforms/Utils.h>
 # endif
 
-# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<libunwind.h>)
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
+#  include <unwind.h>
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE 0
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 1
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 1
+extern "C" void __register_frame(void const*);
+extern "C" void __deregister_frame(void const*);
+# elif defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<libunwind.h>)
 #  ifndef UNW_LOCAL_ONLY
 #   define UNW_LOCAL_ONLY
 #  endif
@@ -85,8 +97,14 @@
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 0
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 0
 # endif
+# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<execinfo.h>)
+#  include <execinfo.h>
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE 1
+# else
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE 0
+# endif
 # ifndef UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES
-#  define UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES 0
+#  define UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
 # endif
 
 // import
@@ -351,8 +369,27 @@ namespace uwvm2::runtime::lib
         inline runtime_global_state g_runtime{};  // [global]
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        thread_local ::std::uint_least32_t tiered_entry_hot_probe_tick{};  // [thread-local]
-        thread_local ::std::uint_least32_t tiered_counter_sample_tick{};   // [thread-local]
+#  if defined(UWVM_USE_THREAD_LOCAL)
+#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#    ifdef UWVM
+    [[__gnu__::__tls_model__("local-exec")]]
+#    else
+    [[__gnu__::__tls_model__("local-dynamic")]]
+#    endif
+#   endif
+        inline thread_local ::std::uint_least32_t tiered_entry_hot_probe_tick{};  // [global] [thread-local]
+#  endif
+
+#  if defined(UWVM_USE_THREAD_LOCAL)
+#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#    ifdef UWVM
+    [[__gnu__::__tls_model__("local-exec")]]
+#    else
+    [[__gnu__::__tls_model__("local-dynamic")]]
+#    endif
+#   endif
+        inline thread_local ::std::uint_least32_t tiered_counter_sample_tick{};   // [global] [thread-local]
+#  endif
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
@@ -372,24 +409,19 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
-        inline bool& runtime_process_exiting_flag() noexcept
+        struct runtime_process_exit_state
         {
-            static bool flag{};
-            return flag;
-        }
+            bool exiting{};
 
-        inline void mark_runtime_process_exiting() noexcept { runtime_process_exiting_flag() = true; }
+            ~runtime_process_exit_state() noexcept { exiting = true; }
+        };
 
-        inline void ensure_runtime_process_exit_handler_registered() noexcept
-        {
-            static bool registered{(::std::atexit(mark_runtime_process_exiting), true)};
-            static_cast<void>(registered);
-        }
+        inline runtime_process_exit_state g_runtime_process_exit_state{};  // [global]
 
         inline compiled_module_record::~compiled_module_record() noexcept
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(runtime_process_exiting_flag())
+            if(g_runtime_process_exit_state.exiting)
             {
                 static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_module.release());
                 static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_context_holder.release());
@@ -737,11 +769,23 @@ namespace uwvm2::runtime::lib
         }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept
-        {
-            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
-            return runtime_mode::global_runtime_llvm_jit_call_stack == runtime_mode::runtime_llvm_jit_call_stack_t::unwind;
-        }
+#  if defined(UWVM_USE_THREAD_LOCAL)
+#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#    ifdef UWVM
+    [[__gnu__::__tls_model__("local-exec")]]
+#    else
+    [[__gnu__::__tls_model__("local-dynamic")]]
+#    endif
+#   endif
+        inline thread_local ::std::uintptr_t llvm_jit_trap_return_address{}; // [global] [thread-local]
+#  else
+        inline ::std::uintptr_t llvm_jit_trap_return_address{};               // [global]
+#  endif
+
+        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
+            get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
+        [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept;
+        [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept;
 
         inline void record_llvm_jit_unwind_entry(::std::size_t module_id,
                                                  ::std::size_t function_index,
@@ -866,19 +910,26 @@ namespace uwvm2::runtime::lib
 #  endif
 # endif
 
-        UWVM_NOINLINE inline bool runtime_llvm_jit_unwind_probe_leaf() noexcept
+        [[maybe_unused]] UWVM_NOINLINE inline bool runtime_llvm_jit_unwind_probe_leaf() noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             auto const backtrace{capture_llvm_jit_unwind_backtrace(0uz)};
-            return backtrace.size >= 2uz;
+            auto const usable{backtrace.size >= 2uz};
+            ::std::atomic_signal_fence(::std::memory_order_seq_cst);
+            return usable;
 # else
             return false;
 # endif
         }
 
-        UWVM_NOINLINE inline bool runtime_llvm_jit_unwind_probe_root() noexcept { return runtime_llvm_jit_unwind_probe_leaf(); }
+        [[maybe_unused]] UWVM_NOINLINE inline bool runtime_llvm_jit_unwind_probe_root() noexcept
+        {
+            auto const usable{runtime_llvm_jit_unwind_probe_leaf()};
+            ::std::atomic_signal_fence(::std::memory_order_seq_cst);
+            return usable;
+        }
 
-        [[nodiscard]] inline bool runtime_llvm_jit_unwind_backend_usable() noexcept
+        [[maybe_unused]] [[nodiscard]] inline bool runtime_llvm_jit_unwind_backend_usable() noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             static bool const usable{runtime_llvm_jit_unwind_probe_root()};
@@ -890,15 +941,321 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_can_replace_instruction_frames() noexcept
         {
-            // Native unwinding through ordinary C++ frames is not enough: the LLVM JIT path also
-            // needs verified registration of generated-code unwind info before it may replace the
-            // existing instruction call-stack frames. Keep this closed until that JIT-frame path is
-            // proven, matching WAVM's model of pairing libunwind with registered generated frames.
+            // JIT unwind mode only requires generated code to carry registered .eh_frame FDEs.
+            // Host uwvm2 frames may still be built without unwind tables; trap reporting falls
+            // back to the captured JIT return address for the innermost generated frame.
 # if UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES
-            return runtime_llvm_jit_unwind_backend_usable();
+            return true;
 # else
             return false;
 # endif
+        }
+
+#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
+        struct runtime_llvm_jit_eh_frame_record
+        {
+            ::std::uint8_t* addr{};
+            ::std::size_t size{};
+        };
+
+        template <typename Visit>
+        inline void visit_runtime_llvm_jit_eh_frame_fdes(::std::uint8_t* addr, ::std::size_t size, Visit visit) noexcept
+        {
+            auto const end{addr + size};
+            auto curr{addr};
+            while(curr < end)
+            {
+                auto const record{curr};
+                if(static_cast<::std::size_t>(end - curr) < sizeof(::std::uint_least32_t)) [[unlikely]] { return; }
+
+                ::std::uint_least32_t length32{};
+                ::std::memcpy(::std::addressof(length32), curr, sizeof(length32));
+                curr += sizeof(length32);
+                if(length32 == 0u) { return; }
+
+                ::std::size_t length{};
+                if(length32 == 0xffffffffu)
+                {
+                    if(static_cast<::std::size_t>(end - curr) < sizeof(::std::uint_least64_t)) [[unlikely]] { return; }
+                    ::std::uint_least64_t length64{};
+                    ::std::memcpy(::std::addressof(length64), curr, sizeof(length64));
+                    curr += sizeof(length64);
+                    if(length64 > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return; }
+                    length = static_cast<::std::size_t>(length64);
+                }
+                else
+                {
+                    length = static_cast<::std::size_t>(length32);
+                }
+
+                if(length > static_cast<::std::size_t>(end - curr)) [[unlikely]] { return; }
+                auto const next{curr + length};
+                if(length < sizeof(::std::uint_least32_t)) [[unlikely]]
+                {
+                    curr = next;
+                    continue;
+                }
+
+                ::std::uint_least32_t cie_offset{};
+                ::std::memcpy(::std::addressof(cie_offset), curr, sizeof(cie_offset));
+                if(cie_offset != 0u) { visit(record); }
+                curr = next;
+            }
+        }
+#endif
+
+        class runtime_llvm_jit_section_memory_manager final : public ::llvm::SectionMemoryManager
+        {
+        public:
+            ~runtime_llvm_jit_section_memory_manager() override
+            {
+#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
+                for(auto const& frame: eh_frame_records_)
+                {
+                    visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) noexcept { __deregister_frame(fde); });
+                }
+#endif
+            }
+
+            void registerEHFrames(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) override
+            {
+#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
+                static_cast<void>(load_addr);
+                visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) noexcept { __register_frame(fde); });
+                eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
+#else
+                ::llvm::SectionMemoryManager::registerEHFrames(addr, load_addr, size);
+#endif
+            }
+
+        private:
+#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
+            ::uwvm2::utils::container::vector<runtime_llvm_jit_eh_frame_record> eh_frame_records_{};
+#endif
+        };
+
+        inline bool ensure_llvm_jit_native_target_initialized() noexcept;
+
+# if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
+        struct runtime_llvm_jit_live_unwind_probe_state
+        {
+            inline static constexpr int max_frames{64};
+
+            void* frames[max_frames]{};
+            int frame_count{};
+            ::std::uintptr_t function_address{};
+        };
+
+        [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe_saw_jit_frame(runtime_llvm_jit_live_unwind_probe_state const& state) noexcept
+        {
+            constexpr ::std::uintptr_t probe_function_span{4096u};
+            auto const begin{state.function_address};
+            auto const end{begin + probe_function_span};
+            if(begin == 0u) [[unlikely]] { return false; }
+
+            auto const frame_count{state.frame_count < runtime_llvm_jit_live_unwind_probe_state::max_frames
+                                       ? state.frame_count
+                                       : runtime_llvm_jit_live_unwind_probe_state::max_frames};
+            for(int i{}; i != frame_count; ++i)
+            {
+                auto ip{reinterpret_cast<::std::uintptr_t>(state.frames[i])};
+                if(ip != 0u) { --ip; }
+                if(ip >= begin && ip < end) { return true; }
+            }
+
+            return false;
+        }
+
+        [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe() noexcept
+        {
+            if(!ensure_llvm_jit_native_target_initialized()) [[unlikely]] { return false; }
+
+            ::llvm::LLVMContext context{};
+            auto module{::std::make_unique<::llvm::Module>("uwvm2_runtime_llvm_jit_unwind_probe", context)};
+
+            ::llvm::EngineBuilder target_builder{};
+            target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(::llvm::CodeGenOptLevel::None);
+
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            if(target_machine == nullptr) [[unlikely]] { return false; }
+            target_machine->setFastISel(true);
+
+            module->setTargetTriple(target_machine->getTargetTriple());
+            module->setDataLayout(target_machine->createDataLayout());
+
+            auto* const i32_type{::llvm::Type::getInt32Ty(context)};
+            auto* const void_type{::llvm::Type::getVoidTy(context)};
+            auto* const ptr_type{::llvm::PointerType::getUnqual(context)};
+            auto* const backtrace_type{::llvm::FunctionType::get(i32_type, {ptr_type, i32_type}, false)};
+            auto* const backtrace_function{
+                ::llvm::Function::Create(backtrace_type, ::llvm::GlobalValue::ExternalLinkage, "backtrace", *module)};
+
+            auto* const probe_type{::llvm::FunctionType::get(void_type, {ptr_type, ptr_type}, false)};
+            auto* const probe_function{
+                ::llvm::Function::Create(probe_type,
+                                         ::llvm::GlobalValue::ExternalLinkage,
+                                         "uwvm2_runtime_llvm_jit_live_unwind_probe",
+                                         *module)};
+            probe_function->addFnAttr(::llvm::Attribute::NoInline);
+            probe_function->setUWTableKind(::llvm::UWTableKind::Async);
+            probe_function->addFnAttr("disable-tail-calls", "true");
+            probe_function->addFnAttr("frame-pointer", "all");
+
+            auto* const entry_block{::llvm::BasicBlock::Create(context, "entry", probe_function)};
+            ::llvm::IRBuilder<> builder{entry_block};
+            auto* const frames_arg{probe_function->getArg(0)};
+            auto* const count_arg{probe_function->getArg(1)};
+            auto* const count_value{
+                builder.CreateCall(backtrace_function,
+                                   {frames_arg,
+                                    ::llvm::ConstantInt::get(i32_type, runtime_llvm_jit_live_unwind_probe_state::max_frames)})};
+            builder.CreateStore(count_value, count_arg);
+            builder.CreateRetVoid();
+
+            if(::llvm::verifyModule(*module)) [[unlikely]] { return false; }
+
+            ::llvm::sys::DynamicLibrary::AddSymbol("backtrace",
+                                                   reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
+
+            auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{module.release()})
+                                .setEngineKind(::llvm::EngineKind::JIT)
+                                .setOptLevel(::llvm::CodeGenOptLevel::None)
+                                .setMCJITMemoryManager(::std::make_unique<runtime_llvm_jit_section_memory_manager>())
+                                .create(target_machine.get())};
+            if(raw_engine == nullptr) [[unlikely]] { return false; }
+            static_cast<void>(target_machine.release());
+
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+            engine->finalizeObject();
+
+            auto const probe_address{reinterpret_cast<::std::uintptr_t>(engine->getPointerToFunction(probe_function))};
+            if(probe_address == 0u) [[unlikely]] { return false; }
+
+            runtime_llvm_jit_live_unwind_probe_state state{};
+            state.function_address = probe_address;
+
+            using probe_func_t = void (*)(void**, int*) noexcept;
+            auto const probe_func{reinterpret_cast<probe_func_t>(probe_address)};
+            probe_func(state.frames, ::std::addressof(state.frame_count));
+
+            return runtime_llvm_jit_live_unwind_probe_saw_jit_frame(state);
+        }
+# else
+        [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe() noexcept
+        {
+            return false;
+        }
+# endif
+
+        enum class runtime_llvm_jit_unwind_probe_status : unsigned
+        {
+            ok,
+            no_backend,
+            no_frame_replacement,
+            live_probe_failed
+        };
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+            runtime_llvm_jit_unwind_probe_status_reason(runtime_llvm_jit_unwind_probe_status st) noexcept
+        {
+            switch(st)
+            {
+                case runtime_llvm_jit_unwind_probe_status::ok: return u8"ok";
+                case runtime_llvm_jit_unwind_probe_status::no_backend: return u8"no unwind backend was compiled into this build";
+                case runtime_llvm_jit_unwind_probe_status::no_frame_replacement: return u8"generated-code unwind-frame replacement is not verified";
+                case runtime_llvm_jit_unwind_probe_status::live_probe_failed: return u8"generated-code live unwind probe failed";
+            }
+
+            return u8"unknown unwind probe failure";
+        }
+
+        [[nodiscard]] inline runtime_llvm_jit_unwind_probe_status runtime_llvm_jit_checked_unwind_probe_status() noexcept
+        {
+# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
+            return runtime_llvm_jit_unwind_probe_status::no_backend;
+# else
+            if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
+            {
+                return runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
+            }
+            static bool const live_probe_ok{runtime_llvm_jit_live_unwind_probe()};
+            if(!live_probe_ok) [[unlikely]] { return runtime_llvm_jit_unwind_probe_status::live_probe_failed; }
+            return runtime_llvm_jit_unwind_probe_status::ok;
+# endif
+        }
+
+        inline void runtime_llvm_jit_auto_unwind_fallback_warning_once(runtime_llvm_jit_unwind_probe_status st) noexcept
+        {
+            static bool warned{};
+            if(warned) { return; }
+            warned = true;
+
+            if(!::uwvm2::uwvm::io::show_runtime_warning) { return; }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"[warn]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"LLVM JIT call-stack auto mode could not use generated-code unwind (",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                runtime_llvm_jit_unwind_probe_status_reason(st),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"); falling back to instruction call-stack frames.",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8" (runtime)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            if(::uwvm2::uwvm::io::runtime_warning_fatal) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
+
+        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
+            get_runtime_llvm_jit_effective_call_stack_mode() noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+            using runtime_llvm_jit_call_stack_t = runtime_mode::runtime_llvm_jit_call_stack_t;
+
+            auto const requested{runtime_mode::global_runtime_llvm_jit_call_stack};
+            if(requested != runtime_llvm_jit_call_stack_t::auto_policy) { return requested; }
+
+# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
+            return runtime_llvm_jit_call_stack_t::instruction;
+# else
+            auto const st{runtime_llvm_jit_checked_unwind_probe_status()};
+            if(st == runtime_llvm_jit_unwind_probe_status::ok) { return runtime_llvm_jit_call_stack_t::unwind; }
+            runtime_llvm_jit_auto_unwind_fallback_warning_once(st);
+            return runtime_llvm_jit_call_stack_t::instruction;
+# endif
+        }
+
+        [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+            auto const mode{get_runtime_llvm_jit_effective_call_stack_mode()};
+            return mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind ||
+                   mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck;
+        }
+
+        [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+            auto const requested{runtime_mode::global_runtime_llvm_jit_call_stack};
+            return requested != runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck &&
+                   get_runtime_llvm_jit_effective_call_stack_mode() == runtime_mode::runtime_llvm_jit_call_stack_t::unwind;
         }
 
         [[noreturn]] inline void runtime_llvm_jit_unwind_call_stack_fatal(::uwvm2::utils::container::u8string_view reason) noexcept
@@ -928,20 +1285,14 @@ namespace uwvm2::runtime::lib
 
         inline void validate_runtime_llvm_jit_unwind_call_stack_or_fatal() noexcept
         {
-            if(!runtime_llvm_jit_unwind_call_stack_requested()) { return; }
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+            if(runtime_mode::global_runtime_llvm_jit_call_stack != runtime_mode::runtime_llvm_jit_call_stack_t::unwind) { return; }
 
-# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
-            runtime_llvm_jit_unwind_call_stack_fatal(u8"no unwind backend was compiled into this build");
-# else
-            if(!runtime_llvm_jit_unwind_backend_usable()) [[unlikely]]
+            auto const st{runtime_llvm_jit_checked_unwind_probe_status()};
+            if(st != runtime_llvm_jit_unwind_probe_status::ok) [[unlikely]]
             {
-                runtime_llvm_jit_unwind_call_stack_fatal(u8"the unwind backend self-test failed");
+                runtime_llvm_jit_unwind_call_stack_fatal(runtime_llvm_jit_unwind_probe_status_reason(st));
             }
-            if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
-            {
-                runtime_llvm_jit_unwind_call_stack_fatal(u8"generated-code unwind-frame replacement is not verified");
-            }
-# endif
         }
 
         template <typename Output>
@@ -957,8 +1308,73 @@ namespace uwvm2::runtime::lib
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
-            auto const backtrace{capture_llvm_jit_unwind_backtrace(2uz)};
-            if(backtrace.size == 0uz)
+            auto const print_unwind_ip{
+                [&](::std::size_t i, ::std::uintptr_t ip) noexcept
+                {
+                    auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
+
+                    ::fast_io::io::perr(u8log_output_ul,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        u8"[info]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"#",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        i,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" ip=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        ::fast_io::mnp::hex0x<false>(ip));
+
+                    if(resolved.entry != nullptr && resolved.entry->module_id < g_runtime.modules.size())
+                    {
+                        auto const& mod_rec{g_runtime.modules.index_unchecked(resolved.entry->module_id)};
+                        auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
+                        auto const fn_name{resolve_func_display_name(mod_rec.module_name, resolved.entry->function_index)};
+
+                        ::fast_io::io::perr(u8log_output_ul,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8" module=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            mod_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8" func_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            resolved.entry->function_index,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8" +",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            ::fast_io::mnp::hex0x<false>(resolved.offset),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            resolved.entry->raw_entry ? ::uwvm2::utils::container::u8string_view{u8" raw"}
+                                                                      : ::uwvm2::utils::container::u8string_view{u8" typed"});
+
+                        if(!fn_name.empty())
+                        {
+                            ::fast_io::io::perr(u8log_output_ul,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8" func_name=\"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                fn_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\"");
+                        }
+                    }
+
+                    ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                }};
+
+            ::std::size_t printed_frame_count{};
+            if(llvm_jit_trap_return_address != 0u)
+            {
+                auto trap_ip{llvm_jit_trap_return_address};
+                if(trap_ip != 0u) { --trap_ip; }
+                print_unwind_ip(printed_frame_count++, trap_ip);
+            }
+
+            auto const backtrace{capture_llvm_jit_unwind_backtrace(0uz)};
+            if(backtrace.size == 0uz && printed_frame_count == 0uz)
             {
                 ::fast_io::io::perrln(u8log_output_ul,
                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -974,58 +1390,9 @@ namespace uwvm2::runtime::lib
             for(::std::size_t i{}; i != backtrace.size; ++i)
             {
                 auto const ip{backtrace.frames[i]};
-                auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
-
-                ::fast_io::io::perr(u8log_output_ul,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                    u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"#",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    i,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8" ip=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    ::fast_io::mnp::hex0x<false>(ip));
-
-                if(resolved.entry != nullptr && resolved.entry->module_id < g_runtime.modules.size())
-                {
-                    auto const& mod_rec{g_runtime.modules.index_unchecked(resolved.entry->module_id)};
-                    auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
-                    auto const fn_name{resolve_func_display_name(mod_rec.module_name, resolved.entry->function_index)};
-
-                    ::fast_io::io::perr(u8log_output_ul,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" module=",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        mod_name,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" func_idx=",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        resolved.entry->function_index,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" +",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        ::fast_io::mnp::hex0x<false>(resolved.offset),
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        resolved.entry->raw_entry ? ::uwvm2::utils::container::u8string_view{u8" raw"}
-                                                                  : ::uwvm2::utils::container::u8string_view{u8" typed"});
-
-                    if(!fn_name.empty())
-                    {
-                        ::fast_io::io::perr(u8log_output_ul,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8" func_name=\"",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                            fn_name,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"\"");
-                    }
-                }
-
-                ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                if(printed_frame_count != 0uz && ip == llvm_jit_trap_return_address - 1u) { continue; }
+                if(printed_frame_count != 0uz && resolve_llvm_jit_unwind_entry(ip).entry == nullptr) { continue; }
+                print_unwind_ip(printed_frame_count++, ip);
             }
 # else
             ::fast_io::io::perrln(u8log_output_ul,
@@ -1109,7 +1476,10 @@ namespace uwvm2::runtime::lib
             ::fast_io::io::perrln(u8log_output_ul);
         }
 
-        [[noreturn]] inline constexpr void trap_fatal(trap_kind k) noexcept
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+#endif
+        UWVM_NOINLINE inline void trap_fatal(trap_kind k) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -1126,7 +1496,10 @@ namespace uwvm2::runtime::lib
 
             dump_call_stack_for_trap();
 
-            ::fast_io::fast_terminate();
+            using terminate_func_t = void (*)() noexcept;
+            terminate_func_t volatile terminate_func{::fast_io::fast_terminate};
+            terminate_func();
+            ::std::atomic_signal_fence(::std::memory_order_seq_cst);
         }
 
 #ifdef UWVM_CPP_EXCEPTIONS
@@ -1766,11 +2139,13 @@ namespace uwvm2::runtime::lib
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
 
             using runtime_llvm_jit_call_stack_t = runtime_mode::runtime_llvm_jit_call_stack_t;
-            switch(runtime_mode::global_runtime_llvm_jit_call_stack)
+            switch(get_runtime_llvm_jit_effective_call_stack_mode())
             {
+                case runtime_llvm_jit_call_stack_t::auto_policy: return u8"auto";
                 case runtime_llvm_jit_call_stack_t::instruction: return u8"instruction";
                 case runtime_llvm_jit_call_stack_t::none: return u8"none";
                 case runtime_llvm_jit_call_stack_t::unwind: return u8"unwind";
+                case runtime_llvm_jit_call_stack_t::unwind_uncheck: return u8"unwind-uncheck";
             }
 
             return u8"instruction";
@@ -1781,15 +2156,13 @@ namespace uwvm2::runtime::lib
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
 
             using runtime_llvm_jit_call_stack_t = runtime_mode::runtime_llvm_jit_call_stack_t;
-            switch(runtime_mode::global_runtime_llvm_jit_call_stack)
+            switch(get_runtime_llvm_jit_effective_call_stack_mode())
             {
+                case runtime_llvm_jit_call_stack_t::auto_policy: [[fallthrough]];
                 case runtime_llvm_jit_call_stack_t::instruction: return true;
                 case runtime_llvm_jit_call_stack_t::none: return false;
-                case runtime_llvm_jit_call_stack_t::unwind:
-                {
-                    validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
-                    return false;
-                }
+                case runtime_llvm_jit_call_stack_t::unwind: [[fallthrough]];
+                case runtime_llvm_jit_call_stack_t::unwind_uncheck: return false;
             }
 
             return true;
@@ -1800,6 +2173,7 @@ namespace uwvm2::runtime::lib
         {
             validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
             opt.emit_call_stack_frames = runtime_llvm_jit_uses_instruction_call_stack_frames();
+            opt.emit_unwind_call_stack_frames = runtime_llvm_jit_unwind_call_stack_requested();
         }
 
         inline void publish_llvm_jit_call_indirect_defined_entry_targets(compiled_defined_func_info const* info,
@@ -6594,6 +6968,14 @@ namespace uwvm2::runtime::lib
                 }
             }
 
+            if(runtime_mode::global_runtime_mode == runtime_mode::runtime_mode_t::full_compile &&
+               runtime_mode::global_runtime_compiler == runtime_mode::runtime_compiler_t::llvm_jit_only)
+            {
+                return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                       ::llvm::CodeGenOptLevel::Aggressive,
+                                                                       ::uwvm2::utils::container::u8string_view{u8"aot:max", 7uz});
+            }
+
             return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::legacy_light,
                                                                    default_level,
                                                                    ::uwvm2::utils::container::u8string_view{u8"default", 7uz});
@@ -6862,9 +7244,12 @@ namespace uwvm2::runtime::lib
                                                   get_runtime_llvm_jit_call_stack_mode_name(),
                                                   u8" unwind_backend=",
                                                   runtime_llvm_jit_unwind_backend_name(),
-                                                  u8" unwind_usable=",
-                                                  runtime_llvm_jit_unwind_backend_usable() ? ::uwvm2::utils::container::u8string_view{u8"yes"}
-                                                                                          : ::uwvm2::utils::container::u8string_view{u8"no"},
+                                                  u8" unwind_check=",
+                                                  runtime_llvm_jit_unwind_check_requested()
+                                                      ? ::uwvm2::utils::container::u8string_view{u8"live-jit"}
+                                                      : (runtime_llvm_jit_unwind_call_stack_requested()
+                                                             ? ::uwvm2::utils::container::u8string_view{u8"skipped"}
+                                                             : ::uwvm2::utils::container::u8string_view{u8"off"}),
                                                   u8" unwind_replace_frames=",
                                                   runtime_llvm_jit_unwind_can_replace_instruction_frames()
                                                       ? ::uwvm2::utils::container::u8string_view{u8"yes"}
@@ -6893,6 +7278,7 @@ namespace uwvm2::runtime::lib
                                 .setOptLevel(codegen_opt_level)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
+                                .setMCJITMemoryManager(::std::make_unique<runtime_llvm_jit_section_memory_manager>())
                                 .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]]
             {
@@ -7478,7 +7864,6 @@ namespace uwvm2::runtime::lib
 
         inline void compile_all_modules_if_needed(bool initialize_interpreter_bridges) noexcept
         {
-            ensure_runtime_process_exit_handler_registered();
 
 #if !defined(UWVM_RUNTIME_HAS_BACKEND)
             static_cast<void>(initialize_interpreter_bridges);
@@ -8413,7 +8798,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         inline void initialize_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
         {
-            ensure_runtime_process_exit_handler_registered();
+
             ensure_bridges_initialized();
 
             if(g_runtime.lazy_initialized.load(::std::memory_order_acquire)) { return; }
@@ -8740,7 +9125,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         inline void initialize_llvm_jit_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
         {
-            ensure_runtime_process_exit_handler_registered();
+
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                                       ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
@@ -9272,49 +9657,67 @@ namespace uwvm2::runtime::lib
     }  // namespace
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-    [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+    [[clang::disable_tail_calls]]
+# endif
+    UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
     {
+# if UWVM_HAS_BUILTIN(__builtin_return_address)
+        llvm_jit_trap_return_address = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
+# else
+        llvm_jit_trap_return_address = 0u;
+# endif
         switch(k)
         {
             case llvm_jit_trap_kind::unreachable:
             {
                 trap_fatal(trap_kind::unreachable);
+                return;
             }
             case llvm_jit_trap_kind::invalid_conversion_to_integer:
             {
                 trap_fatal(trap_kind::invalid_conversion_to_integer);
+                return;
             }
             case llvm_jit_trap_kind::integer_divide_by_zero:
             {
                 trap_fatal(trap_kind::integer_divide_by_zero);
+                return;
             }
             case llvm_jit_trap_kind::integer_overflow:
             {
                 trap_fatal(trap_kind::integer_overflow);
+                return;
             }
             case llvm_jit_trap_kind::call_indirect_table_out_of_bounds:
             {
                 trap_fatal(trap_kind::call_indirect_table_out_of_bounds);
+                return;
             }
             case llvm_jit_trap_kind::call_indirect_null_element:
             {
                 trap_fatal(trap_kind::call_indirect_null_element);
+                return;
             }
             case llvm_jit_trap_kind::call_indirect_type_mismatch:
             {
                 trap_fatal(trap_kind::call_indirect_type_mismatch);
+                return;
             }
             case llvm_jit_trap_kind::memory_out_of_bounds:
             {
                 trap_fatal(trap_kind::memory_out_of_bounds);
+                return;
             }
             case llvm_jit_trap_kind::runtime_invariant_failure:
             {
                 trap_fatal(trap_kind::runtime_invariant_failure);
+                return;
             }
             [[unlikely]] default:
             {
                 trap_fatal(trap_kind::runtime_invariant_failure);
+                return;
             }
         }
     }
@@ -9814,7 +10217,6 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     void llvm_jit_reset_runtime_state_host_api() noexcept
     {
-        ensure_runtime_process_exit_handler_registered();
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
         g_runtime.lazy_scheduler.stop();

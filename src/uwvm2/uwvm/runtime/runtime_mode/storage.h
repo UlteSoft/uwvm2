@@ -94,9 +94,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     enum class runtime_llvm_jit_call_stack_t : unsigned
     {
+        auto_policy,
         instruction,
         none,
-        unwind
+        unwind,
+        unwind_uncheck
     };
 #endif
 
@@ -187,7 +189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline bool runtime_llvm_jit_call_stack_existed{};  // [global]
 
     /// @brief Runtime LLVM JIT call-stack tracking mode.
-    inline runtime_llvm_jit_call_stack_t global_runtime_llvm_jit_call_stack{runtime_llvm_jit_call_stack_t::instruction};  // [global]
+    inline runtime_llvm_jit_call_stack_t global_runtime_llvm_jit_call_stack{runtime_llvm_jit_call_stack_t::auto_policy};  // [global]
 
     /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]

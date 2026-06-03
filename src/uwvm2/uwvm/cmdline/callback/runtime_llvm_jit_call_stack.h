@@ -54,13 +54,6 @@
 # define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 0
 #endif
 
-#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) && !defined(_WIN32) && \
-    (__has_include(<libunwind.h>) || __has_include(<unwind.h>))
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 1
-#else
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 0
-#endif
-
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
@@ -99,7 +92,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         auto const currp1_str{currp1->str};
 
         using runtime_llvm_jit_call_stack_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t;
-        if(currp1_str == u8"instruction")
+        if(currp1_str == u8"auto")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::auto_policy;
+        }
+        else if(currp1_str == u8"instruction")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::instruction;
         }
@@ -111,6 +108,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else if(currp1_str == u8"unwind")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind;
+        }
+        else if(currp1_str == u8"unwind-uncheck" || currp1_str == u8"unwind-unchecked")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind_uncheck;
         }
 # endif
         else [[unlikely]]
@@ -127,6 +128,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\". Expected ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                u8"auto",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"instruction",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8", ",
@@ -137,6 +142,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8", or ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"unwind",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", or ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                u8"unwind-uncheck",
 # endif
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8". Usage: ",

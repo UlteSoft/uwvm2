@@ -67,6 +67,7 @@ struct compile_option
     bool lazy_defined_targets_are_atomic{};
     bool emit_tiered_loop_reentry_entries{};
     bool emit_call_stack_frames{true};
+    bool emit_unwind_call_stack_frames{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -580,6 +581,7 @@ namespace details
                                                       bool lazy_defined_targets_are_atomic = false,
                                                       bool emit_tiered_loop_reentry_entries = false,
                                                       bool emit_call_stack_frames = true,
+                                                      bool emit_unwind_call_stack_frames = false,
                                                       ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr)
         UWVM_THROWS
     {
@@ -840,7 +842,8 @@ namespace details
                                                                                      lazy_defined_typed_entry_target_count,
                                                                                      lazy_defined_targets_are_atomic,
                                                                                      emit_tiered_loop_reentry_entries,
-                                                                                     emit_call_stack_frames)};
+                                                                                     emit_call_stack_frames,
+                                                                                     emit_unwind_call_stack_frames)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -1148,6 +1151,7 @@ namespace details
                                     options.lazy_defined_targets_are_atomic,
                                     options.emit_tiered_loop_reentry_entries,
                                     options.emit_call_stack_frames,
+                                    options.emit_unwind_call_stack_frames,
                                     ::std::addressof(local_func_storage.tiered_loop_reentries));
         return local_func_storage;
     }

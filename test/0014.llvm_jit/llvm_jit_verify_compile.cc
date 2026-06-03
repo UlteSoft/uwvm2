@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -34,6 +35,16 @@ namespace
         0x7fu, 0x41u, 0x0au, 0x41u, 0x14u, 0x41u, 0x01u, 0x1bu, 0x21u, 0x00u, 0x20u, 0x00u,
         0x41u, 0x0au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
+    // Generated from:
+    // (module
+    //   (func $inner unreachable)
+    //   (func $_start (export "_start") call $inner))
+    inline constexpr ::std::array<unsigned char, 43uz> trap_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u,
+        0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x00u, 0x07u, 0x0au, 0x01u,
+        0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x01u, 0x0au, 0x0au,
+        0x02u, 0x03u, 0x00u, 0x00u, 0x0bu, 0x04u, 0x00u, 0x10u, 0x00u, 0x0bu};
+
     [[maybe_unused]] void test_runtime_entry()
     {
         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t module{};
@@ -59,6 +70,32 @@ namespace
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
         return ::std::string{"\""} + path.string() + "\"";
+    }
+
+    [[nodiscard]] bool read_text_file(::std::filesystem::path const& path, ::std::string& text)
+    {
+        ::std::ifstream input(path);
+        if(!input) [[unlikely]]
+        {
+            ::std::cerr << "failed to open text file: " << path << '\n';
+            return false;
+        }
+
+        text.assign(::std::istreambuf_iterator<char>{input}, ::std::istreambuf_iterator<char>{});
+        if(input.bad()) [[unlikely]]
+        {
+            ::std::cerr << "failed to read text file: " << path << '\n';
+            return false;
+        }
+
+        return true;
+    }
+
+    [[nodiscard]] bool text_file_contains(::std::filesystem::path const& path, ::std::string_view needle)
+    {
+        ::std::string text{};
+        if(!read_text_file(path, text)) [[unlikely]] { return false; }
+        return text.find(needle) != ::std::string::npos;
     }
 
     [[nodiscard]] ::std::filesystem::path find_uwvm_binary(::std::filesystem::path dir)
@@ -102,6 +139,144 @@ namespace
             return false;
         }
 
+        return true;
+    }
+
+    [[nodiscard]] bool run_trap_command(::std::string const& command, ::std::filesystem::path const& output_path, char const* label)
+    {
+        auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
+        ::std::cout << "[llvm_jit] " << full_command << '\n';
+
+        auto const status{::std::system(full_command.c_str())};
+        if(status == 0) [[unlikely]]
+        {
+            ::std::cerr << "uwvm trap command unexpectedly returned success for " << label << '\n';
+            return false;
+        }
+
+        return true;
+    }
+
+    [[nodiscard]] bool check_unwind_trap_output(::std::filesystem::path const& output_path, char const* label)
+    {
+        ::std::string output{};
+        if(!read_text_file(output_path, output)) [[unlikely]] { return false; }
+
+        auto const has_unwind_header{output.find("LLVM JIT unwind call stack") != ::std::string::npos};
+        auto const has_module{output.find(" module=") != ::std::string::npos};
+        auto const has_func_idx{output.find(" func_idx=") != ::std::string::npos};
+        if(has_unwind_header && has_module && has_func_idx) [[likely]] { return true; }
+
+        ::std::cerr << "missing LLVM JIT unwind frame in " << label << " output:\n" << output << '\n';
+        return false;
+    }
+
+    [[nodiscard]] bool run_default_unwind_trap_mode(::std::filesystem::path const& uwvm_path,
+                                                    ::std::filesystem::path const& executable_dir,
+                                                    ::std::filesystem::path const& wasm_path,
+                                                    ::std::string_view mode_name,
+                                                    ::std::string_view mode_args,
+                                                    ::std::string_view expected_call_stack,
+                                                    ::std::string_view expected_unwind_check)
+    {
+        auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit"};
+        auto const output_path{artifact_dir / (::std::string{"unwind_"} + ::std::string{mode_name} + ".out")};
+        auto const log_path{artifact_dir / (::std::string{"unwind_"} + ::std::string{mode_name} + ".log")};
+        auto const command{quote_argument(uwvm_path) + " " + ::std::string{mode_args} + " -Rclog file " + quote_argument(log_path) +
+                           " --run " + quote_argument(wasm_path)};
+
+        if(!run_trap_command(command, output_path, mode_name.data())) [[unlikely]] { return false; }
+        if(!check_unwind_trap_output(output_path, mode_name.data())) [[unlikely]] { return false; }
+
+        auto const expected_call_stack_field{::std::string{"call_stack="} + ::std::string{expected_call_stack}};
+        auto const expected_unwind_check_field{::std::string{"unwind_check="} + ::std::string{expected_unwind_check}};
+        if(!text_file_contains(log_path, expected_call_stack_field) ||
+           !text_file_contains(log_path, expected_unwind_check_field) ||
+           !text_file_contains(log_path, "unwind_replace_frames=yes") ||
+           !text_file_contains(log_path, "call_stack_frames=omit")) [[unlikely]]
+        {
+            ::std::cerr << "missing LLVM JIT unwind policy in runtime log: " << log_path << '\n';
+            return false;
+        }
+
+        return true;
+    }
+
+    [[nodiscard]] bool probe_default_call_stack_unwind(::std::filesystem::path const& uwvm_path,
+                                                       ::std::filesystem::path const& executable_dir,
+                                                       bool& default_uses_unwind)
+    {
+        auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit"};
+        auto const wasm_path{artifact_dir / "default_call_stack_probe.wasm"};
+        auto const log_path{artifact_dir / "default_call_stack_probe.log"};
+        if(!write_fixture(wasm_path, select_start_wasm)) [[unlikely]] { return false; }
+
+        auto const command{quote_argument(uwvm_path) + " -Raot -Rclog file " + quote_argument(log_path) + " --run " + quote_argument(wasm_path)};
+        ::std::cout << "[llvm_jit] " << command << '\n';
+
+        auto const status{::std::system(command.c_str())};
+        if(status != 0) [[unlikely]]
+        {
+            ::std::cerr << "uwvm returned non-zero status while probing default LLVM JIT call-stack policy: " << status << '\n';
+            return false;
+        }
+
+        ::std::string log{};
+        if(!read_text_file(log_path, log)) [[unlikely]] { return false; }
+
+        if(log.find("call_stack=unwind") != ::std::string::npos)
+        {
+            default_uses_unwind = true;
+            return true;
+        }
+
+        if(log.find("call_stack=instruction") != ::std::string::npos || log.find("call_stack=none") != ::std::string::npos)
+        {
+            default_uses_unwind = false;
+            return true;
+        }
+
+        ::std::cerr << "unable to determine default LLVM JIT call-stack policy from log:\n" << log << '\n';
+        return false;
+    }
+
+    [[nodiscard]] bool run_default_unwind_trap_fixture(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& executable_dir)
+    {
+        bool default_uses_unwind{};
+        if(!probe_default_call_stack_unwind(uwvm_path, executable_dir, default_uses_unwind)) [[unlikely]] { return false; }
+        if(!default_uses_unwind)
+        {
+            ::std::cout << "[llvm_jit] skip default unwind trap fixture: default call-stack policy is not unwind\n";
+            return true;
+        }
+
+        auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / "trap_start.wasm"};
+        if(!write_fixture(wasm_path, trap_start_wasm)) [[unlikely]] { return false; }
+
+        if(!run_default_unwind_trap_mode(uwvm_path, executable_dir, wasm_path, "aot_default", "-Raot", "unwind", "live-jit")) [[unlikely]]
+        {
+            return false;
+        }
+        if(!run_default_unwind_trap_mode(uwvm_path,
+                                         executable_dir,
+                                         wasm_path,
+                                         "aot_auto",
+                                         "-Raot -Rllvm-call-stack auto",
+                                         "unwind",
+                                         "live-jit")) [[unlikely]]
+        {
+            return false;
+        }
+        if(!run_default_unwind_trap_mode(uwvm_path,
+                                         executable_dir,
+                                         wasm_path,
+                                         "aot_unwind_uncheck",
+                                         "-Raot -Rllvm-call-stack unwind-uncheck",
+                                         "unwind-uncheck",
+                                         "skipped")) [[unlikely]]
+        {
+            return false;
+        }
         return true;
     }
 
@@ -181,6 +356,7 @@ int main(int argc, char** argv)
 
     if(!run_fixture(uwvm_path, executable_dir, "nontrivial_start.wasm", nontrivial_start_wasm)) [[unlikely]] { return 1; }
     if(!run_fixture(uwvm_path, executable_dir, "select_start.wasm", select_start_wasm)) [[unlikely]] { return 1; }
+    if(!run_default_unwind_trap_fixture(uwvm_path, executable_dir)) [[unlikely]] { return 1; }
 
     return 0;
 }

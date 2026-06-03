@@ -165,6 +165,13 @@ inline void apply_llvm_jit_platform_function_attrs([[maybe_unused]] ::llvm::Func
 #endif
 }
 
+inline void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Function& function)
+{
+    function.setUWTableKind(::llvm::UWTableKind::Async);
+    function.addFnAttr("disable-tail-calls", "true");
+    function.addFnAttr("frame-pointer", "all");
+}
+
 inline void apply_llvm_jit_calling_conv(::llvm::Function& function, ::llvm::CallingConv::ID calling_conv) noexcept
 {
     function.setCallingConv(calling_conv);
@@ -310,8 +317,15 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto trap_kind_type{function_type->getParamType(0u)};
-    apply_llvm_jit_host_calling_conv(
-        ir_builder.CreateCall(function_type, bridge_pointer, {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))}));
+    auto trap_call{
+        ir_builder.CreateCall(function_type, bridge_pointer, {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))})};
+    trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+    apply_llvm_jit_host_calling_conv(trap_call);
+
+    auto anchor_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
+    auto anchor{::llvm::InlineAsm::get(anchor_function_type, "", "~{memory}", true)};
+    auto anchor_call{ir_builder.CreateCall(anchor_function_type, anchor)};
+    anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
 }
 
 inline void
@@ -1475,7 +1489,7 @@ inline void llvm_jit_store_little_endian_integer(::std::byte* memory_ptr, UInt v
     ::std::memcpy(memory_ptr, ::std::addressof(value), sizeof(UInt));
 }
 
-[[noreturn]] inline void llvm_jit_memory_bridge_trap() noexcept
+inline void llvm_jit_memory_bridge_trap() noexcept
 { ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds); }
 
 template <typename MemoryT, typename Fn>
@@ -2200,6 +2214,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     bool lazy_defined_targets_are_atomic{};
     bool emit_tiered_loop_reentry_entries{};
     bool emit_call_stack_frames{true};
+    bool emit_unwind_call_stack_frames{};
     local_func_storage_t const* local_func_storage_ptr{};
     ::uwvm2::utils::container::vector<runtime_operand_stack_value_type> local_types{};
     ::uwvm2::utils::container::vector<::std::size_t> local_offsets{};
@@ -2252,7 +2267,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                                              ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
                                                                              bool lazy_defined_targets_are_atomic = false,
                                                                              bool emit_tiered_loop_reentry_entries = false,
-                                                                             bool emit_call_stack_frames = true)
+                                                                             bool emit_call_stack_frames = true,
+                                                                             bool emit_unwind_call_stack_frames = false)
 {
     state = {};
     state.verify_llvm_jit_ir = verify_llvm_jit_ir;
@@ -2264,6 +2280,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     state.lazy_defined_targets_are_atomic = lazy_defined_targets_are_atomic;
     state.emit_tiered_loop_reentry_entries = emit_tiered_loop_reentry_entries;
     state.emit_call_stack_frames = emit_call_stack_frames;
+    state.emit_unwind_call_stack_frames = emit_unwind_call_stack_frames;
 
     auto function_type_ptr{local_func_storage.function_type_ptr};
     auto wasm_code_ptr{local_func_storage.wasm_code_ptr};
@@ -2357,6 +2374,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
     if(state.llvm_public_entry_function == nullptr) [[unlikely]] { return false; }
     apply_llvm_jit_wasm_calling_conv(*state.llvm_public_entry_function);
+    if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*state.llvm_public_entry_function); }
 
     if(emit_tiered_loop_reentry_entries)
     {
@@ -2383,6 +2401,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         }
         if(state.llvm_function == nullptr) [[unlikely]] { return false; }
         apply_llvm_jit_wasm_calling_conv(*state.llvm_function);
+        if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*state.llvm_function); }
 
         state.tiered_core_entry_id_arg = state.llvm_function->getArg(0u);
         state.tiered_core_local_base_arg = state.llvm_function->getArg(1u);
@@ -2681,6 +2700,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 }
                 if(reentry_function == nullptr) [[unlikely]] { return false; }
                 apply_llvm_jit_host_calling_conv(*reentry_function);
+                if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*reentry_function); }
 
                 auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", reentry_function)};
                 if(entry_block == nullptr) [[unlikely]] { return false; }
@@ -2795,6 +2815,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
             }
             if(raw_entry_function == nullptr) [[unlikely]] { return false; }
             apply_llvm_jit_host_calling_conv(*raw_entry_function);
+            if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*raw_entry_function); }
 
             auto const abi_layout{get_runtime_wasm_call_abi_layout(*function_type_ptr)};
             if(!abi_layout.valid) [[unlikely]] { return false; }
