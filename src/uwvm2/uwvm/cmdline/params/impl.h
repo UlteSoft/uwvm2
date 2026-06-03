@@ -55,6 +55,7 @@
 # include "runtime_llvm_jit_policy.h"
 # include "runtime_llvm_jit_lazy_policy.h"
 # include "runtime_llvm_jit_full_policy.h"
+# include "runtime_llvm_jit_call_stack.h"
 # include "runtime_llvm_jit_disable_ir_verifaction.h"
 # include "runtime_debug_int.h"
 # include "runtime_int.h"

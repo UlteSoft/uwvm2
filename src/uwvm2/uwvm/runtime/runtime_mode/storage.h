@@ -91,6 +91,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         passbuilder_o2,
         passbuilder_o3
     };
+
+    enum class runtime_llvm_jit_call_stack_t : unsigned
+    {
+        instruction,
+        none,
+        unwind
+    };
 #endif
 
     inline bool custom_runtime_mode_existed{};      // [global]
@@ -175,6 +182,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief Full/tier-2 LLVM JIT policy override.
     inline runtime_llvm_jit_full_policy_t global_runtime_llvm_jit_full_policy{runtime_llvm_jit_full_policy_t::auto_policy};  // [global]
+
+    /// @brief Whether the runtime LLVM JIT call-stack tracking mode was explicitly configured.
+    inline bool runtime_llvm_jit_call_stack_existed{};  // [global]
+
+    /// @brief Runtime LLVM JIT call-stack tracking mode.
+    inline runtime_llvm_jit_call_stack_t global_runtime_llvm_jit_call_stack{runtime_llvm_jit_call_stack_t::instruction};  // [global]
 
     /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]

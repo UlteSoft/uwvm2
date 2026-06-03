@@ -178,6 +178,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t context_address{};
         ::std::uint_least32_t encoded_type_id{};
+        ::std::uintptr_t typed_entry_address{};
     };
 
     struct llvm_jit_call_indirect_table_view_t

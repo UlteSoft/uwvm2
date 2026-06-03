@@ -55,6 +55,7 @@ export import :runtime_scheduling_policy;
 export import :runtime_llvm_jit_policy;
 export import :runtime_llvm_jit_lazy_policy;
 export import :runtime_llvm_jit_full_policy;
+export import :runtime_llvm_jit_call_stack;
 export import :runtime_llvm_jit_disable_ir_verifaction;
 export import :runtime_debug_int;
 export import :runtime_int;
