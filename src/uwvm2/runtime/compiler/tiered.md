@@ -124,11 +124,27 @@ Pure modes do not request or observe the Tier 2 scheduler unit:
 
 ## Scheduling Policy
 
+Tier 0 interpreter lazy translation is not enqueued in the shared lazy compile
+scheduler in tiered mode. The executing thread claims the interpreter lazy unit
+directly, translates it, publishes it, and continues with the interpreter. This
+keeps the scheduler available for Tier 1 LLVM lazy demand work and Tier 2
+background work.
+
 Tier 1 demand compilation uses priority 1 or higher. Tier 2 full compilation is
 queued at priority 0, so it stays behind demand work that is already visible to
 the scheduler. The Tier 2 translation itself runs with zero nested compile
 threads because it already occupies a runtime compile worker; this avoids
 oversubscribing the machine while the main program is executing.
+
+Tiered loop OSR can use a separate one-worker urgent scheduler when the module
+is large enough for OSR polling, currently at least 512 local functions. Small
+modules keep loop OSR on the normal scheduler to avoid adding another worker to
+short benchmarks. Urgent requests are still counter-gated: each request carries
+the function's OSR activity counter and a global urgent ticket. If later urgent
+tickets overtake a request and that function has not refreshed activity beyond
+one queued poll, the urgent worker demotes the request back to normal priority
+1. This lets long-running loops keep the urgent lane while short loops that end
+soon after requesting LLVM give the lane back.
 
 The default Tier 2 codegen optimization level is `Less` (LLVM O1), matching the
 lazy tier. `-Rllvm-opt` still overrides this, so experiments can compare O0,
@@ -136,11 +152,15 @@ O1, O2, and O3 without changing the tiered implementation.
 
 ## Runtime Logging
 
-With `--runtime-compile-log`, tiered summaries include:
+With `--runtime-compiler-log`, tiered summaries include:
 
 - interpreter fallback counts and timing;
+- sampled interpreter fallback and entry miss counters used by the large-module
+  long-run gate;
+- Tier 0 direct interpreter compile counts;
 - loop OSR callback, ready, miss, and stall timing;
 - loop OSR deferral counts from the counter-only request gate;
+- urgent OSR request, demotion, ticket, and scheduler counters;
 - Tier 2 request, ready, failed, and publish counts;
 - Tier 2 translation, materialization, and publication time in nanoseconds.
 - per-module counter summaries, including entry/OSR counters, thresholds, lazy
@@ -178,16 +198,24 @@ misses on the same local function before the bridge enqueues LLVM work for
 small modules. The threshold scales up for large modules and large functions:
 modules with at least 512 local functions require 16384 entry misses, modules
 with at least 1024 local functions require 65536 entry misses, and modules with
-at least 8192 local functions require 1048576 entry misses. Compile units of up
-to 128/512/1024 bytes can lower that large-module threshold back to
-8192/16384/32768 misses while the module has fewer than 4096 local functions,
-because tiny helpers are cheap to materialize and often sit on hot indirect-call
-paths. Modules at CPython scale keep the larger 1048576 entry-miss threshold even
-for tiny helpers. Compile units of at least 4096/8192 bytes require at least
-65536/262144 entry misses, and compile units of at least 32768 bytes are kept
-out of entry-triggered lazy LLVM. This keeps large projects such as SQLite or
-CPython from starting dozens of expensive LLVM entry materializations from
-short-lived helper calls.
+at least 8192 local functions require 1048576 entry misses until the module is
+classified as a large long-running module. Compile units of up to 128/512/1024
+bytes can lower that large-module threshold back to 8192/16384/32768 misses
+while the module has fewer than 4096 local functions, because tiny helpers are
+cheap to materialize and often sit on hot indirect-call paths.
+
+Modules at CPython scale, currently modules with at least 8192 local functions,
+use sampled module-level counters to separate startup noise from true long
+runs. A module enters the large-long-run state only after sampled interpreter
+fallbacks or sampled entry misses reach 4194304, or after successful native
+tiered switches reach 1048576. Once active, small top-hot compile units lower
+their entry thresholds to 65536/131072/262144/524288 misses for code sizes up
+to 128/512/1024/4096 bytes. Larger compile units keep the conservative
+large-module thresholds. Compile units of at least 4096/8192 bytes require at
+least 65536/262144 entry misses, and compile units of at least 32768 bytes are
+kept out of entry-triggered lazy LLVM. This keeps short CPython startup scripts
+from starting LLVM work, while allowing long-running Python loops to promote a
+small set of top-hot functions without using elapsed time as a policy input.
 
 Entry hotness counters are sampled for larger modules to keep the miss path
 cheap while preserving a counter-based policy. Modules with fewer than 512 local
@@ -217,3 +245,13 @@ instead. This avoids both the hot-loop poll overhead and the expensive
 single-function LLVM materialization from Python bytecode loops that are shorter
 than the compile cost. This is still counter-only policy; elapsed time is only
 reported for offline calibration.
+
+When a loop OSR request is queued, the interpreter continues to poll the
+runtime through the same countdown path while the LLVM unit remains in the
+`queued` state. These queued polls update the per-function OSR activity counter
+but do not enqueue duplicate LLVM work. The urgent scheduler uses that activity
+counter only as an ordering signal: a queued urgent request is considered stale
+when at least four newer urgent tickets exist and the function has refreshed
+the activity counter no more than once since enqueue. Stale urgent requests are
+requeued on the normal lazy scheduler, so the LLVM work can still complete if
+the program keeps running, but it no longer blocks the urgent lane.

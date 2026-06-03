@@ -27,6 +27,7 @@
 # include <coroutine>
 # include <atomic>
 # include <cstddef>
+# include <cstdint>
 # include <memory>
 # include <utility>
 // macro
@@ -210,6 +211,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 #endif
     }
 
+    struct lazy_compile_request;
+    using lazy_compile_request_callback_type = bool (*)(lazy_compile_request const&) noexcept;
+
     struct lazy_compile_request
     {
         using compile_callback_type = void (*)(void*) noexcept;
@@ -218,6 +222,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         compile_callback_type compile{};
         void* user_data{};
         unsigned priority{};
+        lazy_compile_request_callback_type before_compile{};
+        lazy_compile_request_callback_type stale{};
+        ::std::uintptr_t callback_word0{};
+        ::std::uintptr_t callback_word1{};
     };
 
     struct lazy_compile_scheduler;
@@ -400,6 +408,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
             this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
             return true;
+        }
+
+        [[nodiscard]] inline bool requeue_existing_queued_request(lazy_compile_request request) noexcept
+        {
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
+
+            auto const st{request.unit->state.load(::std::memory_order_acquire)};
+            if(st != lazy_compile_state::queued) { return lazy_compile_state_is_terminal(st); }
+
+            if(this->try_enqueue(request))
+            {
+                this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                return true;
+            }
+
+            this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            auto expected{lazy_compile_state::queued};
+            (void)request.unit->state.compare_exchange_strong(expected,
+                                                              lazy_compile_state::uncompiled,
+                                                              ::std::memory_order_acq_rel,
+                                                              ::std::memory_order_acquire);
+            this->notify_unit(*request.unit);
+            return false;
         }
 
         inline void request_or_compile_inline(lazy_compile_request request) noexcept
@@ -657,6 +688,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void execute_request(lazy_compile_request request, bool worker_thread) noexcept
         {
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return; }
+
+            if(request.before_compile != nullptr && !request.before_compile(request))
+            {
+                if(request.stale != nullptr && request.stale(request)) { return; }
+
+                auto expected_stale{lazy_compile_state::queued};
+                (void)request.unit->state.compare_exchange_strong(expected_stale,
+                                                                  lazy_compile_state::uncompiled,
+                                                                  ::std::memory_order_acq_rel,
+                                                                  ::std::memory_order_acquire);
+                this->notify_unit(*request.unit);
+                return;
+            }
 
             auto expected{lazy_compile_state::queued};
             if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::compiling, ::std::memory_order_acq_rel, ::std::memory_order_acquire))

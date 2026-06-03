@@ -117,7 +117,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 store_interpreter_imm_field(state_address_ip, disabled);
                 return tiered_loop_osr_fast_poll_state::skip;
             }
-            if(state == ::uwvm2::utils::thread::lazy_compile_state::uncompiled) [[unlikely]] { return tiered_loop_osr_fast_poll_state::countdown; }
+            if(state == ::uwvm2::utils::thread::lazy_compile_state::uncompiled ||
+               state == ::uwvm2::utils::thread::lazy_compile_state::queued) [[unlikely]]
+            {
+                return tiered_loop_osr_fast_poll_state::countdown;
+            }
             return tiered_loop_osr_fast_poll_state::skip;
         }
 # endif
