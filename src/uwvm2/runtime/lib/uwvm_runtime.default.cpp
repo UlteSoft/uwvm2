@@ -240,15 +240,11 @@ namespace uwvm2::runtime::lib
             ::uwvm2::utils::thread::lazy_compile_unit_state tiered_full_compile_state{};
             ::std::uint_least8_t tiered_full_ready{};
             ::std::size_t tiered_switch_count{};
-            ::std::size_t tiered_direct_switch_count{};
-            ::std::size_t tiered_full_request_count{};
-            ::std::size_t tiered_full_publish_count{};
             ::std::size_t tiered_interpreter_fallback_count{};
             ::std::size_t tiered_entry_miss_count{};
             ::std::uint_least8_t tiered_large_long_run_ready{};
             ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_entry_hot_counters{};
             ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_osr_request_counters{};
-            ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_osr_activity_counters{};
 #endif
 
             // Canonical type-index table for fast call_indirect signature checks.
@@ -298,33 +294,16 @@ namespace uwvm2::runtime::lib
             ::std::atomic_size_t lazy_runtime_compiled_hit_count{};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::uwvm2::utils::thread::lazy_compile_scheduler tiered_urgent_scheduler{};
-            ::std::atomic_size_t tiered_runtime_interpreter_entry_count{};
             ::std::atomic_size_t tiered_osr_callback_count{};
             ::std::atomic_size_t tiered_osr_ready_count{};
             ::std::atomic_size_t tiered_osr_miss_count{};
             ::std::atomic_size_t tiered_osr_deferred_count{};
             ::std::atomic_size_t tiered_osr_compile_request_count{};
             ::std::atomic_size_t tiered_osr_urgent_request_count{};
-            ::std::atomic_size_t tiered_osr_urgent_demote_count{};
-            ::std::atomic_size_t tiered_osr_urgent_ticket_count{};
             ::std::atomic_size_t tiered_full_compile_request_count{};
             ::std::atomic_size_t tiered_full_compile_ready_count{};
             ::std::atomic_size_t tiered_full_compile_failed_count{};
             ::std::atomic_size_t tiered_full_publish_count{};
-            ::std::atomic_size_t tiered_int_direct_compile_count{};
-            ::std::atomic<::std::uint_least64_t> tiered_osr_callback_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_osr_lookup_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_osr_jit_exec_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_osr_miss_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_full_compile_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_full_materialize_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_full_publish_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_compile_wait_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_exec_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_total_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_outer_compile_wait_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_outer_exec_time_ns{};
-            ::std::atomic<::std::uint_least64_t> tiered_int_outer_total_time_ns{};
 # endif
 #endif
         };
@@ -332,9 +311,8 @@ namespace uwvm2::runtime::lib
         inline runtime_global_state g_runtime{};  // [global]
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        thread_local ::std::size_t tiered_interpreter_fallback_depth{};    // [thread-local]
         thread_local ::std::uint_least32_t tiered_entry_hot_probe_tick{};  // [thread-local]
-        thread_local ::std::uint_least32_t tiered_activity_probe_tick{};   // [thread-local]
+        thread_local ::std::uint_least32_t tiered_counter_sample_tick{};   // [thread-local]
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
@@ -1179,26 +1157,6 @@ namespace uwvm2::runtime::lib
             return ts;
         }
 
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        [[nodiscard]] inline ::std::uint_least64_t lazy_clock_now_ns() noexcept
-        {
-            auto const ts{lazy_clock_now()};
-            constexpr ::std::uint_least64_t subsecond_units_per_ns{::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u};
-            auto const sec_ns{static_cast<::std::uint_least64_t>(ts.seconds) * 1'000'000'000u};
-            if constexpr(subsecond_units_per_ns == 0u) { return sec_ns; }
-            else
-            {
-                return sec_ns + static_cast<::std::uint_least64_t>(ts.subseconds / subsecond_units_per_ns);
-            }
-        }
-
-        [[nodiscard]] inline ::std::uint_least64_t lazy_elapsed_ns(::std::uint_least64_t begin_ns, ::std::uint_least64_t end_ns) noexcept
-        { return end_ns >= begin_ns ? end_ns - begin_ns : 0u; }
-
-        inline void lazy_add_elapsed_ns(::std::atomic<::std::uint_least64_t>& target, ::std::uint_least64_t begin_ns, ::std::uint_least64_t end_ns) noexcept
-        { target.fetch_add(lazy_elapsed_ns(begin_ns, end_ns), ::std::memory_order_relaxed); }
-# endif
-
         [[nodiscard]] inline ::std::size_t lazy_total_function_count() noexcept
         {
             ::std::size_t total{};
@@ -1256,194 +1214,6 @@ namespace uwvm2::runtime::lib
             return total;
         }
 
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        inline void print_tiered_runtime_module_counter_logs(::uwvm2::utils::container::u8string_view log_prefix) noexcept
-        {
-            using lazy_compile_state_t = ::uwvm2::utils::thread::lazy_compile_state;
-            constexpr auto u32_max{(::std::numeric_limits<::std::uint_least32_t>::max)()};
-
-            for(::std::size_t module_id{}; module_id != g_runtime.modules.size(); ++module_id)
-            {
-                auto const& rec{g_runtime.modules.index_unchecked(module_id)};
-                auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-                if(local_n == 0uz) { continue; }
-
-                ::std::size_t entry_active{};
-                ::std::size_t entry_ready{};
-                ::std::size_t entry_blocked{};
-                ::std::size_t osr_active{};
-                ::std::size_t osr_ready{};
-                ::std::size_t osr_activity_active{};
-                ::std::size_t state_uncompiled{};
-                ::std::size_t state_queued{};
-                ::std::size_t state_compiling{};
-                ::std::size_t state_compiled{};
-                ::std::size_t state_failed{};
-                ::std::size_t size_le128{};
-                ::std::size_t size_le512{};
-                ::std::size_t size_le1024{};
-                ::std::size_t size_le4096{};
-                ::std::size_t size_le8192{};
-                ::std::size_t size_le32768{};
-                ::std::size_t size_gt32768{};
-                ::std::uint_least32_t entry_counter_max{};
-                ::std::uint_least32_t osr_counter_max{};
-                ::std::uint_least32_t osr_activity_max{};
-                ::std::uint_least32_t entry_threshold_min{u32_max};
-                ::std::uint_least32_t entry_threshold_max{};
-                ::std::uint_least32_t osr_threshold_min{u32_max};
-                ::std::uint_least32_t osr_threshold_max{};
-
-                for(::std::size_t local_index{}; local_index != local_n; ++local_index)
-                {
-                    auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
-                    if(code_size <= 128uz) { ++size_le128; }
-                    else if(code_size <= 512uz) { ++size_le512; }
-                    else if(code_size <= 1024uz) { ++size_le1024; }
-                    else if(code_size <= 4096uz) { ++size_le4096; }
-                    else if(code_size <= 8192uz) { ++size_le8192; }
-                    else if(code_size <= 32768uz) { ++size_le32768; }
-                    else
-                    {
-                        ++size_gt32768;
-                    }
-
-                    auto const entry_threshold{tiered_entry_hot_request_threshold(rec, local_index)};
-                    if(entry_threshold == u32_max) { ++entry_blocked; }
-                    else
-                    {
-                        if(entry_threshold < entry_threshold_min) { entry_threshold_min = entry_threshold; }
-                        if(entry_threshold > entry_threshold_max) { entry_threshold_max = entry_threshold; }
-                    }
-
-                    ::std::uint_least32_t entry_counter{};
-                    if(local_index < rec.tiered_entry_hot_counters.size())
-                    {
-                        auto& counter{const_cast<::std::uint_least32_t&>(rec.tiered_entry_hot_counters.index_unchecked(local_index))};
-                        entry_counter = ::std::atomic_ref<::std::uint_least32_t>{counter}.load(::std::memory_order_relaxed);
-                    }
-                    if(entry_counter != 0u) { ++entry_active; }
-                    if(entry_counter > entry_counter_max) { entry_counter_max = entry_counter; }
-                    if(entry_threshold != u32_max && entry_counter >= entry_threshold) { ++entry_ready; }
-
-                    auto const osr_threshold{tiered_loop_osr_request_threshold(rec, local_index)};
-                    if(osr_threshold < osr_threshold_min) { osr_threshold_min = osr_threshold; }
-                    if(osr_threshold > osr_threshold_max) { osr_threshold_max = osr_threshold; }
-
-                    ::std::uint_least32_t osr_counter{};
-                    if(local_index < rec.tiered_osr_request_counters.size())
-                    {
-                        auto& counter{const_cast<::std::uint_least32_t&>(rec.tiered_osr_request_counters.index_unchecked(local_index))};
-                        osr_counter = ::std::atomic_ref<::std::uint_least32_t>{counter}.load(::std::memory_order_relaxed);
-                    }
-                    if(osr_counter != 0u) { ++osr_active; }
-                    if(osr_counter > osr_counter_max) { osr_counter_max = osr_counter; }
-                    if(osr_counter >= osr_threshold) { ++osr_ready; }
-
-                    ::std::uint_least32_t osr_activity{};
-                    if(local_index < rec.tiered_osr_activity_counters.size())
-                    {
-                        auto& counter{const_cast<::std::uint_least32_t&>(rec.tiered_osr_activity_counters.index_unchecked(local_index))};
-                        osr_activity = ::std::atomic_ref<::std::uint_least32_t>{counter}.load(::std::memory_order_relaxed);
-                    }
-                    if(osr_activity != 0u) { ++osr_activity_active; }
-                    if(osr_activity > osr_activity_max) { osr_activity_max = osr_activity; }
-
-                    auto const& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
-                    switch(fn.materialization_state.state.load(::std::memory_order_acquire))
-                    {
-                        case lazy_compile_state_t::uncompiled: ++state_uncompiled; break;
-                        case lazy_compile_state_t::queued: ++state_queued; break;
-                        case lazy_compile_state_t::compiling: ++state_compiling; break;
-                        case lazy_compile_state_t::compiled: ++state_compiled; break;
-                        case lazy_compile_state_t::failed: ++state_failed; break;
-                    }
-                }
-
-                if(entry_threshold_min == u32_max) { entry_threshold_min = 0u; }
-                if(osr_threshold_min == u32_max) { osr_threshold_min = 0u; }
-
-                auto const t2_state{rec.tiered_full_compile_state.state.load(::std::memory_order_acquire)};
-                auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
-                auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
-                auto const fallback_count{::std::atomic_ref<::std::size_t>{fallback_counter}.load(::std::memory_order_relaxed)};
-                auto const entry_miss_count{::std::atomic_ref<::std::size_t>{entry_miss_counter}.load(::std::memory_order_relaxed)};
-                auto const large_long_run{tiered_large_module_long_run_active(rec)};
-                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                     log_prefix,
-                                     u8"module-counter module=\"",
-                                     rec.module_name,
-                                     u8"\" module_id=",
-                                     module_id,
-                                     u8" local_functions=",
-                                     local_n,
-                                     u8" t2_switch_threshold=",
-                                     tiered_full_compile_switch_request_threshold(rec),
-                                     u8" t2_state=",
-                                     ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::compile_state_name(t2_state),
-                                     u8" large_long_run=",
-                                     large_long_run ? 1u : 0u,
-                                     u8" entry_misses=",
-                                     entry_miss_count,
-                                     u8" int_fallbacks_sampled=",
-                                     fallback_count,
-                                     u8" entry_probe_stride=",
-                                     tiered_entry_hot_probe_stride(rec),
-                                     u8" entry_active=",
-                                     entry_active,
-                                     u8" entry_ready=",
-                                     entry_ready,
-                                     u8" entry_blocked=",
-                                     entry_blocked,
-                                     u8" entry_counter_max=",
-                                     entry_counter_max,
-                                     u8" entry_threshold_min=",
-                                     entry_threshold_min,
-                                     u8" entry_threshold_max=",
-                                     entry_threshold_max,
-                                     u8" osr_active=",
-                                     osr_active,
-                                     u8" osr_ready=",
-                                     osr_ready,
-                                     u8" osr_counter_max=",
-                                     osr_counter_max,
-                                     u8" osr_activity_active=",
-                                     osr_activity_active,
-                                     u8" osr_activity_max=",
-                                     osr_activity_max,
-                                     u8" osr_threshold_min=",
-                                     osr_threshold_min,
-                                     u8" osr_threshold_max=",
-                                     osr_threshold_max,
-                                     u8" lazy_uncompiled=",
-                                     state_uncompiled,
-                                     u8" lazy_queued=",
-                                     state_queued,
-                                     u8" lazy_compiling=",
-                                     state_compiling,
-                                     u8" lazy_compiled=",
-                                     state_compiled,
-                                     u8" lazy_failed=",
-                                     state_failed,
-                                     u8" size_le128=",
-                                     size_le128,
-                                     u8" size_le512=",
-                                     size_le512,
-                                     u8" size_le1024=",
-                                     size_le1024,
-                                     u8" size_le4096=",
-                                     size_le4096,
-                                     u8" size_le8192=",
-                                     size_le8192,
-                                     u8" size_le32768=",
-                                     size_le32768,
-                                     u8" size_gt32768=",
-                                     size_gt32768,
-                                     u8"\n");
-            }
-        }
-# endif
-
         inline void print_lazy_runtime_compiler_log(::fast_io::unix_timestamp run_start,
                                                     ::fast_io::unix_timestamp exec_start,
                                                     ::fast_io::unix_timestamp exec_end,
@@ -1460,8 +1230,6 @@ namespace uwvm2::runtime::lib
             auto const compiled_hit_count{g_runtime.lazy_runtime_compiled_hit_count.load(::std::memory_order_relaxed)};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::std::size_t tiered_switches{};
-            ::std::size_t tiered_direct_switches{};
-            ::std::size_t tiered_interpreter_entries{};
             ::std::size_t tiered_interpreter_fallbacks_sampled{};
             ::std::size_t tiered_entry_misses{};
             ::std::size_t tiered_large_long_run_modules{};
@@ -1471,26 +1239,10 @@ namespace uwvm2::runtime::lib
             ::std::size_t tiered_osr_deferred{};
             ::std::size_t tiered_osr_compile_requests{};
             ::std::size_t tiered_osr_urgent_requests{};
-            ::std::size_t tiered_osr_urgent_demotes{};
-            ::std::size_t tiered_osr_urgent_tickets{};
             ::std::size_t tiered_full_compile_requests{};
             ::std::size_t tiered_full_compile_ready{};
             ::std::size_t tiered_full_compile_failed{};
             ::std::size_t tiered_full_publishes{};
-            ::std::size_t tiered_int_direct_compiles{};
-            ::std::uint_least64_t tiered_osr_callback_ns{};
-            ::std::uint_least64_t tiered_osr_lookup_ns{};
-            ::std::uint_least64_t tiered_osr_jit_exec_ns{};
-            ::std::uint_least64_t tiered_osr_miss_ns{};
-            ::std::uint_least64_t tiered_full_compile_ns{};
-            ::std::uint_least64_t tiered_full_materialize_ns{};
-            ::std::uint_least64_t tiered_full_publish_ns{};
-            ::std::uint_least64_t tiered_int_compile_wait_ns{};
-            ::std::uint_least64_t tiered_int_exec_ns{};
-            ::std::uint_least64_t tiered_int_total_ns{};
-            ::std::uint_least64_t tiered_int_outer_compile_wait_ns{};
-            ::std::uint_least64_t tiered_int_outer_exec_ns{};
-            ::std::uint_least64_t tiered_int_outer_total_ns{};
             auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                                       ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
             if(tiered_backend)
@@ -1498,40 +1250,22 @@ namespace uwvm2::runtime::lib
                 for(auto const& rec: g_runtime.modules)
                 {
                     tiered_switches += rec.tiered_switch_count;
-                    tiered_direct_switches += rec.tiered_direct_switch_count;
                     auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
                     auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
                     tiered_interpreter_fallbacks_sampled += ::std::atomic_ref<::std::size_t>{fallback_counter}.load(::std::memory_order_relaxed);
                     tiered_entry_misses += ::std::atomic_ref<::std::size_t>{entry_miss_counter}.load(::std::memory_order_relaxed);
                     if(tiered_large_module_long_run_active(rec)) { ++tiered_large_long_run_modules; }
                 }
-                tiered_interpreter_entries = g_runtime.tiered_runtime_interpreter_entry_count.load(::std::memory_order_relaxed);
                 tiered_osr_callbacks = g_runtime.tiered_osr_callback_count.load(::std::memory_order_relaxed);
                 tiered_osr_ready = g_runtime.tiered_osr_ready_count.load(::std::memory_order_relaxed);
                 tiered_osr_misses = g_runtime.tiered_osr_miss_count.load(::std::memory_order_relaxed);
                 tiered_osr_deferred = g_runtime.tiered_osr_deferred_count.load(::std::memory_order_relaxed);
                 tiered_osr_compile_requests = g_runtime.tiered_osr_compile_request_count.load(::std::memory_order_relaxed);
                 tiered_osr_urgent_requests = g_runtime.tiered_osr_urgent_request_count.load(::std::memory_order_relaxed);
-                tiered_osr_urgent_demotes = g_runtime.tiered_osr_urgent_demote_count.load(::std::memory_order_relaxed);
-                tiered_osr_urgent_tickets = g_runtime.tiered_osr_urgent_ticket_count.load(::std::memory_order_relaxed);
                 tiered_full_compile_requests = g_runtime.tiered_full_compile_request_count.load(::std::memory_order_relaxed);
                 tiered_full_compile_ready = g_runtime.tiered_full_compile_ready_count.load(::std::memory_order_relaxed);
                 tiered_full_compile_failed = g_runtime.tiered_full_compile_failed_count.load(::std::memory_order_relaxed);
                 tiered_full_publishes = g_runtime.tiered_full_publish_count.load(::std::memory_order_relaxed);
-                tiered_int_direct_compiles = g_runtime.tiered_int_direct_compile_count.load(::std::memory_order_relaxed);
-                tiered_osr_callback_ns = g_runtime.tiered_osr_callback_time_ns.load(::std::memory_order_relaxed);
-                tiered_osr_lookup_ns = g_runtime.tiered_osr_lookup_time_ns.load(::std::memory_order_relaxed);
-                tiered_osr_jit_exec_ns = g_runtime.tiered_osr_jit_exec_time_ns.load(::std::memory_order_relaxed);
-                tiered_osr_miss_ns = g_runtime.tiered_osr_miss_time_ns.load(::std::memory_order_relaxed);
-                tiered_full_compile_ns = g_runtime.tiered_full_compile_time_ns.load(::std::memory_order_relaxed);
-                tiered_full_materialize_ns = g_runtime.tiered_full_materialize_time_ns.load(::std::memory_order_relaxed);
-                tiered_full_publish_ns = g_runtime.tiered_full_publish_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_compile_wait_ns = g_runtime.tiered_int_compile_wait_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_exec_ns = g_runtime.tiered_int_exec_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_total_ns = g_runtime.tiered_int_total_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_outer_compile_wait_ns = g_runtime.tiered_int_outer_compile_wait_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_outer_exec_ns = g_runtime.tiered_int_outer_exec_time_ns.load(::std::memory_order_relaxed);
-                tiered_int_outer_total_ns = g_runtime.tiered_int_outer_total_time_ns.load(::std::memory_order_relaxed);
             }
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -1568,10 +1302,6 @@ namespace uwvm2::runtime::lib
                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                      u8" tiered_switches=",
                                      tiered_switches,
-                                     u8" tiered_direct_switches=",
-                                     tiered_direct_switches,
-                                     u8" tiered_int_fallbacks=",
-                                     tiered_interpreter_entries,
                                      u8" tiered_int_fallbacks_sampled=",
                                      tiered_interpreter_fallbacks_sampled,
                                      u8" tiered_entry_misses=",
@@ -1590,10 +1320,6 @@ namespace uwvm2::runtime::lib
                                      tiered_osr_compile_requests,
                                      u8" tiered_osr_urgent_requests=",
                                      tiered_osr_urgent_requests,
-                                     u8" tiered_osr_urgent_demotes=",
-                                     tiered_osr_urgent_demotes,
-                                     u8" tiered_osr_urgent_tickets=",
-                                     tiered_osr_urgent_tickets,
                                      u8" tiered_full_requests=",
                                      tiered_full_compile_requests,
                                      u8" tiered_full_ready=",
@@ -1601,43 +1327,7 @@ namespace uwvm2::runtime::lib
                                      u8" tiered_full_failed=",
                                      tiered_full_compile_failed,
                                      u8" tiered_full_publishes=",
-                                     tiered_full_publishes,
-                                     u8" tiered_int_direct_compiles=",
-                                     tiered_int_direct_compiles,
-                                     u8" tiered_osr_callback_ns=",
-                                     tiered_osr_callback_ns,
-                                     u8" tiered_osr_lookup_ns=",
-                                     tiered_osr_lookup_ns,
-                                     u8" tiered_osr_overhead_ns=",
-                                     tiered_osr_lookup_ns,
-                                     u8" tiered_osr_jit_exec_ns=",
-                                     tiered_osr_jit_exec_ns,
-                                     u8" tiered_osr_miss_ns=",
-                                     tiered_osr_miss_ns,
-                                     u8" tiered_osr_stall_ns=",
-                                     tiered_osr_miss_ns,
-                                     u8" tiered_full_compile_ns=",
-                                     tiered_full_compile_ns,
-                                     u8" tiered_full_materialize_ns=",
-                                     tiered_full_materialize_ns,
-                                     u8" tiered_full_publish_ns=",
-                                     tiered_full_publish_ns,
-                                     u8" tiered_int_compile_wait_ns=",
-                                     tiered_int_compile_wait_ns,
-                                     u8" tiered_int_stall_ns=",
-                                     tiered_int_compile_wait_ns,
-                                     u8" tiered_int_exec_ns=",
-                                     tiered_int_exec_ns,
-                                     u8" tiered_int_total_ns=",
-                                     tiered_int_total_ns,
-                                     u8" tiered_int_outer_compile_wait_ns=",
-                                     tiered_int_outer_compile_wait_ns,
-                                     u8" tiered_int_outer_stall_ns=",
-                                     tiered_int_outer_compile_wait_ns,
-                                     u8" tiered_int_outer_exec_ns=",
-                                     tiered_int_outer_exec_ns,
-                                     u8" tiered_int_outer_total_ns=",
-                                     tiered_int_outer_total_ns);
+                                     tiered_full_publishes);
             }
 # endif
 
@@ -1649,10 +1339,6 @@ namespace uwvm2::runtime::lib
                                  u8" stop_time=",
                                  stop_end - exec_end,
                                  u8"\n");
-
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            if(tiered_backend) { print_tiered_runtime_module_counter_logs(log_prefix); }
-# endif
 
             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                  log_prefix,
@@ -2082,7 +1768,6 @@ namespace uwvm2::runtime::lib
         constexpr ::std::size_t tiered_large_long_run_local_function_threshold{8192uz};
         constexpr ::std::size_t tiered_large_long_run_entry_counter_threshold{4194304uz};
         constexpr ::std::size_t tiered_large_long_run_switch_counter_threshold{1048576uz};
-        constexpr ::std::size_t tiered_urgent_stale_ticket_gap{4uz};
 
         [[nodiscard]] inline ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
@@ -2104,7 +1789,7 @@ namespace uwvm2::runtime::lib
                                                                                  ::std::memory_order_release);
         }
 
-        [[nodiscard]] inline ::std::uint_least32_t tiered_activity_counter_stride(compiled_module_record const& rec) noexcept
+        [[nodiscard]] inline ::std::uint_least32_t tiered_large_long_run_counter_sample_stride(compiled_module_record const& rec) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 8192uz) { return 16u; }
@@ -2113,10 +1798,10 @@ namespace uwvm2::runtime::lib
             return 1u;
         }
 
-        [[nodiscard]] inline bool tiered_activity_counter_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
+        [[nodiscard]] inline bool tiered_large_long_run_counter_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
         {
             if(stride <= 1u) { return true; }
-            auto const tick{++tiered_activity_probe_tick};
+            auto const tick{++tiered_counter_sample_tick};
             auto const phase{static_cast<::std::uint_least32_t>((local_index + 1uz) * 0x85ebca6buz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
         }
@@ -2254,7 +1939,6 @@ namespace uwvm2::runtime::lib
             opt.curr_wasm_id = module_id;
             opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
 
-            auto const compile_start_ns{lazy_clock_now_ns()};
             bool compiled_ok{};
 #  ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -2274,31 +1958,20 @@ namespace uwvm2::runtime::lib
                 compiled_ok = false;
             }
 #  endif
-            auto const compile_end_ns{lazy_clock_now_ns()};
-            g_runtime.tiered_full_compile_time_ns.fetch_add(lazy_elapsed_ns(compile_start_ns, compile_end_ns), ::std::memory_order_relaxed);
             if(!compiled_ok) [[unlikely]]
             {
                 mark_tiered_full_compile_failed(*rec);
                 return;
             }
 
-            auto const materialize_start_ns{compile_end_ns};
             if(!try_materialize_runtime_module_llvm_jit(*rec, false, ::llvm::CodeGenOptLevel::Less)) [[unlikely]]
             {
-                auto const materialize_end_ns{lazy_clock_now_ns()};
-                g_runtime.tiered_full_materialize_time_ns.fetch_add(lazy_elapsed_ns(materialize_start_ns, materialize_end_ns), ::std::memory_order_relaxed);
                 mark_tiered_full_compile_failed(*rec);
                 return;
             }
 
-            auto const materialize_end_ns{lazy_clock_now_ns()};
-            g_runtime.tiered_full_materialize_time_ns.fetch_add(lazy_elapsed_ns(materialize_start_ns, materialize_end_ns), ::std::memory_order_relaxed);
-
-            auto const publish_start_ns{materialize_end_ns};
             if(!publish_tiered_full_module_entries(*rec, module_id)) [[unlikely]]
             {
-                auto const publish_end_ns{lazy_clock_now_ns()};
-                g_runtime.tiered_full_publish_time_ns.fetch_add(lazy_elapsed_ns(publish_start_ns, publish_end_ns), ::std::memory_order_relaxed);
                 mark_tiered_full_compile_failed(*rec);
                 return;
             }
@@ -2306,17 +1979,12 @@ namespace uwvm2::runtime::lib
             store_tiered_full_ready(*rec, true);
             if(!publish_tiered_full_module_entries(*rec, module_id)) [[unlikely]]
             {
-                auto const publish_end_ns{lazy_clock_now_ns()};
-                g_runtime.tiered_full_publish_time_ns.fetch_add(lazy_elapsed_ns(publish_start_ns, publish_end_ns), ::std::memory_order_relaxed);
                 mark_tiered_full_compile_failed(*rec);
                 return;
             }
 
-            auto const publish_end_ns{lazy_clock_now_ns()};
-            g_runtime.tiered_full_publish_time_ns.fetch_add(lazy_elapsed_ns(publish_start_ns, publish_end_ns), ::std::memory_order_relaxed);
             g_runtime.tiered_full_compile_ready_count.fetch_add(1uz, ::std::memory_order_relaxed);
             g_runtime.tiered_full_publish_count.fetch_add(local_func_count, ::std::memory_order_relaxed);
-            ::std::atomic_ref<::std::size_t>{rec->tiered_full_publish_count}.fetch_add(local_func_count, ::std::memory_order_relaxed);
 
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
@@ -2342,18 +2010,14 @@ namespace uwvm2::runtime::lib
                                                                  .priority = 0u};
             if(!g_runtime.lazy_scheduler.try_request(request)) { return; }
 
-            auto const request_index{::std::atomic_ref<::std::size_t>{rec.tiered_full_request_count}.fetch_add(1uz, ::std::memory_order_relaxed)};
-            if(request_index == 0uz)
+            g_runtime.tiered_full_compile_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
-                g_runtime.tiered_full_compile_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
-                if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-                {
-                    ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(u8"tiered-full-request module=\"",
-                                                                                                                 rec.module_name,
-                                                                                                                 u8"\" module_id=",
-                                                                                                                 module_id_from_record(rec),
-                                                                                                                 u8" priority=0");
-                }
+                ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(u8"tiered-full-request module=\"",
+                                                                                                             rec.module_name,
+                                                                                                             u8"\" module_id=",
+                                                                                                             module_id_from_record(rec),
+                                                                                                             u8" priority=0");
             }
         }
 
@@ -2370,7 +2034,6 @@ namespace uwvm2::runtime::lib
         inline void record_tiered_llvm_jit_switch(compiled_module_record& rec) noexcept
         {
             auto const switch_count{::std::atomic_ref<::std::size_t>{rec.tiered_switch_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-            ::std::atomic_ref<::std::size_t>{rec.tiered_direct_switch_count}.fetch_add(1uz, ::std::memory_order_relaxed);
             auto const full_compile_switch_threshold{tiered_t0_enabled() ? tiered_full_compile_switch_request_threshold(rec) : 1uz};
             if(tiered_t2_enabled() && switch_count >= full_compile_switch_threshold &&
                rec.tiered_full_compile_state.state.load(::std::memory_order_relaxed) == ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
@@ -2389,17 +2052,12 @@ namespace uwvm2::runtime::lib
 
         inline void record_tiered_interpreter_entry(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
-            auto const stride{tiered_activity_counter_stride(rec)};
-            if(tiered_activity_counter_sampled(local_index, stride))
+            auto const stride{tiered_large_long_run_counter_sample_stride(rec)};
+            if(tiered_large_long_run_counter_sampled(local_index, stride))
             {
                 ::std::atomic_ref<::std::size_t>{rec.tiered_interpreter_fallback_count}.fetch_add(static_cast<::std::size_t>(stride),
                                                                                                   ::std::memory_order_relaxed);
                 static_cast<void>(tiered_large_module_long_run_active(rec));
-            }
-
-            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-            {
-                g_runtime.tiered_runtime_interpreter_entry_count.fetch_add(1uz, ::std::memory_order_relaxed);
             }
         }
 
@@ -2423,11 +2081,6 @@ namespace uwvm2::runtime::lib
                     }
                 }
             }
-
-            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-            {
-                g_runtime.tiered_runtime_interpreter_entry_count.fetch_add(1uz, ::std::memory_order_relaxed);
-            }
         }
 
         inline void record_tiered_osr_compile_request() noexcept
@@ -2435,75 +2088,23 @@ namespace uwvm2::runtime::lib
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]] { g_runtime.tiered_osr_compile_request_count.fetch_add(1uz, ::std::memory_order_relaxed); }
         }
 
-        [[nodiscard]] inline ::std::uint_least32_t tiered_record_loop_osr_activity(compiled_module_record& rec, ::std::size_t local_index) noexcept
-        {
-            if(local_index >= rec.tiered_osr_activity_counters.size()) [[unlikely]] { return 0u; }
-
-            auto& counter{rec.tiered_osr_activity_counters.index_unchecked(local_index)};
-            return ::std::atomic_ref<::std::uint_least32_t>{counter}.fetch_add(1u, ::std::memory_order_relaxed) + 1u;
-        }
-
-        [[nodiscard]] inline ::std::uint_least32_t tiered_loop_osr_activity(compiled_module_record const& rec, ::std::size_t local_index) noexcept
-        {
-            if(local_index >= rec.tiered_osr_activity_counters.size()) [[unlikely]] { return 0u; }
-
-            auto& counter{const_cast<::std::uint_least32_t&>(rec.tiered_osr_activity_counters.index_unchecked(local_index))};
-            return ::std::atomic_ref<::std::uint_least32_t>{counter}.load(::std::memory_order_relaxed);
-        }
-
-        inline void record_tiered_interpreter_fallback_timing(::std::uint_least64_t compile_wait_ns,
-                                                              ::std::uint_least64_t exec_ns,
-                                                              ::std::uint_least64_t total_ns,
-                                                              bool outermost) noexcept
-        {
-            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-            {
-                g_runtime.tiered_int_compile_wait_time_ns.fetch_add(compile_wait_ns, ::std::memory_order_relaxed);
-                g_runtime.tiered_int_exec_time_ns.fetch_add(exec_ns, ::std::memory_order_relaxed);
-                g_runtime.tiered_int_total_time_ns.fetch_add(total_ns, ::std::memory_order_relaxed);
-                if(outermost)
-                {
-                    g_runtime.tiered_int_outer_compile_wait_time_ns.fetch_add(compile_wait_ns, ::std::memory_order_relaxed);
-                    g_runtime.tiered_int_outer_exec_time_ns.fetch_add(exec_ns, ::std::memory_order_relaxed);
-                    g_runtime.tiered_int_outer_total_time_ns.fetch_add(total_ns, ::std::memory_order_relaxed);
-                }
-            }
-        }
-
         inline void reset_tiered_runtime_log_metrics() noexcept
         {
-            g_runtime.tiered_runtime_interpreter_entry_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_callback_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_ready_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_miss_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_deferred_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_compile_request_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_osr_urgent_request_count.store(0uz, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_urgent_demote_count.store(0uz, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_urgent_ticket_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_full_compile_request_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_full_compile_ready_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_full_compile_failed_count.store(0uz, ::std::memory_order_relaxed);
             g_runtime.tiered_full_publish_count.store(0uz, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_direct_compile_count.store(0uz, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_callback_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_lookup_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_jit_exec_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_osr_miss_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_full_compile_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_full_materialize_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_full_publish_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_compile_wait_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_exec_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_total_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_outer_compile_wait_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_outer_exec_time_ns.store(0u, ::std::memory_order_relaxed);
-            g_runtime.tiered_int_outer_total_time_ns.store(0u, ::std::memory_order_relaxed);
         }
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
-            ::std::uint_least32_t threshold{4096u};
+            ::std::uint_least32_t threshold{32768u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 8192uz) { threshold = 1048576u; }
             else if(local_n >= 1024uz) { threshold = 65536u; }
@@ -2512,9 +2113,9 @@ namespace uwvm2::runtime::lib
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(local_n < 4096uz)
             {
-                if(code_size <= 128uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
-                else if(code_size <= 512uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
-                else if(code_size <= 1024uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
+                if(code_size <= 128uz) { threshold = (threshold < 262144u) ? 262144u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold < 65536u) ? 65536u : threshold; }
+                else if(code_size <= 1024uz) { threshold = (threshold < 32768u) ? 32768u : threshold; }
             }
             else if(local_n >= tiered_large_long_run_local_function_threshold && tiered_large_module_long_run_active(rec))
             {
@@ -2584,7 +2185,8 @@ namespace uwvm2::runtime::lib
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n)) { return false; }
             if(local_n < 1024uz) { return true; }
-            return llvm_jit_lazy_compile_unit_code_size(rec, local_index) < 32768uz;
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            return code_size < 32768uz;
         }
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
@@ -2781,102 +2383,6 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        [[nodiscard]] inline compiled_module_record*
-            tiered_find_module_record_from_llvm_lazy_context(llvm_jit_lazy_compile_request_context_t const& ctx) noexcept
-        {
-            auto const it{g_runtime.module_name_to_id.find(ctx.module_name)};
-            if(it == g_runtime.module_name_to_id.end()) { return nullptr; }
-            auto const module_id{it->second};
-            if(module_id >= g_runtime.modules.size()) { return nullptr; }
-            return ::std::addressof(g_runtime.modules.index_unchecked(module_id));
-        }
-
-        [[nodiscard]] inline bool tiered_urgent_llvm_request_before_compile(::uwvm2::utils::thread::lazy_compile_request const& request) noexcept
-        {
-            auto const ctx{static_cast<llvm_jit_lazy_compile_request_context_t const*>(request.user_data)};
-            if(ctx == nullptr || ctx->lazy_storage == nullptr) [[unlikely]] { return false; }
-            if(ctx->compile_unit_index >= ctx->lazy_storage->compile_units.size()) [[unlikely]] { return false; }
-
-            auto const& cu{ctx->lazy_storage->compile_units.index_unchecked(ctx->compile_unit_index)};
-            auto const local_index{cu.local_function_index};
-            if(local_index >= ctx->lazy_storage->functions.size()) [[unlikely]] { return false; }
-
-            auto const& fn{ctx->lazy_storage->functions.index_unchecked(local_index)};
-            auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
-            if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled || st == ::uwvm2::utils::thread::lazy_compile_state::failed) { return true; }
-
-            auto const rec{tiered_find_module_record_from_llvm_lazy_context(*ctx)};
-            if(rec == nullptr) [[unlikely]] { return false; }
-            if(tiered_full_ready(*rec)) { return false; }
-            if(!tiered_local_function_direct_supported(*rec, local_index)) { return false; }
-
-            auto const activity_snapshot{static_cast<::std::uint_least32_t>(request.callback_word0)};
-            auto const urgent_ticket{static_cast<::std::size_t>(request.callback_word1)};
-            if(activity_snapshot != 0u && urgent_ticket != 0uz)
-            {
-                auto const latest_ticket{g_runtime.tiered_osr_urgent_ticket_count.load(::std::memory_order_relaxed)};
-                auto const current_activity{tiered_loop_osr_activity(*rec, local_index)};
-                auto const refresh_count{current_activity > activity_snapshot ? current_activity - activity_snapshot : 0u};
-                if(refresh_count <= 1u && latest_ticket >= urgent_ticket + tiered_urgent_stale_ticket_gap)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        [[nodiscard]] inline bool tiered_urgent_llvm_request_demote(::uwvm2::utils::thread::lazy_compile_request const& request) noexcept
-        {
-            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
-            if(request.unit->state.load(::std::memory_order_acquire) != ::uwvm2::utils::thread::lazy_compile_state::queued) { return true; }
-            if(!g_runtime.lazy_scheduler.running()) { return false; }
-
-            auto const ctx{static_cast<llvm_jit_lazy_compile_request_context_t const*>(request.user_data)};
-            if(ctx == nullptr || ctx->lazy_storage == nullptr) [[unlikely]] { return false; }
-            if(ctx->compile_unit_index >= ctx->lazy_storage->compile_units.size()) [[unlikely]] { return false; }
-
-            auto const& cu{ctx->lazy_storage->compile_units.index_unchecked(ctx->compile_unit_index)};
-            auto const local_index{cu.local_function_index};
-            if(local_index >= ctx->lazy_storage->functions.size()) [[unlikely]] { return false; }
-
-            auto const rec{tiered_find_module_record_from_llvm_lazy_context(*ctx)};
-            if(rec == nullptr || tiered_full_ready(*rec) || !tiered_local_function_direct_supported(*rec, local_index)) { return false; }
-
-            auto const activity_snapshot{static_cast<::std::uint_least32_t>(request.callback_word0)};
-            auto const urgent_ticket{static_cast<::std::size_t>(request.callback_word1)};
-            if(activity_snapshot == 0u || urgent_ticket == 0uz) { return false; }
-
-            auto const latest_ticket{g_runtime.tiered_osr_urgent_ticket_count.load(::std::memory_order_relaxed)};
-            auto const current_activity{tiered_loop_osr_activity(*rec, local_index)};
-            auto const refresh_count{current_activity > activity_snapshot ? current_activity - activity_snapshot : 0u};
-            if(refresh_count > 1u || latest_ticket < urgent_ticket + tiered_urgent_stale_ticket_gap) { return false; }
-
-            auto normal_request{request};
-            normal_request.priority = 1u;
-            normal_request.before_compile = nullptr;
-            normal_request.stale = nullptr;
-            auto const demoted{g_runtime.lazy_scheduler.requeue_existing_queued_request(normal_request)};
-            if(demoted)
-            {
-                g_runtime.tiered_osr_urgent_demote_count.fetch_add(1uz, ::std::memory_order_relaxed);
-                if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-                {
-                    ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(
-                        u8"tiered-urgent-demote module=\"",
-                        ctx->module_name,
-                        u8"\" priority=1 activity_snapshot=",
-                        activity_snapshot,
-                        u8" current_activity=",
-                        current_activity,
-                        u8" refresh_count=",
-                        refresh_count,
-                        u8" urgent_ticket=",
-                        urgent_ticket);
-                }
-            }
-            return demoted;
-        }
-
         [[nodiscard]] inline bool tiered_loop_osr_should_use_urgent_scheduler(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
@@ -2887,9 +2393,7 @@ namespace uwvm2::runtime::lib
             return code_size >= 4096uz;
         }
 
-        [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec,
-                                                                           ::std::size_t local_index,
-                                                                           ::std::uint_least32_t osr_activity_snapshot) noexcept
+        [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
             if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() || local_index >= rec.llvm_jit_lazy_background_request_contexts.size()) [[unlikely]]
             {
@@ -2947,11 +2451,6 @@ namespace uwvm2::runtime::lib
 
             if(use_urgent_scheduler)
             {
-                auto const urgent_ticket{g_runtime.tiered_osr_urgent_ticket_count.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-                request.before_compile = tiered_urgent_llvm_request_before_compile;
-                request.stale = tiered_urgent_llvm_request_demote;
-                request.callback_word0 = osr_activity_snapshot;
-                request.callback_word1 = urgent_ticket;
                 if(g_runtime.tiered_urgent_scheduler.try_request(request))
                 {
                     record_tiered_osr_compile_request();
@@ -2962,12 +2461,7 @@ namespace uwvm2::runtime::lib
 
             if(g_runtime.lazy_scheduler.running())
             {
-                record_tiered_osr_compile_request();
-                request.before_compile = nullptr;
-                request.stale = nullptr;
-                request.callback_word0 = 0u;
-                request.callback_word1 = 0u;
-                static_cast<void>(g_runtime.lazy_scheduler.try_request(request));
+                if(g_runtime.lazy_scheduler.try_request(request)) { record_tiered_osr_compile_request(); }
             }
             return true;
         }
@@ -2983,7 +2477,6 @@ namespace uwvm2::runtime::lib
         {
             if(!tiered_runtime_active()) { return false; }
             auto const log_enabled{::uwvm2::uwvm::io::enable_runtime_log};
-            ::std::uint_least64_t const callback_start_ns{log_enabled ? lazy_clock_now_ns() : 0u};
             if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_callback_count.fetch_add(1uz, ::std::memory_order_relaxed); }
             auto const disable_poll{[&]() noexcept
                                     {
@@ -2995,15 +2488,7 @@ namespace uwvm2::runtime::lib
                                     }};
             auto const record_miss{[&]() noexcept -> bool
                                    {
-                                       if(log_enabled) [[unlikely]]
-                                       {
-                                           auto const end_ns{lazy_clock_now_ns()};
-                                           auto const elapsed_ns{lazy_elapsed_ns(callback_start_ns, end_ns)};
-                                           g_runtime.tiered_osr_miss_count.fetch_add(1uz, ::std::memory_order_relaxed);
-                                           g_runtime.tiered_osr_callback_time_ns.fetch_add(elapsed_ns, ::std::memory_order_relaxed);
-                                           g_runtime.tiered_osr_lookup_time_ns.fetch_add(elapsed_ns, ::std::memory_order_relaxed);
-                                           g_runtime.tiered_osr_miss_time_ns.fetch_add(elapsed_ns, ::std::memory_order_relaxed);
-                                       }
+                                       if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_miss_count.fetch_add(1uz, ::std::memory_order_relaxed); }
                                        return false;
                                    }};
             if((result_bytes != 0uz && result_buffer == nullptr) || (local_bytes != 0uz && local_base == nullptr)) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -3048,7 +2533,6 @@ namespace uwvm2::runtime::lib
                 disable_poll();
                 return record_miss();
             }
-            auto const osr_activity_snapshot{tiered_record_loop_osr_activity(rec, local_index)};
 
             ::std::uintptr_t reentry_address{};
             if(!try_get_tiered_ready_loop_reentry(rec, module_id, local_index, loop_wasm_code_offset, reentry_address))
@@ -3066,7 +2550,7 @@ namespace uwvm2::runtime::lib
                     if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_deferred_count.fetch_add(1uz, ::std::memory_order_relaxed); }
                     return record_miss();
                 }
-                static_cast<void>(try_request_tiered_loop_reentry_compile(rec, local_index, osr_activity_snapshot));
+                static_cast<void>(try_request_tiered_loop_reentry_compile(rec, local_index));
                 if(!try_get_tiered_ready_loop_reentry(rec, module_id, local_index, loop_wasm_code_offset, reentry_address))
                 {
                     auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
@@ -3080,16 +2564,8 @@ namespace uwvm2::runtime::lib
 
             using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(reentry_address)};
-            ::std::uint_least64_t const jit_start_ns{log_enabled ? lazy_clock_now_ns() : 0u};
-            if(log_enabled) [[unlikely]] { lazy_add_elapsed_ns(g_runtime.tiered_osr_lookup_time_ns, callback_start_ns, jit_start_ns); }
             entry_fn(0u, reinterpret_cast<::std::uintptr_t>(result_buffer), result_bytes, reinterpret_cast<::std::uintptr_t>(local_base), local_bytes);
-            if(log_enabled) [[unlikely]]
-            {
-                auto const end_ns{lazy_clock_now_ns()};
-                g_runtime.tiered_osr_ready_count.fetch_add(1uz, ::std::memory_order_relaxed);
-                lazy_add_elapsed_ns(g_runtime.tiered_osr_jit_exec_time_ns, jit_start_ns, end_ns);
-                lazy_add_elapsed_ns(g_runtime.tiered_osr_callback_time_ns, callback_start_ns, end_ns);
-            }
+            if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_ready_count.fetch_add(1uz, ::std::memory_order_relaxed); }
             record_tiered_llvm_jit_switch(rec);
             return true;
         }
@@ -5021,7 +4497,6 @@ namespace uwvm2::runtime::lib
                                                                    ::std::memory_order_acq_rel,
                                                                    ::std::memory_order_acquire))
                     {
-                        g_runtime.tiered_int_direct_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                         request.compile(request.user_data);
                         g_runtime.lazy_scheduler.complete_request(*request.unit);
                         return request.unit->state.load(::std::memory_order_acquire) == ::uwvm2::utils::thread::lazy_compile_state::compiled;
@@ -5546,22 +5021,6 @@ namespace uwvm2::runtime::lib
             if(compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(try_execute_tiered_llvm_jit_defined_from_stack_active(module_id, function_index, param_bytes, result_bytes, stack_top_ptr)) { return; }
             record_tiered_interpreter_entry(module_id, function_index);
-            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-            {
-                auto const outermost{tiered_interpreter_fallback_depth == 0uz};
-                ++tiered_interpreter_fallback_depth;
-                auto const fallback_start_ns{lazy_clock_now_ns()};
-                ensure_tiered_lazy_defined_function_compiled(module_id, function_index);
-                auto const exec_start_ns{lazy_clock_now_ns()};
-                execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, stack_top_ptr);
-                auto const exec_end_ns{lazy_clock_now_ns()};
-                --tiered_interpreter_fallback_depth;
-                record_tiered_interpreter_fallback_timing(lazy_elapsed_ns(fallback_start_ns, exec_start_ns),
-                                                          lazy_elapsed_ns(exec_start_ns, exec_end_ns),
-                                                          lazy_elapsed_ns(fallback_start_ns, exec_end_ns),
-                                                          outermost);
-                return;
-            }
             ensure_tiered_lazy_defined_function_compiled(module_id, function_index);
             execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, stack_top_ptr);
         }
@@ -8669,9 +8128,6 @@ namespace uwvm2::runtime::lib
                     rec.tiered_full_compile_state.state.store(::uwvm2::utils::thread::lazy_compile_state::uncompiled, ::std::memory_order_relaxed);
                     store_tiered_full_ready(rec, false);
                     rec.tiered_switch_count = 0uz;
-                    rec.tiered_direct_switch_count = 0uz;
-                    rec.tiered_full_request_count = 0uz;
-                    rec.tiered_full_publish_count = 0uz;
                     rec.tiered_interpreter_fallback_count = 0uz;
                     rec.tiered_entry_miss_count = 0uz;
                     rec.tiered_large_long_run_ready = 0u;
@@ -8679,21 +8135,16 @@ namespace uwvm2::runtime::lib
                     rec.tiered_entry_hot_counters.resize(local_n);
                     rec.tiered_osr_request_counters.clear();
                     rec.tiered_osr_request_counters.resize(local_n);
-                    rec.tiered_osr_activity_counters.clear();
-                    rec.tiered_osr_activity_counters.resize(local_n);
                 }
                 else
                 {
                     rec.tiered_full_compile_state.state.store(::uwvm2::utils::thread::lazy_compile_state::uncompiled, ::std::memory_order_relaxed);
                     store_tiered_full_ready(rec, false);
-                    rec.tiered_full_request_count = 0uz;
-                    rec.tiered_full_publish_count = 0uz;
                     rec.tiered_interpreter_fallback_count = 0uz;
                     rec.tiered_entry_miss_count = 0uz;
                     rec.tiered_large_long_run_ready = 0u;
                     rec.tiered_entry_hot_counters.clear();
                     rec.tiered_osr_request_counters.clear();
-                    rec.tiered_osr_activity_counters.clear();
                 }
 # endif
 

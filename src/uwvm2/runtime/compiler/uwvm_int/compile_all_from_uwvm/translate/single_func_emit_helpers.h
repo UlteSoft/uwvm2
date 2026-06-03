@@ -27,20 +27,6 @@ struct runtime_log_stats_t
 
 runtime_log_stats_t runtime_log_stats{};
 
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-struct tiered_osr_runtime_log_stats_t
-{
-    ::std::uint_least64_t block_poll_count{};
-    ::std::uint_least64_t loop_poll_count{};
-    ::std::uint_least64_t skip_module_count{};
-    ::std::uint_least64_t skip_stack_count{};
-    ::std::uint_least64_t skip_result_count{};
-    ::std::uint_least64_t skip_countdown_count{};
-};
-
-tiered_osr_runtime_log_stats_t tiered_osr_runtime_log_stats{};
-#endif
-
 // Best-effort: current Wasm IP for emit logs.
 ::std::size_t runtime_log_curr_ip{};
 

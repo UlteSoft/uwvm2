@@ -435,7 +435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     .request_countdown = interpreter_tiered_osr_request_countdown_disabled};
         }
         if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 512u}; }
-        if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 512u}; }
+        if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 2048u}; }
         return {.initial_countdown = 1024u, .reset_countdown = 1024u, .request_countdown = 2048u};
     }
 
