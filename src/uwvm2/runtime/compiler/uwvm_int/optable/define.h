@@ -418,6 +418,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{
         (::std::numeric_limits<::std::uint_least32_t>::max)()};
     inline constexpr ::std::size_t interpreter_tiered_osr_poll_module_local_function_limit{8192uz};
+    inline constexpr ::std::size_t interpreter_tiered_large_loop_sentinel_function_size{32768uz};
 
     [[nodiscard]] inline constexpr bool
         interpreter_tiered_osr_poll_enabled_for_module_local_function_count(::std::size_t local_function_count) noexcept
@@ -428,15 +429,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t
         interpreter_tiered_loop_osr_counter_policy_for_function_size(::std::size_t function_code_size) noexcept
     {
-        if(function_code_size >= 32768uz)
+        if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size)
         {
-            return {.initial_countdown = interpreter_tiered_osr_request_countdown_disabled,
-                    .reset_countdown = interpreter_tiered_osr_request_countdown_disabled,
-                    .request_countdown = interpreter_tiered_osr_request_countdown_disabled};
+            return {.initial_countdown = 16384u, .reset_countdown = 16384u, .request_countdown = 64u};
         }
         if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 512u}; }
         if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 2048u}; }
         return {.initial_countdown = 1024u, .reset_countdown = 1024u, .request_countdown = 2048u};
+    }
+
+    [[nodiscard]] inline constexpr bool interpreter_tiered_loop_osr_poll_should_emit(::std::size_t local_function_count,
+                                                                                     ::std::size_t function_code_size) noexcept
+    {
+        return interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count) ||
+               function_code_size >= interpreter_tiered_large_loop_sentinel_function_size;
     }
 
     [[nodiscard]] inline constexpr ::std::uint_least32_t

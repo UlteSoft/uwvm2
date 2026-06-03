@@ -242,6 +242,7 @@ namespace uwvm2::runtime::lib
             ::std::size_t tiered_switch_count{};
             ::std::size_t tiered_interpreter_fallback_count{};
             ::std::size_t tiered_entry_miss_count{};
+            ::std::size_t tiered_large_loop_sample_count{};
             ::std::uint_least8_t tiered_large_long_run_ready{};
             ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_entry_hot_counters{};
             ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_osr_request_counters{};
@@ -1232,6 +1233,7 @@ namespace uwvm2::runtime::lib
             ::std::size_t tiered_switches{};
             ::std::size_t tiered_interpreter_fallbacks_sampled{};
             ::std::size_t tiered_entry_misses{};
+            ::std::size_t tiered_large_loop_samples{};
             ::std::size_t tiered_large_long_run_modules{};
             ::std::size_t tiered_osr_callbacks{};
             ::std::size_t tiered_osr_ready{};
@@ -1252,8 +1254,10 @@ namespace uwvm2::runtime::lib
                     tiered_switches += rec.tiered_switch_count;
                     auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
                     auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
+                    auto& large_loop_counter{const_cast<::std::size_t&>(rec.tiered_large_loop_sample_count)};
                     tiered_interpreter_fallbacks_sampled += ::std::atomic_ref<::std::size_t>{fallback_counter}.load(::std::memory_order_relaxed);
                     tiered_entry_misses += ::std::atomic_ref<::std::size_t>{entry_miss_counter}.load(::std::memory_order_relaxed);
+                    tiered_large_loop_samples += ::std::atomic_ref<::std::size_t>{large_loop_counter}.load(::std::memory_order_relaxed);
                     if(tiered_large_module_long_run_active(rec)) { ++tiered_large_long_run_modules; }
                 }
                 tiered_osr_callbacks = g_runtime.tiered_osr_callback_count.load(::std::memory_order_relaxed);
@@ -1306,6 +1310,8 @@ namespace uwvm2::runtime::lib
                                      tiered_interpreter_fallbacks_sampled,
                                      u8" tiered_entry_misses=",
                                      tiered_entry_misses,
+                                     u8" tiered_large_loop_samples=",
+                                     tiered_large_loop_samples,
                                      u8" tiered_large_long_run_modules=",
                                      tiered_large_long_run_modules,
                                      u8" tiered_osr_callbacks=",
@@ -1768,6 +1774,7 @@ namespace uwvm2::runtime::lib
         constexpr ::std::size_t tiered_large_long_run_local_function_threshold{8192uz};
         constexpr ::std::size_t tiered_large_long_run_entry_counter_threshold{4194304uz};
         constexpr ::std::size_t tiered_large_long_run_switch_counter_threshold{1048576uz};
+        constexpr ::std::size_t tiered_large_long_run_loop_sample_threshold{16uz};
 
         [[nodiscard]] inline ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
@@ -1793,9 +1800,9 @@ namespace uwvm2::runtime::lib
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 8192uz) { return 16u; }
-            if(local_n >= 1024uz) { return 4u; }
-            if(local_n >= 512uz) { return 2u; }
-            return 1u;
+            if(local_n >= 1024uz) { return 16u; }
+            if(local_n >= 512uz) { return 8u; }
+            return 16u;
         }
 
         [[nodiscard]] inline bool tiered_large_long_run_counter_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
@@ -1813,7 +1820,12 @@ namespace uwvm2::runtime::lib
             if(ready_ref.load(::std::memory_order_acquire) != 0u) { return true; }
 
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n < tiered_large_long_run_local_function_threshold) { return false; }
+            auto& large_loop_sample_counter{const_cast<::std::size_t&>(rec.tiered_large_loop_sample_count)};
+            auto const large_loop_sample_count{::std::atomic_ref<::std::size_t>{large_loop_sample_counter}.load(::std::memory_order_relaxed)};
+            if(local_n < tiered_large_long_run_local_function_threshold && large_loop_sample_count < tiered_large_long_run_loop_sample_threshold)
+            {
+                return false;
+            }
 
             auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
             auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
@@ -1822,7 +1834,7 @@ namespace uwvm2::runtime::lib
             auto const entry_miss_count{::std::atomic_ref<::std::size_t>{entry_miss_counter}.load(::std::memory_order_relaxed)};
             auto const switch_count{::std::atomic_ref<::std::size_t>{switch_counter}.load(::std::memory_order_relaxed)};
             if(fallback_count < tiered_large_long_run_entry_counter_threshold && entry_miss_count < tiered_large_long_run_entry_counter_threshold &&
-               switch_count < tiered_large_long_run_switch_counter_threshold)
+               switch_count < tiered_large_long_run_switch_counter_threshold && large_loop_sample_count < tiered_large_long_run_loop_sample_threshold)
             {
                 return false;
             }
@@ -1847,10 +1859,14 @@ namespace uwvm2::runtime::lib
                     entry_miss_count,
                     u8" switch_count=",
                     switch_count,
+                    u8" large_loop_samples=",
+                    large_loop_sample_count,
                     u8" entry_threshold=",
                     tiered_large_long_run_entry_counter_threshold,
                     u8" switch_threshold=",
-                    tiered_large_long_run_switch_counter_threshold);
+                    tiered_large_long_run_switch_counter_threshold,
+                    u8" large_loop_threshold=",
+                    tiered_large_long_run_loop_sample_threshold);
             }
             return true;
         }
@@ -1997,7 +2013,8 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        inline void maybe_request_tiered_full_compile(compiled_module_record& rec) noexcept
+        inline void maybe_request_tiered_full_compile(compiled_module_record& rec,
+                                                      ::uwvm2::utils::container::u8string_view reason = u8"switch") noexcept
         {
             if(!tiered_t2_enabled()) { return; }
             if(tiered_full_ready(rec)) { return; }
@@ -2017,7 +2034,8 @@ namespace uwvm2::runtime::lib
                                                                                                              rec.module_name,
                                                                                                              u8"\" module_id=",
                                                                                                              module_id_from_record(rec),
-                                                                                                             u8" priority=0");
+                                                                                                             u8" priority=0 reason=",
+                                                                                                             reason);
             }
         }
 
@@ -2031,6 +2049,41 @@ namespace uwvm2::runtime::lib
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]] { g_runtime.lazy_runtime_miss_count.fetch_add(1uz, ::std::memory_order_relaxed); }
         }
 
+        [[nodiscard]] inline bool tiered_large_loop_sentinel_candidate(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        {
+            if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return false; }
+            return llvm_jit_lazy_compile_unit_code_size(rec, local_index) >=
+                   ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size;
+        }
+
+        inline void record_tiered_large_loop_sample(compiled_module_record& rec, ::std::size_t local_index, ::std::size_t loop_wasm_code_offset) noexcept
+        {
+            static_cast<void>(local_index);
+            auto const sample_count{::std::atomic_ref<::std::size_t>{rec.tiered_large_loop_sample_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
+            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
+            {
+                if(sample_count == 1uz || sample_count == tiered_large_long_run_loop_sample_threshold ||
+                   (sample_count > tiered_large_long_run_loop_sample_threshold &&
+                    (sample_count % tiered_large_long_run_loop_sample_threshold) == 0uz))
+                {
+                    ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(
+                        u8"tiered-large-loop-sample module=\"",
+                        rec.module_name,
+                        u8"\" module_id=",
+                        module_id_from_record(rec),
+                        u8" local_fn=",
+                        local_index,
+                        u8" loop_offset=",
+                        loop_wasm_code_offset,
+                        u8" samples=",
+                        sample_count,
+                        u8" threshold=",
+                        tiered_large_long_run_loop_sample_threshold);
+                }
+            }
+            static_cast<void>(tiered_large_module_long_run_active(rec));
+        }
+
         inline void record_tiered_llvm_jit_switch(compiled_module_record& rec) noexcept
         {
             auto const switch_count{::std::atomic_ref<::std::size_t>{rec.tiered_switch_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
@@ -2038,7 +2091,7 @@ namespace uwvm2::runtime::lib
             if(tiered_t2_enabled() && switch_count >= full_compile_switch_threshold &&
                rec.tiered_full_compile_state.state.load(::std::memory_order_relaxed) == ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
             {
-                maybe_request_tiered_full_compile(rec);
+                maybe_request_tiered_full_compile(rec, u8"switch");
             }
         }
 
@@ -2052,6 +2105,7 @@ namespace uwvm2::runtime::lib
 
         inline void record_tiered_interpreter_entry(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
+            if(rec.llvm_jit_lazy_compiled.functions.size() < tiered_large_long_run_local_function_threshold) { return; }
             auto const stride{tiered_large_long_run_counter_sample_stride(rec)};
             if(tiered_large_long_run_counter_sampled(local_index, stride))
             {
@@ -2104,18 +2158,15 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
-            ::std::uint_least32_t threshold{32768u};
+            ::std::uint_least32_t threshold{4194304u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 8192uz) { threshold = 1048576u; }
-            else if(local_n >= 1024uz) { threshold = 65536u; }
-            else if(local_n >= 512uz) { threshold = 16384u; }
+            else if(local_n >= 512uz) { threshold = 1048576u; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(local_n < 4096uz)
             {
-                if(code_size <= 128uz) { threshold = (threshold < 262144u) ? 262144u : threshold; }
-                else if(code_size <= 512uz) { threshold = (threshold < 65536u) ? 65536u : threshold; }
-                else if(code_size <= 1024uz) { threshold = (threshold < 32768u) ? 32768u : threshold; }
+                if(code_size <= 4096uz) { threshold = (threshold < 4194304u) ? 4194304u : threshold; }
             }
             else if(local_n >= tiered_large_long_run_local_function_threshold && tiered_large_module_long_run_active(rec))
             {
@@ -2131,13 +2182,18 @@ namespace uwvm2::runtime::lib
             return threshold;
         }
 
+        [[nodiscard]] inline bool tiered_entry_hot_tracking_enabled(compiled_module_record const& rec) noexcept
+        {
+            return rec.llvm_jit_lazy_compiled.functions.size() >= 512uz;
+        }
+
         [[nodiscard]] inline ::std::uint_least32_t tiered_entry_hot_probe_stride(compiled_module_record const& rec) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 8192uz) { return 16u; }
-            if(local_n >= 1024uz) { return 4u; }
-            if(local_n >= 512uz) { return 2u; }
-            return 1u;
+            if(local_n >= 1024uz) { return 16u; }
+            if(local_n >= 512uz) { return 8u; }
+            return 16u;
         }
 
         [[nodiscard]] inline bool tiered_entry_hot_probe_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
@@ -2146,6 +2202,81 @@ namespace uwvm2::runtime::lib
             auto const tick{++tiered_entry_hot_probe_tick};
             auto const phase{static_cast<::std::uint_least32_t>(local_index * 0x9e3779b1uz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
+        }
+
+        [[nodiscard]] inline bool tiered_function_code_has_loop(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        {
+            if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return false; }
+
+            auto const& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
+            if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]] { return false; }
+
+            auto const& cu{rec.llvm_jit_lazy_compiled.compile_units.index_unchecked(fn.primary_cu_index)};
+            auto code_curr{cu.code_begin};
+            auto const code_end{cu.code_end};
+            if(code_curr == nullptr || code_end == nullptr || code_curr > code_end) [[unlikely]] { return false; }
+
+            namespace llvm_lazy = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator;
+            using wasm1_code = llvm_lazy::details::all_details::wasm1_code;
+            while(code_curr < code_end)
+            {
+                wasm1_code op{};
+                ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
+                if(op == wasm1_code::loop) { return true; }
+                if(!llvm_lazy::details::skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+            }
+            return false;
+        }
+
+        [[nodiscard]] inline bool tiered_function_code_has_fp_kernel_shape(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        {
+            if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return false; }
+
+            auto const& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
+            if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]] { return false; }
+
+            auto const& cu{rec.llvm_jit_lazy_compiled.compile_units.index_unchecked(fn.primary_cu_index)};
+            auto code_curr{cu.code_begin};
+            auto const code_end{cu.code_end};
+            if(code_curr == nullptr || code_end == nullptr || code_curr > code_end) [[unlikely]] { return false; }
+
+            namespace llvm_lazy = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator;
+            using wasm1_code = llvm_lazy::details::all_details::wasm1_code;
+            ::std::size_t fp_ops{};
+            while(code_curr < code_end)
+            {
+                wasm1_code op{};
+                ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
+                auto const op_value{static_cast<unsigned>(op)};
+                if(op_value == 0x2au || op_value == 0x2bu || op_value == 0x38u || op_value == 0x39u ||
+                   (op_value >= 0x8bu && op_value <= 0xa6u) || (op_value >= 0xb2u && op_value <= 0xbbu))
+                {
+                    if(++fp_ops >= 8uz) { return true; }
+                }
+                if(!llvm_lazy::details::skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+            }
+            return false;
+        }
+
+        [[nodiscard]] inline bool tiered_loop_osr_should_suppress_medium_fp_kernel(compiled_module_record const& rec,
+                                                                                   ::std::size_t local_index) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(local_n < 16uz || local_n >= 128uz) { return false; }
+
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            return code_size >= 1024uz && tiered_function_code_has_fp_kernel_shape(rec, local_index);
+        }
+
+        [[nodiscard]] inline bool tiered_entry_should_compile_inline_for_small_hot_loop(compiled_module_record const& rec,
+                                                                                       ::std::size_t local_index) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(local_n == 0uz || local_n > 8uz) { return false; }
+
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            return code_size >= 480uz && code_size <= 640uz && !tiered_function_code_has_fp_kernel_shape(rec, local_index) &&
+                   tiered_function_code_has_loop(rec, local_index);
         }
 
         [[nodiscard]] inline bool tiered_entry_is_hot_enough_to_request_llvm(compiled_module_record& rec, ::std::size_t local_index) noexcept
@@ -2176,6 +2307,8 @@ namespace uwvm2::runtime::lib
             auto& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
             auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
             if(st != ::uwvm2::utils::thread::lazy_compile_state::uncompiled) { return true; }
+            if(tiered_entry_should_compile_inline_for_small_hot_loop(rec, local_index)) { return true; }
+            if(!tiered_entry_hot_tracking_enabled(rec)) { return false; }
 
             return tiered_entry_is_hot_enough_to_request_llvm(rec, local_index);
         }
@@ -2184,18 +2317,25 @@ namespace uwvm2::runtime::lib
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n)) { return false; }
-            if(local_n < 1024uz) { return true; }
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
-            return code_size < 32768uz;
+            if(tiered_loop_osr_should_suppress_medium_fp_kernel(rec, local_index)) { return false; }
+            return code_size < ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size;
         }
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
-            static_cast<void>(local_index);
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n))
             {
                 return (::std::numeric_limits<::std::uint_least32_t>::max)();
+            }
+            if(tiered_large_loop_sentinel_candidate(rec, local_index)) { return (::std::numeric_limits<::std::uint_least32_t>::max)(); }
+
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            if(local_n >= 16uz && local_n < 128uz)
+            {
+                if(code_size >= 4096uz) { return 4u; }
+                if(code_size >= 1024uz) { return 2u; }
             }
 
             return 1u;
@@ -2284,7 +2424,8 @@ namespace uwvm2::runtime::lib
             {
                 return tiered_llvm_jit_demand_state::busy;
             }
-            if(!tiered_entry_is_hot_enough_to_request_llvm(rec, local_index)) { return tiered_llvm_jit_demand_state::busy; }
+            auto const use_inline_compile{tiered_entry_should_compile_inline_for_small_hot_loop(rec, local_index)};
+            if(!use_inline_compile && !tiered_entry_is_hot_enough_to_request_llvm(rec, local_index)) { return tiered_llvm_jit_demand_state::busy; }
 
             if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]] { return tiered_llvm_jit_demand_state::unavailable; }
 
@@ -2327,7 +2468,20 @@ namespace uwvm2::runtime::lib
                     entry_counter,
                     u8" state=",
                     ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::compile_state_name(st),
-                    u8" priority=1");
+                    u8" priority=1 lane=",
+                    use_inline_compile ? u8"inline" : u8"normal");
+            }
+
+            if(use_inline_compile)
+            {
+                if(!g_runtime.lazy_scheduler.ensure_ready(request))
+                {
+                    return request.unit->state.load(::std::memory_order_acquire) == ::uwvm2::utils::thread::lazy_compile_state::failed
+                               ? tiered_llvm_jit_demand_state::failed
+                               : tiered_llvm_jit_demand_state::busy;
+                }
+                return try_publish_tiered_ready_llvm_jit_entry(rec, module_id, local_index, raw_entry_address) ? tiered_llvm_jit_demand_state::ready
+                                                                                                               : tiered_llvm_jit_demand_state::unavailable;
             }
 
             if(g_runtime.lazy_scheduler.running()) { static_cast<void>(g_runtime.lazy_scheduler.try_request(request)); }
@@ -2393,6 +2547,16 @@ namespace uwvm2::runtime::lib
             return code_size >= 4096uz;
         }
 
+        [[nodiscard]] inline bool tiered_loop_osr_should_compile_inline_after_deferred_sample(compiled_module_record const& rec,
+                                                                                              ::std::size_t local_index) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(local_n < 16uz || local_n >= 128uz) { return false; }
+
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            return code_size >= 1024uz && code_size < 4096uz;
+        }
+
         [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
             if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() || local_index >= rec.llvm_jit_lazy_background_request_contexts.size()) [[unlikely]]
@@ -2412,6 +2576,7 @@ namespace uwvm2::runtime::lib
             auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 2u)};
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
 
+            auto const use_inline_compile{tiered_loop_osr_should_compile_inline_after_deferred_sample(rec, local_index)};
             auto const use_urgent_scheduler{tiered_loop_osr_should_use_urgent_scheduler(rec, local_index) && g_runtime.tiered_urgent_scheduler.running()};
             record_tiered_lazy_miss();
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
@@ -2446,7 +2611,13 @@ namespace uwvm2::runtime::lib
                     u8" state=",
                     ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::compile_state_name(st),
                     u8" priority=2 lane=",
-                    use_urgent_scheduler ? u8"urgent" : u8"normal");
+                    use_inline_compile ? u8"inline" : (use_urgent_scheduler ? u8"urgent" : u8"normal"));
+            }
+
+            if(use_inline_compile)
+            {
+                record_tiered_osr_compile_request();
+                return g_runtime.lazy_scheduler.ensure_ready(request);
             }
 
             if(use_urgent_scheduler)
@@ -2520,6 +2691,11 @@ namespace uwvm2::runtime::lib
             }
             if(!tiered_loop_osr_can_request_llvm(rec, local_index))
             {
+                if(tiered_large_loop_sentinel_candidate(rec, local_index))
+                {
+                    record_tiered_large_loop_sample(rec, local_index, loop_wasm_code_offset);
+                    return record_miss();
+                }
                 disable_poll();
                 return record_miss();
             }
@@ -8130,6 +8306,7 @@ namespace uwvm2::runtime::lib
                     rec.tiered_switch_count = 0uz;
                     rec.tiered_interpreter_fallback_count = 0uz;
                     rec.tiered_entry_miss_count = 0uz;
+                    rec.tiered_large_loop_sample_count = 0uz;
                     rec.tiered_large_long_run_ready = 0u;
                     rec.tiered_entry_hot_counters.clear();
                     rec.tiered_entry_hot_counters.resize(local_n);
@@ -8142,6 +8319,7 @@ namespace uwvm2::runtime::lib
                     store_tiered_full_ready(rec, false);
                     rec.tiered_interpreter_fallback_count = 0uz;
                     rec.tiered_entry_miss_count = 0uz;
+                    rec.tiered_large_loop_sample_count = 0uz;
                     rec.tiered_large_long_run_ready = 0u;
                     rec.tiered_entry_hot_counters.clear();
                     rec.tiered_osr_request_counters.clear();
