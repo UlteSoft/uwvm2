@@ -1775,6 +1775,11 @@ namespace uwvm2::runtime::lib
         constexpr ::std::size_t tiered_large_long_run_entry_counter_threshold{4194304uz};
         constexpr ::std::size_t tiered_large_long_run_switch_counter_threshold{1048576uz};
         constexpr ::std::size_t tiered_large_long_run_loop_sample_threshold{16uz};
+        // This stays above the large-module long-run activation threshold, but it must not be
+        // so high that a huge eval-loop artifact starts compiling only when the guest is about
+        // to exit.  Crossing this counter is the "early enough to amortize or skip entirely"
+        // point for CPython-style sentinel loops.
+        constexpr ::std::uint_least32_t tiered_large_loop_osr_request_threshold{1024u};
 
         [[nodiscard]] inline ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
@@ -2052,8 +2057,21 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool tiered_large_loop_sentinel_candidate(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
             if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return false; }
+            // A true result here means the normal OSR thresholds are not enough.  Huge
+            // CPython-style eval functions need the large-loop sentinel path so the execution
+            // thread can request an urgent artifact without forcing synchronous compilation.
             return llvm_jit_lazy_compile_unit_code_size(rec, local_index) >=
                    ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size;
+        }
+
+        [[nodiscard]] inline bool tiered_module_has_large_loop_sentinel_candidate(compiled_module_record const& rec) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            for(::std::size_t local_index{}; local_index != local_n; ++local_index)
+            {
+                if(tiered_large_loop_sentinel_candidate(rec, local_index)) { return true; }
+            }
+            return false;
         }
 
         inline void record_tiered_large_loop_sample(compiled_module_record& rec, ::std::size_t local_index, ::std::size_t loop_wasm_code_offset) noexcept
@@ -2316,20 +2334,24 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool tiered_loop_osr_can_request_llvm(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n)) { return false; }
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            if(code_size >= ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size)
+            {
+                return tiered_large_module_long_run_active(rec);
+            }
+            if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n)) { return false; }
             if(tiered_loop_osr_should_suppress_medium_fp_kernel(rec, local_index)) { return false; }
-            return code_size < ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size;
+            return true;
         }
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(tiered_large_loop_sentinel_candidate(rec, local_index)) { return tiered_large_loop_osr_request_threshold; }
             if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n))
             {
                 return (::std::numeric_limits<::std::uint_least32_t>::max)();
             }
-            if(tiered_large_loop_sentinel_candidate(rec, local_index)) { return (::std::numeric_limits<::std::uint_least32_t>::max)(); }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(local_n >= 16uz && local_n < 128uz)
@@ -2689,13 +2711,11 @@ namespace uwvm2::runtime::lib
                 disable_poll();
                 return record_miss();
             }
+            auto const large_loop_sentinel{tiered_large_loop_sentinel_candidate(rec, local_index)};
+            if(large_loop_sentinel) { record_tiered_large_loop_sample(rec, local_index, loop_wasm_code_offset); }
             if(!tiered_loop_osr_can_request_llvm(rec, local_index))
             {
-                if(tiered_large_loop_sentinel_candidate(rec, local_index))
-                {
-                    record_tiered_large_loop_sample(rec, local_index, loop_wasm_code_offset);
-                    return record_miss();
-                }
+                if(large_loop_sentinel) { return record_miss(); }
                 disable_poll();
                 return record_miss();
             }
@@ -8530,11 +8550,18 @@ namespace uwvm2::runtime::lib
             bool has_tiered_urgent_scheduler_candidate{};
             if(tiered_t0_backend && worker_count != 0uz)
             {
+                // The current urgent scheduler is a conservative background lane.  Normal
+                // modules use regular loop OSR eligibility; very large modules only get the
+                // urgent lane when they contain a large-loop sentinel such as CPython's
+                // _PyEval_EvalFrameDefault.  Future policy should route those samples through
+                // the execution thread and a main-thread coordinator, then optionally fan out
+                // when WASI threads are implemented.
                 for(auto const& rec: g_runtime.modules)
                 {
                     auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
                     if(local_n >= 512uz &&
-                       ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n))
+                       (::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_n) ||
+                        tiered_module_has_large_loop_sentinel_candidate(rec)))
                     {
                         has_tiered_urgent_scheduler_candidate = true;
                         break;
