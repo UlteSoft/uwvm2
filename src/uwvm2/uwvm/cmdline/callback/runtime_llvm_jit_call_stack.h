@@ -97,7 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::instruction;
         }
         else if(currp1_str == u8"none") { ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::none; }
-# if UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
+# ifdef UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
         else if(currp1_str == u8"unwind") { ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind; }
         else if(currp1_str == u8"unwind-uncheck" || currp1_str == u8"unwind-unchecked")
         {

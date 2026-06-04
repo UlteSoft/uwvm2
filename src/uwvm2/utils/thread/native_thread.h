@@ -218,6 +218,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         compile_callback_type compile{};
         void* user_data{};
         unsigned priority{};
+        bool owns_queued_state{true};
     };
 
     struct lazy_compile_scheduler;
@@ -379,6 +380,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         {
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
 
+            request.owns_queued_state = true;
             auto expected{lazy_compile_state::uncompiled};
             if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::queued, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
             {
@@ -395,6 +397,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                                                                   ::std::memory_order_acq_rel,
                                                                   ::std::memory_order_acquire);
                 this->notify_unit(*request.unit);
+                return false;
+            }
+
+            this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            return true;
+        }
+
+        [[nodiscard]] inline bool try_request_or_shadow_queued(lazy_compile_request request) noexcept
+        {
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
+
+            auto expected{lazy_compile_state::uncompiled};
+            if(request.unit->state.compare_exchange_strong(expected, lazy_compile_state::queued, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
+            {
+                request.owns_queued_state = true;
+                if(!this->try_enqueue(request))
+                {
+                    this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                    expected = lazy_compile_state::queued;
+                    (void)request.unit->state.compare_exchange_strong(expected,
+                                                                      lazy_compile_state::uncompiled,
+                                                                      ::std::memory_order_acq_rel,
+                                                                      ::std::memory_order_acquire);
+                    this->notify_unit(*request.unit);
+                    return false;
+                }
+
+                this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                return true;
+            }
+
+            this->duplicate_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            if(expected != lazy_compile_state::queued) { return expected == lazy_compile_state::compiling || expected == lazy_compile_state::compiled; }
+
+            request.owns_queued_state = false;
+            if(!this->try_enqueue(request))
+            {
+                this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 return false;
             }
 
@@ -565,11 +605,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             }
 
             ::std::size_t write_index{};
-            if(request.priority == 0u) { write_index = (this->queue_head + current_count) % this->queue_capacity; }
+            if(request.priority == 0u)
+            {
+                write_index = (this->queue_head + current_count) % this->queue_capacity;
+            }
             else
             {
-                this->queue_head = this->queue_head == 0uz ? this->queue_capacity - 1uz : this->queue_head - 1uz;
-                write_index = this->queue_head;
+                ::std::size_t insert_offset{current_count};
+                for(::std::size_t i{}; i != current_count; ++i)
+                {
+                    auto const probe_index{(this->queue_head + i) % this->queue_capacity};
+                    if(this->queue.buffer[probe_index].request.priority < request.priority)
+                    {
+                        insert_offset = i;
+                        break;
+                    }
+                }
+
+                for(::std::size_t i{current_count}; i != insert_offset; --i)
+                {
+                    auto const dst_index{(this->queue_head + i) % this->queue_capacity};
+                    auto const src_index{(this->queue_head + i - 1uz) % this->queue_capacity};
+                    this->queue.buffer[dst_index].request = this->queue.buffer[src_index].request;
+                }
+
+                write_index = (this->queue_head + insert_offset) % this->queue_capacity;
             }
 
             this->queue.buffer[write_index].request = request;
@@ -691,6 +751,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             while(this->try_dequeue(request))
             {
                 if(request.unit == nullptr) { continue; }
+                if(!request.owns_queued_state) { continue; }
                 auto expected{lazy_compile_state::queued};
                 (void)request.unit->state.compare_exchange_strong(expected,
                                                                   lazy_compile_state::uncompiled,

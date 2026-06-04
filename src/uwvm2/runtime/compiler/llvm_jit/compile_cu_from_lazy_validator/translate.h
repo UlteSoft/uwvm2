@@ -221,6 +221,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     namespace details
     {
+        inline ::std::atomic_flag lazy_materialize_lock = ATOMIC_FLAG_INIT;
+
+        struct lazy_materialize_lock_guard
+        {
+            inline lazy_materialize_lock_guard() noexcept
+            {
+                while(lazy_materialize_lock.test_and_set(::std::memory_order_acquire))
+                {
+                    ::uwvm2::utils::thread::lazy_compile_thread_yield();
+                }
+            }
+
+            inline lazy_materialize_lock_guard(lazy_materialize_lock_guard const&) noexcept = delete;
+            inline lazy_materialize_lock_guard& operator= (lazy_materialize_lock_guard const&) noexcept = delete;
+
+            inline ~lazy_materialize_lock_guard() noexcept { lazy_materialize_lock.clear(::std::memory_order_release); }
+        };
+
         template <typename>
         struct member_function_first_argument;
 
@@ -1021,6 +1039,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             try
 # endif
             {
+                lazy_materialize_lock_guard materialize_guard{};
                 compile_lazy_local_function_group(*ctx->curr_module,
                                                   storage,
                                                   ctx->options,
@@ -1208,7 +1227,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::uwvm2::utils::thread::lazy_compile_thread_yield();
         }
 
-        details::compile_lazy_local_function_group(curr_module, storage, options, cu.local_function_index, err);
+        {
+            details::lazy_materialize_lock_guard materialize_guard{};
+            details::compile_lazy_local_function_group(curr_module, storage, options, cu.local_function_index, err);
+        }
         ::fast_io::unix_timestamp compile_end_time{};
         if(lazy_runtime_log::enabled()) [[unlikely]]
         {
