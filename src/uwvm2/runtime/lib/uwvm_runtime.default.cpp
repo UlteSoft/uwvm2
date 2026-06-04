@@ -364,6 +364,9 @@ namespace uwvm2::runtime::lib
             ::std::atomic_size_t lazy_runtime_compiled_hit_count{};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::uwvm2::utils::thread::lazy_compile_scheduler tiered_urgent_scheduler{};
+            ::std::atomic_flag tiered_scheduler_start_lock = ATOMIC_FLAG_INIT;
+            ::std::atomic_bool tiered_schedulers_deferred{};
+            ::std::size_t tiered_deferred_worker_count{};
             ::std::atomic_size_t tiered_osr_callback_count{};
             ::std::atomic_size_t tiered_osr_ready_count{};
             ::std::atomic_size_t tiered_osr_miss_count{};
@@ -2630,6 +2633,63 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool tiered_uses_tiered_targets() noexcept { return tiered_t0_enabled() || tiered_t2_enabled(); }
 
+        constexpr ::std::size_t tiered_urgent_scheduler_queue_capacity{64uz};
+
+        inline void verbose_log_registered_tiered_urgent_scheduler(::std::size_t worker_count) noexcept
+        {
+            if(::uwvm2::uwvm::io::show_verbose && worker_count != 0uz) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Registered tiered urgent JIT scheduler (workers=",
+                                    worker_count,
+                                    u8", queue_capacity=",
+                                    tiered_urgent_scheduler_queue_capacity,
+                                    u8"). ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    u8"[",
+                                    ::uwvm2::uwvm::io::get_local_realtime(),
+                                    u8"] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+        }
+
+        inline void ensure_tiered_jit_schedulers_started() noexcept
+        {
+            if(!tiered_runtime_active()) { return; }
+            if(g_runtime.lazy_scheduler.running()) { return; }
+            if(!g_runtime.tiered_schedulers_deferred.load(::std::memory_order_acquire)) { return; }
+
+            while(g_runtime.tiered_scheduler_start_lock.test_and_set(::std::memory_order_acquire))
+            {
+                ::uwvm2::utils::thread::lazy_compile_thread_yield();
+            }
+
+            if(!g_runtime.lazy_scheduler.running() && g_runtime.tiered_schedulers_deferred.load(::std::memory_order_relaxed))
+            {
+                auto const worker_count{g_runtime.tiered_deferred_worker_count};
+                auto const jit_worker_count{worker_count == 0uz ? 0uz : 1uz};
+                g_runtime.lazy_scheduler.start({.worker_count = jit_worker_count,
+                                                .queue_capacity = 0uz,
+                                                .refill_callback = nullptr,
+                                                .refill_user_data = nullptr});
+                g_runtime.tiered_urgent_scheduler.start({.worker_count = jit_worker_count,
+                                                         .queue_capacity = jit_worker_count == 0uz ? 0uz : tiered_urgent_scheduler_queue_capacity,
+                                                         .refill_callback = nullptr,
+                                                         .refill_user_data = nullptr});
+                g_runtime.tiered_schedulers_deferred.store(false, ::std::memory_order_release);
+                verbose_log_registered_tiered_urgent_scheduler(jit_worker_count);
+            }
+
+            g_runtime.tiered_scheduler_start_lock.clear(::std::memory_order_release);
+        }
+
         [[nodiscard]] inline ::std::size_t module_id_from_record(compiled_module_record const& rec) noexcept
         {
             auto const module_count{g_runtime.modules.size()};
@@ -2787,6 +2847,21 @@ namespace uwvm2::runtime::lib
                    switch_count >= (tiered_large_loop_compile_switch_counter_threshold * 4uz);
         }
 
+        [[nodiscard]] inline bool tiered_small_module_long_run_active(compiled_module_record const& rec) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(local_n == 0uz || local_n >= 128uz) { return false; }
+
+            auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
+            auto& switch_counter{const_cast<::std::size_t&>(rec.tiered_switch_count)};
+            auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
+            auto const entry_miss_count{::std::atomic_ref<::std::size_t>{entry_miss_counter}.load(::std::memory_order_relaxed)};
+            auto const switch_count{::std::atomic_ref<::std::size_t>{switch_counter}.load(::std::memory_order_relaxed)};
+            auto const fallback_count{::std::atomic_ref<::std::size_t>{fallback_counter}.load(::std::memory_order_relaxed)};
+
+            return entry_miss_count >= 4096uz || switch_count >= 2048uz || fallback_count >= 4096uz;
+        }
+
         inline void mark_tiered_full_compile_failed(compiled_module_record& rec) noexcept
         {
             store_tiered_full_ready(rec, false);
@@ -2934,6 +3009,7 @@ namespace uwvm2::runtime::lib
         {
             if(!tiered_t2_enabled()) { return; }
             if(tiered_full_ready(rec)) { return; }
+            ensure_tiered_jit_schedulers_started();
             if(!g_runtime.lazy_scheduler.running()) { return; }
             if(rec.tiered_full_compile_state.state.load(::std::memory_order_acquire) != ::uwvm2::utils::thread::lazy_compile_state::uncompiled) { return; }
 
@@ -3209,7 +3285,7 @@ namespace uwvm2::runtime::lib
             if(local_n == 0uz || local_n > 8uz) { return false; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
-            return code_size >= 480uz && code_size <= 640uz && !tiered_function_code_has_fp_kernel_shape(rec, local_index) &&
+            return code_size >= 96uz && code_size <= 640uz && !tiered_function_code_has_fp_kernel_shape(rec, local_index) &&
                    tiered_function_code_has_loop(rec, local_index);
         }
 
@@ -3284,8 +3360,23 @@ namespace uwvm2::runtime::lib
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(local_n >= 16uz && local_n < 128uz)
             {
+                if(tiered_small_module_long_run_active(rec))
+                {
+                    if(code_size >= 4096uz) { return 4u; }
+                    if(code_size >= 1024uz) { return 2u; }
+                    return 4u;
+                }
                 if(code_size >= 4096uz) { return 4u; }
-                if(code_size >= 1024uz) { return 2u; }
+                if(code_size >= 1536uz) { return 2u; }
+
+                constexpr ::std::size_t cold_small_module_osr_work_threshold{8uz * 1024uz * 1024uz};
+                auto threshold{code_size == 0uz ? cold_small_module_osr_work_threshold
+                                                 : (cold_small_module_osr_work_threshold + code_size - 1uz) / code_size};
+                auto const min_threshold{code_size >= 4096uz ? 256uz : 512uz};
+                auto const max_threshold{65535uz};
+                if(threshold < min_threshold) { threshold = min_threshold; }
+                if(threshold > max_threshold) { threshold = max_threshold; }
+                return static_cast<::std::uint_least32_t>(threshold);
             }
 
             return 1u;
@@ -3383,6 +3474,7 @@ namespace uwvm2::runtime::lib
             auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 1u)};
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return tiered_llvm_jit_demand_state::unavailable; }
 
+            ensure_tiered_jit_schedulers_started();
             auto const use_urgent_scheduler{!use_inline_compile && tiered_entry_hot_should_use_urgent_scheduler(rec, local_index)};
             record_tiered_lazy_miss();
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
@@ -3502,6 +3594,7 @@ namespace uwvm2::runtime::lib
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 512uz) { return true; }
             if(tiered_large_module_long_run_active(rec)) { return true; }
+            if(local_n < 128uz) { return tiered_small_module_long_run_active(rec); }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             return code_size >= 4096uz;
@@ -3514,6 +3607,8 @@ namespace uwvm2::runtime::lib
             if(local_n >= 512uz) { return false; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            if(local_n < 128uz && !tiered_small_module_long_run_active(rec) && code_size < 1536uz) { return false; }
+
             return code_size >= 1024uz && code_size < 4096uz;
         }
 
@@ -3544,6 +3639,7 @@ namespace uwvm2::runtime::lib
             auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 2u)};
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
 
+            ensure_tiered_jit_schedulers_started();
             auto const use_inline_compile{tiered_loop_osr_should_compile_inline_after_deferred_sample(rec, local_index)};
             auto const use_urgent_scheduler{tiered_loop_osr_should_use_urgent_scheduler(rec, local_index) && g_runtime.tiered_urgent_scheduler.running()};
             record_tiered_lazy_miss();
@@ -9811,61 +9907,49 @@ namespace uwvm2::runtime::lib
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
             auto const has_lazy_background_work{llvm_lazy_background_enabled && worker_count != 0uz && has_llvm_jit_lazy_background_work()};
-            auto const lazy_scheduler_worker_count{tiered_t0_backend ? (worker_count == 0uz ? 0uz : 1uz) : (has_lazy_background_work ? worker_count : 0uz)};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             bool has_tiered_urgent_scheduler_candidate{};
+            bool tiered_defer_jit_scheduler_start{};
             if(tiered_t0_backend && worker_count != 0uz)
             {
                 // The current urgent scheduler is a conservative background lane for
                 // counter-hot entries and loop OSR.  Future policy should route these samples
                 // through the execution thread and a main-thread coordinator, then optionally
                 // fan out when WASI threads are implemented.
+                bool has_medium_or_large_module{};
                 for(auto const& rec: g_runtime.modules)
                 {
                     auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
                     if(local_n != 0uz)
                     {
                         has_tiered_urgent_scheduler_candidate = true;
-                        break;
+                        if(local_n >= 128uz) { has_medium_or_large_module = true; }
                     }
                 }
+                tiered_defer_jit_scheduler_start = has_tiered_urgent_scheduler_candidate && !has_medium_or_large_module;
             }
+            g_runtime.tiered_schedulers_deferred.store(tiered_defer_jit_scheduler_start, ::std::memory_order_release);
+            g_runtime.tiered_deferred_worker_count = tiered_defer_jit_scheduler_start ? worker_count : 0uz;
 # endif
+            auto const lazy_scheduler_worker_count{
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                tiered_t0_backend ? (worker_count == 0uz || tiered_defer_jit_scheduler_start ? 0uz : 1uz) :
+# endif
+                                  (has_lazy_background_work ? worker_count : 0uz)};
             g_runtime.lazy_scheduler.start({.worker_count = lazy_scheduler_worker_count,
                                             .queue_capacity = 0uz,
                                             .refill_callback = has_lazy_background_work ? &llvm_jit_lazy_background_refill_callback : nullptr,
                                             .refill_user_data = nullptr});
             g_runtime.llvm_jit_urgent_scheduler.start({.worker_count = 0uz, .queue_capacity = 0uz, .refill_callback = nullptr, .refill_user_data = nullptr});
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            auto const urgent_scheduler_worker_count{has_tiered_urgent_scheduler_candidate ? 1uz : 0uz};
-            if(tiered_t0_backend)
+            auto const urgent_scheduler_worker_count{has_tiered_urgent_scheduler_candidate && !tiered_defer_jit_scheduler_start ? 1uz : 0uz};
+            if(tiered_t0_backend && !tiered_defer_jit_scheduler_start)
             {
-                constexpr ::std::size_t urgent_scheduler_queue_capacity{64uz};
                 g_runtime.tiered_urgent_scheduler.start({.worker_count = urgent_scheduler_worker_count,
-                                                         .queue_capacity = urgent_scheduler_worker_count == 0uz ? 0uz : urgent_scheduler_queue_capacity,
+                                                         .queue_capacity = urgent_scheduler_worker_count == 0uz ? 0uz : tiered_urgent_scheduler_queue_capacity,
                                                          .refill_callback = nullptr,
                                                          .refill_user_data = nullptr});
-                if(::uwvm2::uwvm::io::show_verbose && urgent_scheduler_worker_count != 0uz) [[unlikely]]
-                {
-                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                        u8"[info]  ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"Registered tiered urgent JIT scheduler (workers=",
-                                        urgent_scheduler_worker_count,
-                                        u8", queue_capacity=",
-                                        urgent_scheduler_queue_capacity,
-                                        u8"). ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                                        u8"[",
-                                        ::uwvm2::uwvm::io::get_local_realtime(),
-                                        u8"] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                        u8"(verbose)\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                }
+                verbose_log_registered_tiered_urgent_scheduler(urgent_scheduler_worker_count);
             }
             else
             {

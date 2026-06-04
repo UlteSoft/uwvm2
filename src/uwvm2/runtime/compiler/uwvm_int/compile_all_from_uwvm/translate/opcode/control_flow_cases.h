@@ -120,7 +120,8 @@ case wasm1_code::block:
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     if constexpr(CompileOption.enable_tiered_loop_osr_poll)
     {
-        if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_func_count) &&
+        auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
+        if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_poll_should_emit(local_func_count, function_code_size) &&
            !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
         {
             auto const result_begin{curr_func_type.result.begin};
@@ -135,7 +136,6 @@ case wasm1_code::block:
                 {
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                    auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
                     auto const request_countdown{
                         ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_block_osr_request_countdown_for_function_size(function_code_size)};
                     if(request_countdown != ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)

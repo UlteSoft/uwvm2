@@ -435,6 +435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return {.initial_countdown = 256u, .reset_countdown = 256u, .request_countdown = 16u};
         }
         if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 512u}; }
+        if(function_code_size >= 1536uz) { return {.initial_countdown = 8u, .reset_countdown = 128u, .request_countdown = 256u}; }
         if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 2048u}; }
         return {.initial_countdown = 1024u, .reset_countdown = 1024u, .request_countdown = 2048u};
     }
@@ -443,8 +444,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                         
         ::std::size_t function_code_size) noexcept
     {
-        return interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count) ||
-               function_code_size >= interpreter_tiered_large_loop_sentinel_function_size;
+        if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size) { return true; }
+        if(!interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count)) { return false; }
+        if(local_function_count < 128uz) { return function_code_size >= 1536uz; }
+        return true;
     }
 
     [[nodiscard]] inline constexpr ::std::uint_least32_t interpreter_tiered_block_osr_request_countdown_for_function_size(
