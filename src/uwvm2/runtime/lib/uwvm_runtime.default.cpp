@@ -72,7 +72,7 @@
 #  include <llvm/Transforms/Utils.h>
 # endif
 
-# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN64) &&                                                                                                     \
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN64) &&                                                                                                      \
      ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && !defined(__CYGWIN__) &&              \
      __has_include(<windows.h>)
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE 1
@@ -381,27 +381,27 @@ namespace uwvm2::runtime::lib
         inline runtime_global_state g_runtime{};  // [global]
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-#  if defined(UWVM_USE_THREAD_LOCAL)
-#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
-#    ifdef UWVM
-    [[__gnu__::__tls_model__("local-exec")]]
-#    else
-    [[__gnu__::__tls_model__("local-dynamic")]]
-#    endif
+# if defined(UWVM_USE_THREAD_LOCAL)
+#  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#   ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#   else
+        [[__gnu__::__tls_model__("local-dynamic")]]
 #   endif
+#  endif
         inline thread_local ::std::uint_least32_t tiered_entry_hot_probe_tick{};  // [global] [thread-local]
-#  endif
+# endif
 
-#  if defined(UWVM_USE_THREAD_LOCAL)
-#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
-#    ifdef UWVM
-    [[__gnu__::__tls_model__("local-exec")]]
-#    else
-    [[__gnu__::__tls_model__("local-dynamic")]]
-#    endif
+# if defined(UWVM_USE_THREAD_LOCAL)
+#  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#   ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#   else
+        [[__gnu__::__tls_model__("local-dynamic")]]
 #   endif
-        inline thread_local ::std::uint_least32_t tiered_counter_sample_tick{};   // [global] [thread-local]
 #  endif
+        inline thread_local ::std::uint_least32_t tiered_counter_sample_tick{};  // [global] [thread-local]
+# endif
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
@@ -609,7 +609,10 @@ namespace uwvm2::runtime::lib
                 {
                     auto& call_stack{get_call_stack()};
                     if(!call_stack.frames.empty()) [[likely]] { ctx->module_id = call_stack.frames.back().module_id; }
-                    else { ctx->module_id = preload_call_context_t::invalid_module_id; }
+                    else
+                    {
+                        ctx->module_id = preload_call_context_t::invalid_module_id;
+                    }
                 }
                 ctx->preload_module_memory_attribute = attribute;
                 ctx->capi_function = function;
@@ -781,28 +784,24 @@ namespace uwvm2::runtime::lib
         }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-#  if defined(UWVM_USE_THREAD_LOCAL)
-#   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
-#    ifdef UWVM
-    [[__gnu__::__tls_model__("local-exec")]]
-#    else
-    [[__gnu__::__tls_model__("local-dynamic")]]
-#    endif
+# if defined(UWVM_USE_THREAD_LOCAL)
+#  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#   ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#   else
+        [[__gnu__::__tls_model__("local-dynamic")]]
 #   endif
-        inline thread_local ::std::uintptr_t llvm_jit_trap_return_address{}; // [global] [thread-local]
-#  else
-        inline ::std::uintptr_t llvm_jit_trap_return_address{};               // [global]
 #  endif
+        inline thread_local ::std::uintptr_t llvm_jit_trap_return_address{};  // [global] [thread-local]
+# else
+        inline ::std::uintptr_t llvm_jit_trap_return_address{};  // [global]
+# endif
 
-        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
-            get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
+        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept;
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept;
 
-        inline void record_llvm_jit_unwind_entry(::std::size_t module_id,
-                                                 ::std::size_t function_index,
-                                                 ::std::uintptr_t address,
-                                                 bool raw_entry) noexcept
+        inline void record_llvm_jit_unwind_entry(::std::size_t module_id, ::std::size_t function_index, ::std::uintptr_t address, bool raw_entry) noexcept
         {
             if(address == 0u) [[unlikely]] { return; }
 
@@ -901,10 +900,8 @@ namespace uwvm2::runtime::lib
             if(omit > static_cast<::std::size_t>((::std::numeric_limits<::ULONG>::max)())) [[unlikely]] { return storage; }
 
             void* frames[llvm_jit_unwind_backtrace_storage::max_frames]{};
-            auto const captured{::RtlCaptureStackBackTrace(static_cast<::ULONG>(omit),
-                                                           static_cast<::ULONG>(llvm_jit_unwind_backtrace_storage::max_frames),
-                                                           frames,
-                                                           nullptr)};
+            auto const captured{
+                ::RtlCaptureStackBackTrace(static_cast<::ULONG>(omit), static_cast<::ULONG>(llvm_jit_unwind_backtrace_storage::max_frames), frames, nullptr)};
             storage.size = static_cast<::std::size_t>(captured);
             for(::std::size_t i{}; i != storage.size; ++i)
             {
@@ -1051,25 +1048,19 @@ namespace uwvm2::runtime::lib
             auto* const ptr_type{::llvm::PointerType::getUnqual(context)};
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             auto* const backtrace_type{::llvm::FunctionType::get(i32_type, {ptr_type, i32_type}, false)};
-            auto* const backtrace_function{
-                ::llvm::Function::Create(backtrace_type, ::llvm::GlobalValue::ExternalLinkage, "backtrace", *module)};
+            auto* const backtrace_function{::llvm::Function::Create(backtrace_type, ::llvm::GlobalValue::ExternalLinkage, "backtrace", *module)};
 
             auto* const probe_type{::llvm::FunctionType::get(void_type, {ptr_type, ptr_type}, false)};
 #  else
             static_cast<void>(i32_type);
             auto* const capture_type{::llvm::FunctionType::get(void_type, {ptr_type}, false)};
-            auto* const capture_function{::llvm::Function::Create(capture_type,
-                                                                   ::llvm::GlobalValue::ExternalLinkage,
-                                                                   "uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
-                                                                   *module)};
+            auto* const capture_function{
+                ::llvm::Function::Create(capture_type, ::llvm::GlobalValue::ExternalLinkage, "uwvm2_runtime_llvm_jit_live_unwind_probe_capture", *module)};
 
             auto* const probe_type{::llvm::FunctionType::get(void_type, {ptr_type}, false)};
 #  endif
             auto* const probe_function{
-                ::llvm::Function::Create(probe_type,
-                                         ::llvm::GlobalValue::ExternalLinkage,
-                                         "uwvm2_runtime_llvm_jit_live_unwind_probe",
-                                         *module)};
+                ::llvm::Function::Create(probe_type, ::llvm::GlobalValue::ExternalLinkage, "uwvm2_runtime_llvm_jit_live_unwind_probe", *module)};
             probe_function->addFnAttr(::llvm::Attribute::NoInline);
             probe_function->setUWTableKind(::llvm::UWTableKind::Async);
             probe_function->addFnAttr("disable-tail-calls", "true");
@@ -1081,9 +1072,7 @@ namespace uwvm2::runtime::lib
             auto* const frames_arg{probe_function->getArg(0)};
             auto* const count_arg{probe_function->getArg(1)};
             auto* const count_value{
-                builder.CreateCall(backtrace_function,
-                                   {frames_arg,
-	                                    ::llvm::ConstantInt::get(i32_type, runtime_llvm_jit_live_unwind_probe_state::max_frames)})};
+                builder.CreateCall(backtrace_function, {frames_arg, ::llvm::ConstantInt::get(i32_type, runtime_llvm_jit_live_unwind_probe_state::max_frames)})};
             builder.CreateStore(count_value, count_arg);
 #  else
             auto* const state_arg{probe_function->getArg(0)};
@@ -1094,20 +1083,18 @@ namespace uwvm2::runtime::lib
             if(::llvm::verifyModule(*module)) [[unlikely]] { return false; }
 
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
-            ::llvm::sys::DynamicLibrary::AddSymbol("backtrace",
-                                                   reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
+            ::llvm::sys::DynamicLibrary::AddSymbol("backtrace", reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
 #  else
-            ::llvm::sys::DynamicLibrary::AddSymbol(
-                "uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
-                reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&runtime_llvm_jit_live_unwind_probe_capture)));
+            ::llvm::sys::DynamicLibrary::AddSymbol("uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
+                                                   reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&runtime_llvm_jit_live_unwind_probe_capture)));
 #  endif
 
-            auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{module.release()})
-                                .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(::llvm::CodeGenOptLevel::None)
-                                .setMCJITMemoryManager(::std::make_unique<
-                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
-                                .create(target_machine.get())};
+            auto raw_engine{
+                ::llvm::EngineBuilder(llvm_module_owner_t{module.release()})
+                    .setEngineKind(::llvm::EngineKind::JIT)
+                    .setOptLevel(::llvm::CodeGenOptLevel::None)
+                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
 
@@ -1133,10 +1120,7 @@ namespace uwvm2::runtime::lib
             return runtime_llvm_jit_live_unwind_probe_saw_jit_frame(state);
         }
 # else
-        [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe() noexcept
-        {
-            return false;
-        }
+        [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe() noexcept { return false; }
 # endif
 
         enum class runtime_llvm_jit_unwind_probe_status : unsigned
@@ -1223,42 +1207,40 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline runtime_llvm_jit_unwind_probe_result runtime_llvm_jit_checked_unwind_probe_result() noexcept
         {
             static runtime_llvm_jit_unwind_probe_result const result{[]() noexcept
-            {
-                auto const start_time{runtime_llvm_jit_unwind_probe_verbose_now()};
+                                                                     {
+                                                                         auto const start_time{runtime_llvm_jit_unwind_probe_verbose_now()};
 
-                runtime_llvm_jit_unwind_probe_status status{};
+                                                                         runtime_llvm_jit_unwind_probe_status status{};
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
-                status = runtime_llvm_jit_unwind_probe_status::no_backend;
+                                                                         status = runtime_llvm_jit_unwind_probe_status::no_backend;
 # else
-                if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
-                {
-                    status = runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
-                }
-                else if(!runtime_llvm_jit_live_unwind_probe()) [[unlikely]]
-                {
-                    status = runtime_llvm_jit_unwind_probe_status::live_probe_failed;
-                }
-                else
-                {
-                    status = runtime_llvm_jit_unwind_probe_status::ok;
-                }
+                                                                         if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
+                                                                         {
+                                                                             status = runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
+                                                                         }
+                                                                         else if(!runtime_llvm_jit_live_unwind_probe()) [[unlikely]]
+                                                                         {
+                                                                             status = runtime_llvm_jit_unwind_probe_status::live_probe_failed;
+                                                                         }
+                                                                         else
+                                                                         {
+                                                                             status = runtime_llvm_jit_unwind_probe_status::ok;
+                                                                         }
 # endif
 
-                runtime_llvm_jit_unwind_probe_result ret{.status = status};
-                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                {
-                    ret.elapsed = runtime_llvm_jit_unwind_probe_verbose_now() - start_time;
-                }
-                runtime_llvm_jit_unwind_probe_verbose_info(ret);
-                return ret;
-            }()};
+                                                                         runtime_llvm_jit_unwind_probe_result ret{.status = status};
+                                                                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                                                                         {
+                                                                             ret.elapsed = runtime_llvm_jit_unwind_probe_verbose_now() - start_time;
+                                                                         }
+                                                                         runtime_llvm_jit_unwind_probe_verbose_info(ret);
+                                                                         return ret;
+                                                                     }()};
             return result;
         }
 
         [[nodiscard]] inline runtime_llvm_jit_unwind_probe_status runtime_llvm_jit_checked_unwind_probe_status() noexcept
-        {
-            return runtime_llvm_jit_checked_unwind_probe_result().status;
-        }
+        { return runtime_llvm_jit_checked_unwind_probe_result().status; }
 
         inline void runtime_llvm_jit_auto_unwind_fallback_warning_once(runtime_llvm_jit_unwind_probe_status st) noexcept
         {
@@ -1299,8 +1281,7 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
-            get_runtime_llvm_jit_effective_call_stack_mode() noexcept
+        [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
             using runtime_llvm_jit_call_stack_t = runtime_mode::runtime_llvm_jit_call_stack_t;
@@ -1322,8 +1303,7 @@ namespace uwvm2::runtime::lib
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
             auto const mode{get_runtime_llvm_jit_effective_call_stack_mode()};
-            return mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind ||
-                   mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck;
+            return mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind || mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck;
         }
 
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept
@@ -2286,8 +2266,7 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        inline void configure_runtime_llvm_jit_call_stack_policy(
-            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option& opt) noexcept
+        inline void configure_runtime_llvm_jit_call_stack_policy(::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option& opt) noexcept
         {
             validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
             opt.emit_call_stack_frames = runtime_llvm_jit_uses_instruction_call_stack_frames();
@@ -2760,33 +2739,29 @@ namespace uwvm2::runtime::lib
             }
 
             ::std::uint_least8_t expected{};
-            if(ready_ref.compare_exchange_strong(expected,
-                                                 static_cast<::std::uint_least8_t>(1u),
-                                                 ::std::memory_order_acq_rel,
-                                                 ::std::memory_order_acquire) &&
+            if(ready_ref.compare_exchange_strong(expected, static_cast<::std::uint_least8_t>(1u), ::std::memory_order_acq_rel, ::std::memory_order_acquire) &&
                ::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
-                ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(
-                    u8"tiered-large-long-run module=\"",
-                    rec.module_name,
-                    u8"\" module_id=",
-                    module_id_from_record(rec),
-                    u8" local_functions=",
-                    local_n,
-                    u8" fallback_count=",
-                    fallback_count,
-                    u8" entry_miss_count=",
-                    entry_miss_count,
-                    u8" switch_count=",
-                    switch_count,
-                    u8" large_loop_samples=",
-                    large_loop_sample_count,
-                    u8" entry_threshold=",
-                    tiered_large_long_run_entry_counter_threshold,
-                    u8" switch_threshold=",
-                    tiered_large_long_run_switch_counter_threshold,
-                    u8" large_loop_threshold=",
-                    tiered_large_long_run_loop_sample_threshold);
+                ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(u8"tiered-large-long-run module=\"",
+                                                                                                             rec.module_name,
+                                                                                                             u8"\" module_id=",
+                                                                                                             module_id_from_record(rec),
+                                                                                                             u8" local_functions=",
+                                                                                                             local_n,
+                                                                                                             u8" fallback_count=",
+                                                                                                             fallback_count,
+                                                                                                             u8" entry_miss_count=",
+                                                                                                             entry_miss_count,
+                                                                                                             u8" switch_count=",
+                                                                                                             switch_count,
+                                                                                                             u8" large_loop_samples=",
+                                                                                                             large_loop_sample_count,
+                                                                                                             u8" entry_threshold=",
+                                                                                                             tiered_large_long_run_entry_counter_threshold,
+                                                                                                             u8" switch_threshold=",
+                                                                                                             tiered_large_long_run_switch_counter_threshold,
+                                                                                                             u8" large_loop_threshold=",
+                                                                                                             tiered_large_long_run_loop_sample_threshold);
             }
             return true;
         }
@@ -2951,8 +2926,7 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        inline void maybe_request_tiered_full_compile(compiled_module_record& rec,
-                                                      ::uwvm2::utils::container::u8string_view reason = u8"switch") noexcept
+        inline void maybe_request_tiered_full_compile(compiled_module_record& rec, ::uwvm2::utils::container::u8string_view reason = u8"switch") noexcept
         {
             if(!tiered_t2_enabled()) { return; }
             if(tiered_full_ready(rec)) { return; }
@@ -3004,22 +2978,20 @@ namespace uwvm2::runtime::lib
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
                 if(sample_count == 1uz || sample_count == tiered_large_long_run_loop_sample_threshold ||
-                   (sample_count > tiered_large_long_run_loop_sample_threshold &&
-                    (sample_count % tiered_large_long_run_loop_sample_threshold) == 0uz))
+                   (sample_count > tiered_large_long_run_loop_sample_threshold && (sample_count % tiered_large_long_run_loop_sample_threshold) == 0uz))
                 {
-                    ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(
-                        u8"tiered-large-loop-sample module=\"",
-                        rec.module_name,
-                        u8"\" module_id=",
-                        module_id_from_record(rec),
-                        u8" local_fn=",
-                        local_index,
-                        u8" loop_offset=",
-                        loop_wasm_code_offset,
-                        u8" samples=",
-                        sample_count,
-                        u8" threshold=",
-                        tiered_large_long_run_loop_sample_threshold);
+                    ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(u8"tiered-large-loop-sample module=\"",
+                                                                                                                 rec.module_name,
+                                                                                                                 u8"\" module_id=",
+                                                                                                                 module_id_from_record(rec),
+                                                                                                                 u8" local_fn=",
+                                                                                                                 local_index,
+                                                                                                                 u8" loop_offset=",
+                                                                                                                 loop_wasm_code_offset,
+                                                                                                                 u8" samples=",
+                                                                                                                 sample_count,
+                                                                                                                 u8" threshold=",
+                                                                                                                 tiered_large_long_run_loop_sample_threshold);
                 }
             }
             static_cast<void>(tiered_large_module_long_run_active(rec));
@@ -3101,14 +3073,8 @@ namespace uwvm2::runtime::lib
         {
             ::std::uint_least32_t threshold{4194304u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n < 128uz)
-            {
-                threshold = 131072u;
-            }
-            else if(local_n < 512uz)
-            {
-                threshold = 262144u;
-            }
+            if(local_n < 128uz) { threshold = 131072u; }
+            else if(local_n < 512uz) { threshold = 262144u; }
             else if(local_n >= 8192uz) { threshold = 1048576u; }
             else if(local_n >= 512uz) { threshold = 1048576u; }
 
@@ -3145,9 +3111,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline bool tiered_entry_hot_tracking_enabled(compiled_module_record const& rec) noexcept
-        {
-            return !rec.llvm_jit_lazy_compiled.functions.empty();
-        }
+        { return !rec.llvm_jit_lazy_compiled.functions.empty(); }
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_entry_hot_probe_stride(compiled_module_record const& rec) noexcept
         {
@@ -3211,8 +3175,8 @@ namespace uwvm2::runtime::lib
                 wasm1_code op{};
                 ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
                 auto const op_value{static_cast<unsigned>(op)};
-                if(op_value == 0x2au || op_value == 0x2bu || op_value == 0x38u || op_value == 0x39u ||
-                   (op_value >= 0x8bu && op_value <= 0xa6u) || (op_value >= 0xb2u && op_value <= 0xbbu))
+                if(op_value == 0x2au || op_value == 0x2bu || op_value == 0x38u || op_value == 0x39u || (op_value >= 0x8bu && op_value <= 0xa6u) ||
+                   (op_value >= 0xb2u && op_value <= 0xbbu))
                 {
                     if(++fp_ops >= 8uz) { return true; }
                 }
@@ -3221,8 +3185,7 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        [[nodiscard]] inline bool tiered_loop_osr_should_suppress_medium_fp_kernel(compiled_module_record const& rec,
-                                                                                   ::std::size_t local_index) noexcept
+        [[nodiscard]] inline bool tiered_loop_osr_should_suppress_medium_fp_kernel(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n < 16uz || local_n >= 128uz) { return false; }
@@ -3231,8 +3194,7 @@ namespace uwvm2::runtime::lib
             return code_size >= 1024uz && tiered_function_code_has_fp_kernel_shape(rec, local_index);
         }
 
-        [[nodiscard]] inline bool tiered_entry_should_compile_inline_for_small_hot_loop(compiled_module_record const& rec,
-                                                                                       ::std::size_t local_index) noexcept
+        [[nodiscard]] inline bool tiered_entry_should_compile_inline_for_small_hot_loop(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n == 0uz || local_n > 8uz) { return false; }
@@ -3768,10 +3730,8 @@ namespace uwvm2::runtime::lib
 
             if(!g_runtime.llvm_jit_urgent_scheduler.running())
             {
-                g_runtime.llvm_jit_urgent_scheduler.start({.worker_count = 1uz,
-                                                           .queue_capacity = llvm_jit_urgent_scheduler_queue_capacity,
-                                                           .refill_callback = nullptr,
-                                                           .refill_user_data = nullptr});
+                g_runtime.llvm_jit_urgent_scheduler.start(
+                    {.worker_count = 1uz, .queue_capacity = llvm_jit_urgent_scheduler_queue_capacity, .refill_callback = nullptr, .refill_user_data = nullptr});
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -3797,14 +3757,12 @@ namespace uwvm2::runtime::lib
             return g_runtime.llvm_jit_urgent_scheduler.running();
         }
 
-        [[nodiscard]] inline bool llvm_jit_lazy_demand_should_use_urgent_scheduler(
-            compiled_module_record const& rec,
-            ::std::size_t local_index,
-            ::uwvm2::utils::thread::lazy_compile_state current_state) noexcept
+        [[nodiscard]] inline bool llvm_jit_lazy_demand_should_use_urgent_scheduler(compiled_module_record const& rec,
+                                                                                   ::std::size_t local_index,
+                                                                                   ::uwvm2::utils::thread::lazy_compile_state current_state) noexcept
         {
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
-            if(current_state != ::uwvm2::utils::thread::lazy_compile_state::queued &&
-               current_state != ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
+            if(current_state != ::uwvm2::utils::thread::lazy_compile_state::queued && current_state != ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
             {
                 return false;
             }
@@ -5705,10 +5663,7 @@ namespace uwvm2::runtime::lib
             for(;;)
             {
                 auto const st{request.unit->state.load(::std::memory_order_acquire)};
-                if(::uwvm2::utils::thread::lazy_compile_state_is_terminal(st))
-                {
-                    return st == ::uwvm2::utils::thread::lazy_compile_state::compiled;
-                }
+                if(::uwvm2::utils::thread::lazy_compile_state_is_terminal(st)) { return st == ::uwvm2::utils::thread::lazy_compile_state::compiled; }
 
                 if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled || st == ::uwvm2::utils::thread::lazy_compile_state::queued)
                 {
@@ -5730,8 +5685,7 @@ namespace uwvm2::runtime::lib
         }
 # endif
 
-        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t TranslateOpt,
-                  bool DirectCompileForTieredT0 = false>
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t TranslateOpt, bool DirectCompileForTieredT0 = false>
         inline void ensure_lazy_defined_function_compiled_impl(::std::size_t module_id, ::std::size_t function_index) noexcept
         {
             if(!g_runtime.lazy_compile_active) { return; }
@@ -6837,8 +6791,8 @@ namespace uwvm2::runtime::lib
                                     target.context_address = 0u;
                                     ::std::uintptr_t typed_defined_entry_address{};
                                     if(try_get_runtime_llvm_jit_defined_entry_address(defined_info->module_id,
-                                                                                     defined_info->function_index,
-                                                                                     typed_defined_entry_address))
+                                                                                      defined_info->function_index,
+                                                                                      typed_defined_entry_address))
                                     {
                                         target.typed_entry_address = typed_defined_entry_address;
                                     }
@@ -7120,8 +7074,7 @@ namespace uwvm2::runtime::lib
             ::uwvm2::utils::container::u8string_view policy_name{};
         };
 
-        [[nodiscard]] inline ::llvm::CodeGenOptLevel resolve_runtime_llvm_jit_lazy_codegen_opt_level(
-            ::llvm::CodeGenOptLevel default_level) noexcept
+        [[nodiscard]] inline ::llvm::CodeGenOptLevel resolve_runtime_llvm_jit_lazy_codegen_opt_level(::llvm::CodeGenOptLevel default_level) noexcept
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
 
@@ -7153,17 +7106,17 @@ namespace uwvm2::runtime::lib
             return default_level;
         }
 
-        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy make_runtime_llvm_jit_full_materialize_strategy(
-            runtime_llvm_jit_full_pipeline_kind pipeline,
-            ::llvm::CodeGenOptLevel codegen_opt_level,
-            ::uwvm2::utils::container::u8string_view policy_name) noexcept
+        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy
+            make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind pipeline,
+                                                            ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                            ::uwvm2::utils::container::u8string_view policy_name) noexcept
         {
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { pipeline = runtime_llvm_jit_full_pipeline_kind::none; }
             return {.pipeline = pipeline, .codegen_opt_level = codegen_opt_level, .policy_name = policy_name};
         }
 
-        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy resolve_runtime_llvm_jit_full_materialize_strategy(
-            ::llvm::CodeGenOptLevel default_level) noexcept
+        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy
+            resolve_runtime_llvm_jit_full_materialize_strategy(::llvm::CodeGenOptLevel default_level) noexcept
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
 
@@ -7178,10 +7131,9 @@ namespace uwvm2::runtime::lib
                                                                                ::llvm::CodeGenOptLevel::None,
                                                                                ::uwvm2::utils::container::u8string_view{u8"full:debug", 10uz});
                     case runtime_llvm_jit_full_policy_t::legacy_light:
-                        return make_runtime_llvm_jit_full_materialize_strategy(
-                            runtime_llvm_jit_full_pipeline_kind::legacy_light,
-                            default_level,
-                            ::uwvm2::utils::container::u8string_view{u8"full:legacy-light", 17uz});
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::legacy_light,
+                                                                               default_level,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"full:legacy-light", 17uz});
                     case runtime_llvm_jit_full_policy_t::passbuilder_o1:
                         return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
                                                                                ::llvm::CodeGenOptLevel::Less,
@@ -7235,8 +7187,7 @@ namespace uwvm2::runtime::lib
                                                                    ::uwvm2::utils::container::u8string_view{u8"default", 7uz});
         }
 
-        [[nodiscard]] inline constexpr ::llvm::OptimizationLevel get_runtime_llvm_jit_pipeline_opt_level(
-            ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        [[nodiscard]] inline constexpr ::llvm::OptimizationLevel get_runtime_llvm_jit_pipeline_opt_level(::llvm::CodeGenOptLevel codegen_opt_level) noexcept
         {
             switch(codegen_opt_level)
             {
@@ -7248,21 +7199,20 @@ namespace uwvm2::runtime::lib
             ::fast_io::fast_terminate();
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::container::u8string_view get_runtime_llvm_jit_full_pipeline_name(
-            runtime_llvm_jit_full_pipeline_kind pipeline) noexcept
+        [[nodiscard]] inline ::uwvm2::utils::container::u8string_view
+            get_runtime_llvm_jit_full_pipeline_name(runtime_llvm_jit_full_pipeline_kind pipeline) noexcept
         {
             switch(pipeline)
             {
                 case runtime_llvm_jit_full_pipeline_kind::none: return ::uwvm2::utils::container::u8string_view{u8"none", 4uz};
                 case runtime_llvm_jit_full_pipeline_kind::legacy_light: return ::uwvm2::utils::container::u8string_view{u8"legacy-light", 12uz};
-                case runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned:
-                    return ::uwvm2::utils::container::u8string_view{u8"passbuilder-tuned", 17uz};
+                case runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned: return ::uwvm2::utils::container::u8string_view{u8"passbuilder-tuned", 17uz};
             }
             ::fast_io::fast_terminate();
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view get_runtime_llvm_jit_codegen_opt_level_name(
-            ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+            get_runtime_llvm_jit_codegen_opt_level_name(::llvm::CodeGenOptLevel codegen_opt_level) noexcept
         {
             switch(codegen_opt_level)
             {
@@ -7333,13 +7283,9 @@ namespace uwvm2::runtime::lib
                 pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);
                 pass_builder.registerFunctionAnalyses(function_analysis_manager);
                 pass_builder.registerLoopAnalyses(loop_analysis_manager);
-                pass_builder.crossRegisterProxies(loop_analysis_manager,
-                                                  function_analysis_manager,
-                                                  cgscc_analysis_manager,
-                                                  module_analysis_manager);
+                pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager, module_analysis_manager);
 
-                auto module_pass_manager{
-                    pass_builder.buildPerModuleDefaultPipeline(pipeline_opt_level)};
+                auto module_pass_manager{pass_builder.buildPerModuleDefaultPipeline(pipeline_opt_level)};
                 module_pass_manager.run(module, module_analysis_manager);
             }
 
@@ -7501,13 +7447,11 @@ namespace uwvm2::runtime::lib
                                                   u8" unwind_check=",
                                                   runtime_llvm_jit_unwind_check_requested()
                                                       ? ::uwvm2::utils::container::u8string_view{u8"live-jit"}
-                                                      : (runtime_llvm_jit_unwind_call_stack_requested()
-                                                             ? ::uwvm2::utils::container::u8string_view{u8"skipped"}
-                                                             : ::uwvm2::utils::container::u8string_view{u8"off"}),
+                                                      : (runtime_llvm_jit_unwind_call_stack_requested() ? ::uwvm2::utils::container::u8string_view{u8"skipped"}
+                                                                                                        : ::uwvm2::utils::container::u8string_view{u8"off"}),
                                                   u8" unwind_replace_frames=",
-                                                  runtime_llvm_jit_unwind_can_replace_instruction_frames()
-                                                      ? ::uwvm2::utils::container::u8string_view{u8"yes"}
-                                                      : ::uwvm2::utils::container::u8string_view{u8"no"},
+                                                  runtime_llvm_jit_unwind_can_replace_instruction_frames() ? ::uwvm2::utils::container::u8string_view{u8"yes"}
+                                                                                                           : ::uwvm2::utils::container::u8string_view{u8"no"},
                                                   u8" call_stack_frames=",
                                                   runtime_llvm_jit_uses_instruction_call_stack_frames() ? u8"emit" : u8"omit");
             if(!optimize_runtime_llvm_jit_module(*merged_module,
@@ -7527,14 +7471,14 @@ namespace uwvm2::runtime::lib
                                                   u8"\" time=",
                                                   llvm_jit_materialize_runtime_log_now() - optimize_start_time);
 
-            auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
-                                .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(codegen_opt_level)
-                                .setMCPU(host_cpu_name)
-                                .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<
-                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
-                                .create(target_machine.get())};
+            auto raw_engine{
+                ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
+                    .setEngineKind(::llvm::EngineKind::JIT)
+                    .setOptLevel(codegen_opt_level)
+                    .setMCPU(host_cpu_name)
+                    .setMAttrs(host_target_attributes)
+                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -9848,8 +9792,7 @@ namespace uwvm2::runtime::lib
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
             auto const has_lazy_background_work{llvm_lazy_background_enabled && worker_count != 0uz && has_llvm_jit_lazy_background_work()};
-            auto const lazy_scheduler_worker_count{
-                tiered_t0_backend ? (worker_count == 0uz ? 0uz : 1uz) : (has_lazy_background_work ? worker_count : 0uz)};
+            auto const lazy_scheduler_worker_count{tiered_t0_backend ? (worker_count == 0uz ? 0uz : 1uz) : (has_lazy_background_work ? worker_count : 0uz)};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             bool has_tiered_urgent_scheduler_candidate{};
             if(tiered_t0_backend && worker_count != 0uz)
@@ -9873,10 +9816,7 @@ namespace uwvm2::runtime::lib
                                             .queue_capacity = 0uz,
                                             .refill_callback = has_lazy_background_work ? &llvm_jit_lazy_background_refill_callback : nullptr,
                                             .refill_user_data = nullptr});
-            g_runtime.llvm_jit_urgent_scheduler.start({.worker_count = 0uz,
-                                                       .queue_capacity = 0uz,
-                                                       .refill_callback = nullptr,
-                                                       .refill_user_data = nullptr});
+            g_runtime.llvm_jit_urgent_scheduler.start({.worker_count = 0uz, .queue_capacity = 0uz, .refill_callback = nullptr, .refill_user_data = nullptr});
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             auto const urgent_scheduler_worker_count{has_tiered_urgent_scheduler_candidate ? 1uz : 0uz};
             if(tiered_t0_backend)
