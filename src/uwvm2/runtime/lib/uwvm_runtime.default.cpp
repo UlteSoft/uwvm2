@@ -2665,15 +2665,15 @@ namespace uwvm2::runtime::lib
         constexpr ::std::size_t tiered_large_long_run_local_function_threshold{8192uz};
         constexpr ::std::size_t tiered_large_long_run_entry_counter_threshold{1048576uz};
         constexpr ::std::size_t tiered_large_long_run_switch_counter_threshold{262144uz};
-        constexpr ::std::size_t tiered_large_long_run_loop_sample_threshold{4uz};
+        constexpr ::std::size_t tiered_large_long_run_loop_sample_threshold{1uz};
         constexpr ::std::size_t tiered_large_loop_compile_entry_counter_threshold{16777216uz};
         constexpr ::std::size_t tiered_large_loop_compile_fallback_counter_threshold{67108864uz};
         constexpr ::std::size_t tiered_large_loop_compile_switch_counter_threshold{8388608uz};
-        // This stays above the large-module long-run activation threshold, but it must not be
-        // so high that a huge eval-loop artifact starts compiling only when the guest is about
-        // to exit.  Crossing this counter is the "early enough to amortize or skip entirely"
-        // point for CPython-style sentinel loops.
-        constexpr ::std::uint_least32_t tiered_large_loop_osr_request_threshold{4u};
+        // Huge CPython-style eval artifacts are expensive to JIT.  Large-loop samples still
+        // activate long-run entry policy immediately, but the eval-sized OSR request itself
+        // waits for a much stronger counter so medium workloads do not leave a multi-second
+        // compile debt at process exit.
+        constexpr ::std::uint_least32_t tiered_large_loop_osr_request_threshold{262144u};
 
         [[nodiscard]] inline ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
@@ -2769,6 +2769,10 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool tiered_large_loop_sentinel_compile_active(compiled_module_record const& rec) noexcept
         {
             if(!tiered_large_module_long_run_active(rec)) { return false; }
+
+            auto& large_loop_sample_counter{const_cast<::std::size_t&>(rec.tiered_large_loop_sample_count)};
+            auto const large_loop_sample_count{::std::atomic_ref<::std::size_t>{large_loop_sample_counter}.load(::std::memory_order_relaxed)};
+            if(large_loop_sample_count >= tiered_large_long_run_loop_sample_threshold) { return true; }
 
             auto& fallback_counter{const_cast<::std::size_t&>(rec.tiered_interpreter_fallback_count)};
             auto& entry_miss_counter{const_cast<::std::size_t&>(rec.tiered_entry_miss_count)};
@@ -2977,8 +2981,11 @@ namespace uwvm2::runtime::lib
             auto const sample_count{::std::atomic_ref<::std::size_t>{rec.tiered_large_loop_sample_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
-                if(sample_count == 1uz || sample_count == tiered_large_long_run_loop_sample_threshold ||
-                   (sample_count > tiered_large_long_run_loop_sample_threshold && (sample_count % tiered_large_long_run_loop_sample_threshold) == 0uz))
+                auto const log_periodic_sample{tiered_large_long_run_loop_sample_threshold > 1uz &&
+                                               sample_count > tiered_large_long_run_loop_sample_threshold &&
+                                               (sample_count % tiered_large_long_run_loop_sample_threshold) == 0uz};
+                auto const log_power_of_two_sample{tiered_large_long_run_loop_sample_threshold <= 1uz && (sample_count & (sample_count - 1uz)) == 0uz};
+                if(sample_count == 1uz || sample_count == tiered_large_long_run_loop_sample_threshold || log_periodic_sample || log_power_of_two_sample)
                 {
                     ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_runtime_log::line(u8"tiered-large-loop-sample module=\"",
                                                                                                                  rec.module_name,
@@ -3071,42 +3078,44 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
         {
-            ::std::uint_least32_t threshold{4194304u};
+            ::std::uint_least32_t threshold{262144u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n < 128uz) { threshold = 131072u; }
-            else if(local_n < 512uz) { threshold = 262144u; }
-            else if(local_n >= 8192uz) { threshold = 1048576u; }
-            else if(local_n >= 512uz) { threshold = 1048576u; }
+            if(local_n < 128uz) { threshold = 8192u; }
+            else if(local_n < 512uz) { threshold = 16384u; }
+            else if(local_n >= 8192uz) { threshold = 262144u; }
+            else if(local_n >= 512uz) { threshold = 65536u; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(local_n < 128uz)
             {
-                if(code_size <= 128uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
-                else if(code_size <= 512uz) { threshold = (threshold > 65536u) ? 65536u : threshold; }
-                else if(code_size <= 1024uz) { threshold = (threshold > 131072u) ? 131072u : threshold; }
-                else if(code_size <= 4096uz) { threshold = (threshold > 262144u) ? 262144u : threshold; }
+                if(code_size <= 128uz) { threshold = (threshold > 2048u) ? 2048u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold > 4096u) ? 4096u : threshold; }
+                else if(code_size <= 1024uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
+                else if(code_size <= 4096uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
             }
             else if(local_n < 512uz)
             {
-                if(code_size <= 128uz) { threshold = (threshold > 65536u) ? 65536u : threshold; }
-                else if(code_size <= 512uz) { threshold = (threshold > 131072u) ? 131072u : threshold; }
-                else if(code_size <= 4096uz) { threshold = (threshold > 524288u) ? 524288u : threshold; }
+                if(code_size <= 128uz) { threshold = (threshold > 4096u) ? 4096u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
+                else if(code_size <= 4096uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
             }
             else if(local_n < 4096uz)
             {
-                if(code_size <= 4096uz) { threshold = (threshold < 4194304u) ? 4194304u : threshold; }
+                if(code_size <= 128uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
+                else if(code_size <= 4096uz) { threshold = (threshold > 65536u) ? 65536u : threshold; }
             }
             else if(local_n >= tiered_large_long_run_local_function_threshold && tiered_large_module_long_run_active(rec))
             {
-                if(code_size <= 128uz) { threshold = (threshold > 65536u) ? 65536u : threshold; }
-                else if(code_size <= 512uz) { threshold = (threshold > 131072u) ? 131072u : threshold; }
-                else if(code_size <= 1024uz) { threshold = (threshold > 262144u) ? 262144u : threshold; }
-                else if(code_size <= 4096uz) { threshold = (threshold > 524288u) ? 524288u : threshold; }
+                if(code_size <= 128uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
+                else if(code_size <= 1024uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
+                else if(code_size <= 4096uz) { threshold = (threshold > 65536u) ? 65536u : threshold; }
             }
 
             if(code_size >= 32768uz) { threshold = ::std::numeric_limits<::std::uint_least32_t>::max(); }
-            else if(code_size >= 8192uz) { threshold = (threshold < 262144u) ? 262144u : threshold; }
-            else if(code_size >= 4096uz) { threshold = (threshold < 65536u) ? 65536u : threshold; }
+            else if(code_size >= 8192uz) { threshold = (threshold < 131072u) ? 131072u : threshold; }
+            else if(code_size >= 4096uz) { threshold = (threshold < 32768u) ? 32768u : threshold; }
             return threshold;
         }
 
@@ -3428,7 +3437,7 @@ namespace uwvm2::runtime::lib
 
             if(use_urgent_scheduler)
             {
-                if(g_runtime.tiered_urgent_scheduler.try_request(request))
+                if(g_runtime.tiered_urgent_scheduler.try_request_or_shadow_queued(request))
                 {
                     g_runtime.tiered_osr_urgent_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
                     return tiered_llvm_jit_demand_state::busy;
@@ -3502,10 +3511,19 @@ namespace uwvm2::runtime::lib
                                                                                               ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n < 16uz || local_n >= 128uz) { return false; }
+            if(local_n >= 512uz) { return false; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             return code_size >= 1024uz && code_size < 4096uz;
+        }
+
+        [[nodiscard]] inline bool tiered_loop_osr_should_wait_for_urgent_compile(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        {
+            auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+            if(local_n >= 512uz) { return false; }
+
+            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
+            return code_size < 8192uz;
         }
 
         [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec, ::std::size_t local_index) noexcept
@@ -3519,7 +3537,6 @@ namespace uwvm2::runtime::lib
             auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
             if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]] { return false; }
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled) { return true; }
-            if(st == ::uwvm2::utils::thread::lazy_compile_state::queued) { return true; }
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiling) { return true; }
             if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]] { return false; }
 
@@ -3573,10 +3590,14 @@ namespace uwvm2::runtime::lib
 
             if(use_urgent_scheduler)
             {
-                if(g_runtime.tiered_urgent_scheduler.try_request(request))
+                if(g_runtime.tiered_urgent_scheduler.try_request_or_shadow_queued(request))
                 {
                     record_tiered_osr_compile_request();
                     g_runtime.tiered_osr_urgent_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                    if(tiered_loop_osr_should_wait_for_urgent_compile(rec, local_index))
+                    {
+                        return g_runtime.tiered_urgent_scheduler.wait_until_ready_passive(*request.unit);
+                    }
                     return true;
                 }
             }

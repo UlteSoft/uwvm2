@@ -432,7 +432,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             if(expected != lazy_compile_state::queued) { return expected == lazy_compile_state::compiling || expected == lazy_compile_state::compiled; }
 
             request.owns_queued_state = false;
-            if(!this->try_enqueue(request))
+            if(!this->try_enqueue(request, true))
             {
                 this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 return false;
@@ -591,13 +591,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 #endif
         }
 
-        [[nodiscard]] inline bool try_enqueue(lazy_compile_request request) noexcept
+        [[nodiscard]] inline bool try_enqueue(lazy_compile_request request, bool deduplicate_unit = false) noexcept
         {
             if(this->queue_capacity == 0uz || this->stop_requested.load(::std::memory_order_acquire)) { return false; }
 
             this->lock_queue();
 
             auto const current_count{this->queued_count.load(::std::memory_order_relaxed)};
+            if(deduplicate_unit && request.unit != nullptr)
+            {
+                for(::std::size_t i{}; i != current_count; ++i)
+                {
+                    auto const probe_index{(this->queue_head + i) % this->queue_capacity};
+                    if(this->queue.buffer[probe_index].request.unit == request.unit)
+                    {
+                        this->unlock_queue();
+                        return true;
+                    }
+                }
+            }
+
             if(current_count >= this->queue_capacity)
             {
                 this->unlock_queue();

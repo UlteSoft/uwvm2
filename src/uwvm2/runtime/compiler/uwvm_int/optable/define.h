@@ -432,7 +432,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size)
         {
-            return {.initial_countdown = 16384u, .reset_countdown = 16384u, .request_countdown = 64u};
+            return {.initial_countdown = 256u, .reset_countdown = 256u, .request_countdown = 16u};
         }
         if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 512u}; }
         if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 2048u}; }
@@ -440,7 +440,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     [[nodiscard]] inline constexpr bool interpreter_tiered_loop_osr_poll_should_emit(::std::size_t local_function_count,
-                                                                                     ::std::size_t function_code_size) noexcept
+                                        
+        ::std::size_t function_code_size) noexcept
     {
         return interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count) ||
                function_code_size >= interpreter_tiered_large_loop_sentinel_function_size;
