@@ -1161,19 +1161,103 @@ namespace uwvm2::runtime::lib
             return u8"unknown unwind probe failure";
         }
 
+        struct runtime_llvm_jit_unwind_probe_result
+        {
+            runtime_llvm_jit_unwind_probe_status status{};
+            ::fast_io::unix_timestamp elapsed{};
+        };
+
+        [[nodiscard]] inline ::fast_io::unix_timestamp runtime_llvm_jit_unwind_probe_verbose_now() noexcept
+        {
+            ::fast_io::unix_timestamp ts{};
+            if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return ts; }
+
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                ts = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // keep default timestamp
+            }
+# endif
+
+            return ts;
+        }
+
+        inline void runtime_llvm_jit_unwind_probe_verbose_info(runtime_llvm_jit_unwind_probe_result const& result) noexcept
+        {
+            if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"LLVM JIT unwind self-check status=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                runtime_llvm_jit_unwind_probe_status_reason(result.status),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" backend=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                runtime_llvm_jit_unwind_backend_name(),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" time=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                result.elapsed,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"s. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                u8"[",
+                                ::uwvm2::uwvm::io::get_local_realtime(),
+                                u8"] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
+        [[nodiscard]] inline runtime_llvm_jit_unwind_probe_result runtime_llvm_jit_checked_unwind_probe_result() noexcept
+        {
+            static runtime_llvm_jit_unwind_probe_result const result{[]() noexcept
+            {
+                auto const start_time{runtime_llvm_jit_unwind_probe_verbose_now()};
+
+                runtime_llvm_jit_unwind_probe_status status{};
+# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
+                status = runtime_llvm_jit_unwind_probe_status::no_backend;
+# else
+                if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
+                {
+                    status = runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
+                }
+                else if(!runtime_llvm_jit_live_unwind_probe()) [[unlikely]]
+                {
+                    status = runtime_llvm_jit_unwind_probe_status::live_probe_failed;
+                }
+                else
+                {
+                    status = runtime_llvm_jit_unwind_probe_status::ok;
+                }
+# endif
+
+                runtime_llvm_jit_unwind_probe_result ret{.status = status};
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    ret.elapsed = runtime_llvm_jit_unwind_probe_verbose_now() - start_time;
+                }
+                runtime_llvm_jit_unwind_probe_verbose_info(ret);
+                return ret;
+            }()};
+            return result;
+        }
+
         [[nodiscard]] inline runtime_llvm_jit_unwind_probe_status runtime_llvm_jit_checked_unwind_probe_status() noexcept
         {
-# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
-            return runtime_llvm_jit_unwind_probe_status::no_backend;
-# else
-            if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
-            {
-                return runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
-            }
-            static bool const live_probe_ok{runtime_llvm_jit_live_unwind_probe()};
-            if(!live_probe_ok) [[unlikely]] { return runtime_llvm_jit_unwind_probe_status::live_probe_failed; }
-            return runtime_llvm_jit_unwind_probe_status::ok;
-# endif
+            return runtime_llvm_jit_checked_unwind_probe_result().status;
         }
 
         inline void runtime_llvm_jit_auto_unwind_fallback_warning_once(runtime_llvm_jit_unwind_probe_status st) noexcept
