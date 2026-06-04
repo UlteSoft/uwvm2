@@ -2684,11 +2684,11 @@ namespace uwvm2::runtime::lib
         constexpr ::std::size_t tiered_large_loop_compile_entry_counter_threshold{16777216uz};
         constexpr ::std::size_t tiered_large_loop_compile_fallback_counter_threshold{67108864uz};
         constexpr ::std::size_t tiered_large_loop_compile_switch_counter_threshold{8388608uz};
-        // Huge CPython-style eval artifacts are expensive to JIT.  Large-loop samples still
-        // activate long-run entry policy immediately, but the eval-sized OSR request itself
-        // waits for a much stronger counter so medium workloads do not leave a multi-second
-        // compile debt at process exit.
-        constexpr ::std::uint_least32_t tiered_large_loop_osr_request_threshold{262144u};
+        // Huge CPython-style eval artifacts need an early counter-only urgent Tier 1 request.
+        // The bytecode-local loop poll already filters by iteration count; this runtime gate
+        // remains earlier than the old 262144-signal gate, but avoids handing the main
+        // CPython eval frame to a huge Tier 1 artifact before the loop has proven long enough.
+        constexpr ::std::uint_least32_t tiered_large_loop_osr_request_threshold{131072u};
 
         [[nodiscard]] inline ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
@@ -2696,6 +2696,17 @@ namespace uwvm2::runtime::lib
             if(local_n >= 1024uz) { return (::std::numeric_limits<::std::size_t>::max)(); }
             if(local_n >= 512uz) { return 1048576uz; }
             return tiered_full_compile_switch_threshold;
+        }
+
+        [[nodiscard]] inline bool tiered_t1_schedulers_stable_for_full_compile() noexcept
+        {
+            if(g_runtime.lazy_scheduler.queued_count.load(::std::memory_order_acquire) != 0uz) { return false; }
+            if(g_runtime.tiered_urgent_scheduler.running() &&
+               g_runtime.tiered_urgent_scheduler.queued_count.load(::std::memory_order_acquire) != 0uz)
+            {
+                return false;
+            }
+            return true;
         }
 
         [[nodiscard]] inline bool tiered_full_ready(compiled_module_record const& rec) noexcept
@@ -2966,6 +2977,7 @@ namespace uwvm2::runtime::lib
             if(tiered_full_ready(rec)) { return; }
             ensure_tiered_jit_schedulers_started();
             if(!g_runtime.lazy_scheduler.running()) { return; }
+            if(!tiered_t1_schedulers_stable_for_full_compile()) { return; }
             if(rec.tiered_full_compile_state.state.load(::std::memory_order_acquire) != ::uwvm2::utils::thread::lazy_compile_state::uncompiled) { return; }
 
             ::uwvm2::utils::thread::lazy_compile_request request{.unit = ::std::addressof(rec.tiered_full_compile_state),
@@ -3038,7 +3050,7 @@ namespace uwvm2::runtime::lib
         inline void record_tiered_llvm_jit_switch(compiled_module_record& rec) noexcept
         {
             auto const switch_count{::std::atomic_ref<::std::size_t>{rec.tiered_switch_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-            auto const full_compile_switch_threshold{tiered_t0_enabled() ? tiered_full_compile_switch_request_threshold(rec) : 1uz};
+            auto const full_compile_switch_threshold{tiered_full_compile_switch_request_threshold(rec)};
             if(tiered_t2_enabled() && switch_count >= full_compile_switch_threshold &&
                rec.tiered_full_compile_state.state.load(::std::memory_order_relaxed) == ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
             {

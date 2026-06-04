@@ -233,14 +233,22 @@ large interpreter function can cost more than the remaining execution it saves.
 
 After the bytecode-local OSR counter expires, a per-function runtime counter
 decides whether to request LLVM. Small and medium modules request on the first
-runtime OSR signal. Modules at CPython scale, currently modules with at least
-8192 local functions, do not get Tier 0 OSR polls during interpreter bytecode
-translation and cannot request LLVM from OSR; they rely on entry counters
-instead. This avoids both the hot-loop poll overhead and the expensive
-single-function LLVM materialization from Python bytecode loops that are shorter
-than the compile cost. This is still counter-only policy.
+runtime OSR signal. Huge loop sentinel functions, currently functions of at
+least 32768 bytes, use an earlier counter-only urgent Tier 1 path: their local
+poll runs at a 256-iteration cadence after an initial 256 iterations, emits a
+runtime signal after 16 local expirations, and requests LLVM after 131072 runtime
+signals. This replaces the old 262144-runtime-signal gate that let CPython-style
+eval loops run mostly in Tier 0. The request remains asynchronous and urgent;
+the interpreter continues until a ready loop reentry is published.
 
 When a loop OSR request is queued, the interpreter continues to poll the
 runtime through the same countdown path while the LLVM unit remains in the
 `queued` state. The lazy unit state prevents duplicate LLVM work, so queued
 polls only observe the existing request.
+
+Tier 2 is intentionally conservative by default. Switch counters still gate the
+full-module request, but the request is delayed while either the normal Tier 1
+queue or the tiered urgent queue has visible queued work. Disabling Tier 0 no
+longer makes Tier 2 request after a single native switch; the same switch
+threshold policy is used so short-process measurements continue to reflect
+Tier 1 behavior instead of accidental full-module compilation.
