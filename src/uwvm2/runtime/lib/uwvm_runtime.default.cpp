@@ -786,6 +786,51 @@ namespace uwvm2::runtime::lib
             return fn_it->second;
         }
 
+        template <typename Output>
+        [[nodiscard]] inline bool dump_call_stack_frame_for_trap(Output& u8log_output_ul,
+                                                                  ::std::size_t frame_index,
+                                                                  ::std::size_t module_id,
+                                                                  ::std::size_t function_index) noexcept
+        {
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
+
+            auto const& mod_rec{g_runtime.modules.index_unchecked(module_id)};
+            auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
+            auto const fn_name{resolve_func_display_name(mod_rec.module_name, function_index)};
+
+            ::fast_io::io::perr(u8log_output_ul,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"#",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                frame_index,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" module=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                mod_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" func_idx=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                function_index);
+
+            if(!fn_name.empty())
+            {
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8" func_name=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    fn_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\"");
+            }
+
+            ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            return true;
+        }
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # if defined(UWVM_USE_THREAD_LOCAL)
 #  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
@@ -803,6 +848,20 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept;
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept;
+
+        [[nodiscard]] inline bool runtime_llvm_jit_call_stack_applies_to_current_compiler() noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+
+            auto const compiler{runtime_mode::global_runtime_compiler};
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(compiler == runtime_mode::runtime_compiler_t::llvm_jit_only) { return true; }
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            if(compiler == runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered) { return true; }
+# endif
+            return false;
+        }
 
         inline void record_llvm_jit_unwind_entry(::std::size_t module_id, ::std::size_t function_index, ::std::uintptr_t address, bool raw_entry) noexcept
         {
@@ -1291,6 +1350,7 @@ namespace uwvm2::runtime::lib
 
             auto const requested{runtime_mode::global_runtime_llvm_jit_call_stack};
             if(requested != runtime_llvm_jit_call_stack_t::auto_policy) { return requested; }
+            if(!runtime_llvm_jit_call_stack_applies_to_current_compiler()) { return runtime_llvm_jit_call_stack_t::instruction; }
 
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             return runtime_llvm_jit_call_stack_t::instruction;
@@ -1305,6 +1365,7 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_call_stack_requested() noexcept
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+            if(!runtime_llvm_jit_call_stack_applies_to_current_compiler()) { return false; }
             auto const mode{get_runtime_llvm_jit_effective_call_stack_mode()};
             return mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind || mode == runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck;
         }
@@ -1355,113 +1416,38 @@ namespace uwvm2::runtime::lib
         }
 
         template <typename Output>
-        inline void dump_llvm_jit_unwind_call_stack_for_trap(Output& u8log_output_ul) noexcept
+        inline void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul, ::std::size_t& printed_frame_count) noexcept
         {
-            ::fast_io::io::perr(u8log_output_ul,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"LLVM JIT unwind call stack:\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
-            auto const print_unwind_ip{
-                [&](::std::size_t i, ::std::uintptr_t ip) noexcept
+            auto const print_resolved_unwind_ip{
+                [&](::std::uintptr_t ip) noexcept
                 {
                     auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
-
-                    ::fast_io::io::perr(u8log_output_ul,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                        u8"[info]  ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"#",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        i,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" ip=",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        ::fast_io::mnp::hex0x<false>(ip));
-
-                    if(resolved.entry != nullptr && resolved.entry->module_id < g_runtime.modules.size())
+                    if(resolved.entry == nullptr) { return; }
+                    if(dump_call_stack_frame_for_trap(u8log_output_ul,
+                                                      printed_frame_count,
+                                                      resolved.entry->module_id,
+                                                      resolved.entry->function_index))
                     {
-                        auto const& mod_rec{g_runtime.modules.index_unchecked(resolved.entry->module_id)};
-                        auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
-                        auto const fn_name{resolve_func_display_name(mod_rec.module_name, resolved.entry->function_index)};
-
-                        ::fast_io::io::perr(u8log_output_ul,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8" module=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                            mod_name,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8" func_idx=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                            resolved.entry->function_index,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8" +",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                            ::fast_io::mnp::hex0x<false>(resolved.offset),
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            resolved.entry->raw_entry ? ::uwvm2::utils::container::u8string_view{u8" raw"}
-                                                                      : ::uwvm2::utils::container::u8string_view{u8" typed"});
-
-                        if(!fn_name.empty())
-                        {
-                            ::fast_io::io::perr(u8log_output_ul,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8" func_name=\"",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                fn_name,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"\"");
-                        }
+                        ++printed_frame_count;
                     }
-
-                    ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 }};
 
-            ::std::size_t printed_frame_count{};
             if(llvm_jit_trap_return_address != 0u)
             {
                 auto trap_ip{llvm_jit_trap_return_address};
                 if(trap_ip != 0u) { --trap_ip; }
-                print_unwind_ip(printed_frame_count++, trap_ip);
+                print_resolved_unwind_ip(trap_ip);
             }
 
             auto const backtrace{capture_llvm_jit_unwind_backtrace(0uz)};
-            if(backtrace.size == 0uz && printed_frame_count == 0uz)
-            {
-                ::fast_io::io::perrln(u8log_output_ul,
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                      u8"uwvm: ",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                      u8"[info]  ",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                      u8"<empty>",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                return;
-            }
-
             for(::std::size_t i{}; i != backtrace.size; ++i)
             {
                 auto const ip{backtrace.frames[i]};
-                if(printed_frame_count != 0uz && ip == llvm_jit_trap_return_address - 1u) { continue; }
+                if(printed_frame_count != 0uz && llvm_jit_trap_return_address != 0u && ip == llvm_jit_trap_return_address - 1u) { continue; }
                 if(printed_frame_count != 0uz && resolve_llvm_jit_unwind_entry(ip).entry == nullptr) { continue; }
-                print_unwind_ip(printed_frame_count++, ip);
+                print_resolved_unwind_ip(ip);
             }
-# else
-            ::fast_io::io::perrln(u8log_output_ul,
-                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                  u8"uwvm: ",
-                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                  u8"[info]  ",
-                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                  u8"<unwind backend unavailable on this build>",
-                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 # endif
         }
 #endif
@@ -1487,49 +1473,18 @@ namespace uwvm2::runtime::lib
 
             auto const& frames{get_call_stack().frames};
             auto const n{frames.size()};
+            ::std::size_t printed_frame_count{};
             for(::std::size_t i{}; i != n; ++i)
             {
                 auto const& fr{frames.index_unchecked(n - 1uz - i)};
-                if(fr.module_id >= g_runtime.modules.size()) { continue; }
-
-                auto const& mod_rec{g_runtime.modules.index_unchecked(fr.module_id)};
-                auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
-                auto const fn_name{resolve_func_display_name(mod_rec.module_name, fr.function_index)};
-
-                ::fast_io::io::perr(u8log_output_ul,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                    u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"#",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    i,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8" module=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    mod_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8" func_idx=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    fr.function_index);
-
-                if(!fn_name.empty())
-                {
-                    ::fast_io::io::perr(u8log_output_ul,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" func_name=\"",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        fn_name,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"\"");
-                }
-
-                ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                if(dump_call_stack_frame_for_trap(u8log_output_ul, i, fr.module_id, fr.function_index)) { ++printed_frame_count; }
             }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(runtime_llvm_jit_unwind_call_stack_requested()) { dump_llvm_jit_unwind_call_stack_for_trap(u8log_output_ul); }
+            if(printed_frame_count == 0uz && runtime_llvm_jit_unwind_call_stack_requested())
+            {
+                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count);
+            }
 #endif
 
             ::fast_io::io::perrln(u8log_output_ul);
