@@ -227,10 +227,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         {
             inline lazy_materialize_lock_guard() noexcept
             {
-                while(lazy_materialize_lock.test_and_set(::std::memory_order_acquire))
-                {
-                    ::uwvm2::utils::thread::lazy_compile_thread_yield();
-                }
+                while(lazy_materialize_lock.test_and_set(::std::memory_order_acquire)) { ::uwvm2::utils::thread::lazy_compile_thread_yield(); }
             }
 
             inline lazy_materialize_lock_guard(lazy_materialize_lock_guard const&) noexcept = delete;
@@ -558,14 +555,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 return false;
             }
 
-            auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
-                                .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(options.codegen_opt_level)
-                                .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
-                                .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<
-                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
-                                .create(target_machine.get())};
+            auto raw_engine{
+                ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
+                    .setEngineKind(::llvm::EngineKind::JIT)
+                    .setOptLevel(options.codegen_opt_level)
+                    .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
+                    .setMAttrs(host_target_attributes)
+                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
 
@@ -659,14 +656,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 return false;
             }
 
-            auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
-                                .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(options.codegen_opt_level)
-                                .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
-                                .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<
-                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
-                                .create(target_machine.get())};
+            auto raw_engine{
+                ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
+                    .setEngineKind(::llvm::EngineKind::JIT)
+                    .setOptLevel(options.codegen_opt_level)
+                    .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
+                    .setMAttrs(host_target_attributes)
+                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
 
@@ -685,10 +682,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
                 auto const entry_address{resolve_llvm_function_address(*engine, function_name)};
                 auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
-                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]]
-                {
-                    return false;
-                }
+                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
 
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
                 materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
@@ -699,10 +693,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     auto const reentry_function_name{
                         all_details::get_llvm_wasm_tiered_loop_reentry_raw_function_name(curr_module, function_index_u32, reentry.wasm_code_offset)};
                     auto const reentry_address{resolve_llvm_function_address(*engine, reentry_function_name)};
-                    if(reentry_address == 0u) [[unlikely]]
-                    {
-                        return false;
-                    }
+                    if(reentry_address == 0u) [[unlikely]] { return false; }
                     materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
                 }
                 materialized.entry_address = entry_address;
@@ -1311,11 +1302,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
 
         auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-        if(!materialized.ready ||
-           materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size())
-        {
-            return false;
-        }
+        if(!materialized.ready || materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size()) { return false; }
 
         for(::std::size_t i{}; i != materialized.tiered_loop_reentries.size(); ++i)
         {
@@ -1327,7 +1314,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         return false;
     }
-
 }
 #endif
 

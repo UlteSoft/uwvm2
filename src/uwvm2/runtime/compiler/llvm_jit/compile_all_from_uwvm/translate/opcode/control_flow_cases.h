@@ -638,10 +638,7 @@ case wasm1_code::end:
             {
                 disable_inline_llvm_jit_emission();
             }
-            else if(tiered_loop_reentries_out != nullptr)
-            {
-                *tiered_loop_reentries_out = llvm_jit_emit_state.tiered_loop_reentries;
-            }
+            else if(tiered_loop_reentries_out != nullptr) { *tiered_loop_reentries_out = llvm_jit_emit_state.tiered_loop_reentries; }
         }
 
         return;

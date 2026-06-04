@@ -415,8 +415,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::uint_least32_t request_countdown{};
     };
 
-    inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{
-        (::std::numeric_limits<::std::uint_least32_t>::max)()};
+    inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{(::std::numeric_limits<::std::uint_least32_t>::max)()};
     // Large modules still need loop sampling so hot interpreter loops can be detected.
     // CPython-like modules can have a huge eval loop in a 32KB+ function; tiered policy should
     // let the execution thread report that hot loop to an urgent coordinator instead of relying
@@ -425,14 +424,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr ::std::size_t interpreter_tiered_osr_poll_module_local_function_limit{8192uz};
     inline constexpr ::std::size_t interpreter_tiered_large_loop_sentinel_function_size{32768uz};
 
-    [[nodiscard]] inline constexpr bool
-        interpreter_tiered_osr_poll_enabled_for_module_local_function_count(::std::size_t local_function_count) noexcept
-    {
-        return local_function_count < interpreter_tiered_osr_poll_module_local_function_limit;
-    }
+    [[nodiscard]] inline constexpr bool interpreter_tiered_osr_poll_enabled_for_module_local_function_count(::std::size_t local_function_count) noexcept
+    { return local_function_count < interpreter_tiered_osr_poll_module_local_function_limit; }
 
-    [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t
-        interpreter_tiered_loop_osr_counter_policy_for_function_size(::std::size_t function_code_size) noexcept
+    [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t interpreter_tiered_loop_osr_counter_policy_for_function_size(
+        ::std::size_t function_code_size) noexcept
     {
         if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size)
         {
@@ -450,8 +446,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                function_code_size >= interpreter_tiered_large_loop_sentinel_function_size;
     }
 
-    [[nodiscard]] inline constexpr ::std::uint_least32_t
-        interpreter_tiered_block_osr_request_countdown_for_function_size(::std::size_t function_code_size) noexcept
+    [[nodiscard]] inline constexpr ::std::uint_least32_t interpreter_tiered_block_osr_request_countdown_for_function_size(
+        ::std::size_t function_code_size) noexcept
     {
         // Do not request the current LLVM OSR path for very large functions.  They are sampled
         // by the large-loop sentinel above, then need a dedicated urgent artifact strategy; the

@@ -568,22 +568,22 @@ namespace details
 
 #include "single_func_emit.h"
 
-    inline constexpr void validate_runtime_local_func(validation_module_storage_t const& module_storage,
-                                                      local_func_storage_t const& local_func_storage,
-                                                      ::uwvm2::validation::error::code_validation_error_impl& err,
-                                                      llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
-                                                      bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
-                                                      bool route_wasm_calls_through_runtime_bridge = false,
-                                                      ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
-                                                      ::std::size_t lazy_defined_raw_call_target_count = 0uz,
-                                                      ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
-                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
-                                                      bool lazy_defined_targets_are_atomic = false,
-                                                      bool emit_tiered_loop_reentry_entries = false,
-                                                      bool emit_call_stack_frames = true,
-                                                      bool emit_unwind_call_stack_frames = false,
-                                                      ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr)
-        UWVM_THROWS
+    inline constexpr void
+        validate_runtime_local_func(validation_module_storage_t const& module_storage,
+                                    local_func_storage_t const& local_func_storage,
+                                    ::uwvm2::validation::error::code_validation_error_impl& err,
+                                    llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
+                                    bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
+                                    bool route_wasm_calls_through_runtime_bridge = false,
+                                    ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
+                                    ::std::size_t lazy_defined_raw_call_target_count = 0uz,
+                                    ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
+                                    ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
+                                    bool lazy_defined_targets_are_atomic = false,
+                                    bool emit_tiered_loop_reentry_entries = false,
+                                    bool emit_call_stack_frames = true,
+                                    bool emit_unwind_call_stack_frames = false,
+                                    ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};

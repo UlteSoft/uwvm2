@@ -2501,8 +2501,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ir_builder.SetInsertPoint(state.return_block);
     if(state.func_result_count_uz == 0uz)
     {
-        if(state.emit_call_stack_frames && !state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder))
-            [[unlikely]]
+        if(state.emit_call_stack_frames && !state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]]
         {
             return false;
         }
@@ -2510,8 +2509,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
     else if(state.return_phi != nullptr && state.return_phi->getNumIncomingValues() != 0u)
     {
-        if(state.emit_call_stack_frames && !state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder))
-            [[unlikely]]
+        if(state.emit_call_stack_frames && !state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]]
         {
             return false;
         }
@@ -2529,8 +2527,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(!state.emit_tiered_loop_reentry_entries) { return true; }
             if(state.llvm_context_holder == nullptr || state.llvm_module == nullptr || state.llvm_function == nullptr ||
                state.tiered_core_entry_block == nullptr || state.tiered_core_normal_init_block == nullptr || state.tiered_core_entry_id_arg == nullptr ||
-               state.tiered_core_local_base_arg == nullptr)
-                [[unlikely]]
+               state.tiered_core_local_base_arg == nullptr) [[unlikely]]
             {
                 return false;
             }
@@ -2566,13 +2563,12 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     auto local_pointer{state.local_pointers.index_unchecked(local_index)};
                     if(llvm_local_type == nullptr || local_pointer == nullptr) [[unlikely]] { return false; }
 
-                    auto local_address{load_builder.CreateInBoundsGEP(llvm_i8_type,
-                                                                       local_base_ptr,
-                                                                       {::llvm::ConstantInt::get(llvm_intptr_type,
-                                                                                                 state.local_offsets.index_unchecked(local_index))},
-                                                                       "tiered.local.addr")};
-                    auto typed_local_address{
-                        load_builder.CreateBitCast(local_address, get_llvm_pointer_type(llvm_local_type), "tiered.local.typed.addr")};
+                    auto local_address{
+                        load_builder.CreateInBoundsGEP(llvm_i8_type,
+                                                       local_base_ptr,
+                                                       {::llvm::ConstantInt::get(llvm_intptr_type, state.local_offsets.index_unchecked(local_index))},
+                                                       "tiered.local.addr")};
+                    auto typed_local_address{load_builder.CreateBitCast(local_address, get_llvm_pointer_type(llvm_local_type), "tiered.local.typed.addr")};
                     load_builder.CreateStore(load_builder.CreateLoad(llvm_local_type, typed_local_address, "tiered.local"), local_pointer);
                 }
                 load_builder.CreateBr(target_block);
@@ -2591,8 +2587,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
             auto public_function{state.llvm_public_entry_function};
             auto const llvm_context_holder{state.llvm_context_holder};
             if(local_func_storage_ptr == nullptr || llvm_module == nullptr || core_function == nullptr || public_function == nullptr ||
-               llvm_context_holder == nullptr)
-                [[unlikely]]
+               llvm_context_holder == nullptr) [[unlikely]]
             {
                 return false;
             }
@@ -2604,9 +2599,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(entry_block == nullptr) [[unlikely]] { return false; }
             ::llvm::IRBuilder<> public_builder(entry_block);
 
-            if(state.emit_call_stack_frames && !emit_runtime_local_func_llvm_jit_call_stack_push(public_builder,
-                                                                                                 local_func_storage_ptr->module_id,
-                                                                                                 local_func_storage_ptr->function_index))
+            if(state.emit_call_stack_frames &&
+               !emit_runtime_local_func_llvm_jit_call_stack_push(public_builder, local_func_storage_ptr->module_id, local_func_storage_ptr->function_index))
                 [[unlikely]]
             {
                 return false;
@@ -2622,25 +2616,30 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(state.emit_call_stack_frames && !emit_runtime_local_func_llvm_jit_call_stack_pop(public_builder)) [[unlikely]] { return false; }
 
             if(public_function->getReturnType()->isVoidTy()) { public_builder.CreateRetVoid(); }
-            else { public_builder.CreateRet(core_call); }
+            else
+            {
+                public_builder.CreateRet(core_call);
+            }
 
             return verify_llvm_jit_function(*public_function, state.verify_llvm_jit_ir);
         }};
 
-    auto const get_tiered_osr_local_bytes{
-        [&]() -> ::std::size_t
-        {
-            ::std::size_t local_bytes{};
-            for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
-            {
-                auto const abi_size{get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(local_index))};
-                auto const offset{state.local_offsets.index_unchecked(local_index)};
-                if(abi_size == 0uz || offset > (::std::numeric_limits<::std::size_t>::max() - abi_size)) [[unlikely]] { return 0uz; }
-                auto const end{offset + abi_size};
-                if(end > local_bytes) { local_bytes = end; }
-            }
-            return local_bytes;
-        }};
+    auto const get_tiered_osr_local_bytes{[&]() -> ::std::size_t
+                                          {
+                                              ::std::size_t local_bytes{};
+                                              for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
+                                              {
+                                                  auto const abi_size{get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(local_index))};
+                                                  auto const offset{state.local_offsets.index_unchecked(local_index)};
+                                                  if(abi_size == 0uz || offset > (::std::numeric_limits<::std::size_t>::max() - abi_size)) [[unlikely]]
+                                                  {
+                                                      return 0uz;
+                                                  }
+                                                  auto const end{offset + abi_size};
+                                                  if(end > local_bytes) { local_bytes = end; }
+                                              }
+                                              return local_bytes;
+                                          }};
 
     auto const emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers{
         [&]() -> bool
@@ -2766,10 +2765,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             return true;
         }};
 
-    if(!emit_runtime_local_func_llvm_jit_tiered_core_dispatch() ||
-       !emit_runtime_local_func_llvm_jit_tiered_public_entry_wrapper() ||
-       !emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers())
-        [[unlikely]]
+    if(!emit_runtime_local_func_llvm_jit_tiered_core_dispatch() || !emit_runtime_local_func_llvm_jit_tiered_public_entry_wrapper() ||
+       !emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers()) [[unlikely]]
     {
         return false;
     }
@@ -3010,8 +3007,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
         if(reentry.wasm_code_offset == state.current_wasm_op_offset) { return true; }
     }
 
-    state.tiered_loop_reentries.push_back({.wasm_code_offset = state.current_wasm_op_offset,
-                                           .entry_id = static_cast<::std::uint_least32_t>(next_entry_id)});
+    state.tiered_loop_reentries.push_back({.wasm_code_offset = state.current_wasm_op_offset, .entry_id = static_cast<::std::uint_least32_t>(next_entry_id)});
     state.tiered_loop_reentry_blocks.push_back(target_block);
     return true;
 }
@@ -4149,8 +4145,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto raw_target_struct_type{get_llvm_runtime_raw_call_target_struct_type(llvm_context)};
     auto table_view_struct_type{get_llvm_runtime_call_indirect_table_view_struct_type(llvm_context)};
     auto typed_entry_function_type{get_llvm_function_type_from_wasm_function_type(llvm_context, *callee_type_ptr)};
-    if(raw_entry_function_type == nullptr || raw_target_struct_type == nullptr || table_view_struct_type == nullptr ||
-       typed_entry_function_type == nullptr) [[unlikely]]
+    if(raw_entry_function_type == nullptr || raw_target_struct_type == nullptr || table_view_struct_type == nullptr || typed_entry_function_type == nullptr)
+        [[unlikely]]
     {
         return false;
     }
@@ -4217,9 +4213,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     ir_builder.SetInsertPoint(typed_block);
     auto typed_entry_function_ptr{
         ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(typed_entry_function_type), "call_indirect.typed.entry.ptr")};
-    auto typed_call{apply_llvm_jit_wasm_calling_conv(ir_builder.CreateCall(typed_entry_function_type,
-                                                                           typed_entry_function_ptr,
-                                                                           {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
+    auto typed_call{apply_llvm_jit_wasm_calling_conv(
+        ir_builder.CreateCall(typed_entry_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
     auto typed_end_block{ir_builder.GetInsertBlock()};
     ir_builder.CreateBr(merge_block);
 

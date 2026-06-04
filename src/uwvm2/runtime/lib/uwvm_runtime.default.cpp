@@ -4650,9 +4650,7 @@ namespace uwvm2::runtime::lib
         };
 
         struct preload_memory_delivery_t
-        {
-            unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
-        };
+        { unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none}; };
 
         [[nodiscard]] inline constexpr bool
             compute_preload_byte_length(::std::uint_least64_t page_count, ::std::uint_least64_t page_size_bytes, ::std::uint_least64_t& byte_length) noexcept

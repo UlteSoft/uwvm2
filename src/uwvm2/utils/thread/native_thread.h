@@ -605,10 +605,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             }
 
             ::std::size_t write_index{};
-            if(request.priority == 0u)
-            {
-                write_index = (this->queue_head + current_count) % this->queue_capacity;
-            }
+            if(request.priority == 0u) { write_index = (this->queue_head + current_count) % this->queue_capacity; }
             else
             {
                 ::std::size_t insert_offset{current_count};

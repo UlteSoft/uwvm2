@@ -257,8 +257,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::uwvm2::utils::container::vector<::std::byte> result_buffer{};
     };
 
-    [[nodiscard]] inline constexpr ::std::uint_least8_t wasm_entry_type_code(auto type) noexcept
-    { return static_cast<::std::uint_least8_t>(type); }
+    [[nodiscard]] inline constexpr ::std::uint_least8_t wasm_entry_type_code(auto type) noexcept { return static_cast<::std::uint_least8_t>(type); }
 
     [[nodiscard]] inline constexpr ::std::size_t wasm_entry_scalar_abi_size(::std::uint_least8_t code) noexcept
     {
@@ -300,7 +299,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <bool allow_signed_decimal, typename Out, typename Unsigned>
-    [[nodiscard]] inline constexpr bool parse_wasm_entry_integer(::uwvm2::utils::container::u8string_view str, Out& out) noexcept
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_integer(::uwvm2::utils::container::u8string_view str, Out & out) noexcept
     {
         static_assert(sizeof(Out) == sizeof(Unsigned));
         auto const first{str.cbegin()};
@@ -309,7 +308,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         if constexpr(allow_signed_decimal)
         {
-            Out signed_value; // no init necessary
+            Out signed_value;  // no init necessary
             if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(signed_value)))
             {
                 out = signed_value;
@@ -317,7 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        Unsigned unsigned_value; // no init necessary
+        Unsigned unsigned_value;  // no init necessary
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex_get<true, false, true>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin_get<true, false, true>(unsigned_value)) ||
@@ -331,7 +330,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename... Args>
-    [[noreturn]] inline void wasm_set_start_func_fatal(Args&&... args) noexcept
+    [[noreturn]] inline void wasm_set_start_func_fatal(Args && ... args) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -346,7 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     [[nodiscard]] inline constexpr bool parse_wasm_entry_i32(::uwvm2::utils::container::u8string_view str,
-                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32& out) noexcept
+                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 & out) noexcept
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
@@ -355,7 +354,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     [[nodiscard]] inline constexpr bool parse_wasm_entry_i64(::uwvm2::utils::container::u8string_view str,
-                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64& out) noexcept
+                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 & out) noexcept
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_u64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
@@ -367,22 +366,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
-#if defined(FAST_IO_NOT_USE_FAST_FLOAT)
+# if defined(FAST_IO_NOT_USE_FAST_FLOAT)
         auto const char_first{reinterpret_cast<char const*>(first)};
         auto const char_last{reinterpret_cast<char const*>(last)};
         auto const [next, err]{::std::from_chars(char_first, char_last, out, ::std::chars_format::general)};
         if(err == ::std::errc{} && next == char_last) { return true; }
-#else
+# else
         auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
         if(err == ::fast_io::parse_code::ok && next == last) { return true; }
         auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat_get<true, true>(out))};
         if(hex_err == ::fast_io::parse_code::ok && hex_next == last) { return true; }
-#endif
+# endif
         return false;
     }
 
     template <typename T>
-    [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T& out) noexcept
+    [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T & out) noexcept
     {
         auto first{str.cbegin()};
         auto last{str.cend()};
@@ -395,8 +394,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return false;
     }
 
-    [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(
-        ::uwvm2::utils::container::u8string_view str) noexcept
+    [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(::uwvm2::utils::container::u8string_view str) noexcept
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32_value{};
         if(parse_wasm_entry_i32(str, i32_value)) { return {u8"i32/i64 literal"}; }
@@ -414,7 +412,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output, typename ValueTypePtr>
-    inline void print_wasm_entry_type_span(Output& output, ValueTypePtr begin, ValueTypePtr end) noexcept
+    inline void print_wasm_entry_type_span(Output & output, ValueTypePtr begin, ValueTypePtr end) noexcept
     {
         ::fast_io::io::perr(output, u8"(");
         bool first{true};
@@ -431,7 +429,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output>
-    inline void print_wasm_entry_info_prefix(Output& output) noexcept
+    inline void print_wasm_entry_info_prefix(Output & output) noexcept
     {
         ::fast_io::io::perr(output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -496,14 +494,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 u8"\"",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
         }
-        ::fast_io::io::perr(u8log_output_ul,
-                            u8")\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        ::fast_io::io::perr(u8log_output_ul, u8")\n\n", ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
     }
 
     template <typename T>
-    inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte>& buffer, ::std::size_t& offset, T const& value) noexcept
+    inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
         if(offset > buffer.size() || sizeof(T) > buffer.size() - offset) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -522,7 +518,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return value;
     }
 
-    inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte>& buffer,
+    inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte> & buffer,
                                          ::std::size_t& offset,
                                          ::uwvm2::utils::container::u8string_view arg,
                                          ::std::uint_least8_t type_code,
@@ -581,7 +577,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output, typename Signed, typename Unsigned>
-    inline void print_wasm_entry_integer_formats(Output& output, Signed value) noexcept
+    inline void print_wasm_entry_integer_formats(Output & output, Signed value) noexcept
     {
         static_assert(sizeof(Signed) == sizeof(Unsigned));
         auto const bits{::std::bit_cast<Unsigned>(value)};
@@ -609,7 +605,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output>
-    inline void print_wasm_entry_argument_verbose(Output& output,
+    inline void print_wasm_entry_argument_verbose(Output & output,
                                                   ::uwvm2::utils::container::vector<::std::byte> const& buffer,
                                                   ::std::size_t& offset,
                                                   ::uwvm2::utils::container::u8string_view arg,
@@ -744,10 +740,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         print_wasm_entry_type_span(u8log_output_ul, ft.result.begin, ft.result.end);
         ::fast_io::io::perr(u8log_output_ul, u8"\n", body_indent, u8"arguments:\n");
 
-        if(argument_tokens.empty())
-        {
-            ::fast_io::io::perr(u8log_output_ul, argument_indent, u8"<none>\n");
-        }
+        if(argument_tokens.empty()) { ::fast_io::io::perr(u8log_output_ul, argument_indent, u8"<none>\n"); }
         else
         {
             ::std::size_t offset{};
@@ -786,8 +779,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             auto const size{wasm_entry_scalar_abi_size(type_code)};
             if(size == 0uz) [[unlikely]]
             {
-                auto const kind{is_result ? ::uwvm2::utils::container::u8string_view{u8"result"}
-                                          : ::uwvm2::utils::container::u8string_view{u8"parameter"}};
+                auto const kind{is_result ? ::uwvm2::utils::container::u8string_view{u8"result"} : ::uwvm2::utils::container::u8string_view{u8"parameter"}};
                 wasm_set_start_func_fatal(u8"Unsupported --wasm-set-start-func ",
                                           kind,
                                           u8" type: ",
