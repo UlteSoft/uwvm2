@@ -2230,7 +2230,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::llvm::BasicBlock* tiered_core_normal_init_block{};
     ::llvm::Argument* tiered_core_entry_id_arg{};
     ::llvm::Argument* tiered_core_local_base_arg{};
-    ::uwvm2::utils::container::owned_ptr<::llvm::IRBuilder<>> ir_builder{};
+    ::uwvm2::utils::container::delete_owned_ptr<::llvm::IRBuilder<>> ir_builder{};
     ::uwvm2::utils::container::vector<::llvm::AllocaInst*> local_pointers{};
     runtime_memory_access_info_t memory0_access_info{};
     bool memory0_access_info_resolved{};
@@ -2251,17 +2251,17 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                                       llvm_jit_module_storage_t& module_storage)
 {
     module_storage = {};
-    module_storage.llvm_context_holder = ::uwvm2::utils::container::make_owned<::llvm::LLVMContext>();
+    module_storage.llvm_context_holder = ::uwvm2::utils::container::make_delete_owned<::llvm::LLVMContext>();
     if(module_storage.llvm_context_holder == nullptr) [[unlikely]] { return false; }
 
     auto const llvm_module_name{get_llvm_wasm_ir_module_name(runtime_module)};
     module_storage.llvm_module =
-        ::uwvm2::utils::container::make_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
+        ::uwvm2::utils::container::make_delete_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
     if(module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
     // Full JIT and tier-2 JIT run cross-function optimization pipelines that may inline Wasm callees into their callers.
     // Keep compact DWARF metadata so trap reporting can reconstruct the logical Wasm stack after native frames disappear.
-    module_storage.llvm_di_builder = ::uwvm2::utils::container::make_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
+    module_storage.llvm_di_builder = ::uwvm2::utils::container::make_delete_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
     if(module_storage.llvm_di_builder == nullptr) [[unlikely]] { return false; }
 
     module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Debug Info Version", ::llvm::DEBUG_METADATA_VERSION);
@@ -2467,7 +2467,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         state.tiered_core_normal_init_block = body_init_block;
     }
 
-    state.ir_builder = ::uwvm2::utils::container::make_owned<::llvm::IRBuilder<>>(body_init_block);
+    state.ir_builder = ::uwvm2::utils::container::make_delete_owned<::llvm::IRBuilder<>>(body_init_block);
     if(state.llvm_di_subprogram != nullptr)
     {
         auto const line{static_cast<unsigned>(local_func_storage.function_index + 1uz)};

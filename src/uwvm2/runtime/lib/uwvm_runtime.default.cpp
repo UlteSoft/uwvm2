@@ -285,7 +285,7 @@ namespace uwvm2::runtime::lib
             llvm_jit_lazy_compile_options_t llvm_jit_lazy_compile_options{};
             ::uwvm2::utils::container::vector<llvm_jit_lazy_compile_request_context_t> llvm_jit_lazy_background_request_contexts{};
             ::uwvm2::utils::container::vector<::uwvm2::validation::error::code_validation_error_impl> llvm_jit_lazy_background_errors{};
-            ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_jit_context_holder{};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::LLVMContext> llvm_jit_context_holder{};
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_entry_addresses{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_raw_entry_addresses{};
@@ -1519,14 +1519,27 @@ namespace uwvm2::runtime::lib
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t last_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
+            ::std::size_t first_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
+            ::std::size_t first_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
+            bool printing_backtrace_frames{};
 
             auto const print_wasm_frame{
                 [&](::std::size_t module_id, ::std::size_t function_index) noexcept
                 {
                     if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
+                    if(printing_backtrace_frames && printed_frame_count > 1uz && module_id == first_printed_module_id &&
+                       function_index == first_printed_function_index)
+                    {
+                        return;
+                    }
 
                     if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, module_id, function_index))
                     {
+                        if(printed_frame_count == 0uz)
+                        {
+                            first_printed_module_id = module_id;
+                            first_printed_function_index = function_index;
+                        }
                         last_printed_module_id = module_id;
                         last_printed_function_index = function_index;
                         ++printed_frame_count;
@@ -1593,10 +1606,15 @@ namespace uwvm2::runtime::lib
             }
 
             auto const backtrace{capture_llvm_jit_unwind_backtrace(0uz)};
+            printing_backtrace_frames = true;
             for(::std::size_t i{}; i != backtrace.size; ++i)
             {
                 auto const ip{backtrace.frames[i]};
-                if(printed_frame_count != 0uz && llvm_jit_trap_return_address != 0u && ip == llvm_jit_trap_return_address - 1u) { continue; }
+                if(printed_frame_count != 0uz && llvm_jit_trap_return_address != 0u &&
+                   (ip == llvm_jit_trap_return_address || ip == llvm_jit_trap_return_address - 1u))
+                {
+                    continue;
+                }
                 if(printed_frame_count != 0uz && resolve_llvm_jit_unwind_entry(ip).entry == nullptr) { continue; }
                 print_resolved_unwind_ip(ip);
             }

@@ -175,7 +175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     struct lazy_materialized_function_storage_t
     {
         local_func_storage_t local_func{};
-        ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
+        ::uwvm2::utils::container::delete_owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
         ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t raw_entry_address{};

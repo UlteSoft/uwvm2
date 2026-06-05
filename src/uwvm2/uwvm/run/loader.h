@@ -69,6 +69,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         {
             using namespace ::uwvm2::uwvm::imported::wasi::wasip1::storage;
 
+            // Command-line parsing rejects ordinary overlap between
+            // `--wasip1-single-create <module>` and
+            // `--wasip1-group-add-module <group> <module>`. Recheck after module
+            // loading because names may also come from preload-DL or weak-symbol
+            // metadata; if the same loaded module resolves to two different
+            // states, runtime cannot choose a policy safely.
             auto const anonymous_group_index{find_wasip1_anonymous_module_group_index(target_kind, module_name)};
             auto const named_group_index{find_named_wasip1_module_group_index(module_name)};
             if(anonymous_group_index == invalid_wasip1_group_index || named_group_index == invalid_wasip1_group_index ||
@@ -96,6 +102,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         {
             using target_kind = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
 
+            // Validate every loaded module namespace that can make WASI calls.
+            // The same module name table is used later for target environment
+            // dispatch, so this is the last chance to report ambiguous bindings
+            // before runtime state is initialized.
             if(!::uwvm2::uwvm::wasm::storage::execute_wasm.module_name.empty())
             {
                 if(!validate_wasip1_group_binding_for_loaded_module(target_kind::main_wasm, ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name))
@@ -184,9 +194,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+        // WASI local import handling has two separate questions:
+        //
+        // 1. Do we need initialized WASI environments? Yes if the global module
+        //    is enabled, host APIs are exposed, or any target override exists.
+        // 2. Do we need to load the built-in `wasi_snapshot_preview1` module?
+        //    Yes only if at least one loaded Wasm module can actually see that
+        //    import after target-local enable/disable overrides are applied.
         auto const need_wasip1_environment{::uwvm2::uwvm::wasm::storage::local_preload_wasip1 || ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api ||
                                            ::uwvm2::uwvm::imported::wasi::wasip1::storage::has_any_configured_wasip1_module_override()};
 
+        // Resolve import visibility exactly like the dependency checker and
+        // runtime linker. A target-local enable/disable setting takes priority
+        // over the global `--wasip1-global-disable` / default enabled state.
         auto const wasip1_import_visible_for_loaded_wasm{
             [](::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
                ::uwvm2::utils::container::u8string_view module_name) noexcept -> bool
@@ -199,6 +219,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
             }};
 
+        // If the global WASI import is disabled, still load the local imported
+        // module when a loaded executable/preload Wasm module has a target-local
+        // enable override. Without this pass, target enable could initialize an
+        // environment but still fail dependency resolution due to a missing
+        // local import provider.
         bool need_wasip1_local_imported_module{::uwvm2::uwvm::wasm::storage::local_preload_wasip1};
         if(!need_wasip1_local_imported_module)
         {

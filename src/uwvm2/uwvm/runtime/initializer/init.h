@@ -32,6 +32,9 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -81,6 +84,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+        // Runtime import resolution repeats the WASI Preview 1 visibility check
+        // used by the pre-runtime dependency pass. The dependency pass provides
+        // the user-facing error in normal executable mode, while this runtime
+        // guard keeps the linker defensive when runtime initialization is called
+        // after a non-standard module-table change or with unresolved imports
+        // intentionally preserved for diagnostics.
         [[nodiscard]] inline constexpr bool is_wasip1_import_visible_for_wasm_module(::uwvm2::utils::container::u8string_view consumer_module_name,
                                                                                      ::uwvm2::utils::container::u8string_view import_module_name) noexcept
         {
@@ -5661,6 +5670,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
 #ifndef UWVM_MODULE
 // macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>

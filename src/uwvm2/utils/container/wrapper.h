@@ -283,6 +283,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
         return ::uwvm2::utils::container::owned_ptr<T>{ptr};
     }
 
+    template <typename T, typename... Args>
+    [[nodiscard]] inline auto make_delete_owned(Args && ... args) -> ::uwvm2::utils::container::delete_owned_ptr<T>
+    { return ::uwvm2::utils::container::delete_owned_ptr<T>{new T(::std::forward<Args>(args)...)}; }
+
     /// @brief ordered
     template <typename Key, typename Compare = ::std::less<Key>, typename Alloc = ::uwvm2::utils::container::fast_io_global_std_allocator<Key>>
     using set = ::std::set<Key, Compare, Alloc>;  /// @todo replace with btree set

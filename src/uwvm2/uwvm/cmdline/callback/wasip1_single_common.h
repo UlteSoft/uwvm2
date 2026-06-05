@@ -53,6 +53,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
         using override_state_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t;
 
+        // Single-target commands are keyed by one Wasm module name. Validate the
+        // selector here, then leave all option-specific parsing to
+        // wasip1_module_details so single and group targets cannot drift apart.
         [[nodiscard]] inline parameter_return_type validate_module_arg(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
@@ -75,6 +78,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         [[nodiscard]] inline override_state_t* find_created_single(::uwvm2::utils::container::u8string_view module_name) noexcept
         { return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_targetless_wasip1_module_override(module_name); }
 
+        // Public single callbacks pass a concrete target_action_t. This helper
+        // enforces "create first", resolves the anonymous target state, and then
+        // delegates to the shared target dispatcher for argv/env/fd/mount/socket
+        // semantics and conflict checks.
         [[nodiscard]] inline parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,

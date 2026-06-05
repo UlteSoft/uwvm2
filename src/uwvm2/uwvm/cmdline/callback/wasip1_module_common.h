@@ -71,6 +71,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using preopen_socket_t = ::uwvm2::imported::wasi::wasip1::environment::preopen_socket_t;
 #  endif
 
+        // All target-local WASI Preview 1 commands are reduced to this enum at
+        // the public callback boundary. Keeping the dispatcher strongly typed is
+        // intentional: the single and group callback files only validate their
+        // leading selector (module name or group name), and every semantic rule
+        // for a WASI target lives in the switch below. That avoids maintaining a
+        // second string parser for each concrete command name.
         enum class target_action_t : unsigned
         {
             enable,
@@ -96,6 +102,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  endif
         };
 
+        // Parse the action word used by the legacy "module action sequence"
+        // callback. The modern single/group parameter files pass
+        // target_action_t directly, but this helper is kept for the compact
+        // multi-action form so both frontends share exactly the same validator.
         [[nodiscard]] inline bool parse_target_action(::uwvm2::utils::container::u8string_view text, target_action_t& action) noexcept
         {
             if(text == u8"enable") { action = target_action_t::enable; }
@@ -123,6 +133,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return true;
         }
 
+        // WebAssembly module names are user-visible identifiers, but the loader
+        // stores them in the same UTF-8 text representation used by wasm names.
+        // Validate at command-line time so later group lookups can compare raw
+        // byte strings without revalidating or diagnosing late.
         [[nodiscard]] inline bool validate_wasm_utf8_name(::uwvm2::utils::container::u8string_view text) noexcept
         {
             auto const [module_name_pos,
@@ -162,6 +176,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return err == ::fast_io::parse_code::ok && next == text.cend();
         }
 
+        // force-args consumes a dynamic number of following tokens. The generic
+        // command-line scanner normally treats an option-looking token such as
+        // "--x" as a parameter, so force-args has a pretreatment hook that marks
+        // the count and exactly <count> following tokens as occupied arguments.
+        // This is also what makes `--wasip1-*-force-args 0` unambiguous: the
+        // count is consumed even though no argv payload follows.
         inline void force_args_pretreatment(char8_t const* const*& argv_curr,
                                             char8_t const* const* argv_end,
                                             ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr,
@@ -297,6 +317,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                               ::uwvm2::utils::container::u8cstring_view arg1,
                                               ::uwvm2::utils::container::u8cstring_view arg2) noexcept
         {
+            // Socket parsing already exists in the global callback layer, and it
+            // includes platform-specific address validation plus fd range checks.
+            // For a target-local socket command, temporarily append the target's
+            // sockets after the global sockets, invoke the global callback, then
+            // split the vector at the original global boundary. The target still
+            // owns only its own sockets; the temporary global prefix only makes
+            // duplicate fd checks see the same effective preopen set that runtime
+            // initialization will later materialize.
             auto saved_global_preopen_sockets{::std::move(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.preopen_sockets)};
             auto saved_target_preopen_sockets{::std::move(target.preopen_sockets)};
 
@@ -352,6 +380,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                               ::uwvm2::utils::container::u8cstring_view arg2,
                                               ::uwvm2::utils::container::u8cstring_view arg3) noexcept
         {
+            // Three-argument socket commands are currently the Unix-domain form:
+            // <fd> unix <path>. Keep this overload structurally identical to the
+            // two-argument path so target-local TCP/UDP and Unix socket handling
+            // cannot diverge from the global parser.
             auto saved_global_preopen_sockets{::std::move(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.preopen_sockets)};
             auto saved_target_preopen_sockets{::std::move(target.preopen_sockets)};
 
@@ -413,6 +445,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 if(limit > ::std::numeric_limits<fd_t>::max()) [[unlikely]] { return print_usage_error(parameter, u8"Illegal fd limit."); }
             }
 
+            // Match the global fd-limit command: zero is a user-facing spelling
+            // for "maximum representable WASI fd", not a request to disable fd
+            // allocation. Runtime initialization uses a literal zero only as the
+            // internal "no explicit limit has been committed yet" sentinel.
             if(limit == 0uz) { limit = ::std::numeric_limits<fd_t>::max(); }
             if(target.fd_limit_is_set) [[unlikely]]
             {
@@ -428,6 +464,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                               trace_output_target_t trace_target,
                                                               ::uwvm2::utils::container::u8string_view file_path) noexcept
         {
+            // The public parameter is "once", but this predicate lets the
+            // sequence parser diagnose identical repeats separately from repeats
+            // that would silently redirect traces to another sink.
             if(!target.trace_wasip1_call_is_set) [[unlikely]] { return true; }
             if(target.trace_wasip1_call != (trace_target != trace_output_target_t::none)) [[unlikely]] { return false; }
             if(target.trace_wasip1_output_target != trace_target) [[unlikely]] { return false; }
@@ -466,11 +505,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
             using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
 
+            // Mark every token consumed by this action as occupied so a later
+            // pass does not reinterpret an argv payload, file path, socket
+            // address, or environment value as another parameter.
             auto const mark_consumed{[mark_begin](::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept
                                      {
                                          for(auto curr{mark_begin}; curr <= last; ++curr) { curr->type = parameter_type::occupied_arg; }
                                      }};
 
+            // Several target options are mutually exclusive boolean overrides:
+            // enable/disable, expose/hide, inherit/noinherit, strict/relaxed
+            // UTF-8. Store both the value and an "is set" bit so "false" is not
+            // confused with "not specified; inherit the global default".
             auto const set_bool_option{[&](bool& option, bool& option_is_set, bool value, auto const& conflict_message) noexcept -> parameter_return_type
                                        {
                                            if(option_is_set) [[unlikely]] { return print_usage_error(parameter, conflict_message); }
@@ -698,6 +744,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
             case target_action_t::force_args:
             {
+                // Target force-args is a complete argv replacement for this
+                // target. It deliberately does not inherit the `--run` argv tail
+                // and cannot be combined with set-argv0, because set-argv0 is
+                // defined as a patch over the default argv vector.
                 if(extra1 == para_end || !is_argument_result(extra1->type)) [[unlikely]]
                 {
                     return print_usage_error(parameter, u8"Missing force-args count.");
@@ -750,6 +800,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
             case target_action_t::delete_system_environment:
             {
+                // Deleting the same name twice has no runtime side effect, but
+                // it is rejected because it usually means a positional single or
+                // group command was accidentally attached to the wrong target.
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
                 {
                     return print_usage_error(parameter, u8"Missing environment variable name.");
@@ -779,6 +832,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
             case target_action_t::add_or_replace_environment:
             {
+                // Add-or-replace remains repeatable by design: the last value for
+                // a key wins before materialization. A same-target delete for the
+                // same name is still a conflict because command order should not
+                // change whether a target imports or synthesizes that variable.
                 auto extra2{extra1 + 1u};
                 if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
                 {
@@ -828,6 +885,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             case target_action_t::socket_udp_bind:
             case target_action_t::socket_udp_connect:
             {
+                // Socket actions share the global TCP/UDP parsers, then perform
+                // an additional target-local duplicate fd check. Runtime will
+                // merge global and target sockets; duplicate fds inside one
+                // target are rejected here so the failure is tied to the exact
+                // command that introduced it.
                 auto extra2{extra1 + 1u};
                 if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
                 {
@@ -909,6 +971,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
             using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
 
+            // Legacy sequence form:
+            //   <target> action [payload...] action [payload...]
+            // Each successful action marks its own payload as occupied; the loop
+            // then advances over those occupied tokens until it finds the next
+            // action word or reaches the end of the parsed command line.
             auto curr_action{action_arg};
             while(curr_action != para_end && curr_action->type == parameter_type::arg)
             {

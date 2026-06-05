@@ -1889,6 +1889,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+        // Normal executable-mode exit must release LLVM JIT runtime state before
+        // process teardown. The runtime library intentionally avoids destroying
+        // MCJIT objects from static destructors, because they can run after other
+        // LLVM globals have already started tearing down. Cleaning here keeps
+        // sanitizer builds from reporting the live runtime-owned LLVM graph as a
+        // process-exit leak while preserving the defensive static-destruction
+        // guard for abnormal exit paths.
+        ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
+# endif
+
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
 #endif
     }

@@ -53,6 +53,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
         using override_state_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t;
 
+        // Group action commands are keyed by an existing group name. The name is
+        // not a WebAssembly module name, so only emptiness is rejected here.
         [[nodiscard]] inline parameter_return_type validate_group_arg(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* group_arg,
                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
@@ -68,6 +70,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::def;
         }
 
+        // Group membership still references a concrete Wasm module name. Use the
+        // same UTF-8 validation as single targets so lookup keys are comparable
+        // and diagnostics are emitted before any module is executed.
         [[nodiscard]] inline parameter_return_type validate_module_arg(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
@@ -87,6 +92,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::def;
         }
 
+        // Public group callbacks pass a concrete target_action_t. This helper
+        // enforces "create group first", resolves the shared group state, and
+        // then delegates to the common target dispatcher. Keeping the dispatcher
+        // shared makes single and group targets obey identical force-args,
+        // environment, fd-limit, mount, overlap, normalization, and socket rules.
         [[nodiscard]] inline parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,

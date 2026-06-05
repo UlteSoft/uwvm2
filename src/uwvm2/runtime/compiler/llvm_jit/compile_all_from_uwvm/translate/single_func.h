@@ -19,9 +19,9 @@ struct local_func_storage_t
 struct llvm_jit_module_storage_t
 {
     bool emitted{};
-    ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
-    ::uwvm2::utils::container::owned_ptr<::llvm::Module> llvm_module{};
-    ::uwvm2::utils::container::owned_ptr<::llvm::DIBuilder> llvm_di_builder{};
+    ::uwvm2::utils::container::delete_owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
+    ::uwvm2::utils::container::delete_owned_ptr<::llvm::Module> llvm_module{};
+    ::uwvm2::utils::container::delete_owned_ptr<::llvm::DIBuilder> llvm_di_builder{};
     ::llvm::DIFile* llvm_di_file{};
     ::llvm::DICompileUnit* llvm_di_compile_unit{};
 

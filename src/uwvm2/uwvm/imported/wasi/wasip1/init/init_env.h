@@ -146,6 +146,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     ///       function does not modify the host's SIGPIPE handling or per-socket flags (such as SO_NOSIGPIPE).
     ///       Instead, individual WASI socket operations (for example, sock_send via MSG_NOSIGNAL where supported)
     ///       are responsible for preventing SIGPIPE from being delivered to the host process.
+    /// @note This function initializes one concrete WASI environment from the current global command-line
+    ///       accumulators. Target-specific initialization below temporarily swaps those accumulators to a merged
+    ///       global+target view, calls this function, then restores the original global state.
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
     {
@@ -212,6 +215,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
                 if(wasm_file_ppos != nullptr || use_custom_argv0)
                 {
+                    // Default argv comes from the parsed `--run <wasm> ...`
+                    // tail. If set-argv0 is present, skip the wasm filename and
+                    // write the custom argv[0] first; the remaining run-tail
+                    // arguments keep their original order.
                     auto const& pr{::uwvm2::uwvm::cmdline::parsing_result};
                     auto const parsed_wasi_argv_size{wasm_file_ppos == nullptr ? 0uz : static_cast<::std::size_t>(pr.end() - wasm_file_ppos)};
                     auto const wasi_argv_size{parsed_wasi_argv_size + static_cast<::std::size_t>(wasm_file_ppos == nullptr && use_custom_argv0)};
@@ -349,9 +356,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             for(auto const& e: wasip1_environment_storage) { env.envs.emplace_back_unchecked(u8string_view{e.data(), e.size()}); }
         }
 
-        // ====== Stronger failure semantics (internal) ======
-        // Do not mutate `env.fd_storage` until we know initialization succeeds.
-        // Note: `--wasip1-set-fd-limit 0` is translated to `fd_t::max()` by the cmdline callback; here `0` means "unset".
+        // ====== File descriptor table ======
+        // Build a temporary fd map first and commit it only after all stdio,
+        // socket, directory, duplicate-fd, and limit checks succeed. This keeps
+        // a failed target environment initialization from partially overwriting
+        // a previous environment's descriptor table.
+        //
+        // Note: `--wasip1-set-fd-limit 0` is translated to `fd_t::max()` by the
+        // cmdline callback; here a literal zero means "the environment has no
+        // explicit limit yet, use the built-in default".
         auto const fd_limit_before{env.fd_storage.fd_limit};
         ::std::size_t fd_limit{fd_limit_before};
         if(fd_limit == 0uz) [[unlikely]] { fd_limit = 1024uz; }
@@ -432,7 +445,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                   return true;
                               }};
 
-        // native in out err
+        // Native stdin/stdout/stderr are always installed first as fds 0, 1, 2.
+        // WASI Preview 1 assumes these descriptors exist; therefore fd_limit
+        // smaller than 3 is rejected before this point.
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -468,8 +483,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-        // preopened sockets
-        // See init_wasip1_environment() @note about SIGPIPE handling.
+        // Preopened sockets use explicit fds supplied by command-line options.
+        // They are inserted before directory preopens so the directory allocator
+        // can skip occupied fd numbers and still expose directories as a compact
+        // scan starting at fd 3 where possible. See the function-level @note for
+        // SIGPIPE policy.
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -599,6 +617,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
                     if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
                     {
+                        // Connected sockets perform the host connect during
+                        // initialization; bind/listen sockets publish a server
+                        // endpoint that is already usable when wasm starts.
                         ::fast_io::posix_connect(sock, ::std::addressof(un), addr_len);
                     }
                     else
@@ -692,8 +713,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         }
 #  endif
 
-        // preopened directories: assign from fd3, skipping occupied fds (including explicit socket fds)
-        // Since they are all continuous (even if sockets are interspersed, they can still be scanned simultaneously by preopen)
+        // Preopened directories are assigned automatically from fd3 upward,
+        // skipping any explicit socket fds already present. The final WASI fd
+        // table may still contain holes due to socket fd choices; those holes
+        // are represented by renumber_map after materialization below.
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
@@ -737,7 +760,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
             new_dir_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir);
 
-            // preload stack (exactly 1 element)
+            // A preopen directory is represented as a one-entry directory stack.
+            // WASI path traversal may push more stack entries at runtime, but
+            // command-line mounts always start with exactly the host directory
+            // opened by the mount-dir callback.
             auto& dir_stack_vec{new_dir_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack.dir_stack};
             auto& new_entry_ref{dir_stack_vec.emplace_back()};
             auto& new_entry{new_entry_ref.ptr->dir_stack};
@@ -801,7 +827,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             }
         }
 
-        // fd limit check
+        // Enforce the configured fd limit after all automatic and explicit
+        // preopens have been staged. This catches combined failures such as
+        // stdio + sockets + mounts exceeding a small target fd limit.
         if(fd_map.size() > fd_limit) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -819,7 +847,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             return false;
         }
 
-        // materialize into opens + renumber_map (no holes in opens)
+        // Materialize the temporary map into the fd manager representation.
+        // Contiguous fds starting at zero are moved into `opens`; remaining
+        // sparse descriptors are kept in `renumber_map` so lookup by original
+        // WASI fd still works without padding `opens` with empty entries.
         ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t> opens_new{};
         ::uwvm2::utils::container::map<fd_t, ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t> renumber_map_new{};
 
@@ -838,7 +869,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         for(auto& [fd, uni]: fd_map) { renumber_map_new.emplace(fd, ::std::move(uni)); }
 
-        // commit (swap destroys old state on success; env remains unchanged on failure)
+        // Commit. Swapping destroys the old descriptor state only after every
+        // previous step has succeeded.
         env.fd_storage.opens.swap(opens_new);
         env.fd_storage.renumber_map.swap(renumber_map_new);
         env.fd_storage.closes.clear();
@@ -852,6 +884,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
         using u8string = ::uwvm2::utils::container::u8string;
 
+        // Copy scalar and trace defaults into the target environment first.
+        // Fields with an explicit target value override the global default;
+        // unset fields inherit the already-initialized global environment.
         state.env.wasip1_memory = nullptr;
         if(state.trace_wasip1_call_is_set)
         {
@@ -885,6 +920,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+        // Runtime socket preopens are global sockets followed by target-local
+        // sockets. Callback-time validation already rejects duplicate fds inside
+        // one target, and the concrete initializer will reject any remaining
+        // duplicate after the full effective list is visible.
         state.env.preopen_sockets = default_wasip1_env.preopen_sockets;
         state.env.preopen_sockets.reserve(state.env.preopen_sockets.size() + state.preopen_sockets.size());
         for(auto const& preopen_socket: state.preopen_sockets) { state.env.preopen_sockets.emplace_back(preopen_socket); }
@@ -942,11 +981,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             state.noinherit_system_environment_is_set ? state.noinherit_system_environment : saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(combined_delete_system_environment);
         wasip1_add_or_replace_environment = ::std::move(combined_add_or_replace_environment);
+        // Target argv policy deliberately does not inherit global force-args or
+        // global set-argv0. If the target did not set either option, it uses the
+        // default `--run` argv tail exactly like a fresh global environment; if
+        // it did, the target policy applies only to that target.
         wasip1_argv0_is_set = state.argv0_is_set;
         wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{};
         wasip1_force_args_is_set = state.force_args_is_set;
         wasip1_force_argument_storage = state.force_args_is_set ? state.force_argument_storage : ::uwvm2::utils::container::vector<u8string>{};
 
+        // Mounts are global mounts followed by target mounts. Their validation
+        // already used the same effective ordering, so fd assignment and
+        // preopen-name reporting here match command-line diagnostics.
         state.env.mount_dir_roots = ::std::move(saved_default_mount_dir_roots);
         state.env.mount_dir_roots.reserve(global_mount_dir_count + module_mount_dir_count);
         for(auto& mount_root: saved_module_mount_dir_roots) { state.env.mount_dir_roots.emplace_back(::std::move(mount_root)); }
@@ -956,6 +1002,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         state.argument_storage = ::std::move(wasip1_argument_storage);
         state.environment_storage = ::std::move(wasip1_environment_storage);
 
+        // Restore global command-line accumulators immediately after the target
+        // environment is materialized. state.argument_storage and
+        // state.environment_storage now own the strings referenced by state.env.
         wasip1_noinherit_system_environment = saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(saved_delete_system_environment);
         wasip1_add_or_replace_environment = ::std::move(saved_add_or_replace_environment);
