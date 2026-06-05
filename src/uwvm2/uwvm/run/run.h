@@ -506,25 +506,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     /**
-     * @brief   Parse an entry argument as `float` or `double`.
-     * @details In addition to the core floating syntax accepted by `parse_wasm_entry_float_range`, this helper accepts
-     *          a trailing `f`/`F` suffix so command-line users can write familiar single-precision literals.
-     */
-    template <typename T>
-    [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T & out) noexcept
-    {
-        auto first{str.cbegin()};
-        auto last{str.cend()};
-        if(parse_wasm_entry_float_range(first, last, out)) { return true; }
-        if(first != last && (last[-1] == u8'f' || last[-1] == u8'F'))
-        {
-            --last;
-            if(parse_wasm_entry_float_range(first, last, out)) { return true; }
-        }
-        return false;
-    }
-
-    /**
      * @brief   Classify an input literal for arity-mismatch diagnostics.
      * @details The classification is intentionally descriptive rather than exact.  For example, a literal that fits
      *          `i32` also fits `i64`, so it is reported as `i32/i64 literal`; similarly, many `f32` literals can be
@@ -532,17 +513,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      */
     [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(::uwvm2::utils::container::u8string_view str) noexcept
     {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32_value{};
+        // These are parser sinks used only to classify the token; the parsed values are never read.
+
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32_value;  // no init necessary
         if(parse_wasm_entry_i32(str, i32_value)) { return {u8"i32/i64 literal"}; }
 
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64_value{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64_value;  // no init necessary
         if(parse_wasm_entry_i64(str, i64_value)) { return {u8"i64 literal"}; }
 
-        float f32_value{};
-        if(parse_wasm_entry_float(str, f32_value)) { return {u8"f32/f64 literal"}; }
+        float f32_value;  // no init necessary
+        if(parse_wasm_entry_float_range(str.cbegin(), str.cend(), f32_value)) { return {u8"f32/f64 literal"}; }
 
-        double f64_value{};
-        if(parse_wasm_entry_float(str, f64_value)) { return {u8"f64 literal"}; }
+        double f64_value;  // no init necessary
+        if(parse_wasm_entry_float_range(str.cbegin(), str.cend(), f64_value)) { return {u8"f64 literal"}; }
 
         return {u8"unknown literal"};
     }
@@ -726,7 +709,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             case wasm_value_type::f32:
             {
                 float value{};
-                if(!parse_wasm_entry_float(arg, value)) [[unlikely]]
+                if(!parse_wasm_entry_float_range(arg.cbegin(), arg.cend(), value)) [[unlikely]]
                 {
                     wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected f32, got \"", arg, u8"\".");
                 }
@@ -736,7 +719,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             case wasm_value_type::f64:
             {
                 double value{};
-                if(!parse_wasm_entry_float(arg, value)) [[unlikely]]
+                if(!parse_wasm_entry_float_range(arg.cbegin(), arg.cend(), value)) [[unlikely]]
                 {
                     wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected f64, got \"", arg, u8"\".");
                 }

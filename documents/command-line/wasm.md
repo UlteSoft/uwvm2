@@ -105,8 +105,10 @@ Floating-point arguments:
 
 | Parameter type | Accepted forms | Notes |
 | --- | --- | --- |
-| `f32` | ordinary decimal/general float; optional trailing `f`/`F`; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `3.5`, `-3.0e4`, `3.5f`, `0x1.8p0`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
-| `f64` | ordinary decimal/general float; optional trailing `f`/`F`; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `4.5`, `-4.5`, `0X1.2P1`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
+| `f32` | ordinary decimal/general float; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `3.5`, `-3.0e4`, `0x1.8p0`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
+| `f64` | ordinary decimal/general float; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `4.5`, `-4.5`, `0X1.2P1`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
+
+C/C++-style `f`/`F` suffixes are not accepted. For example, `0.3f` cannot be used to request f32 parsing followed by widening to f64; each token must match the accepted syntax for the target parameter directly.
 
 Examples:
 
