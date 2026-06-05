@@ -204,13 +204,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             return true;
         }
 
+        /// @brief      Grow memory in the default fail-fast/silent policy.
+        /// @details    "Silent" means silent with respect to the host allocation result. A request that exceeds the configured Wasm limit must be rejected by
+        ///             the caller as a Wasm `-1` result before this function is entered. Once this function is used, a host allocation failure is handled by
+        ///             immediate `fast_terminate()`, not by returning an error to the Wasm program. Do not replace this path with `grow_strictly()` merely to
+        ///             make host allocation failure observable.
         inline constexpr void grow_silently(::std::size_t page_grow_size,
                                             ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
         {
             if(!this->try_grow_silently(page_grow_size, max_limit_memory_length)) [[unlikely]] { ::fast_io::fast_terminate(); }
         }
 
-        /// @brief     Strictly use a non-silent allocator (which may return nullptr), then indicates allocation success via the return value.
+        /// @brief     Strictly use a non-silent allocator (which may return nullptr), then indicate allocation success via the return value.
+        /// @details   Strict growth is selected only when the strict flag is enabled: host allocation failure becomes the Wasm `memory.grow` failure result
+        ///            (`-1`) and execution may continue. It is not equivalent to `grow_silently()`.
         inline constexpr bool grow_strictly(::std::size_t page_grow_size,
                                             ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),
                                             ::std::size_t* old_page_size_out = nullptr) noexcept

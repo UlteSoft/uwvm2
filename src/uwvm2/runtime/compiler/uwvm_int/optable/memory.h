@@ -2717,7 +2717,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: supported for the i32 delta operand and i32 result when i32 stack-top caching is enabled.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][max_limit_memory_length:size_t][next_opfunc_ptr]`.
-    /// @note Growth may be strict or silent depending on `grow_strict` configuration; the Wasm result uses `-1` on failure for strict growth.
+    /// @note Growth may be strict or silent depending on `grow_strict` configuration. User-limit failures are reported to Wasm as `-1`. In the default
+    ///       fail-fast/silent policy, host allocation failure terminates the process silently; in strict mode, host allocation failure is also reported as
+    ///       the Wasm `-1` result.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_memory_grow(Type... type) UWVM_THROWS
@@ -2758,6 +2760,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
+            // Default policy: fail-fast/silent host allocation handling.
+            //
+            // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
+            // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
+            // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()` or an OOM callback to
+            // make host allocation failure observable; that changes the selected memory-growth policy.
+            //
+            // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
+            // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
+            // happen only on later guest writes, where the kernel can kill the process without a recoverable runtime
+            // error. The silent default intentionally matches that path. Strict mode is for systems that can report
+            // host allocation failure at grow time and should convert that failure to Wasm `-1`.
+            //
             // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
             // otherwise another grow may slip in between the caller-side precheck and the actual grow.
             if constexpr(native_memory_t::support_multi_thread)
@@ -3359,6 +3375,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
+            // Default policy: fail-fast/silent host allocation handling.
+            //
+            // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
+            // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
+            // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()` or an OOM callback to
+            // make host allocation failure observable; that changes the selected memory-growth policy.
+            //
+            // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
+            // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
+            // happen only on later guest writes, where the kernel can kill the process without a recoverable runtime
+            // error. The silent default intentionally matches that path. Strict mode is for systems that can report
+            // host allocation failure at grow time and should convert that failure to Wasm `-1`.
+            //
             // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
             // otherwise another grow may slip in between the caller-side precheck and the actual grow.
             if constexpr(native_memory_t::support_multi_thread)

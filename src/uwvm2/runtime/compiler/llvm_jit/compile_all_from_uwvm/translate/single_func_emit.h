@@ -1873,6 +1873,17 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
     auto const delta_pages{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(delta_i32))};
     ::std::size_t old_pages{};
 
+    // Strict mode is the observable host-allocation failure path: failed growth is reported to
+    // Wasm as `-1` and execution may continue. Without this flag, the default fail-fast/silent
+    // policy is used: requests beyond the configured Wasm/user limit still return `-1`, but host
+    // allocation failure is silent with respect to the host result and may terminate the process
+    // through `grow_silently()`/`try_grow_silently()`.
+    //
+    // On overcommit systems, especially common Linux configurations, allocation admission can
+    // succeed up to the architecture/user-VA limit (for example, about 128 TiB on common x86-64
+    // layouts). The real OOM may happen only on later guest writes, where the kernel can kill the
+    // process without a recoverable runtime error. Do not replace the silent path with strict
+    // growth merely to synthesize an OOM diagnostic.
     if(::uwvm2::object::memory::flags::grow_strict)
     {
         return memory_p->grow_strictly(delta_pages, max_limit_memory_length, ::std::addressof(old_pages)) ? static_cast<runtime_wasm_i32>(old_pages)
@@ -1881,6 +1892,8 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
 
     if constexpr(runtime_native_memory_t::support_multi_thread)
     {
+        // Keep the check inside the backend critical section for concurrent memories. A false result here is a
+        // Wasm -1 max/fit failure, not a request to synthesize a diagnostic OOM trap.
         return memory_p->try_grow_silently(delta_pages, max_limit_memory_length, ::std::addressof(old_pages)) ? static_cast<runtime_wasm_i32>(old_pages)
                                                                                                               : static_cast<runtime_wasm_i32>(-1);
     }
