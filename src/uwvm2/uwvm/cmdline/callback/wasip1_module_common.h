@@ -102,6 +102,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                         ::uwvm2::utils::container::u8cstring_view wasi_dir,
                                         ::uwvm2::utils::container::u8cstring_view system_dir) noexcept
         {
+            // Target-specific mounts must obey the same rules as global mounts:
+            // guest path normalization, duplicate rejection, ancestor/child
+            // overlap rejection, UTF-8 policy, host directory opening, and the
+            // `--wasip1-disable-mount-path-normalization` /
+            // `--wasip1-allow-overlapping-mount-paths` switches. Rather than
+            // duplicating that security-sensitive logic here, temporarily build
+            // a synthetic default environment containing the global mounts plus
+            // the target's current mounts, then invoke the global mount callback.
             auto const saved_global_disable_utf8_check{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.disable_utf8_check};
             auto saved_global_mount_dir_roots{::std::move(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.mount_dir_roots)};
             auto saved_target_mount_dir_roots{::std::move(target.mount_dir_roots)};
@@ -132,6 +140,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                           fake_results,
                                                                                           fake_results + (sizeof(fake_results) / sizeof(fake_results[0])))};
 
+            // Split the synthetic environment back into the real global portion
+            // and the target-specific portion. A successful callback appends the
+            // new mount after the preserved global entries, so the original
+            // global count is the stable boundary.
             ::uwvm2::utils::container::vector<mount_dir_root_t> restored_global_mount_dir_roots{};
             restored_global_mount_dir_roots.reserve(global_mount_dir_count);
 
