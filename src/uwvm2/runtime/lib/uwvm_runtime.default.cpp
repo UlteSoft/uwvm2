@@ -7994,12 +7994,6 @@ namespace uwvm2::runtime::lib
             ::uwvm2::object::memory::error::output_memory_error(memerr);
         }
 
-        inline void memory_oom_callback() noexcept
-        {
-            print_trap_fatal_message(trap_kind::runtime_invariant_failure);
-            dump_call_stack_for_trap(trap_kind::runtime_invariant_failure);
-        }
-
         template <bool TryTieredJit, typename... Args>
         UWVM_ALWAYS_INLINE inline void execute_defined_for_bridge(Args&&... args) noexcept
         {
@@ -8460,7 +8454,6 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func = trap_memory_out_of_bounds;
-                ::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func = memory_oom_callback;
 
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                 ::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func = tiered_try_enter_loop_osr;

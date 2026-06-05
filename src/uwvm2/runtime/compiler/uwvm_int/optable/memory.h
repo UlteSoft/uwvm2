@@ -340,20 +340,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
-        UWVM_GNU_COLD [[noreturn]] inline void memory_oom_terminate() noexcept
-        {
-            if(::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func == nullptr) [[unlikely]]
-            {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
-                ::fast_io::fast_terminate();
-            }
-
-            ::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func();
-            ::fast_io::fast_terminate();
-        }
-
         template <typename MemoryT>
         UWVM_ALWAYS_INLINE inline constexpr void check_memory_bounds_unlocked(MemoryT const& memory,
                                                                               ::std::size_t memory_idx,
@@ -2765,8 +2751,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
             // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
             // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
-            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()` or an OOM callback to
-            // make host allocation failure observable; that changes the selected memory-growth policy.
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()`, and do not add an
+            // OOM callback to make host allocation failure observable; that changes the selected memory-growth policy.
             //
             // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
             // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
@@ -3380,8 +3366,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
             // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
             // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
-            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()` or an OOM callback to
-            // make host allocation failure observable; that changes the selected memory-growth policy.
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()`, and do not add an
+            // OOM callback to make host allocation failure observable; that changes the selected memory-growth policy.
             //
             // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
             // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
