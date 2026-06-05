@@ -301,9 +301,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     /**
      * @brief Runtime-entry call descriptor passed from the UWVM front-end to the runtime library.
      * @details The function index is always import-inclusive.  `param_buffer` and `result_buffer` are raw,
-     *          tightly-packed little host-memory byte buffers containing only scalar wasm entry values that
-     *          this layer currently supports (`i32`, `i64`, `f32`, and `f64`).  Empty vectors represent an
-     *          absent ABI buffer and are converted to null pointers before calling runtime library APIs.
+     *          tightly-packed host-native object-representation byte buffers containing only scalar wasm entry values
+     *          that this layer currently supports (`i32`, `i64`, `f32`, and `f64`).  These are not WebAssembly
+     *          linear-memory encodings, so no little-endian normalization is performed here.  Empty vectors represent
+     *          an absent ABI buffer and are converted to null pointers before calling runtime library APIs.
      */
     struct runtime_entry_invocation
     {
@@ -636,9 +637,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     /**
      * @brief   Append a trivially-copyable wasm ABI value into an entry buffer.
-     * @details Values are copied byte-for-byte into a compact buffer.  The buffer layout intentionally avoids alignment
-     *          assumptions because it crosses the front-end/runtime-library boundary as `std::byte*` plus byte length.
-     *          Bounds failures indicate an internal size-calculation bug and terminate immediately.
+     * @details Values are copied byte-for-byte into a compact host-native ABI buffer.  The buffer layout intentionally
+     *          avoids alignment assumptions because it crosses the front-end/runtime-library boundary as `std::byte*`
+     *          plus byte length.  Bounds failures indicate an internal size-calculation bug and terminate immediately.
      */
     template <typename T>
     inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
