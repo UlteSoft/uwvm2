@@ -37,10 +37,10 @@ UWVM2 includes multiple runtime execution backends (interpreter and in-memory co
 High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
 
 ### WASI host extensions
-WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. See [imported/readme.md](src/uwvm2/imported/readme.md) for details.
+WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. UWVM2 can route WASI P1 through global defaults, anonymous single-module targets, or named shared groups that apply to the main module, preloaded Wasm modules, native preload dynamic libraries, and weak-symbol modules. See [imported/readme.md](src/uwvm2/imported/readme.md) and [WASI Commands](documents/command-line/wasi.md) for details.
 
 ### Plugin-facing host APIs
-Preload modules (dynamic libraries / weak-symbol plugins) can consume a stable host-side API for linear-memory access, and can now optionally consume the UWVM2 WASI Preview 1 host API as well. The WASI table is disabled by default and must be explicitly enabled from the command line.
+Preload modules (dynamic libraries / weak-symbol plugins) can consume a stable host-side API for linear-memory access, and can optionally consume the UWVM2 WASI Preview 1 host API as well. The WASI table is disabled by default and must be explicitly enabled from the command line. When enabled for a single target or named group, plugin-facing WASI calls are resolved against that target's WASI environment rather than one process-wide table. Native dynamic libraries still execute as host code and must be treated as trusted host extensions.
 
 ### Flexible linear memory models
 uwvm2 provides three host-side models for implementing WebAssembly linear memory (mmap-based, multi-threaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual memory support. See [readme.md](src/uwvm2/object/memory/readme.md) for a detailed description.

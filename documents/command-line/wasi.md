@@ -43,6 +43,66 @@ Loaded modules are checked under these target kinds:
 
 One module name cannot be configured as both a single target and a member of a named group. The command-line callbacks prevent most conflicts immediately, and `run/loader.h` validates loaded module bindings again before initializing WASI environments.
 
+## WASI Preview 1 Groups And Plugin-Facing Host APIs
+
+UWVM2 treats WASI Preview 1 configuration as a target selection problem, not as one process-wide WASI table. Every loaded module resolves to exactly one WASI target:
+
+- The global default target, when no override is configured.
+- An anonymous single-module target created with `--wasip1-single-create <module>`.
+- A named shared target created with `--wasip1-group-create <group>` and populated with `--wasip1-group-add-module <group> <module>`.
+
+A target owns the effective WASI Preview 1 capability policy for the modules that resolve to it. That policy includes WASI import visibility, plugin-facing host API exposure, inherited and explicit environment variables, `argv[0]`, directory preopens, socket preopens, fd limits, UTF-8 checking, and trace routing. Target environments are initialized from global defaults plus target-specific overrides, so a group can share common global mounts while adding private mounts, sockets, or environment variables for only the modules in that group.
+
+Named groups are the shared form of this model. All module names bound to the same group use the same target configuration and the same initialized WASI environment for UWVM2's WASI host calls. A group can contain any loaded target kind recognized by the runtime:
+
+- `main_wasm`
+- `preload_wasm`
+- `preloaded_dl`
+- `weak_symbol`
+
+This is intentionally different from a model where each plugin receives an unrelated store-local WASI context. In UWVM2, a Wasm preload module and a native preload plugin can be bound to the same named group so both use the same group-level WASI capability policy.
+
+The plugin-facing WASI Preview 1 host API follows the same target lookup:
+
+- The API table is hidden by default.
+- `--wasip1-global-expose-host-api` exposes it globally by default.
+- `--wasip1-single-expose-host-api <module>` exposes it for one single-module target.
+- `--wasip1-group-expose-host-api <group>` exposes it for one named group.
+- The matching `hide-host-api` commands can explicitly hide it for a target when that target is configured.
+
+When UWVM2 calls a native preload-DL or weak-symbol plugin function, the runtime records the owning plugin module and selects the WASI environment for that owner before plugin-facing WASI calls are dispatched. If that owner is bound to a named group, plugin-facing WASI calls made during that UWVM2 preload invocation use the group's environment. Calls made by native code outside UWVM2's preload invocation context are native host behavior and should not be relied on for group selection. For native preload-DL and weak-symbol plugins, place target-level `expose-host-api` or `hide-host-api` configuration before registering/loading the target plugin so the loader installs the intended table. The global expose command also refreshes already loaded native preload-DL and weak-symbol modules when those features are compiled.
+
+This target model is a VM feature, not a proof that no other runtime can emulate a similar policy in an embedding application. Embedders for other runtimes can manually create multiple stores, linkers, or WASI contexts. UWVM2's documented behavior is that this selection is available as a first-class command-line model across the main Wasm module, preloaded Wasm modules, native preload dynamic libraries, and weak-symbol modules.
+
+Native dynamic libraries are not WebAssembly sandboxes. A native `.so`, `.dll`, or `.dylib` can execute host code outside WASI unless the operating system or deployment environment applies an additional sandbox. WASI grouping controls which UWVM2 WASI host API table and WASI environment the plugin receives; it does not by itself confine arbitrary native code.
+
+Example: keep the application modules on the global default target, while binding a crypto Wasm module and a native acceleration plugin to a private `crypto` group:
+
+```bash
+uwvm \
+  --wasm-set-main-module-name main \
+  --wasip1-global-mount-dir /app ./app \
+  --wasip1-group-create crypto \
+  --wasip1-group-add-module crypto crypto \
+  --wasip1-group-add-module crypto crypto_accelerate \
+  --wasip1-group-enable crypto \
+  --wasip1-group-expose-host-api crypto \
+  --wasip1-group-mount-dir crypto /crypto ./crypto-data \
+  --wasip1-group-set-fd-limit crypto 64 \
+  --wasm-preload-library utility.wasm utility \
+  --wasm-preload-library crypto.wasm crypto \
+  --wasm-register-dl ./crypto_accelerate.so crypto_accelerate \
+  --run main.wasm
+```
+
+In this example:
+
+- `main.wasm`, named as `main`, and `utility.wasm`, named as `utility`, use the global default WASI target because neither name is bound to a single target or a named group.
+- `crypto.wasm`, named as `crypto`, and `crypto_accelerate.so`, named as `crypto_accelerate`, both resolve to the `crypto` group.
+- The global target sees the `/app` preopen.
+- The `crypto` group sees the global target's inherited configuration plus its own `/crypto` preopen and fd limit.
+- The plugin-facing WASI Preview 1 host API is exposed to the `crypto` group, not to every preload module by default.
+
 ## Core WASI Command
 
 | Command | Alias | Arguments | Repeatability | Behavior |
