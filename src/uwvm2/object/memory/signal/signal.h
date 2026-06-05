@@ -60,6 +60,9 @@
 UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 {
 # if !(defined(_WIN32) || defined(__CYGWIN__))
+    /// @brief      POSIX C signal APIs imported with their platform ABI symbol names.
+    /// @details    This namespace avoids accidental calls through macro-expanded or wrapped names while
+    ///             still letting the signal layer chain to the process' previous handlers.
     namespace posix
     {
         extern int raise(int) noexcept
@@ -88,39 +91,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     }  // namespace posix
 # endif
 
+    /// @brief      Reserved virtual-memory interval protected by the mmap-backed wasm memory runtime.
+    /// @details    The interval [begin, end) is the complete reserved address range, including committed
+    ///             pages and guard/uncommitted pages. A fault inside this interval is considered a wasm
+    ///             memory bounds fault and is converted to mmap_memory_error_t.
+    /// @note       @p length_p points to the currently allocated/committed byte length when the memory can
+    ///             grow at runtime. When it is null, the fixed segment size is derived from end - begin.
     struct protected_memory_segment_t
     {
+        /// @brief  First byte of the reserved virtual address interval.
         ::std::byte const* begin{};
+
+        /// @brief  One-past-the-last byte of the reserved virtual address interval.
         ::std::byte const* end{};
+
+        /// @brief  Optional live memory length used to report the valid wasm memory size.
         ::std::atomic_size_t const* length_p{};
+
+        /// @brief  Wasm linear-memory index used in diagnostics.
         ::std::size_t memory_idx{};
     };
 
+    /// @brief      Callback type invoked when a protected mmap segment is faulted.
+    /// @details    The callback receives a fully populated fault report. It must not throw and it is
+    ///             expected to be terminal; the dispatcher terminates immediately after invoking it.
     using mmap_memory_out_of_bounds_func_t = void (*)(::uwvm2::object::memory::error::mmap_memory_error_t const&) noexcept;
 
     namespace detail
     {
+        /// @brief  Global registry of protected mmap-backed memory intervals.
+        /// @note   Structural mutations are intentionally restricted to VM/module setup and teardown.
+        ///         The platform fault handler reads this container without taking locks.
         inline ::uwvm2::utils::container::vector<protected_memory_segment_t> segments{};  // [global]
+
+        /// @brief  Optional process-wide hook for translating mmap memory faults to a runtime-specific action.
         inline mmap_memory_out_of_bounds_func_t mmap_memory_out_of_bounds_func{};         // [global]
 
+        /// @brief      Previous platform handlers saved when UWVM installs its own fault handler.
+        /// @details    The signal layer only consumes faults that belong to registered protected segments.
+        ///             Unrelated process faults are forwarded to the saved handlers when possible.
         struct signal_handlers_t
         {
 # if defined(_WIN32) || defined(__CYGWIN__)
 #  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
+            /// @brief  Previous Win32 unhandled-exception filter used on old Windows targets.
             ::fast_io::win32::pvectored_exception_handler previous_unhandled_exception_filter{};
 #  else
+            /// @brief  Handle returned by AddVectoredExceptionHandler for modern Windows targets.
             void* vectored_handler_handle{};
 #  endif
 # else
+            /// @brief  SIGSEGV handler active before UWVM installed its handler.
             struct ::sigaction previous_sigsegv{};
+
+            /// @brief  SIGBUS handler active before UWVM installed its handler.
             struct ::sigaction previous_sigbus{};
+
+            /// @brief  True after previous_sigsegv contains a valid saved handler.
             bool has_previous_sigsegv{};
+
+            /// @brief  True after previous_sigbus contains a valid saved handler.
             bool has_previous_sigbus{};
 # endif
         };
 
+        /// @brief  Process-wide storage for saved signal/exception handlers.
         inline signal_handlers_t signal_handlers{};  // [global]
 
+        /// @brief      Return the valid wasm memory length associated with a protected segment.
+        /// @details    Growable memories publish their current length through length_p. Fixed-size
+        ///             segments use the reserved interval length as the reported memory length.
         inline constexpr ::std::size_t get_memory_length(protected_memory_segment_t const& seg) noexcept
         {
             if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::size_t>(seg.length_p->load(::std::memory_order_acquire)); }
@@ -128,6 +168,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return static_cast<::std::size_t>(seg.end - seg.begin);
         }
 
+        /// @brief      Build a user-facing mmap fault report from a segment and a raw fault address.
+        /// @param      seg                 Registered protected segment containing the fault address.
+        /// @param      fault_addr          Address reported by the platform fault mechanism.
+        /// @param      instruction_address Best-effort program counter of the faulting instruction.
+        /// @return     Diagnostic data consumed by the default reporter or a custom out-of-bounds hook.
         inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t
             make_mmap_memory_error(protected_memory_segment_t const& seg,
                                    ::std::byte const* fault_addr,
@@ -142,6 +187,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                     .instruction_address = instruction_address};
         }
 
+        /// @brief      Try to consume a platform fault as a wasm mmap memory fault.
+        /// @return     False when the address is null or outside every registered protected segment.
+        /// @details    For registered protected segments this function is terminal: it invokes the custom
+        ///             handler when present, otherwise prints the default mmap memory error, and then
+        ///             terminates. The boolean return exists for the platform handler's pass-through path.
         inline bool handle_fault_address(::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
@@ -167,6 +217,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 # if defined(_WIN32) || defined(__CYGWIN__)
+        /// @brief      Windows vectored exception entry point used to intercept access violations.
+        /// @details    Access violations are translated only when the fault address falls inside a
+        ///             registered protected segment. All other exceptions continue through the normal
+        ///             Windows exception-dispatch chain.
         inline ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             if(exception_pointers == nullptr || exception_pointers->ExceptionRecord == nullptr) [[unlikely]] { return 0 /*EXCEPTION_CONTINUE_SEARCH*/; }
@@ -193,6 +247,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 #  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
+        /// @brief      Compatibility unhandled-exception filter for old Windows targets.
+        /// @details    Old targets do not provide vectored exception handling, so the same access-violation
+        ///             translation is installed through SetUnhandledExceptionFilter and chained manually.
         inline ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             auto const ret{vectored_exception_handler(exception_pointers)};
@@ -205,6 +262,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 #  endif
 
+        /// @brief      Install the Windows access-violation handler once for the process.
+        /// @details    The handler is process-wide because Windows exception dispatch is process/thread
+        ///             global. register_protected_segment calls this lazily before publishing the first
+        ///             protected interval.
         inline void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
@@ -242,6 +303,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 # else
+        /// @brief      Extract the faulting instruction address from a POSIX ucontext, when supported.
+        /// @details    The exact register field is OS and architecture specific. Unsupported targets return
+        ///             zero, which keeps diagnostics valid while omitting the instruction address.
         [[nodiscard]] inline ::std::uintptr_t get_signal_instruction_address(void* context) noexcept
         {
 #  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
@@ -272,6 +336,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #  endif
         }
 
+        /// @brief      Forward an unhandled POSIX signal to the handler that was installed before UWVM.
+        /// @details    Both SA_SIGINFO handlers and classic one-argument handlers are supported. Default
+        ///             handlers are restored and re-raised so the process observes the platform's normal
+        ///             crash behavior.
         inline constexpr void dispatch_previous_handler(int signal, ::siginfo_t* siginfo, void* context, struct ::sigaction const& previous) noexcept
         {
             if(previous.sa_flags & SA_SIGINFO)
@@ -301,6 +369,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             previous.sa_handler(signal);
         }
 
+        /// @brief      POSIX SIGSEGV/SIGBUS entry point used to intercept protected-memory faults.
+        /// @details    Faults inside registered protected segments are converted to wasm memory diagnostics.
+        ///             Other faults are delegated to the previous handler, or to the platform default action
+        ///             when no previous handler is available.
         inline void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
@@ -326,6 +398,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             posix::raise(signal);
         }
 
+        /// @brief      Install POSIX SIGSEGV and, where available, SIGBUS handlers once for the process.
+        /// @details    The handler is installed lazily by register_protected_segment. It uses SA_SIGINFO so
+        ///             the fault address and optional machine context are available for diagnostics.
         inline void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
@@ -379,6 +454,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 # endif
     }  // namespace detail
 
+    /// @brief      Set the process-wide callback used for protected mmap memory faults.
+    /// @note       The callback should be installed before guest execution begins. Updating it concurrently
+    ///             with fault handling is not synchronized.
+    inline constexpr void set_mmap_memory_out_of_bounds_handler(mmap_memory_out_of_bounds_func_t func) noexcept
+    { detail::mmap_memory_out_of_bounds_func = func; }
+
+    /// @brief      Register a reserved memory interval whose guard faults should be reported as wasm mmap faults.
+    /// @param      begin      First byte of the reserved virtual address interval.
+    /// @param      end        One-past-the-last byte of the reserved virtual address interval.
+    /// @param      length_p   Optional pointer to the live committed/valid length for growable memories.
+    /// @param      memory_idx Wasm linear-memory index used in diagnostics.
     /// @note       Protected memory segments are expected to be registered during VM/module initialization,
     ///             before any guest code that may trigger memory access violations is executed. After
     ///             initialization, the set of segments is treated as structurally immutable (only the
@@ -387,10 +473,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     ///             are performed. This design ensures that the signal/exception handler can traverse the
     ///             global segments container without additional synchronization, as there are no
     ///             concurrent structural modifications.
-
-    inline constexpr void set_mmap_memory_out_of_bounds_handler(mmap_memory_out_of_bounds_func_t func) noexcept
-    { detail::mmap_memory_out_of_bounds_func = func; }
-
     inline constexpr void register_protected_segment(::std::byte const* begin,
                                                      ::std::byte const* end,
                                                      ::std::atomic_size_t const* length_p = nullptr,
@@ -417,6 +499,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         detail::segments.emplace_back(begin, end, length_p, memory_idx);
     }
 
+    /// @brief      Remove a previously registered protected memory interval.
+    /// @details    The interval is matched by the exact begin/end pair used at registration time. Missing
+    ///             entries are ignored because teardown paths may be reached after partial initialization.
+    /// @note       This must not run concurrently with guest execution or with platform fault handling.
     inline constexpr void unregister_protected_segment(::std::byte const* begin, ::std::byte const* end) noexcept
     {
         if(begin == nullptr || end == nullptr) [[unlikely]] { return; }
@@ -432,6 +518,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
     }
 
+    /// @brief      Remove all protected memory intervals from the global registry.
+    /// @note       Intended for whole-runtime teardown or reinitialization outside guest execution.
     inline constexpr void clear_protected_segments() noexcept { detail::segments.clear(); }
 
 }  // namespace uwvm2::object::memory::signal
