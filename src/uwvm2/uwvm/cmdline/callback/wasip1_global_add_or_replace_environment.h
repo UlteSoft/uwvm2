@@ -57,7 +57,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  else
     UWVM_GNU_COLD inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_add_environment_callback(
+        ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_add_or_replace_environment_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
@@ -73,7 +73,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_global_add_environment),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_global_add_or_replace_environment),
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_global_add_environment),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_global_add_or_replace_environment),
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
@@ -137,8 +137,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         currp2->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment.emplace_back(
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t{env_name_sv, value_sv});
+        auto& add_or_replace_environment{::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_or_replace_environment};
+        if(auto env_iter{add_or_replace_environment.find(env_name_sv)}; env_iter != add_or_replace_environment.end())
+        {
+            env_iter->second = value_sv;
+        }
+        else
+        {
+            add_or_replace_environment.emplace(env_name_sv, value_sv);
+        }
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }

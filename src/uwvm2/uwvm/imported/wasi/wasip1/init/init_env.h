@@ -243,6 +243,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
+            // Build the materialized WASI environment in the same order as the
+            // command-line model:
+            //
+            // 1. Optionally import the process environment.
+            // 2. Drop malformed host entries whose key is empty.
+            // 3. Remove inherited keys listed in the delete set.
+            // 4. Apply explicit add-or-replace entries.
+            //
+            // Add-or-replace deliberately runs after deletion. This keeps the
+            // operation useful for "delete inherited value, then provide a
+            // deterministic guest value" and matches the target-override merge
+            // logic below.
             auto const get_env_key{[](u8string_view env_str) constexpr noexcept -> u8string_view
                                    {
                                        auto const eq_pos{env_str.find_character(u8'=')};
@@ -269,7 +281,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     env_vec = ::std::move(filtered);
                 }
 
-                // Delete system environment (ignored when -I1nosysenv is present).
+                // Delete inherited host environment variables. The command-line
+                // callback already rejects duplicate delete names, so the set
+                // lookup here is a pure membership test with no ordering
+                // semantics.
                 if(!wasip1_delete_system_environment.empty())
                 {
                     ::uwvm2::utils::container::vector<u8string> kept{};
@@ -279,34 +294,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                         u8string_view const ev{e.data(), e.size()};
                         u8string_view const key{get_env_key(ev)};
 
-                        bool should_delete{};
-                        for(auto const del_key: wasip1_delete_system_environment)
+                        if(wasip1_delete_system_environment.find(key) == wasip1_delete_system_environment.cend())
                         {
-                            if(del_key == key)
-                            {
-                                should_delete = true;
-                                break;
-                            }
+                            kept.emplace_back_unchecked(::std::move(e));
                         }
-
-                        if(!should_delete) { kept.emplace_back_unchecked(::std::move(e)); }
                     }
                     env_vec = ::std::move(kept);
                 }
             }
 
-            // Add/replace environment variables (wins over delete).
-            if(!wasip1_add_environment.empty())
+            // Apply explicit variables after deletion. Existing host entries are
+            // replaced in place to preserve the host environment's relative
+            // order where possible; new entries are appended after the inherited
+            // block. The map has already collapsed duplicate command-line names
+            // to the last value.
+            if(!wasip1_add_or_replace_environment.empty())
             {
-                for(auto const& kv: wasip1_add_environment)
+                for(auto const& kv: wasip1_add_or_replace_environment)
                 {
-                    auto new_entry{::uwvm2::utils::container::u8concat_uwvm(kv.env, u8"=", kv.value)};
+                    auto new_entry{::uwvm2::utils::container::u8concat_uwvm(kv.first, u8"=", kv.second)};
 
                     bool replaced{};
                     for(auto& e: env_vec)
                     {
                         u8string_view const ev{e.data(), e.size()};
-                        if(get_env_key(ev) == kv.env)
+                        if(get_env_key(ev) == kv.first)
                         {
                             e = ::std::move(new_entry);
                             replaced = true;
@@ -866,9 +878,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         for(auto const& preopen_socket: state.preopen_sockets) { state.env.preopen_sockets.emplace_back(preopen_socket); }
 #  endif
 
+        // Target initialization reuses the global initializer to avoid a second,
+        // subtly different environment-construction path. The global command-line
+        // accumulators are moved aside, replaced by a merged global+target view,
+        // then restored immediately after initialization. The final strings are
+        // moved into the target state so all string_views in state.env.envs point
+        // at target-owned storage.
         auto const saved_noinherit_system_environment{wasip1_noinherit_system_environment};
         auto saved_delete_system_environment{::std::move(wasip1_delete_system_environment)};
-        auto saved_add_environment{::std::move(wasip1_add_environment)};
+        auto saved_add_or_replace_environment{::std::move(wasip1_add_or_replace_environment)};
         auto saved_argv0_storage{::std::move(wasip1_argv0_storage)};
         auto saved_environment_storage{::std::move(wasip1_environment_storage)};
         auto saved_argument_storage{::std::move(wasip1_argument_storage)};
@@ -880,20 +898,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         auto const global_mount_dir_count{saved_default_mount_dir_roots.size()};
         auto const module_mount_dir_count{saved_module_mount_dir_roots.size()};
 
-        ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> combined_delete_system_environment{};
+        // Delete names are a set: global and target delete commands combine by
+        // union. Repeated target deletes were rejected during command parsing,
+        // and overlap with global deletes has the same final effect.
+        wasip1_environment_name_set_t combined_delete_system_environment{saved_delete_system_environment};
         combined_delete_system_environment.reserve(saved_delete_system_environment.size() + state.delete_system_environment.size());
-        for(auto const env_name: saved_delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
-        for(auto const env_name: state.delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
+        for(auto const env_name: state.delete_system_environment) { combined_delete_system_environment.emplace(env_name); }
 
-        ::uwvm2::utils::container::vector<::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t> combined_add_environment{};
-        combined_add_environment.reserve(saved_add_environment.size() + state.add_environment.size());
-        for(auto const& env_pair: saved_add_environment) { combined_add_environment.emplace_back(env_pair); }
-        for(auto const& env_pair: state.add_environment) { combined_add_environment.emplace_back(env_pair); }
+        // Add-or-replace entries are a map: target values override global values
+        // for matching keys before materialization. This is equivalent to
+        // applying global add-or-replace first and target add-or-replace second,
+        // while avoiding duplicate-key vectors and linear replacement scans.
+        wasip1_environment_map_t combined_add_or_replace_environment{saved_add_or_replace_environment};
+        combined_add_or_replace_environment.reserve(saved_add_or_replace_environment.size() + state.add_or_replace_environment.size());
+        for(auto const& env_pair: state.add_or_replace_environment)
+        {
+            if(auto env_iter{combined_add_or_replace_environment.find(env_pair.first)}; env_iter != combined_add_or_replace_environment.end())
+            {
+                env_iter->second = env_pair.second;
+            }
+            else
+            {
+                combined_add_or_replace_environment.emplace(env_pair.first, env_pair.second);
+            }
+        }
 
         wasip1_noinherit_system_environment =
             state.noinherit_system_environment_is_set ? state.noinherit_system_environment : saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(combined_delete_system_environment);
-        wasip1_add_environment = ::std::move(combined_add_environment);
+        wasip1_add_or_replace_environment = ::std::move(combined_add_or_replace_environment);
         wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{saved_argv0_storage};
 
         state.env.mount_dir_roots = ::std::move(saved_default_mount_dir_roots);
@@ -907,7 +940,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         wasip1_noinherit_system_environment = saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(saved_delete_system_environment);
-        wasip1_add_environment = ::std::move(saved_add_environment);
+        wasip1_add_or_replace_environment = ::std::move(saved_add_or_replace_environment);
         wasip1_argv0_storage = ::std::move(saved_argv0_storage);
         wasip1_argument_storage = ::std::move(saved_argument_storage);
         wasip1_environment_storage = ::std::move(saved_environment_storage);

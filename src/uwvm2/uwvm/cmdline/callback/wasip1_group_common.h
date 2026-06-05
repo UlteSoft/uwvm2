@@ -90,7 +90,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         [[nodiscard]] inline parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                ::uwvm2::utils::container::u8string_view action) noexcept
+                                                                wasip1_module_details::target_action_t action) noexcept
         {
             auto group_arg{para_curr + 1u};
             ::uwvm2::utils::container::u8string_view group_name{};

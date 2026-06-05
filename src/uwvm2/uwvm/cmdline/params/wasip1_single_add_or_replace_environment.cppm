@@ -31,7 +31,7 @@ module;
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 #endif
 
-export module uwvm2.uwvm.cmdline.params:wasip1_group_add_environment;
+export module uwvm2.uwvm.cmdline.params:wasip1_single_add_or_replace_environment;
 
 import fast_io;
 import uwvm2.utils.container;
@@ -44,4 +44,4 @@ import uwvm2.utils.cmdline;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "wasip1_group_add_environment.h"
+#include "wasip1_single_add_or_replace_environment.h"

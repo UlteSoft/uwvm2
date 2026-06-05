@@ -24,7 +24,7 @@
 
 #ifndef UWVM_MODULE
 // std
-# include <cstddef>
+# include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
@@ -32,31 +32,46 @@
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 # endif
 // import
+# include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
-# include <uwvm2/uwvm/cmdline/params/impl.h>
-# include "wasip1_group_common.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
-
+    namespace details
+    {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_add_or_replace_environment_alias{u8"-I1Gaddrepenv"};
 #  if defined(UWVM_MODULE)
-    extern "C++" UWVM_GNU_COLD
+        extern "C++"
 #  else
-    UWVM_GNU_COLD inline constexpr
+        inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_add_environment_callback(
-            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
-            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
-    { return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_add_environment, para_curr, para_end, u8"add-environment"); }
+            ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_add_or_replace_environment_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+    }  // namespace details
+
+#  if defined(__clang__)
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wbraced-scalar-init"
+#  endif
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_group_add_or_replace_environment{
+        .name{u8"--wasip1-group-add-or-replace-environment"},
+        .describe{u8"Add or replace one environment variable for one named group."},
+        .usage{u8"<group:str> <env:str> <value:str>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_add_or_replace_environment_alias), 1uz}},
+        .handle{::std::addressof(details::wasip1_group_add_or_replace_environment_callback)},
+        .cate{::uwvm2::utils::cmdline::categorization::wasi}};
+#  if defined(__clang__)
+#   pragma clang diagnostic pop
+#  endif
 
 # endif
 #endif

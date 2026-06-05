@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-04-27
+ * @date        2026-02-14
  * @copyright   APL-2.0 License
  */
 
@@ -29,7 +29,7 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
 // import
 # include <fast_io.h>
@@ -45,15 +45,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_single_add_environment_alias{u8"-I1Saddenv"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_add_or_replace_environment_alias{
+            u8"--wasip1-add-or-replace-environment",
+            u8"-I1addrepenv"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasip1_single_add_environment_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+            ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_add_or_replace_environment_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
@@ -62,12 +65,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #   pragma clang diagnostic push
 #   pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #  endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_single_add_environment{
-        .name{u8"--wasip1-single-add-environment"},
-        .describe{u8"Add one environment variable for one single module."},
-        .usage{u8"<module:str> <env:str> <value:str>"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_single_add_environment_alias), 1uz}},
-        .handle{::std::addressof(details::wasip1_single_add_environment_callback)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_global_add_or_replace_environment{
+        .name{u8"--wasip1-global-add-or-replace-environment"},
+        .describe{u8"Add or replace a global-default WASI Preview 1 environment variable."},
+        .usage{u8"<env:str> <value:str>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_add_or_replace_environment_alias.data(),
+                                                             details::wasip1_global_add_or_replace_environment_alias.size()}},
+        .handle{::std::addressof(details::wasip1_global_add_or_replace_environment_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
 #   pragma clang diagnostic pop
@@ -75,12 +79,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
 # endif
 #endif
-}
+}  // namespace uwvm2::uwvm::cmdline::params
 
 #ifndef UWVM_MODULE
 // macro
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>

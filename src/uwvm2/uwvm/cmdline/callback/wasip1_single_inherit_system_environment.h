@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_inherit_system_environment,
                                                    para_curr,
                                                    para_end,
-                                                   u8"inherit-system-environment");
+                                                   wasip1_module_details::target_action_t::inherit_system_environment);
     }
 
 # endif

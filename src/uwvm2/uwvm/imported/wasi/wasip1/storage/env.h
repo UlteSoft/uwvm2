@@ -55,11 +55,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
 
-    struct wasip1_add_environment_t
-    {
-        ::uwvm2::utils::container::u8string_view env{};
-        ::uwvm2::utils::container::u8string_view value{};
-    };
+    // Command-line environment edits are stored as views into the already-owned
+    // command-line argument storage. They are consumed only during pre-execution
+    // WASI environment initialization, so no extra string ownership is required
+    // here. The final "KEY=VALUE" strings are materialized later in
+    // wasip1_environment_storage or in a target state's environment_storage.
+    //
+    // Delete entries are represented as a set because duplicate deletion is a
+    // command-line error and initialization only needs membership tests.
+    // Add-or-replace entries are represented as a map because the observable
+    // semantics are keyed by environment name: inserting the same name again
+    // replaces the previous value before the environment is materialized.
+    using wasip1_environment_name_set_t =
+        ::uwvm2::utils::container::unordered_flat_set<::uwvm2::utils::container::u8string_view,
+                                                      ::uwvm2::utils::container::pred::u8string_view_hash,
+                                                      ::uwvm2::utils::container::pred::u8string_view_equal>;
+    using wasip1_environment_map_t =
+        ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view,
+                                                      ::uwvm2::utils::container::u8string_view,
+                                                      ::uwvm2::utils::container::pred::u8string_view_hash,
+                                                      ::uwvm2::utils::container::pred::u8string_view_equal>;
 
     enum class wasip1_module_target_kind_t : unsigned
     {
@@ -97,8 +112,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::single};
         ::uwvm2::utils::container::u8string trace_wasip1_group_name_storage{};
 
-        ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> delete_system_environment{};
-        ::uwvm2::utils::container::vector<wasip1_add_environment_t> add_environment{};
+        // Target-local environment edits. These mirror the global edit model but
+        // are applied after the global command-line defaults when the target's
+        // concrete WASI environment is initialized. A target map entry therefore
+        // overrides a global add-or-replace entry with the same key, while a
+        // target delete entry participates in the combined delete set.
+        wasip1_environment_name_set_t delete_system_environment{};
+        wasip1_environment_map_t add_or_replace_environment{};
         ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t> mount_dir_roots{};
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::environment::preopen_socket_t> preopen_sockets{};
@@ -113,7 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         {
             return this->enabled_is_set || this->expose_host_api_is_set || this->noinherit_system_environment_is_set || this->disable_utf8_check_is_set ||
                    this->fd_limit_is_set || this->argv0_is_set || this->trace_wasip1_call_is_set || !this->delete_system_environment.empty() ||
-                   !this->add_environment.empty() || !this->mount_dir_roots.empty()
+                   !this->add_or_replace_environment.empty() || !this->mount_dir_roots.empty()
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
                    || !this->preopen_sockets.empty()
 #  endif
@@ -133,11 +153,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     /// @brief     Do not inherit host environment variables into WASI Preview 1 environment.
     inline bool wasip1_noinherit_system_environment{};  // [global]
 
-    /// @brief     Delete host environment variables by name (ignored when wasip1_noinherit_system_environment is set).
-    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> wasip1_delete_system_environment{};  // [global]
+    /// @brief     Delete inherited host environment variables by name.
+    /// @details   This set is ignored when wasip1_noinherit_system_environment is set because no host entries are imported.
+    ///            The set still remains valid command-line state so target override initialization can merge it with
+    ///            target-local delete sets without introducing duplicate entries.
+    inline wasip1_environment_name_set_t wasip1_delete_system_environment{};  // [global]
 
-    /// @brief     Add/replace environment variables (wins over wasip1_delete_system_environment).
-    inline ::uwvm2::utils::container::vector<wasip1_add_environment_t> wasip1_add_environment{};  // [global]
+    /// @brief     Add or replace environment variables by name.
+    /// @details   These entries are applied after host inheritance and after delete processing. This ordering is intentional:
+    ///            an explicit add-or-replace command should be able to recreate a variable even if an inherited host variable
+    ///            with the same name was deleted earlier. When target overrides are initialized, target entries replace global
+    ///            entries with the same key before materialization.
+    inline wasip1_environment_map_t wasip1_add_or_replace_environment{};  // [global]
 
     /// @brief     Store raw WASI Preview 1 mount paths instead of normalized guest paths.
     inline bool wasip1_disable_mount_path_normalization{};  // [global]

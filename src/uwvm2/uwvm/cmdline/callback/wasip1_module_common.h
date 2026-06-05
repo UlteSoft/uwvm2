@@ -71,6 +71,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using preopen_socket_t = ::uwvm2::imported::wasi::wasip1::environment::preopen_socket_t;
 #  endif
 
+        enum class target_action_t : unsigned
+        {
+            enable,
+            disable,
+            expose_host_api,
+            hide_host_api,
+            noinherit_system_environment,
+            inherit_system_environment,
+            disable_utf8_check,
+            enable_utf8_check,
+            trace,
+            set_argv0,
+            set_fd_limit,
+            delete_system_environment,
+            add_or_replace_environment,
+            mount_dir,
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+            socket_tcp_connect,
+            socket_tcp_listen,
+            socket_udp_bind,
+            socket_udp_connect,
+#  endif
+        };
+
+        [[nodiscard]] inline bool parse_target_action(::uwvm2::utils::container::u8string_view text, target_action_t& action) noexcept
+        {
+            if(text == u8"enable") { action = target_action_t::enable; }
+            else if(text == u8"disable") { action = target_action_t::disable; }
+            else if(text == u8"expose-host-api") { action = target_action_t::expose_host_api; }
+            else if(text == u8"hide-host-api") { action = target_action_t::hide_host_api; }
+            else if(text == u8"noinherit-system-environment") { action = target_action_t::noinherit_system_environment; }
+            else if(text == u8"inherit-system-environment") { action = target_action_t::inherit_system_environment; }
+            else if(text == u8"disable-utf8-check") { action = target_action_t::disable_utf8_check; }
+            else if(text == u8"enable-utf8-check") { action = target_action_t::enable_utf8_check; }
+            else if(text == u8"trace") { action = target_action_t::trace; }
+            else if(text == u8"set-argv0") { action = target_action_t::set_argv0; }
+            else if(text == u8"set-fd-limit") { action = target_action_t::set_fd_limit; }
+            else if(text == u8"delete-system-environment") { action = target_action_t::delete_system_environment; }
+            else if(text == u8"add-or-replace-environment") { action = target_action_t::add_or_replace_environment; }
+            else if(text == u8"mount-dir") { action = target_action_t::mount_dir; }
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+            else if(text == u8"socket-tcp-connect") { action = target_action_t::socket_tcp_connect; }
+            else if(text == u8"socket-tcp-listen") { action = target_action_t::socket_tcp_listen; }
+            else if(text == u8"socket-udp-bind") { action = target_action_t::socket_udp_bind; }
+            else if(text == u8"socket-udp-connect") { action = target_action_t::socket_udp_connect; }
+#  endif
+            else { return false; }
+            return true;
+        }
+
         [[nodiscard]] inline bool validate_wasm_utf8_name(::uwvm2::utils::container::u8string_view text) noexcept
         {
             auto const [module_name_pos,
@@ -319,21 +369,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         [[nodiscard]] inline bool has_deleted_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
         {
-            for(auto const existing_env_name: target.delete_system_environment)
-            {
-                if(existing_env_name == env_name) [[unlikely]] { return true; }
-            }
-            return false;
-        }
-
-        [[nodiscard]] inline ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t const*
-            find_added_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
-        {
-            for(auto const& entry: target.add_environment)
-            {
-                if(entry.env == env_name) [[unlikely]] { return ::std::addressof(entry); }
-            }
-            return nullptr;
+            return target.delete_system_environment.find(env_name) != target.delete_system_environment.cend();
         }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
@@ -354,7 +390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             apply_module_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_action_end,
-                                ::uwvm2::utils::container::u8string_view action,
+                                target_action_t action,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* extra1,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
                                 override_state_t& target) noexcept
@@ -391,11 +427,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     return parameter_return_type::def;
                 }};
 
-            if(action == u8"enable") { return apply_module_enable_disable_action(true); }
-
-            if(action == u8"disable") { return apply_module_enable_disable_action(false); }
-
-            if(action == u8"expose-host-api")
+            switch(action)
+            {
+            case target_action_t::enable:
+                return apply_module_enable_disable_action(true);
+            case target_action_t::disable:
+                return apply_module_enable_disable_action(false);
+            case target_action_t::expose_host_api:
             {
                 if(auto const ret{set_bool_option(
                        target.expose_host_api,
@@ -409,8 +447,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"hide-host-api")
+            case target_action_t::hide_host_api:
             {
                 if(auto const ret{set_bool_option(
                        target.expose_host_api,
@@ -424,8 +461,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"noinherit-system-environment")
+            case target_action_t::noinherit_system_environment:
             {
                 if(auto const ret{set_bool_option(
                        target.noinherit_system_environment,
@@ -439,8 +475,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"inherit-system-environment")
+            case target_action_t::inherit_system_environment:
             {
                 if(auto const ret{set_bool_option(
                        target.noinherit_system_environment,
@@ -454,8 +489,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"disable-utf8-check")
+            case target_action_t::disable_utf8_check:
             {
                 if(auto const ret{set_bool_option(
                        target.disable_utf8_check,
@@ -469,8 +503,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"enable-utf8-check")
+            case target_action_t::enable_utf8_check:
             {
                 if(auto const ret{set_bool_option(
                        target.disable_utf8_check,
@@ -484,8 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(mark_action_end);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"trace")
+            case target_action_t::trace:
             {
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
                 {
@@ -578,8 +610,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 return print_usage_error(parameter, u8"Invalid trace output target.");
 #  endif
             }
-
-            if(action == u8"set-argv0")
+            case target_action_t::set_argv0:
             {
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing argv0."); }
                 if(target.argv0_is_set) [[unlikely]]
@@ -592,8 +623,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(extra1);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"set-fd-limit")
+            case target_action_t::set_fd_limit:
             {
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing fd limit."); }
                 auto const ret{parse_fd_limit(parameter, ::uwvm2::utils::container::u8string_view{extra1->str}, target)};
@@ -601,8 +631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(extra1);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"delete-system-environment")
+            case target_action_t::delete_system_environment:
             {
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
                 {
@@ -614,24 +643,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 {
                     return print_usage_error(parameter, u8"Invalid environment variable name.");
                 }
-                if(find_added_environment(target, env_name) != nullptr) [[unlikely]]
+                if(has_deleted_environment(target, env_name)) [[unlikely]]
                 {
                     return print_usage_error(
                         parameter,
-                        u8"Conflicting module action. Cannot combine delete-system-environment and add-environment for the same variable in one WASI Preview 1 target.");
+                        u8"Duplicate module action. Cannot delete the same environment variable more than once in one WASI Preview 1 target.");
+                }
+                if(target.add_or_replace_environment.find(env_name) != target.add_or_replace_environment.cend()) [[unlikely]]
+                {
+                    return print_usage_error(
+                        parameter,
+                        u8"Conflicting module action. Cannot combine delete-system-environment and add-or-replace-environment for the same variable in one WASI Preview 1 target.");
                 }
 
-                target.delete_system_environment.emplace_back(env_name);
+                target.delete_system_environment.emplace(env_name);
                 mark_consumed(extra1);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"add-environment")
+            case target_action_t::add_or_replace_environment:
             {
                 auto extra2{extra1 + 1u};
                 if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
                 {
-                    return print_usage_error(parameter, u8"Missing add-environment arguments.");
+                    return print_usage_error(parameter, u8"Missing add-or-replace-environment arguments.");
                 }
 
                 auto const env_name{::uwvm2::utils::container::u8string_view{extra1->str}};
@@ -643,24 +677,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 {
                     return print_usage_error(
                         parameter,
-                        u8"Conflicting module action. Cannot combine add-environment and delete-system-environment for the same variable in one WASI Preview 1 target.");
-                }
-                if(auto const existing_entry{find_added_environment(target, env_name)};
-                   existing_entry != nullptr && existing_entry->value != ::uwvm2::utils::container::u8string_view{extra2->str}) [[unlikely]]
-                {
-                    return print_usage_error(
-                        parameter,
-                        u8"Conflicting module action. Cannot set different values for the same environment variable in one WASI Preview 1 target.");
+                        u8"Conflicting module action. Cannot combine add-or-replace-environment and delete-system-environment for the same variable in one WASI Preview 1 target.");
                 }
 
-                target.add_environment.emplace_back(
-                    ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t{.env = env_name,
-                                                                                             .value = ::uwvm2::utils::container::u8string_view{extra2->str}});
+                auto const env_value{::uwvm2::utils::container::u8string_view{extra2->str}};
+                if(auto env_iter{target.add_or_replace_environment.find(env_name)}; env_iter != target.add_or_replace_environment.end())
+                {
+                    env_iter->second = env_value;
+                }
+                else
+                {
+                    target.add_or_replace_environment.emplace(env_name, env_value);
+                }
                 mark_consumed(extra2);
                 return parameter_return_type::def;
             }
-
-            if(action == u8"mount-dir")
+            case target_action_t::mount_dir:
             {
                 auto extra2{extra1 + 1u};
                 if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
@@ -673,9 +705,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 mark_consumed(extra2);
                 return parameter_return_type::def;
             }
-
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-            if(action == u8"socket-tcp-connect" || action == u8"socket-tcp-listen" || action == u8"socket-udp-bind" || action == u8"socket-udp-connect")
+            case target_action_t::socket_tcp_connect:
+            case target_action_t::socket_tcp_listen:
+            case target_action_t::socket_udp_bind:
+            case target_action_t::socket_udp_connect:
             {
                 auto extra2{extra1 + 1u};
                 if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
@@ -719,29 +753,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         return parameter_return_type::def;
                     }};
 
-                if(action == u8"socket-tcp-connect")
+                switch(action)
                 {
+                case target_action_t::socket_tcp_connect:
                     return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-connect"},
                                                ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_connect,
                                                ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_connect_callback);
-                }
-                if(action == u8"socket-tcp-listen")
-                {
+                case target_action_t::socket_tcp_listen:
                     return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-listen"},
                                                ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_listen,
                                                ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_listen_callback);
-                }
-                if(action == u8"socket-udp-bind")
-                {
+                case target_action_t::socket_udp_bind:
                     return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-bind"},
                                                ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_bind,
                                                ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_bind_callback);
+                case target_action_t::socket_udp_connect:
+                    return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-connect"},
+                                               ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_connect,
+                                               ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_connect_callback);
+                default:
+                    break;
                 }
-                return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-connect"},
-                                           ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_connect,
-                                           ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_connect_callback);
+                break;
             }
 #  endif
+            }
 
             return print_usage_error(parameter, u8"Unknown module action.");
         }
@@ -759,10 +795,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             auto curr_action{action_arg};
             while(curr_action != para_end && curr_action->type == parameter_type::arg)
             {
+                target_action_t action{};
+                if(!parse_target_action(::uwvm2::utils::container::u8string_view{curr_action->str}, action)) [[unlikely]]
+                {
+                    return print_usage_error(parameter, u8"Unknown module action.");
+                }
+
                 auto const ret{apply_module_action(parameter,
                                                    mark_begin,
                                                    curr_action,
-                                                   ::uwvm2::utils::container::u8string_view{curr_action->str},
+                                                   action,
                                                    curr_action + 1u,
                                                    para_end,
                                                    target)};
@@ -778,7 +820,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
                                                                                                 override_state_t& target,
-                                                                                                ::uwvm2::utils::container::u8string_view action) noexcept
+                                                                                                target_action_t action) noexcept
         { return apply_module_action(parameter, target_arg, target_arg, action, target_arg + 1u, para_end, target); }
     }  // namespace wasip1_module_details
 

@@ -126,8 +126,8 @@ For WASI mount paths, this flag changes command-line validation from "valid UTF-
 | `--wasip1-allow-overlapping-mount-paths` | `-I1allowoverlap` | None | Once | Allow duplicate or overlapping WASI mount guest paths. |
 | `--wasip1-global-set-argv0` | `--wasip1-set-argv0`, `-I1argv0` | `<argv0:str>` | Once | Override global-default WASI `argv[0]`. |
 | `--wasip1-global-noinherit-system-environment` | `--wasip1-noinherit-system-environment`, `-I1nosysenv` | None | Once | Start the global-default WASI environment without inheriting host environment variables. |
-| `--wasip1-global-delete-system-environment` | `--wasip1-delete-system-environment`, `-I1delsysenv` | `<env:str>` | Repeatable | Remove one inherited host environment variable by name. |
-| `--wasip1-global-add-environment` | `--wasip1-add-environment`, `-I1addenv` | `<env:str> <value:str>` | Repeatable | Add or replace one WASI environment variable. |
+| `--wasip1-global-delete-system-environment` | `--wasip1-delete-system-environment`, `-I1delsysenv` | `<env:str>` | Repeatable, no duplicate name | Remove one inherited host environment variable by name. Repeating the same name is rejected. |
+| `--wasip1-global-add-or-replace-environment` | `--wasip1-add-or-replace-environment`, `-I1addrepenv` | `<env:str> <value:str>` | Repeatable | Add or replace one WASI environment variable. Repeating the same name is allowed; the last value wins. |
 | `--wasip1-global-socket-tcp-listen` | `--wasip1-socket-tcp-listen`, `-I1tcplisten` | `<fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable | Create a default TCP listening socket. |
 | `--wasip1-global-socket-tcp-connect` | `--wasip1-socket-tcp-connect`, `-I1tcpcon` | `<fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable | Create a default connected TCP client socket. |
 | `--wasip1-global-socket-udp-bind` | `--wasip1-socket-udp-bind`, `-I1udpbind` | `<fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable | Create a default bound UDP socket. |
@@ -167,8 +167,8 @@ All single commands require a module name. The module name must be non-empty and
 | `--wasip1-single-trace` | `-I1Strace` | `<module:str> <none|out|err|file <file:path>>` | Once per target | Route that module's WASI trace output. A bare path is also accepted as file output. |
 | `--wasip1-single-set-argv0` | `-I1Sargv0` | `<module:str> <argv0:str>` | Once per target | Override WASI `argv[0]` for that module. |
 | `--wasip1-single-set-fd-limit` | `-I1Sfdlim` | `<module:str> <limit:size_t>` | Once per target | Override the fd limit for that module. |
-| `--wasip1-single-add-environment` | `-I1Saddenv` | `<module:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for that module. |
-| `--wasip1-single-delete-system-environment` | `-I1Sdelsysenv` | `<module:str> <env:str>` | Repeatable | Delete one inherited variable for that module. |
+| `--wasip1-single-add-or-replace-environment` | `-I1Saddrepenv` | `<module:str> <env:str> <value:str>` | Repeatable | Add or replace one variable for that module. Repeating the same name is allowed; the last value wins. |
+| `--wasip1-single-delete-system-environment` | `-I1Sdelsysenv` | `<module:str> <env:str>` | Repeatable, no duplicate name inside target | Delete one inherited variable for that module. Repeating the same name is rejected. |
 | `--wasip1-single-mount-dir` | `-I1Sdir` | `<module:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one module-specific directory mount. |
 | `--wasip1-single-socket-tcp-listen` | `-I1Stcplisten` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one TCP listening socket for the target. |
 | `--wasip1-single-socket-tcp-connect` | `-I1Stcpcon` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected TCP socket for the target. |
@@ -196,8 +196,8 @@ Group names must be non-empty. Unlike module names, group names are not validate
 | `--wasip1-group-trace` | `-I1Gtrace` | `<group:str> <none|out|err|file <file:path>>` | Once per group | Route the group's WASI trace output. A bare path is also accepted as file output. |
 | `--wasip1-group-set-argv0` | `-I1Gargv0` | `<group:str> <argv0:str>` | Once per group | Override WASI `argv[0]` for the group. |
 | `--wasip1-group-set-fd-limit` | `-I1Gfdlim` | `<group:str> <limit:size_t>` | Once per group | Override the fd limit for the group. |
-| `--wasip1-group-add-environment` | `-I1Gaddenv` | `<group:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for the group. |
-| `--wasip1-group-delete-system-environment` | `-I1Gdelsysenv` | `<group:str> <env:str>` | Repeatable | Delete one inherited variable for the group. |
+| `--wasip1-group-add-or-replace-environment` | `-I1Gaddrepenv` | `<group:str> <env:str> <value:str>` | Repeatable | Add or replace one variable for the group. Repeating the same name is allowed; the last value wins. |
+| `--wasip1-group-delete-system-environment` | `-I1Gdelsysenv` | `<group:str> <env:str>` | Repeatable, no duplicate name inside group | Delete one inherited variable for the group. Repeating the same name is rejected. |
 | `--wasip1-group-mount-dir` | `-I1Gdir` | `<group:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one group-specific directory mount. |
 | `--wasip1-group-socket-tcp-listen` | `-I1Gtcplisten` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one TCP listening socket for the group. |
 | `--wasip1-group-socket-tcp-connect` | `-I1Gtcpcon` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected TCP socket for the group. |
@@ -282,11 +282,10 @@ Environment action rules inside one target:
 
 - Environment names must be non-empty.
 - Environment names must not contain `=`.
-- `add-environment NAME VALUE` conflicts with `delete-system-environment NAME` in the same target.
-- `delete-system-environment NAME` conflicts with a later `add-environment NAME VALUE` in the same target.
-- Repeating `add-environment NAME VALUE` with the same value is accepted by the callback.
-- Repeating `add-environment NAME OTHER_VALUE` with a different value is rejected.
-- Repeating `delete-system-environment NAME` is accepted by the callback and has the same final effect.
+- `add-or-replace-environment NAME VALUE` conflicts with `delete-system-environment NAME` in the same target.
+- `delete-system-environment NAME` conflicts with a later `add-or-replace-environment NAME VALUE` in the same target.
+- Repeating `add-or-replace-environment NAME VALUE` is accepted. If the value differs, the later value replaces the earlier one.
+- Repeating `delete-system-environment NAME` is rejected.
 
 Socket action rules inside one target:
 
@@ -309,23 +308,23 @@ Global environment initialization order:
 Target environment initialization starts from the global command-line settings, then combines target settings:
 
 - Target noinherit/inherit overrides the global inheritance mode when explicitly set.
-- Global delete list and target delete list are concatenated.
-- Global add list and target add list are concatenated.
+- Global delete names and target delete names are merged.
+- Global add-or-replace entries and target add-or-replace entries are merged; target values replace global values for the same name.
 - Target `argv0` replaces global `argv0` when explicitly set.
 - Target mounts are appended after global mounts.
 - Target sockets are appended after global sockets.
 
-Because add rules are applied in list order and replace existing keys, target `add-environment` can override a global `add-environment` for the same variable. Target delete rules can remove inherited host variables, but they cannot remove a global add rule for the same name because all add rules run after all delete rules. Target callbacks reject conflicting add/delete pairs inside one target, but they do not reject a target action that interacts with global defaults.
+Because add-or-replace entries run after delete handling, target `add-or-replace-environment` can override a global `add-or-replace-environment` for the same variable. Target delete rules can remove inherited host variables, but they cannot remove a global add-or-replace rule for the same name because all add-or-replace rules run after all delete rules. Target callbacks reject conflicting add/delete pairs inside one target, but they do not reject a target action that interacts with global defaults.
 
 Examples:
 
 ```bash
 uwvm \
   --wasip1-global-noinherit-system-environment \
-  --wasip1-global-add-environment MODE global \
+  --wasip1-global-add-or-replace-environment MODE global \
   --wasip1-single-create app \
   --wasip1-single-inherit-system-environment app \
-  --wasip1-single-add-environment MODE app \
+  --wasip1-single-add-or-replace-environment MODE app \
   --run app.wasm
 ```
 
@@ -334,7 +333,7 @@ For module `app`, host environment inheritance is re-enabled and `MODE=app` wins
 ```bash
 uwvm \
   --wasip1-global-delete-system-environment SECRET \
-  --wasip1-global-add-environment SECRET public \
+  --wasip1-global-add-or-replace-environment SECRET public \
   --run app.wasm
 ```
 
@@ -618,7 +617,7 @@ Global sandbox with mounted data:
 ```bash
 uwvm \
   --wasip1-global-noinherit-system-environment \
-  --wasip1-global-add-environment PATH /bin \
+  --wasip1-global-add-or-replace-environment PATH /bin \
   --wasip1-global-mount-dir /data ./data \
   --run app.wasm
 ```
