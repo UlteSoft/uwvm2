@@ -67,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
-        auto print_usage_error{[]() constexpr noexcept
+        constexpr auto print_usage_error{[]() constexpr noexcept
                                {
                                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
