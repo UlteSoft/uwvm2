@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        impl.h
+ * @brief       Umbrella include for UWVM predefined I/O facilities.
+ * @details     This header aggregates the I/O predefine components for non-module builds.  It includes the standard
+ *              device partition surface, diagnostic output routing, runtime compiler logging, warning controls, verbose
+ *              controls, and timestamp helper in the same order exported by `uwvm2.uwvm_predefine.io`.
+ *
  * @author      24bit-xjkp
  * @version     2.0.0
  * @date        2025-03-21

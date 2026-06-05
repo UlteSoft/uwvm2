@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        verbose_control.cppm
+ * @brief       C++20 module partition for the UWVM verbose diagnostic switch.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:verbose_control` and includes `verbose_control.h` after
+ *              setting the module-build macros.  The exported flag gates detailed progress records emitted by loader,
+ *              runtime, WASI, validation, and compiler paths.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-07-07

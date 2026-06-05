@@ -5,6 +5,16 @@
  *************************************************************/
 
 /**
+ * @file        no_color.h
+ * @brief       NO_COLOR detection and process-wide color-output controls for UWVM diagnostics.
+ * @details     This header defines the color policy used by UWVM diagnostic output.  `check_has_no_color()` detects the
+ *              presence of the `NO_COLOR` environment variable without relying on C++ library state that may not be
+ *              available in all target environments.  `put_color` caches the inverse result and is used by diagnostic
+ *              formatting code to decide whether ANSI/color manipulators should be emitted.
+ *
+ *              On old Windows targets, UWVM may need to choose between ANSI escape sequences and Win32 console text
+ *              attributes at runtime.  `log_win32_use_ansi_b` records that choice for the color macro layer.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-15
@@ -43,6 +53,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
     namespace details::posix
     {
 # if !(defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__))
+        /// @brief Direct C-library `getenv` entry point used for POSIX-style `NO_COLOR` probing.
+        /// @details The declaration binds to the platform symbol explicitly so the diagnostic color switch can be
+        ///          queried in low-level startup paths without depending on higher-level C++ wrappers.
 #  if defined(__DARWIN_C_LEVEL) || defined(__DJGPP__)
         extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
 #  else
@@ -51,7 +64,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
 # endif
     }  // namespace details::posix
 
-    /// @brief Determine if there is NO_COLOR by environment variable
+    /// @brief Checks whether the process environment contains `NO_COLOR`.
+    /// @details The function implements platform-specific environment lookup for the color policy:
+    ///
+    ///          - Windows NT-family builds query the process environment through `RtlQueryEnvironmentVariable_U`.
+    ///          - Windows 9x builds use `GetEnvironmentVariableA`.
+    ///          - POSIX-style builds call the bound C-library `getenv` symbol.
+    ///
+    ///          Only the presence of `NO_COLOR` matters; its value is intentionally ignored.
+    /// @return `true` when `NO_COLOR` is present, otherwise `false`.
+    /// @see put_color
     inline bool check_has_no_color() noexcept
     {
 # if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
@@ -75,11 +97,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
 # endif
     }
 
+    /// @brief Process-wide switch controlling whether UWVM diagnostics emit color sequences.
+    /// @details The flag is initialized once from `check_has_no_color()`.  Diagnostic sites wrap color tokens with
+    ///          `fast_io::mnp::cond(put_color, ...)`, so setting `NO_COLOR` disables color output while preserving the
+    ///          same message text.
+    /// @see check_has_no_color
+    /// @see UWVM_COLOR_U8_RST_ALL
     inline bool const put_color{!check_has_no_color()};  // [global] No global variable dependencies from other translation units
 
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
-    /// @brief Used to determine whether or not to output colors via win32_text_attr
+    /// @brief Selects ANSI escape output instead of Win32 text attributes on old Windows console targets.
+    /// @details This flag is used by the `UWVM_COLOR_*` macro layer when both ANSI escape sequences and Win32 console
+    ///          text attributes are viable formatting mechanisms.  It is disabled by default and can be enabled by
+    ///          console setup code after detecting ANSI support.
+    /// @see UWVM_COLOR_RST_ALL
+    /// @see uwvm_color_push_macro.h
     inline bool log_win32_use_ansi_b{false};  // [global] No global variable dependencies from other translation units
 # endif
-}  // namespace uwvm2::utils::ansies
+}  // namespace uwvm2::uwvm::utils::ansies
 #endif

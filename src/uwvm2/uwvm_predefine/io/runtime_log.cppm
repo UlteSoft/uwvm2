@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        runtime_log.cppm
+ * @brief       C++20 module partition for UWVM runtime compiler logging.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:runtime_log` and includes `runtime_log.h` after setting
+ *              the module-build macros.  The exported declarations provide the runtime compiler logging enable flag,
+ *              selected target state, and lockable output stream.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-16

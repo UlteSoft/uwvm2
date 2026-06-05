@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        no_color.cppm
+ * @brief       C++20 module partition for UWVM `NO_COLOR` detection and color-output state.
+ * @details     This partition exports `uwvm2.uwvm_predefine.utils.ansies:no_color` and includes `no_color.h` after
+ *              setting the module-build macros.  The exported declarations provide the cached color-output flag and
+ *              old-Windows console color backend selector used by diagnostic formatting code.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-15

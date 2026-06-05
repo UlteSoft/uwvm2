@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        warn_control.cppm
+ * @brief       C++20 module partition for UWVM warning visibility and fatal-conversion controls.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:warn_control` and includes `warn_control.h` after
+ *              setting the module-build macros.  The exported declarations are the process-wide warning category flags
+ *              and their warning-to-fatal conversion controls.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-07-07

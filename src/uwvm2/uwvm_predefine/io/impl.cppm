@@ -5,6 +5,13 @@
  *************************************************************/
 
 /**
+ * @file        impl.cppm
+ * @brief       Primary C++20 module interface for UWVM predefined I/O facilities.
+ * @details     This module exports the `uwvm2.uwvm_predefine.io` module and re-exports all I/O partitions used by UWVM:
+ *              standard-device compatibility, diagnostic output routing, runtime compiler logging, warning controls,
+ *              verbose controls, and diagnostic timestamp helpers.  After defining module-build macros, it includes the
+ *              umbrella header so module and non-module builds share the same declarations.
+ *
  * @author      24bit-xjkp
  * @version     2.0.0
  * @date        2025-03-21

@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        time.cppm
+ * @brief       C++20 module partition for UWVM diagnostic timestamp helpers.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:time` and includes `time.h` after setting the
+ *              module-build macros.  The exported helper returns local realtime timestamps without throwing from
+ *              diagnostic and verbose logging paths.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-16

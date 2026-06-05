@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        time.h
+ * @brief       Exception-safe timestamp helper for UWVM diagnostics.
+ * @details     This header provides the local realtime timestamp helper used by verbose and diagnostic output paths.
+ *              Logging code must remain `noexcept`, so the helper catches `fast_io::error` when C++ exceptions are
+ *              enabled and returns a default-initialized timestamp if the platform clock query fails.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-16
@@ -36,7 +42,13 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 {
-    // For verbose logging while preventing exceptions from being thrown.
+    /// @brief Returns the current local realtime timestamp for diagnostic records.
+    /// @details The timestamp is produced from `fast_io::posix_clock_gettime(posix_clock_id::realtime)` and converted to
+    ///          local ISO-8601 form.  In exception-enabled builds, `fast_io::error` is caught so callers can use this
+    ///          helper from logging and failure-reporting paths without throwing.
+    /// @return The current local ISO-8601 timestamp, or a default-initialized timestamp if clock acquisition fails.
+    /// @see show_verbose
+    /// @see u8log_output
     inline constexpr ::fast_io::iso8601_timestamp get_local_realtime() noexcept
     {
         ::fast_io::iso8601_timestamp local_realtime{};
