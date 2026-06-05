@@ -2032,21 +2032,11 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { return static_cast<runtime_wasm_i32>(-1); }
 
-    auto const old_pages{local_imported_module->memory_size_from_index(memory_index)};
     auto const delta_pages{static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(delta_i32))};
-    if(delta_pages == 0u) { return static_cast<runtime_wasm_i32>(old_pages); }
-
-    if(max_limit_memory_length != ::std::numeric_limits<::std::size_t>::max())
-    {
-        auto const page_size_bytes{local_imported_module->memory_page_size_from_index(memory_index)};
-        if(page_size_bytes == 0u) [[unlikely]] { return static_cast<runtime_wasm_i32>(-1); }
-
-        auto const limit_pages{static_cast<::std::uint_least64_t>(max_limit_memory_length) / page_size_bytes};
-        if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]] { return static_cast<runtime_wasm_i32>(-1); }
-    }
-
-    return local_imported_module->memory_grow_from_index(memory_index, delta_pages) ? static_cast<runtime_wasm_i32>(old_pages)
-                                                                                    : static_cast<runtime_wasm_i32>(-1);
+    ::std::uint_least64_t old_pages{};
+    return local_imported_module->memory_try_grow_from_index(memory_index, delta_pages, max_limit_memory_length, ::std::addressof(old_pages))
+               ? static_cast<runtime_wasm_i32>(old_pages)
+               : static_cast<runtime_wasm_i32>(-1);
 }
 
 template <typename FunctionPtr>
@@ -4871,58 +4861,6 @@ template <typename CreateValue>
                                                                   static_cast<::std::size_t>(memory0_access_info.local_imported_page_size_bytes));
         }};
 
-    auto const emit_direct_local_imported_memory_byte_pointer{
-        [&](validation_module_traits_t::wasm_u32 static_offset, ::std::size_t access_size, ::llvm::Value* address_value) -> ::llvm::Value*
-        {
-            if constexpr(::std::endian::native != ::std::endian::little)
-            {
-                static_cast<void>(static_offset);
-                static_cast<void>(access_size);
-                static_cast<void>(address_value);
-                return nullptr;
-            }
-            else
-            {
-                if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr || address_value == nullptr) [[unlikely]]
-                {
-                    return nullptr;
-                }
-
-                auto const snapshot{emit_local_imported_memory_snapshot()};
-                if(snapshot.memory_begin_address == nullptr || snapshot.byte_length == nullptr) [[unlikely]] { return nullptr; }
-
-                auto llvm_i8_ptr_type{get_llvm_pointer_type(::llvm::Type::getInt8Ty(llvm_context))};
-                auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
-                auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-
-                auto effective_offset{ir_builder.CreateAdd(ir_builder.CreateSExt(address_value, llvm_i64_type),
-                                                           ::llvm::ConstantInt::get(llvm_i64_type, static_cast<::std::uint_least32_t>(static_offset)))};
-                auto effective_negative{ir_builder.CreateICmpSLT(effective_offset, ::llvm::ConstantInt::getSigned(llvm_i64_type, 0))};
-                auto effective_too_large{ir_builder.CreateICmpUGT(effective_offset, ::llvm::ConstantInt::get(llvm_i64_type, 0xffffffffull))};
-                auto memory_length_i64{ir_builder.CreateZExt(snapshot.byte_length, llvm_i64_type)};
-                auto access_size_i64{::llvm::ConstantInt::get(llvm_i64_type, access_size)};
-                auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
-                auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
-                auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
-                auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
-
-                emit_llvm_conditional_memory_out_of_bounds_trap(
-                    *llvm_module,
-                    ir_builder,
-                    ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
-                    memory0_access_info.local_imported_memory_index,
-                    static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
-                    effective_offset,
-                    offset_out_of_range,
-                    snapshot.byte_length,
-                    access_size);
-
-                auto effective_offset_intptr{ir_builder.CreateIntCast(effective_offset, llvm_intptr_type, false)};
-                auto memory_address{ir_builder.CreateAdd(snapshot.memory_begin_address, effective_offset_intptr, "local_imported.memory.addr.int")};
-                return ir_builder.CreateIntToPtr(memory_address, llvm_i8_ptr_type, "local_imported.memory.addr");
-            }
-        }};
-
     auto const emit_local_imported_memory_load_bridge_call_for_scalar{
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
@@ -5179,7 +5117,12 @@ template <typename CreateValue>
             }
             else if(memory0_access_info.local_imported_module_ptr != nullptr)
             {
-                return emit_direct_local_imported_memory_byte_pointer(static_offset, access_size, address_value);
+                // A local-imported memory snapshot does not keep allocator-backed grow locks alive across the actual load/store.
+                // Keep imported memories on the bridge path; the bridge performs the access while the provider's snapshot/lock is active.
+                static_cast<void>(static_offset);
+                static_cast<void>(access_size);
+                static_cast<void>(address_value);
+                return nullptr;
             }
             return nullptr;
         }};

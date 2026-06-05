@@ -822,6 +822,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual constexpr ::uwvm2::uwvm::wasm::type::memory_get_all_result_t<Fs...> get_all_memory_information() const noexcept = 0;
             virtual constexpr ::std::uint_least64_t memory_page_size_from_index(::std::size_t index) const noexcept = 0;
             virtual constexpr bool memory_grow_from_index(::std::size_t index, ::std::uint_least64_t grow_page_size) noexcept = 0;
+            virtual constexpr bool memory_try_grow_from_index(::std::size_t index,
+                                                              ::std::uint_least64_t grow_page_size,
+                                                              ::std::size_t max_limit_memory_length,
+                                                              ::std::uint_least64_t* old_page_size_out) noexcept = 0;
             virtual constexpr bool memory_access_snapshot_from_index(::std::size_t index,
                                                                      ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept = 0;
             virtual constexpr bool
@@ -1188,6 +1192,67 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             {
                 if(index != N) { return memory_grow_from_index_impl<N + 1uz, curr_tuple_type>(mems, index, grow_page_size); }
                 return memory_grow(::fast_io::get<N>(mems), grow_page_size);
+            }
+        }
+
+        template <::std::size_t N, typename MemTuple>
+        inline constexpr bool memory_try_grow_from_index_impl(MemTuple& mems,
+                                                              ::std::size_t index,
+                                                              ::std::uint_least64_t grow_page_size,
+                                                              ::std::size_t max_limit_memory_length,
+                                                              ::std::uint_least64_t* old_page_size_out) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<MemTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N)
+                {
+                    return memory_try_grow_from_index_impl<N + 1uz, curr_tuple_type>(
+                        mems,
+                        index,
+                        grow_page_size,
+                        max_limit_memory_length,
+                        old_page_size_out);
+                }
+
+                auto& memory{::fast_io::get<N>(mems)};
+                using memory_type = ::std::remove_cvref_t<decltype(memory)>;
+
+                if constexpr(requires(memory_type& mem, ::std::size_t grow_pages, ::std::size_t max_bytes, ::std::size_t* old_pages) {
+                                 { mem.try_grow_silently(grow_pages, max_bytes, old_pages) } -> ::std::same_as<bool>;
+                             })
+                {
+                    if(grow_page_size > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]]
+                    {
+                        return false;
+                    }
+
+                    ::std::size_t old_pages{};
+                    auto const ok{memory.try_grow_silently(static_cast<::std::size_t>(grow_page_size),
+                                                           max_limit_memory_length,
+                                                           ::std::addressof(old_pages))};
+                    if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = static_cast<::std::uint_least64_t>(old_pages); }
+                    return ok;
+                }
+                else
+                {
+                    auto const old_pages{memory_size(memory)};
+                    if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = old_pages; }
+
+                    if(max_limit_memory_length != ::std::numeric_limits<::std::size_t>::max())
+                    {
+                        constexpr auto page_size_bytes{memory_page_size_bytes<memory_type>()};
+                        if(page_size_bytes == 0u) [[unlikely]] { return false; }
+
+                        auto const limit_pages{static_cast<::std::uint_least64_t>(max_limit_memory_length) / page_size_bytes};
+                        if(old_pages > limit_pages || grow_page_size > (limit_pages - old_pages)) [[unlikely]] { return false; }
+                    }
+
+                    return grow_page_size == 0u || memory_grow(memory, grow_page_size);
+                }
             }
         }
 
@@ -1663,6 +1728,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 }
             }
 
+            virtual inline constexpr bool memory_try_grow_from_index(::std::size_t index,
+                                                                     ::std::uint_least64_t grow_page_size,
+                                                                     ::std::size_t max_limit_memory_length,
+                                                                     ::std::uint_least64_t* old_page_size_out) noexcept override
+            {
+                if constexpr(has_local_memory_storage<rcvmod_type>)
+                {
+                    using curr_mem_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_memory_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_mem_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return memory_try_grow_from_index_impl<0uz>(module.local_memory,
+                                                                index,
+                                                                grow_page_size,
+                                                                max_limit_memory_length,
+                                                                old_page_size_out);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
             virtual inline constexpr bool memory_access_snapshot_from_index(::std::size_t index,
                                                                             ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept override
             {
@@ -1990,6 +2077,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return this->ptr->memory_grow_from_index(index, grow_page_size);
+        }
+
+        inline constexpr bool memory_try_grow_from_index(::std::size_t index,
+                                                         ::std::uint_least64_t grow_page_size,
+                                                         ::std::size_t max_limit_memory_length,
+                                                         ::std::uint_least64_t* old_page_size_out) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->memory_try_grow_from_index(index, grow_page_size, max_limit_memory_length, old_page_size_out);
         }
 
         inline constexpr bool memory_access_snapshot_from_index(::std::size_t index, ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept
