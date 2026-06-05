@@ -5,6 +5,25 @@
  *************************************************************/
 
 /**
+ * @file        run.h
+ * @brief       Top-level UWVM execution driver and runtime-entry preparation helpers.
+ * @details     This header owns the final handoff from the command-line/loader layer to the executable
+ *              runtime backend.  It performs the remaining orchestration steps that must happen after
+ *              all command-line options have been parsed and after the initial module paths have been
+ *              recorded:
+ *
+ *              - load the executable, local, and weak-symbol WebAssembly modules;
+ *              - build the process-wide module registry and reject duplicate module names;
+ *              - serve non-executing modes such as section-detail printing and parser validation;
+ *              - validate cross-module imports and initialize runtime storage;
+ *              - resolve the entry function, including the explicit `--wasm-set-start-func` override;
+ *              - resolve the runtime compile-thread policy into the value consumed by runtime compilers;
+ *              - dispatch to lazy compilation, lazy compilation with eager validation, or full compilation.
+ *
+ *              The helper functions in this file intentionally keep the interface between the UWVM
+ *              front-end and the runtime library narrow: the runtime receives an import-inclusive wasm
+ *              function index plus optional raw ABI buffers for entry parameters and results.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-03-27
@@ -66,6 +85,28 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
 #if defined(UWVM_RUNTIME_HAS_BACKEND)
+    /**
+     * @brief   Resolve the default entry function for the main module.
+     * @details The returned value is the import-inclusive WebAssembly function index used by the runtime
+     *          storage layer.  Resolution is deliberately conservative because the default entry path
+     *          does not provide host-side arguments or inspect host-import ABIs.
+     *
+     *          Resolution order:
+     *          1. the WebAssembly start section, when present;
+     *          2. an exported function named `_start` from `all_module_export`;
+     *          3. an exported function named `main` from `all_module_export`;
+     *          4. the parsed export section directly, again checking `_start` before `main`.
+     *
+     *          The parsed-export fallback protects the runtime from stale or absent export-map storage.
+     *          Every candidate must resolve to a `() -> ()` wasm function.  Imported candidates are accepted
+     *          only when the import chain ultimately points at a wasm-defined function; host-defined import
+     *          leaves are rejected because the default runtime-entry ABI here is wasm-function based.
+     *
+     * @param   main_module_name Name key of the executable module in the global wasm/runtime registries.
+     * @return  Import-inclusive wasm function index for the default entry function.
+     * @warning This function does not return on failure.  It emits a fatal diagnostic and terminates when no
+     *          valid default entry function can be found.
+     */
     inline ::std::size_t resolve_default_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
@@ -74,8 +115,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         using imported_function_storage_t = ::uwvm2::uwvm::runtime::storage::imported_function_storage_t;
         using func_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
 
-        // We currently do not provide host arguments to the entry function; therefore, the entry must be `() -> ()`.
-        // NOTE: start section in wasm1.0 requires `() -> ()` by the spec; exported fallbacks are kept consistent.
+        // We currently do not provide host arguments to the default entry function; therefore, the entry must be `() -> ()`.
+        // The wasm 1.0 start section already has that signature requirement by specification, and the exported fallbacks
+        // intentionally use the same rule so all default-entry paths share one runtime ABI.
         auto const resolve_import_leaf{[](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
                                        {
                                            constexpr ::std::size_t kMaxChain{4096uz};
@@ -83,11 +125,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                            {
                                                if(imp == nullptr) [[unlikely]] { return nullptr; }
                                                if(imp->link_kind != func_link_kind::imported) { return imp; }
+                                               // Follow import forwarding until a concrete leaf is reached.  The chain limit is a defensive guard
+                                               // against malformed runtime storage; valid import graphs should already have been cycle-checked.
                                                imp = imp->target.imported_ptr;
                                            }
                                            return nullptr;
                                        }};
 
+        // Validate an import-inclusive function index against runtime type storage.  For imported functions, inspect
+        // the resolved wasm-defined leaf because the import entry itself may only be a forwarding slot.
         auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
                                                    {
                                                        auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
@@ -124,7 +170,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                        return is_void_to_void_ft(*f->function_type_ptr);
                                                    }};
 
-        // Prefer start section when present.
+        // Prefer the start section when present.  The parser stores the optional section as a span, so presence must
+        // be tested with the parser's non-null `sec_begin` sentinel rather than by subtracting span pointers.
         auto const all_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)};
         if(all_module_it != ::uwvm2::uwvm::wasm::storage::all_module.end())
         {
@@ -156,7 +203,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        // Otherwise, fall back to exported entrypoints.
+        // Otherwise, fall back to conventional exported entrypoints from the export map.  `_start` follows WASI and
+        // common standalone-wasm conventions; `main` is retained as a compatibility fallback.
         ::std::size_t idx{};
         auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
         if(mit != ::uwvm2::uwvm::wasm::storage::all_module_export.end())
@@ -250,15 +298,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::fast_terminate();
     }
 
+    /**
+     * @brief Runtime-entry call descriptor passed from the UWVM front-end to the runtime library.
+     * @details The function index is always import-inclusive.  `param_buffer` and `result_buffer` are raw,
+     *          tightly-packed little host-memory byte buffers containing only scalar wasm entry values that
+     *          this layer currently supports (`i32`, `i64`, `f32`, and `f64`).  Empty vectors represent an
+     *          absent ABI buffer and are converted to null pointers before calling runtime library APIs.
+     */
     struct runtime_entry_invocation
     {
+        /// Import-inclusive wasm function index selected as the entry point.
         ::std::size_t function_index{};
+
+        /// Packed entry-parameter bytes.  The runtime library interprets this according to the selected function type.
         ::uwvm2::utils::container::vector<::std::byte> param_buffer{};
+
+        /// Packed result storage bytes.  The runtime writes entry results here when the selected entry has results.
         ::uwvm2::utils::container::vector<::std::byte> result_buffer{};
     };
 
+    /**
+     * @brief Normalize a wasm value-type enum value into a compact integer code.
+     * @details Parser feature sets use related enum types for different wasm versions.  Converting through an integer
+     *          keeps later helpers independent of the concrete enum type while preserving the binary value-type code.
+     */
     [[nodiscard]] inline constexpr ::std::uint_least8_t wasm_entry_type_code(auto type) noexcept { return static_cast<::std::uint_least8_t>(type); }
 
+    /**
+     * @brief   Return the scalar ABI byte width for a supported entry value type.
+     * @param   code WebAssembly value-type code.
+     * @return  4 for `i32`/`f32`, 8 for `i64`/`f64`, or 0 for unsupported/non-scalar entry types.
+     */
     [[nodiscard]] inline constexpr ::std::size_t wasm_entry_scalar_abi_size(::std::uint_least8_t code) noexcept
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
@@ -272,6 +342,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
     }
 
+    /**
+     * @brief   Convert a wasm value-type code to a short diagnostic name.
+     * @details Names are used only for user-facing diagnostics and verbose logs.  Unsupported reference/vector types
+     *          are still named when their value-type codes are known so fatal messages can identify the rejected type.
+     * @param   code WebAssembly value-type code.
+     * @return  Static UTF-8 string view naming the value type.
+     */
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view wasm_entry_type_name(::std::uint_least8_t code) noexcept
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
@@ -292,6 +369,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename ScanManipulator>
+    /**
+     * @brief   Run a fast_io scanner and require it to consume the whole input range.
+     * @details Entry argument parsing must reject partial literals such as `123abc`.  This helper centralizes the
+     *          "parse succeeded and stopped exactly at `last`" check for integer and floating-point scanners.
+     */
     [[nodiscard]] inline constexpr bool wasm_entry_scan_exact(char8_t const* first, char8_t const* last, ScanManipulator scan_manipulator) noexcept
     {
         auto const [next, err]{::fast_io::parse_by_scan(first, last, scan_manipulator)};
@@ -299,6 +381,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <bool allow_signed_decimal, typename Out, typename Unsigned>
+    /**
+     * @brief   Parse an integer entry argument into the exact wasm integer storage type.
+     * @details Accepted forms are signed decimal when `allow_signed_decimal` is true, plus unsigned decimal, hexadecimal,
+     *          binary, and octal forms.  Unsigned forms are bit-cast into the signed wasm storage type, allowing users to
+     *          express raw two's-complement bit patterns without relying on implementation-defined signed overflow.
+     *
+     * @tparam  allow_signed_decimal Whether to first accept a signed decimal literal.
+     * @tparam  Out                  Destination integer type used by the wasm runtime ABI.
+     * @tparam  Unsigned             Unsigned integer type with the same width as `Out`.
+     * @param   str                  User-provided UTF-8 argument token.
+     * @param   out                  Receives the parsed value on success.
+     * @return  true when the whole token was parsed successfully, false otherwise.
+     */
     [[nodiscard]] inline constexpr bool parse_wasm_entry_integer(::uwvm2::utils::container::u8string_view str, Out & out) noexcept
     {
         static_assert(sizeof(Out) == sizeof(Unsigned));
@@ -330,6 +425,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename... Args>
+    /**
+     * @brief Emit a fatal `--wasm-set-start-func` diagnostic and terminate.
+     * @details This helper keeps all explicit-entry fatal paths formatted consistently and guarantees that callers do
+     *          not continue after an invalid user-specified entry function or entry argument.
+     */
     [[noreturn]] inline void wasm_set_start_func_fatal(Args && ... args) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -344,6 +444,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::fast_terminate();
     }
 
+    /**
+     * @brief Parse an entry argument as a wasm `i32` storage value.
+     */
     [[nodiscard]] inline constexpr bool parse_wasm_entry_i32(::uwvm2::utils::container::u8string_view str,
                                                              ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 & out) noexcept
     {
@@ -353,6 +456,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return parse_wasm_entry_integer<true, wasm_i32, wasm_u32>(str, out);
     }
 
+    /**
+     * @brief Parse an entry argument as a wasm `i64` storage value.
+     */
     [[nodiscard]] inline constexpr bool parse_wasm_entry_i64(::uwvm2::utils::container::u8string_view str,
                                                              ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 & out) noexcept
     {
@@ -363,6 +469,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename T>
+    /**
+     * @brief   Parse a floating-point literal from a half-open UTF-8 range.
+     * @details The fast-float path accepts the normal fast_io floating scanner and, when available, fast_io hexfloat
+     *          syntax as well.  The fallback path uses `std::from_chars` in general format.  In every case, partial
+     *          consumption is rejected.
+     */
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
@@ -381,6 +493,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename T>
+    /**
+     * @brief   Parse an entry argument as `float` or `double`.
+     * @details In addition to the core floating syntax accepted by `parse_wasm_entry_float_range`, this helper accepts
+     *          a trailing `f`/`F` suffix so command-line users can write familiar single-precision literals.
+     */
     [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T & out) noexcept
     {
         auto first{str.cbegin()};
@@ -394,6 +511,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return false;
     }
 
+    /**
+     * @brief   Classify an input literal for arity-mismatch diagnostics.
+     * @details The classification is intentionally descriptive rather than exact.  For example, a literal that fits
+     *          `i32` also fits `i64`, so it is reported as `i32/i64 literal`; similarly, many `f32` literals can be
+     *          represented as `f64`.
+     */
     [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(::uwvm2::utils::container::u8string_view str) noexcept
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32_value{};
@@ -412,6 +535,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output, typename ValueTypePtr>
+    /**
+     * @brief Print a wasm function type span as `(type, type, ...)`.
+     * @details Used in diagnostics where a full function signature is more helpful than only a raw arity count.
+     */
     inline void print_wasm_entry_type_span(Output & output, ValueTypePtr begin, ValueTypePtr end) noexcept
     {
         ::fast_io::io::perr(output, u8"(");
@@ -429,6 +556,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output>
+    /**
+     * @brief Print the standard UWVM informational prefix to an existing output stream.
+     * @details This helper is used while a multi-line diagnostic already holds the output-stream lock, so it accepts
+     *          the caller's stream reference rather than reacquiring the global logger.
+     */
     inline void print_wasm_entry_info_prefix(Output & output) noexcept
     {
         ::fast_io::io::perr(output,
@@ -440,6 +572,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename FunctionType, typename Tokens>
+    /**
+     * @brief Emit a detailed fatal diagnostic for explicit-entry arity mismatch.
+     * @details The diagnostic prints the selected function signature and a best-effort classification of every supplied
+     *          token.  The entire multi-line record is emitted while holding the logger lock to avoid interleaving with
+     *          other verbose/runtime output.
+     */
     [[noreturn]] inline void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
                                                                       FunctionType const& ft,
                                                                       Tokens const& argument_tokens) noexcept
@@ -499,6 +637,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename T>
+    /**
+     * @brief   Append a trivially-copyable wasm ABI value into an entry buffer.
+     * @details Values are copied byte-for-byte into a compact buffer.  The buffer layout intentionally avoids alignment
+     *          assumptions because it crosses the front-end/runtime-library boundary as `std::byte*` plus byte length.
+     *          Bounds failures indicate an internal size-calculation bug and terminate immediately.
+     */
     inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
@@ -508,6 +652,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename T>
+    /**
+     * @brief   Read a trivially-copyable wasm ABI value from an entry buffer.
+     * @details This is the inverse of `write_wasm_entry_value` and is used only for verbose diagnostics after packing.
+     *          It uses `memcpy` so the diagnostic path does not impose alignment requirements on the packed ABI buffer.
+     */
     [[nodiscard]] inline T read_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> const& buffer, ::std::size_t& offset) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
@@ -518,6 +667,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return value;
     }
 
+    /**
+     * @brief   Parse and pack one explicit entry argument.
+     * @details The selected function type drives the parser.  Only scalar wasm value types currently have a command-line
+     *          representation in this layer.  Unsupported types such as `v128`, `funcref`, and `externref` are rejected
+     *          before the runtime call is configured.
+     *
+     * @param   buffer    Destination ABI byte buffer.
+     * @param   offset    Current byte offset; advanced by the encoded scalar width on success.
+     * @param   arg       User-provided argument token.
+     * @param   type_code Expected wasm value-type code.
+     * @param   arg_index Zero-based argument index used in diagnostics.
+     */
     inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte> & buffer,
                                          ::std::size_t& offset,
                                          ::uwvm2::utils::container::u8string_view arg,
@@ -577,6 +738,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output, typename Signed, typename Unsigned>
+    /**
+     * @brief   Print one integer entry value in several debugging-friendly bases.
+     * @details Both the signed value and the raw unsigned bit pattern are displayed.  This is important for wasm integer
+     *          arguments because command-line users may intentionally pass a raw bit pattern whose signed decimal spelling
+     *          is not the most useful representation.
+     */
     inline void print_wasm_entry_integer_formats(Output & output, Signed value) noexcept
     {
         static_assert(sizeof(Signed) == sizeof(Unsigned));
@@ -605,6 +772,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename Output>
+    /**
+     * @brief   Print a verbose record for one packed explicit-entry argument.
+     * @details The function re-reads the packed bytes rather than reparsing the original token, so the verbose output
+     *          reports exactly what will be handed to the runtime entry ABI.  For floating-point values it prints both
+     *          numeric and raw-bit forms.
+     */
     inline void print_wasm_entry_argument_verbose(Output & output,
                                                   ::uwvm2::utils::container::vector<::std::byte> const& buffer,
                                                   ::std::size_t& offset,
@@ -694,6 +867,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename FunctionType, typename Tokens>
+    /**
+     * @brief   Print the resolved `--wasm-set-start-func` entry configuration.
+     * @details The log contains both local-defined and import-inclusive function indices because the command-line option
+     *          accepts a local-defined index, while the runtime library consumes the import-inclusive wasm function index.
+     *          The multi-line record is emitted under one logger lock to preserve readability in verbose concurrent runs.
+     */
     inline void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
                                                   ::std::size_t function_index,
                                                   ::std::size_t import_count,
@@ -701,9 +880,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                   Tokens const& argument_tokens,
                                                   ::uwvm2::utils::container::vector<::std::byte> const& param_buffer) noexcept
     {
-        constexpr ::uwvm2::utils::container::u8string_view body_indent{u8"              "};
-        constexpr ::uwvm2::utils::container::u8string_view argument_indent{u8"                "};
-
         // Emit the multi-line verbose record as one locked output unit.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
         ::fast_io::operations::decay::stream_ref_decay_lock_guard u8log_output_lg{
@@ -716,14 +892,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                             u8"[info]  ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"--wasm-set-start-func resolved.\n",
-                            body_indent,
-                            u8"local-defined func index: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            u8"--wasm-set-start-func resolved.\n"
+                            // body_indent (begin)
+                            u8"              "
+                            // body_indent (end)
+                            u8"local-defined func index: " ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             local_function_index,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"\n",
-                            body_indent,
+                            u8"\n"
+                            // body_indent (begin)
+                            u8"              "
+                            // body_indent (end)
                             u8"wasm func index:          ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             function_index,
@@ -732,22 +911,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             import_count,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8")\n",
-                            body_indent,
+                            u8")\n"
+                            // body_indent (begin)
+                            u8"              "
+                            // body_indent (end)
                             u8"function type:            ");
         print_wasm_entry_type_span(u8log_output_ul, ft.parameter.begin, ft.parameter.end);
         ::fast_io::io::perr(u8log_output_ul, u8" -> ");
         print_wasm_entry_type_span(u8log_output_ul, ft.result.begin, ft.result.end);
-        ::fast_io::io::perr(u8log_output_ul, u8"\n", body_indent, u8"arguments:\n");
+        ::fast_io::io::perr(u8log_output_ul,
+                            u8"\n"
+                            // body_indent (begin)
+                            u8"              "
+                            // body_indent (end)
+                            u8"arguments:\n");
 
-        if(argument_tokens.empty()) { ::fast_io::io::perr(u8log_output_ul, argument_indent, u8"<none>\n"); }
+        if(argument_tokens.empty())
+        {
+            ::fast_io::io::perr(u8log_output_ul,
+                                // argument_indent (begin)
+                                u8"                  "
+                                // argument_indent (end)
+                                u8"<none>\n");
+        }
         else
         {
             ::std::size_t offset{};
             for(::std::size_t i{}; i != argument_tokens.size(); ++i)
             {
                 // The caller already checked arity, so this token and parameter-type lookup are range-proven.
-                ::fast_io::io::perr(u8log_output_ul, argument_indent);
+                ::fast_io::io::perr(u8log_output_ul,
+                                    // argument_indent (begin)
+                                    u8"                  "
+                                    // argument_indent (end)
+                );
+                
                 print_wasm_entry_argument_verbose(u8log_output_ul,
                                                   param_buffer,
                                                   offset,
@@ -759,7 +957,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         ::fast_io::io::perr(u8log_output_ul,
-                            body_indent,
+                            // body_indent (begin)
+                            u8"              "
+                            // body_indent (end)
+                            ,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                             u8"[",
                             ::uwvm2::uwvm::io::get_local_realtime(),
@@ -770,6 +971,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename ValueTypePtr>
+    /**
+     * @brief   Calculate the byte length needed for a packed entry ABI type span.
+     * @details Each supported wasm scalar is laid out tightly using its natural wasm storage width.  Unsupported value
+     *          types trigger a user-facing fatal error, while size_t overflow triggers termination as an internal
+     *          invariant failure.
+     *
+     * @param   begin     First value type in the span.
+     * @param   end       One-past-last value type in the span.
+     * @param   is_result Selects whether diagnostics say "parameter" or "result".
+     * @return  Required packed ABI byte length.
+     */
     [[nodiscard]] inline ::std::size_t calculate_wasm_entry_abi_bytes(ValueTypePtr begin, ValueTypePtr end, bool is_result) noexcept
     {
         ::std::size_t total{};
@@ -792,6 +1004,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return total;
     }
 
+    /**
+     * @brief   Copy an entry invocation descriptor into a runtime-library run config.
+     * @details Runtime library configs store raw pointer/length pairs instead of owning vectors.  The caller must keep
+     *          `entry` alive until the runtime function returns.  Empty parameter/result vectors are represented as null
+     *          pointers with zero byte counts to avoid exposing implementation-specific empty-vector data pointers.
+     */
     inline void configure_runtime_entry_buffers(auto& cfg, runtime_entry_invocation& entry) noexcept
     {
         cfg.entry_function_index = entry.function_index;
@@ -801,6 +1019,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         cfg.entry_abi_buffers.result_bytes = entry.result_buffer.size();
     }
 
+    /**
+     * @brief   Resolve the actual runtime entry invocation for the main module.
+     * @details Without `--wasm-set-start-func`, this delegates to the default entry resolver and produces empty ABI
+     *          buffers because default entries must be `() -> ()`.  With `--wasm-set-start-func`, the command-line index
+     *          is interpreted as a local-defined function index of the main module.  The function validates arity,
+     *          computes packed parameter/result storage, converts the local-defined index into the runtime's
+     *          import-inclusive function index, and packs every provided argument according to the selected function type.
+     *
+     * @param   main_module_name Name key of the executable module.
+     * @return  Fully configured entry invocation descriptor.
+     * @warning Invalid user input is diagnosed and terminates the process; internal storage inconsistencies terminate
+     *          directly because they indicate earlier loader/runtime initialization bugs.
+     */
     inline runtime_entry_invocation resolve_runtime_entry_invocation(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         runtime_entry_invocation entry{};
@@ -865,6 +1096,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return entry;
     }
 
+    /**
+     * @brief   Compute the default adaptive runtime compile-thread limit.
+     * @details The default policy grows slowly with detected hardware parallelism: roughly `floor(log2(max))`, with a
+     *          minimum of one.  Lower runtime layers may further adapt per-module scheduling below this upper bound.
+     *
+     * @param   max_compile_threads Detected platform concurrency used as the policy input.
+     * @return  Default compile-thread limit selected by policy.
+     */
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
     {
         // Follow the default policy upper bound: roughly one compiler thread per log2(N) CPUs.
@@ -877,6 +1116,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return compiler_threads == 0uz ? 1uz : compiler_threads;
     }
 
+    /**
+     * @brief   Compute the aggressive adaptive runtime compile-thread limit.
+     * @details The aggressive policy targets `floor(max * 2 / 3)` while avoiding multiplication overflow.  A detected
+     *          maximum below two resolves to zero, which keeps tiny/single-threaded environments on the main thread.
+     *
+     * @param   max_compile_threads Detected platform concurrency used as the policy input.
+     * @return  Aggressive compile-thread limit selected by policy.
+     */
     inline constexpr ::std::size_t calculate_aggressive_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
     {
         if(max_compile_threads < 2uz) [[unlikely]] { return 0uz; }
@@ -887,12 +1134,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return quotient * 2uz + (remainder * 2uz) / 3uz;
     }
 
+    /**
+     * @brief   Resolve `--runtime-compile-threads` into the global runtime compile-thread setting.
+     * @details Command-line parsing preserves the raw user policy (`default`, `aggressive`, or numeric).  This function
+     *          performs the platform-dependent resolution:
+     *
+     *          - omitted or `default`: use the default adaptive policy when native threads are available;
+     *          - `aggressive`: use the aggressive adaptive policy when native threads are available;
+     *          - non-negative numeric values: use the exact requested value, warning if it exceeds detected concurrency;
+     *          - negative numeric values: interpret `-N` as `detected_max - N`, rejecting magnitudes above detected max;
+     *          - no `fast_io::native_thread`: force zero extra compile threads and optionally warn for unsupported requests.
+     *
+     *          The resolved value is stored in `global_runtime_compile_threads_resolved` for the runtime library.  Full
+     *          compilation scheduling may still reduce effective parallelism per module based on task count and code size.
+     *
+     * @return  The resolved runtime compile-thread value stored globally.
+     * @warning Some invalid numeric settings are fatal.  Warnings can also be promoted to fatal errors by the global
+     *          runtime warning policy.
+     */
     inline ::std::size_t resolve_runtime_compile_threads() noexcept
     {
         using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
         using runtime_compile_threads_unsigned_type = ::std::make_unsigned_t<runtime_compile_threads_type>;
         using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
 
+        // Warning helper specific to runtime compile-thread policy.  It deliberately uses the same warning category
+        // suffix as the command-line warning toggles so users can suppress or promote this warning class consistently.
         constexpr auto runtime_compile_threads_warn{
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
@@ -908,6 +1175,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
 
+        // Warning-to-fatal escalation is split from the warning helper so diagnostics keep the original warning text
+        // before the generic fatal conversion notice.
         constexpr auto runtime_compile_threads_warn_to_fatal{
             []() constexpr noexcept
             {
@@ -924,6 +1193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 ::fast_io::fast_terminate();
             }};
 
+        // Fatal helper for policy values that are invalid regardless of warning configuration.
         constexpr auto runtime_compile_threads_fatal{
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
@@ -939,6 +1209,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 ::fast_io::fast_terminate();
             }};
 
+        // Verbose helper for the final resolved policy.  It includes the wall-clock timestamp used by other UWVM verbose
+        // runtime messages, making compile-thread diagnostics easy to correlate with later scheduling logs.
         constexpr auto runtime_compile_threads_verbose_info{
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
@@ -959,20 +1231,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }};
 
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        // Treat a failed hardware-concurrency probe as a single-threaded platform.  The rest of the policy code can then
+        // operate on a non-zero detected maximum.
         ::std::size_t max_compile_threads{::uwvm2::utils::thread::hardware_concurrency()};
         if(max_compile_threads == 0uz) [[unlikely]] { max_compile_threads = 1uz; }
         auto const default_compile_threads{calculate_default_runtime_compile_threads(max_compile_threads)};
         auto const aggressive_compile_threads{calculate_aggressive_runtime_compile_threads(max_compile_threads)};
 # else
+        // When native threads are not compiled in, the detected max is only a diagnostic baseline.  All effective
+        // parallel compile-thread counts are forced to zero below.
         constexpr ::std::size_t max_compile_threads{1uz};
 # endif
 
+        // Omitted policy starts at the default adaptive value on threaded builds and at zero otherwise.  The preprocessor
+        // branch keeps the initializer valid even when `default_compile_threads` is not declared.
         ::std::size_t resolved_compile_threads{
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
             default_compile_threads
 # endif
         };
 
+        // Explicit command-line policy overrides the omitted default.  Numeric settings have two meanings:
+        // non-negative values are exact requests; negative values are offsets from detected maximum concurrency.
         if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
         {
             auto const requested_compile_threads_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy};
@@ -1045,6 +1325,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     auto const requested_compile_threads_abs{static_cast<runtime_compile_threads_unsigned_type>(0u) -
                                                              static_cast<runtime_compile_threads_unsigned_type>(requested_compile_threads)};
 
+                    // Compute the absolute value in the unsigned domain so the most-negative signed value is handled
+                    // without signed overflow.  It is rejected below if it exceeds the detected maximum.
                     if(requested_compile_threads_abs > static_cast<runtime_compile_threads_unsigned_type>(max_compile_threads)) [[unlikely]]
                     {
                         runtime_compile_threads_fatal(u8"Invalid negative runtime compile thread count (requested=",
@@ -1063,10 +1345,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
+        // Publish the resolved value before verbose logging so lower layers and diagnostics observe the same state.
         ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved = resolved_compile_threads;
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
+            // Verbose output distinguishes exact numeric settings from adaptive upper bounds.  Adaptive scheduling is
+            // allowed to choose fewer workers later when a module does not have enough compile tasks to justify them.
             if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
             {
                 auto const requested_compile_threads_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy};
@@ -1171,34 +1456,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 #endif
 
+    /**
+     * @brief   Execute the requested UWVM action.
+     * @details This is the top-level driver called by the CRT entry wrapper.  It first performs loader-level work that is
+     *          shared by all modes, then returns early for inspection-only modes, and finally performs runtime-specific
+     *          initialization and backend dispatch for executable mode.
+     *
+     *          High-level control flow:
+     *          1. load the executable module, local modules, and weak-symbol modules;
+     *          2. construct the global `all_module` registry and reject duplicate module names;
+     *          3. serve `section_details` and parser `validation` modes without initializing executable runtime state;
+     *          4. reject executable mode in builds compiled without runtime backends;
+     *          5. check cross-module imports, detect import cycles, and initialize runtime storage;
+     *          6. normalize runtime-mode constraints such as debug-interpreter requiring full compilation;
+     *          7. resolve compile-thread policy and entry invocation;
+     *          8. dispatch to the selected runtime mode/compiler pair.
+     *
+     * @return  Process-style integer return code from `uwvm2::uwvm::run::retval`.
+     * @warning Fatal configuration/runtime invariants can terminate the process through `fast_io::fast_terminate`.
+     */
     inline int run() noexcept
     {
-        // already preload wasm module
+        // Preloaded wasm modules and dynamic-link bindings are prepared before this function is entered.  This driver
+        // consumes the resulting global command-line/storage state and performs the final ordered load/execute sequence.
 
-        // already bind dl
-
-        // load main module
+        // Load the executable wasm module first.  Later local/weak modules may satisfy imports used by the executable.
         if(auto const ret{::uwvm2::uwvm::run::load_exec_wasm_module()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
-        // load local modules
+        // Load explicitly-provided local modules.  These participate in normal import resolution and duplicate checks.
         if(auto const ret{::uwvm2::uwvm::run::load_local_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
-        // load weak symbol modules
+        // Load weak-symbol modules after normal modules so they can provide fallback definitions without changing the
+        // primary module load order.
         if(auto const ret{::uwvm2::uwvm::run::load_weak_symbol_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
-        // check duplicate module and construct ::uwvm2::uwvm::wasm::storage::all_module
+        // Build the unified module table used by later export/import/runtime resolution.  Duplicate module names are
+        // rejected before any mode tries to inspect or execute ambiguous module storage.
         if(auto const ret{::uwvm2::uwvm::wasm::loader::construct_all_module_and_check_duplicate_module()};
            ret != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) [[unlikely]]
         {
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
         }
 
-        // section details occurs before dependency checks
+        // Inspection-only modes intentionally run before dependency checks.  A user may inspect sections or parser-level
+        // validity even when imports are unresolved for execution.
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
             case ::uwvm2::uwvm::wasm::base::mode::section_details:
             {
-                // All modules loaded
+                // All requested modules are loaded and registered, which is enough for section-detail reporting.  Runtime
+                // initialization is skipped because this mode does not instantiate or execute code.
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -1219,23 +1526,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                 ::uwvm2::uwvm::wasm::section_detail::print_section_details();
 
-                // Return directly
+                // Return directly: section-detail mode is complete and must not fall through into runtime checks.
                 return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
             }
             case ::uwvm2::uwvm::wasm::base::mode::validation:
             {
-                // Validate all wasm code
-
-                // Runtime initialization is not performed; only validity checks are conducted using the parser's built-in validation, not the runtime
-                // validation with compilation and partitioning capabilities.
-
-                // validate_all_wasm_code has verbose message, no necessary to print again.
+                // Validate all wasm code with the parser/runtime validator entry point, but do not initialize executable
+                // runtime state.  This path is for validity checks, not compilation, partitioning, or backend execution.
+                // `validate_all_wasm_code` already emits its own verbose progress diagnostics.
                 if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
                 {
                     return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
                 }
 
-                // Return directly
+                // Return directly: validation mode is complete and must not require executable backends.
                 return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
             }
             default:
@@ -1245,6 +1549,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
 #if !defined(UWVM_RUNTIME_HAS_BACKEND)
+        // A backendless build is still useful for parsing, section printing, and validation.  Executable mode is rejected
+        // only after those non-executing modes have had a chance to return successfully.
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
@@ -1255,19 +1561,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
 #else
-        // run vm
-
-        // check import exist and detect cycles
+        // Executable mode begins here.  Import existence and import-cycle validation must precede runtime initialization
+        // because runtime storage assumes all module links are resolvable and acyclic.
         if(auto const ret{::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles()};
            ret != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) [[unlikely]]
         {
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
         }
 
-        // initialize runtime
+        // Initialize runtime storage, link metadata, and backend-visible module data after import resolution succeeds.
         ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
 
 # if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+        // The debug interpreter backend is modeled as a full-compile backend.  If the command line selected a lazy mode,
+        // preserve compatibility by forcing full compilation, subject to the global warning/fatal policy.
         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter &&
            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile) [[unlikely]]
         {
@@ -1304,16 +1611,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 # endif
 
+        // Resolve global execution knobs after runtime storage exists.  Entry resolution needs runtime function type
+        // storage, and compile-thread resolution publishes the value consumed by full-translation runtime code.
         resolve_runtime_compile_threads();
         auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name)};
 
-        // run vm
+        // Dispatch executable mode.  Non-executing modes were returned above; reaching them here indicates a control-flow
+        // bug or an unsupported future mode accidentally bypassing the early-mode handler.
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
             case ::uwvm2::uwvm::wasm::base::mode::section_details: [[fallthrough]];
             case ::uwvm2::uwvm::wasm::base::mode::validation:
             {
-                /// this is an vm bug
+                /// This is a VM control-flow bug: non-executing modes must have returned before runtime dispatch.
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
@@ -1321,11 +1631,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
+                // Runtime mode chooses the broad compilation strategy; runtime compiler chooses the backend that realizes
+                // that strategy.  Each branch validates unsupported mode/backend combinations before calling runtime lib.
                 switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode)
                 {
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        // Lazy execution is available for backends that can compile/materialize functions on demand.
+                        // Build-time feature macros determine which backend enum values can actually be selected.
                         bool lazy_backend_supported{};
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -1363,6 +1677,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::fast_terminate();
                         }
 
+                        // `assume_full_code_verified=false` lets the lazy runtime validate as part of on-demand work.
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
                         configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = false;
@@ -1387,6 +1702,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        // This mode keeps lazy compilation/materialization, but performs a full validation pass before
+                        // execution.  Backends must still support lazy runtime entry.
                         bool lazy_backend_supported{};
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -1424,6 +1741,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::fast_terminate();
                         }
 
+                        // Validate before entering lazy execution, then tell the runtime it can skip duplicate whole-code
+                        // validation work.  Per-function compilation may still occur lazily.
                         if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
                         {
                             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
@@ -1452,12 +1771,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile:
                     {
+                        // Full compilation hands the complete main module to the selected backend before running the entry.
+                        // The same runtime config shape is used for interpreter translation and LLVM JIT full translation.
                         switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
                         {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
                             {
-                                // full compile + uwvm_int interpreter backend
+                                // Full compile with the uwvm-int interpreter backend.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
                                 ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
@@ -1468,7 +1789,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter:
                             {
-                                // not supported yet
+                                // The enum can be selected in debug-interpreter builds, but this runtime path is not
+                                // implemented yet, so fail explicitly instead of falling into another backend.
                                 ::fast_io::io::perr(
                                     ::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -1488,6 +1810,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
                             {
+                                // Tiered compilation is inherently a lazy/tiered strategy and conflicts with the full
+                                // compile runtime mode.  Report the conflict before runtime library entry.
                                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                     u8"uwvm: ",
@@ -1506,6 +1830,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_RUNTIME_LLVM_JIT)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
                             {
+                                // Full compile with the LLVM JIT backend.  LLVM policy details are resolved inside the
+                                // runtime library from the globally configured runtime-mode storage.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
                                 ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
@@ -1515,7 +1841,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
                             [[unlikely]] default:
                             {
-/// @warning Maybe I forgot to realize it.
+/// @warning Unhandled runtime compiler value for full compilation.  This indicates a missing implementation branch.
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
@@ -1538,7 +1864,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             /// @todo add more modes here
             [[unlikely]] default:
             {
-                /// @warning Maybe I forgot to realize it.
+                /// @warning Unhandled execute mode.  Add a dispatch branch before introducing a new executable mode.
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
