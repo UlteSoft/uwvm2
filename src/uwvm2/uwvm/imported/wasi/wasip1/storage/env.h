@@ -242,6 +242,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     inline wasip1_group_index_map_t configured_named_wasip1_module_groups{};      // [global]
 
 #  if defined(UWVM_USE_THREAD_LOCAL)
+    // Fast path: these are consulted on host API calls, so keep direct
+    // thread_local storage and direct use sites when UWVM_USE_THREAD_LOCAL is on.
 #   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #    ifdef UWVM
     [[__gnu__::__tls_model__("local-exec")]]
@@ -285,6 +287,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #   endif
     inline thread_local ::uwvm2::utils::container::u8string_view current_wasip1_target_module_name{};  // [global] [thread_local]
 #  else
+    // Compatibility path for builds without C++ thread_local. The state is still
+    // per native thread, but looked up through a container keyed by thread id.
     using os_thread_id_t =
 #   if defined(__SINGLE_THREAD__)
         ::std::size_t;

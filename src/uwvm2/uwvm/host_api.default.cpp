@@ -964,6 +964,8 @@ namespace uwvm2::uwvm::wasm::type
 #if defined(UWVM_IMPORT_WASI_WASIP1)
         bool expose_host_api{::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
 # if defined(UWVM_USE_THREAD_LOCAL)
+        // Keep the TLS build on the direct thread_local variables. The accessor
+        // path below is only for non-TLS compatibility builds.
         if(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_target_is_set)
         {
             if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(

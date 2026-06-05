@@ -590,6 +590,8 @@ namespace uwvm2::runtime::lib
 
         inline void erase_current_thread_state() noexcept {}
 #else
+        // Keep the UWVM_USE_THREAD_LOCAL branch as direct thread_local storage.
+        // This map exists only for toolchains/platforms where C++ thread_local is disabled.
         using os_thread_id_t =
 # if defined(__SINGLE_THREAD__)
             ::std::size_t;
@@ -661,6 +663,8 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_USE_THREAD_LOCAL)
+        // Non-TLS fallback accessors. Do not route the thread_local build through these;
+        // the direct TLS variables are the fast path and should stay visible in preprocessed code.
         [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::uintptr_t& get_llvm_jit_trap_return_address() noexcept
         { return get_thread_state().llvm_jit_trap_return_address; }
 
@@ -669,6 +673,8 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED) && !defined(UWVM_USE_THREAD_LOCAL)
+        // Tiered sampling counters are direct thread_local variables when available.
+        // The container-backed state below is strictly the compatibility fallback.
         [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::uint_least32_t& get_tiered_entry_hot_probe_tick() noexcept
         { return get_thread_state().tiered_entry_hot_probe_tick; }
 
@@ -4552,6 +4558,8 @@ namespace uwvm2::runtime::lib
         };
 
 #if defined(UWVM_USE_THREAD_LOCAL)
+        // Hot interpreter scratch path: keep direct thread_local access when enabled.
+        // The fallback map below is intentionally not used by TLS builds.
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #  ifdef UWVM
         [[__gnu__::__tls_model__("local-exec")]]
