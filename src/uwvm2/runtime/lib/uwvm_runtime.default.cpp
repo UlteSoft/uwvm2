@@ -424,11 +424,11 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
+        inline bool g_runtime_process_exiting{};  // [global]
+
         struct runtime_process_exit_state
         {
-            bool exiting{};
-
-            ~runtime_process_exit_state() noexcept { exiting = true; }
+            ~runtime_process_exit_state() noexcept { g_runtime_process_exiting = true; }
         };
 
         inline runtime_process_exit_state g_runtime_process_exit_state{};  // [global]
@@ -436,7 +436,7 @@ namespace uwvm2::runtime::lib
         inline compiled_module_record::~compiled_module_record() noexcept
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(g_runtime_process_exit_state.exiting)
+            if(g_runtime_process_exiting)
             {
                 static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_module.release());
                 static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_context_holder.release());
