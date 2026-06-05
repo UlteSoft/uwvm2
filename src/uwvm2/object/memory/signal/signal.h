@@ -237,6 +237,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                 if(exception_pointers->ExceptionRecord->NumberParameters >= 2u)
                 {
                     auto const fault_addr{reinterpret_cast<::std::byte const*>(exception_pointers->ExceptionRecord->ExceptionInformation[1u])};
+
+                    // Windows reports the faulting instruction address directly in the exception record, so
+                    // the signal/ucontext architecture table below is only needed for POSIX targets.
                     auto const instruction_address{reinterpret_cast<::std::uintptr_t>(exception_pointers->ExceptionRecord->ExceptionAddress)};
 
                     if(handle_fault_address(fault_addr, instruction_address)) { return -1 /*EXCEPTION_CONTINUE_EXECUTION*/; }
@@ -320,10 +323,116 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.pc);
 #   elif defined(__linux__) && defined(__arm__)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_pc);
-#   elif defined(__linux__) && defined(__riscv) && __riscv_xlen == 64
+#   elif defined(__linux__) && defined(__riscv)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[REG_PC]);
+#   elif defined(__linux__) && (defined(__loongarch64) || (defined(__loongarch__) && defined(__loongarch_grlen) && __loongarch_grlen == 64))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__pc);
+#   elif defined(__linux__) && (defined(__mips__) || defined(__mips))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.pc);
+#   elif defined(__linux__) && (defined(__powerpc64__) || defined(__PPC64__))
+            // Linux PowerPC stores NIP (next instruction pointer) at general-register slot 32.
+            // This is PT_NIP in the kernel uapi ptrace register layout.
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gp_regs[32u]);
+#   elif defined(__linux__) && (defined(__powerpc__) || defined(__PPC__))
+            // Linux PowerPC stores NIP (next instruction pointer) at general-register slot 32.
+            // This is PT_NIP in the kernel uapi ptrace register layout.
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[32u]);
+#   elif defined(__linux__) && (defined(__s390__) || defined(__s390x__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.psw.addr);
+#   elif defined(__linux__) && (defined(__sparc__) || defined(__sparc))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_PC]);
+#   elif defined(__linux__) && defined(__alpha__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.sc_pc);
+#   elif defined(__linux__) && defined(__arc__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__stop_pc);
+#   elif defined(__linux__) && defined(__csky__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs.__pc);
+#   elif defined(__linux__) && defined(__hppa__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.sc_iaoq[0u]);
+#   elif defined(__linux__) && defined(__m68k__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[R_PC]);
+#   elif defined(__linux__) && defined(__microblaze__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.regs.pc);
+#   elif defined(__linux__) && defined(__or1k__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__pc);
+#   elif defined(__linux__) && (defined(__sh__) || defined(__SH__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.pc);
+#   elif defined(__OpenBSD__) && (defined(__amd64__) || defined(__x86_64__))
+            return static_cast<::std::uintptr_t>(uctx->sc_rip);
+#   elif defined(__OpenBSD__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->sc_eip);
+#   elif defined(__OpenBSD__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->sc_elr);
+#   elif defined(__OpenBSD__) && defined(__arm__)
+            return static_cast<::std::uintptr_t>(uctx->sc_pc);
+#   elif defined(__OpenBSD__) && defined(__riscv)
+            return static_cast<::std::uintptr_t>(uctx->sc_sepc);
+#   elif defined(__OpenBSD__) && (defined(__powerpc64__) || defined(__PPC64__))
+            return static_cast<::std::uintptr_t>(uctx->sc_pc);
+#   elif defined(__OpenBSD__) && (defined(__powerpc__) || defined(__PPC__))
+            return static_cast<::std::uintptr_t>(uctx->sc_frame.srr0);
+#   elif defined(__OpenBSD__) && (defined(__sparc__) || defined(__sparc))
+            return static_cast<::std::uintptr_t>(uctx->sc_pc);
+#   elif defined(__OpenBSD__) && (defined(__mips__) || defined(__mips))
+            return static_cast<::std::uintptr_t>(uctx->sc_pc);
+#   elif defined(__OpenBSD__) && defined(__hppa__)
+            return static_cast<::std::uintptr_t>(uctx->sc_pcoqh);
+#   elif defined(__OpenBSD__) && defined(__alpha__)
+            return static_cast<::std::uintptr_t>(uctx->sc_pc);
+#   elif defined(__OpenBSD__) && defined(__m88k__)
+            // OpenBSD/m88k sigcontext stores struct reg inline: r[32], epsr, fpsr, fpcr, sxip.
+            // sxip carries low valid/exception flag bits, so apply the XIP_ADDR mask.
+            return static_cast<::std::uintptr_t>(uctx->sc_regs[35u] & 0xfffffffcUL);
+#   elif defined(__FreeBSD__) && (defined(__amd64__) || defined(__x86_64__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_rip);
+#   elif defined(__FreeBSD__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_eip);
+#   elif defined(__FreeBSD__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_gpregs.gp_elr);
+#   elif defined(__FreeBSD__) && defined(__arm__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__FreeBSD__) && defined(__riscv)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_gpregs.gp_sepc);
+#   elif defined(__FreeBSD__) && (defined(__powerpc__) || defined(__powerpc64__) || defined(__PPC__) || defined(__PPC64__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_srr0);
+#   elif defined(__NetBSD__) && (defined(__amd64__) || defined(__x86_64__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_RIP]);
+#   elif defined(__NetBSD__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_EIP]);
+#   elif defined(__NetBSD__) && (defined(__aarch64__) || defined(__arm__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && defined(__riscv)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && (defined(__powerpc__) || defined(__powerpc64__) || defined(__PPC__) || defined(__PPC64__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && (defined(__mips__) || defined(__mips))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_EPC]);
+#   elif defined(__NetBSD__) && defined(__hppa__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PCOQH]);
+#   elif defined(__NetBSD__) && (defined(__sparc__) || defined(__sparc))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && defined(__alpha__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && defined(__m68k__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && (defined(__sh__) || defined(__SH__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__NetBSD__) && defined(__vax__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[_REG_PC]);
+#   elif defined(__DragonFly__) && (defined(__amd64__) || defined(__x86_64__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_rip);
+#   elif defined(__sun) && (defined(__i386__) || defined(__amd64) || defined(__amd64__) || defined(__x86_64__) || defined(__sparc__) || defined(__sparc))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_PC]);
+#   elif defined(__serenity__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.rip);
+#   elif defined(__serenity__) && (defined(__aarch64__) || defined(__riscv))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.pc);
 #   elif defined(__APPLE__) && defined(__x86_64__)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rip);
+#   elif defined(__APPLE__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__eip);
+#   elif defined(__APPLE__) && (defined(__ppc__) || defined(__POWERPC__))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__srr0);
 #   elif defined(__APPLE__) && defined(__aarch64__)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__pc);
 #   else
