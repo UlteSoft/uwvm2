@@ -859,7 +859,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
                 break;
             }
-            default: ::fast_io::fast_terminate();
+            [[unlikely]] default:
+            {
+                ::fast_io::fast_terminate();
+            }
         }
 
         ::fast_io::io::perr(output, u8"\n");
@@ -1147,6 +1150,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *
      *          The resolved value is stored in `global_runtime_compile_threads_resolved` for the runtime library.  Full
      *          compilation scheduling may still reduce effective parallelism per module based on task count and code size.
+     *
+     *          Lazy scheduling also treats this as an upper bound: background lazy workers may consume it directly, while
+     *          LLVM/tiered urgent JIT schedulers are separate global lanes with at most one worker each.  A running thread
+     *          may help compile queued lazy work while waiting, but no per-running-thread urgent JIT worker is created here.
      *
      * @return  The resolved runtime compile-thread value stored globally.
      * @warning Some invalid numeric settings are fatal.  Warnings can also be promoted to fatal errors by the global
@@ -1616,8 +1623,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         resolve_runtime_compile_threads();
         auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name)};
 
-        // Dispatch executable mode.  Non-executing modes were returned above; reaching them here indicates a control-flow
-        // bug or an unsupported future mode accidentally bypassing the early-mode handler.
+        // Dispatch matrix:
+        //
+        // 1. `execute_wasm_mode` separates executable `run` from non-executing modes.  The latter must have returned
+        //    before runtime initialization and entry-buffer resolution.
+        // 2. `global_runtime_mode` selects the execution strategy: pure lazy, lazy after whole-code validation, or full
+        //    compilation before entry.
+        // 3. Full compilation then dispatches by runtime compiler backend.  Lazy modes use one runtime-library entry point
+        //    after checking that the selected backend can support on-demand compilation/materialization.
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
             case ::uwvm2::uwvm::wasm::base::mode::section_details: [[fallthrough]];
@@ -1631,6 +1644,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
+                // Only `run` reaches the runtime library.  `runtime_entry` has already been resolved so every branch below
+                // can forward the same packed entry ABI buffers to its selected runtime entry point.
                 // Runtime mode chooses the broad compilation strategy; runtime compiler chooses the backend that realizes
                 // that strategy.  Each branch validates unsupported mode/backend combinations before calling runtime lib.
                 switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode)
@@ -1639,7 +1654,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                         // Lazy execution is available for backends that can compile/materialize functions on demand.
-                        // Build-time feature macros determine which backend enum values can actually be selected.
+                        // Build-time feature macros determine which backend enum values can actually be selected, so the
+                        // support check is assembled from the backend features present in this binary.
                         bool lazy_backend_supported{};
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -1703,7 +1719,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                         // This mode keeps lazy compilation/materialization, but performs a full validation pass before
-                        // execution.  Backends must still support lazy runtime entry.
+                        // execution.  Backends must still support lazy runtime entry; the only difference from plain lazy
+                        // mode is the `assume_full_code_verified=true` flag passed after validation succeeds.
                         bool lazy_backend_supported{};
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
