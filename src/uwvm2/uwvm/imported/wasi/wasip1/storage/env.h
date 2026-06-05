@@ -285,11 +285,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #   endif
     inline thread_local ::uwvm2::utils::container::u8string_view current_wasip1_target_module_name{};  // [global] [thread_local]
 #  else
-    // Non-thread-local build: same state model, process-wide storage.
-    inline wasip1_env_type* current_wasip1_env_ptr{::std::addressof(default_wasip1_env)};  // [global]
-    inline bool current_wasip1_target_is_set{};                                            // [global]
-    inline wasip1_module_target_kind_t current_wasip1_target_kind{};                       // [global]
-    inline ::uwvm2::utils::container::u8string_view current_wasip1_target_module_name{};   // [global]
+    using os_thread_id_t =
+#   if defined(__SINGLE_THREAD__)
+        ::std::size_t;
+#   else
+        decltype(::fast_io::this_thread::get_id());
+#   endif
+
+    struct wasip1_thread_state
+    {
+        wasip1_env_type* current_env_ptr{::std::addressof(default_wasip1_env)};
+        bool current_target_is_set{};
+        wasip1_module_target_kind_t current_target_kind{};
+        ::uwvm2::utils::container::u8string_view current_target_module_name{};
+    };
+
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
+    {
+#   if defined(__SINGLE_THREAD__)
+        return 0uz;
+#   else
+        return ::fast_io::this_thread::get_id();
+#   endif
+    }
+
+    inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, wasip1_thread_state> current_wasip1_states{};  // [global]
+
+    [[nodiscard]] inline wasip1_thread_state& current_wasip1_state() noexcept
+    {
+        auto const id{current_thread_id()};
+        wasip1_thread_state* st{};
+
+        current_wasip1_states.try_emplace_and_visit(
+            id,
+            [&](auto& kv) noexcept { st = ::std::addressof(kv.second); },
+            [&](auto& kv) noexcept { st = ::std::addressof(kv.second); });
+
+        if(st == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        return *st;
+    }
+#  endif
+
+#  if !defined(UWVM_USE_THREAD_LOCAL)
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline wasip1_env_type*& current_wasip1_env_ptr_ref() noexcept
+    { return current_wasip1_state().current_env_ptr; }
+
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline bool& current_wasip1_target_is_set_ref() noexcept
+    { return current_wasip1_state().current_target_is_set; }
+
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline wasip1_module_target_kind_t& current_wasip1_target_kind_ref() noexcept
+    { return current_wasip1_state().current_target_kind; }
+
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline ::uwvm2::utils::container::u8string_view& current_wasip1_target_module_name_ref() noexcept
+    { return current_wasip1_state().current_target_module_name; }
 #  endif
 
     [[nodiscard]] inline bool reopen_wasip1_trace_output_file(::fast_io::u8native_file & output_file,
@@ -377,8 +425,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
     [[nodiscard]] inline wasip1_env_type& current_wasip1_env() noexcept
     {
+#  if defined(UWVM_USE_THREAD_LOCAL)
         if(current_wasip1_env_ptr == nullptr) [[unlikely]] { return default_wasip1_env; }
         return *current_wasip1_env_ptr;
+#  else
+        auto const current_env_ptr{current_wasip1_env_ptr_ref()};
+        if(current_env_ptr == nullptr) [[unlikely]] { return default_wasip1_env; }
+        return *current_env_ptr;
+#  endif
     }
 
     struct scoped_current_wasip1_env_t
@@ -388,19 +442,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         // RAII switch used by runtime dispatch around calls into a target-bound
         // Wasm module. Restoring in the destructor keeps nested host calls and
         // early exits from leaking one module's WASI state into the next module.
-        inline explicit scoped_current_wasip1_env_t(wasip1_env_type& env) noexcept : saved{current_wasip1_env_ptr}
+        inline explicit scoped_current_wasip1_env_t(wasip1_env_type& env) noexcept :
+#  if defined(UWVM_USE_THREAD_LOCAL)
+            saved{current_wasip1_env_ptr}
         { current_wasip1_env_ptr = ::std::addressof(env); }
+#  else
+            saved{current_wasip1_env_ptr_ref()}
+        { current_wasip1_env_ptr_ref() = ::std::addressof(env); }
+#  endif
 
         scoped_current_wasip1_env_t(scoped_current_wasip1_env_t const&) = delete;
         scoped_current_wasip1_env_t& operator= (scoped_current_wasip1_env_t const&) = delete;
 
         inline ~scoped_current_wasip1_env_t()
         {
+#  if defined(UWVM_USE_THREAD_LOCAL)
             if(this->saved == nullptr) [[unlikely]] { current_wasip1_env_ptr = ::std::addressof(default_wasip1_env); }
             else
             {
                 current_wasip1_env_ptr = this->saved;
             }
+#  else
+            if(this->saved == nullptr) [[unlikely]] { current_wasip1_env_ptr_ref() = ::std::addressof(default_wasip1_env); }
+            else
+            {
+                current_wasip1_env_ptr_ref() = this->saved;
+            }
+#  endif
         }
     };
 
@@ -414,21 +482,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         // The string view refers to module-name storage owned by the loader, not
         // transient command-line argument memory.
         inline explicit scoped_current_wasip1_target_t(wasip1_module_target_kind_t target_kind, ::uwvm2::utils::container::u8string_view module_name) noexcept :
+#  if defined(UWVM_USE_THREAD_LOCAL)
             saved_is_set{current_wasip1_target_is_set}, saved_kind{current_wasip1_target_kind}, saved_module_name{current_wasip1_target_module_name}
         {
             current_wasip1_target_is_set = true;
             current_wasip1_target_kind = target_kind;
             current_wasip1_target_module_name = module_name;
         }
+#  else
+            saved_is_set{current_wasip1_target_is_set_ref()},
+            saved_kind{current_wasip1_target_kind_ref()},
+            saved_module_name{current_wasip1_target_module_name_ref()}
+        {
+            current_wasip1_target_is_set_ref() = true;
+            current_wasip1_target_kind_ref() = target_kind;
+            current_wasip1_target_module_name_ref() = module_name;
+        }
+#  endif
 
         scoped_current_wasip1_target_t(scoped_current_wasip1_target_t const&) = delete;
         scoped_current_wasip1_target_t& operator= (scoped_current_wasip1_target_t const&) = delete;
 
         inline ~scoped_current_wasip1_target_t()
         {
+#  if defined(UWVM_USE_THREAD_LOCAL)
             current_wasip1_target_is_set = this->saved_is_set;
             current_wasip1_target_kind = this->saved_kind;
             current_wasip1_target_module_name = this->saved_module_name;
+#  else
+            current_wasip1_target_is_set_ref() = this->saved_is_set;
+            current_wasip1_target_kind_ref() = this->saved_kind;
+            current_wasip1_target_module_name_ref() = this->saved_module_name;
+#  endif
         }
     };
 

@@ -602,6 +602,14 @@ namespace uwvm2::runtime::lib
             call_stack_tls_state call_stack{};
             preload_call_context_t preload_call_context{};
             suppressed_call_stack_frame_t suppressed_call_stack_frame{};
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::std::uintptr_t llvm_jit_trap_return_address{};
+            llvm_jit_trap_kind llvm_jit_last_trap_kind{};
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::std::uint_least32_t tiered_entry_hot_probe_tick{};
+            ::std::uint_least32_t tiered_counter_sample_tick{};
+# endif
         };
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
@@ -650,6 +658,22 @@ namespace uwvm2::runtime::lib
         { return get_thread_state().suppressed_call_stack_frame; }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
+#endif
+
+#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_USE_THREAD_LOCAL)
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::uintptr_t& get_llvm_jit_trap_return_address() noexcept
+        { return get_thread_state().llvm_jit_trap_return_address; }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline llvm_jit_trap_kind& get_llvm_jit_last_trap_kind() noexcept
+        { return get_thread_state().llvm_jit_last_trap_kind; }
+#endif
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED) && !defined(UWVM_USE_THREAD_LOCAL)
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::uint_least32_t& get_tiered_entry_hot_probe_tick() noexcept
+        { return get_thread_state().tiered_entry_hot_probe_tick; }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::uint_least32_t& get_tiered_counter_sample_tick() noexcept
+        { return get_thread_state().tiered_counter_sample_tick; }
 #endif
 
         struct preload_call_context_guard
@@ -896,8 +920,6 @@ namespace uwvm2::runtime::lib
 #   endif
 #  endif
         inline thread_local ::std::uintptr_t llvm_jit_trap_return_address{};  // [global] [thread-local]
-# else
-        inline ::std::uintptr_t llvm_jit_trap_return_address{};  // [global]
 # endif
 # if defined(UWVM_USE_THREAD_LOCAL)
 #  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
@@ -908,8 +930,6 @@ namespace uwvm2::runtime::lib
 #   endif
 #  endif
         inline thread_local llvm_jit_trap_kind llvm_jit_last_trap_kind{};      // [global] [thread-local]
-# else
-        inline llvm_jit_trap_kind llvm_jit_last_trap_kind{};  // [global]
 # endif
 
         [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
@@ -1642,6 +1662,11 @@ namespace uwvm2::runtime::lib
                     if(resolved.entry == nullptr) { return; }
                     print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);
                 }};
+
+# if !defined(UWVM_USE_THREAD_LOCAL)
+            auto const llvm_jit_trap_return_address{get_llvm_jit_trap_return_address()};
+            auto const llvm_jit_last_trap_kind{get_llvm_jit_last_trap_kind()};
+# endif
 
             if(llvm_jit_trap_return_address != 0u)
             {
@@ -2965,7 +2990,11 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool tiered_large_long_run_counter_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
         {
             if(stride <= 1u) { return true; }
+# if defined(UWVM_USE_THREAD_LOCAL)
             auto const tick{++tiered_counter_sample_tick};
+# else
+            auto const tick{++get_tiered_counter_sample_tick()};
+# endif
             auto const phase{static_cast<::std::uint_least32_t>((local_index + 1uz) * 0x85ebca6buz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
         }
@@ -3410,7 +3439,11 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool tiered_entry_hot_probe_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
         {
             if(stride <= 1u) { return true; }
+# if defined(UWVM_USE_THREAD_LOCAL)
             auto const tick{++tiered_entry_hot_probe_tick};
+# else
+            auto const tick{++get_tiered_entry_hot_probe_tick()};
+# endif
             auto const phase{static_cast<::std::uint_least32_t>(local_index * 0x9e3779b1uz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
         }
@@ -4346,7 +4379,12 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        using byte_allocator = ::fast_io::native_thread_local_allocator;
+        using byte_allocator =
+#if defined(UWVM_USE_THREAD_LOCAL)
+            ::fast_io::native_thread_local_allocator;
+#else
+            ::fast_io::native_global_allocator;
+#endif
 
         struct heap_buf_guard
         {
@@ -4363,7 +4401,6 @@ namespace uwvm2::runtime::lib
             }
         };
 
-#if defined(UWVM_USE_THREAD_LOCAL)
         struct thread_local_bump_allocator
         {
             struct block
@@ -4381,7 +4418,12 @@ namespace uwvm2::runtime::lib
                 ::std::size_t sp{};
             };
 
-            using block_allocator = ::fast_io::native_typed_thread_local_allocator<block>;
+            using block_allocator =
+#if defined(UWVM_USE_THREAD_LOCAL)
+                ::fast_io::native_typed_thread_local_allocator<block>;
+#else
+                ::fast_io::native_typed_global_allocator<block>;
+#endif
 
             block* curr{};
             block* free_list{};
@@ -4509,6 +4551,7 @@ namespace uwvm2::runtime::lib
             }
         };
 
+#if defined(UWVM_USE_THREAD_LOCAL)
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #  ifdef UWVM
         [[__gnu__::__tls_model__("local-exec")]]
@@ -4517,6 +4560,22 @@ namespace uwvm2::runtime::lib
 #  endif
 # endif
         inline thread_local thread_local_bump_allocator g_call_scratch{};  // [global] [thread_local]
+#else
+        inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, thread_local_bump_allocator> g_call_scratch_states{};  // [global]
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline thread_local_bump_allocator& get_call_scratch() noexcept
+        {
+            auto const id{current_thread_id()};
+            thread_local_bump_allocator* scratch{};
+
+            g_call_scratch_states.try_emplace_and_visit(
+                id,
+                [&](auto& kv) noexcept { scratch = ::std::addressof(kv.second); },
+                [&](auto& kv) noexcept { scratch = ::std::addressof(kv.second); });
+
+            if(scratch == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return *scratch;
+        }
 #endif
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
@@ -4643,7 +4702,11 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool is_current_wasip1_env_selected(wasip1_env_type& env) noexcept
         {
+# if defined(UWVM_USE_THREAD_LOCAL)
             auto const current_env_ptr{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env_ptr};
+# else
+            auto const current_env_ptr{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env_ptr_ref()};
+# endif
             return current_env_ptr == ::std::addressof(env) ||
                    (current_env_ptr == nullptr &&
                     ::std::addressof(env) == ::std::addressof(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env));
@@ -5853,21 +5916,9 @@ namespace uwvm2::runtime::lib
             thread_local_bump_allocator::mark_t scratch_mark{};
             if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
 # else
-            bool const use_heap{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
-
-            auto const heap_alloc_aligned{[](::std::size_t n, ::std::size_t align, heap_buf_guard& g) noexcept -> ::std::byte*
-                                          {
-                                              if(n == 0uz) [[unlikely]] { n = 1uz; }
-                                              if(n > (::std::numeric_limits<::std::size_t>::max() - (align - 1uz))) [[unlikely]]
-                                              {
-                                                  ::fast_io::fast_terminate();
-                                              }
-                                              auto const raw_n{n + (align - 1uz)};
-                                              void* const raw{byte_allocator::allocate(raw_n)};
-                                              if(raw == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                                              g.ptr = raw;
-                                              return align_ptr_up(static_cast<::std::byte*>(raw), align);
-                                          }};
+            bool const use_scratch{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
+            thread_local_bump_allocator::mark_t scratch_mark{};
+            if(use_scratch) { scratch_mark = get_call_scratch().mark(); }
 # endif
 
             auto caller_stack_top{*caller_stack_top_ptr};
@@ -5880,8 +5931,7 @@ namespace uwvm2::runtime::lib
             if(use_scratch) { frame_alloc = g_call_scratch.allocate_bytes(frame_alloc_n, kFrameAlign); }
             else
 # else
-            heap_buf_guard frame_heap_guard{};
-            if(use_heap) { frame_alloc = heap_alloc_aligned(frame_alloc_n, kFrameAlign, frame_heap_guard); }
+            if(use_scratch) { frame_alloc = get_call_scratch().allocate_bytes(frame_alloc_n, kFrameAlign); }
             else
 # endif
             {
@@ -5966,6 +6016,8 @@ namespace uwvm2::runtime::lib
 
 # if defined(UWVM_USE_THREAD_LOCAL)
             if(use_scratch) { g_call_scratch.release(scratch_mark); }
+# else
+            if(use_scratch) { get_call_scratch().release(scratch_mark); }
 # endif
         }
 
@@ -10209,11 +10261,23 @@ namespace uwvm2::runtime::lib
 # endif
     UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
     {
+# if defined(UWVM_USE_THREAD_LOCAL)
         llvm_jit_last_trap_kind = k;
-# if UWVM_HAS_BUILTIN(__builtin_return_address)
-        llvm_jit_trap_return_address = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
 # else
+        get_llvm_jit_last_trap_kind() = k;
+# endif
+# if UWVM_HAS_BUILTIN(__builtin_return_address)
+#  if defined(UWVM_USE_THREAD_LOCAL)
+        llvm_jit_trap_return_address = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
+#  else
+        get_llvm_jit_trap_return_address() = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
+#  endif
+# else
+#  if defined(UWVM_USE_THREAD_LOCAL)
         llvm_jit_trap_return_address = 0u;
+#  else
+        get_llvm_jit_trap_return_address() = 0u;
+#  endif
 # endif
         switch(k)
         {
