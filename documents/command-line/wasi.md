@@ -62,6 +62,8 @@ For WASI mount paths, this flag changes command-line validation from "valid UTF-
 | `--wasip1-global-disable` | `--wasip1-disable`, `-I1disable` | None | Once | Disable the global-default built-in WASI Preview 1 module unless a target override re-enables it. |
 | `--wasip1-global-set-fd-limit` | `--wasip1-set-fd-limit`, `-I1fdlim` | `<limit:size_t>` | Once | Set the default WASI fd limit. `0` maps to the maximum WASI fd value. |
 | `--wasip1-global-mount-dir` | `--wasip1-mount-dir`, `-I1dir` | `<wasi dir:str> <system dir:path>` | Repeatable | Mount a host directory into the default WASI preopen set. |
+| `--wasip1-disable-mount-path-normalization` | `-I1nomntnorm` | None | Once | Store raw WASI mount guest paths instead of normalized paths. |
+| `--wasip1-allow-overlapping-mount-paths` | `-I1allowoverlap` | None | Once | Allow duplicate or overlapping WASI mount guest paths. |
 | `--wasip1-global-set-argv0` | `--wasip1-set-argv0`, `-I1argv0` | `<argv0:str>` | Once | Override global-default WASI `argv[0]`. |
 | `--wasip1-global-noinherit-system-environment` | `--wasip1-noinherit-system-environment`, `-I1nosysenv` | None | Once | Start the global-default WASI environment without inheriting host environment variables. |
 | `--wasip1-global-delete-system-environment` | `--wasip1-delete-system-environment`, `-I1delsysenv` | `<env:str>` | Repeatable | Remove one inherited host environment variable by name. |
@@ -72,6 +74,10 @@ For WASI mount paths, this flag changes command-line validation from "valid UTF-
 | `--wasip1-global-socket-udp-connect` | `--wasip1-socket-udp-connect`, `-I1udpcon` | `<fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable | Create a default connected UDP socket. |
 
 The socket aliases above are available only when socket support is compiled. The exact alias strings come from the socket parameter headers; use `uwvm --help wasi` on the built binary if you need the authoritative compiled list.
+
+Mount guest paths are normalized by default before they are stored and before overlap checks run. Normalization collapses repeated slashes, removes `.` path components, resolves `..` within the preopen root, and removes trailing slashes except for `/`; a relative path that normalizes to empty becomes `.`.
+
+`--wasip1-disable-mount-path-normalization` changes storage only: the raw guest path is stored in the preopen table. If overlapping mount paths are still disallowed, uwvm still normalizes paths internally for the conflict check. `--wasip1-allow-overlapping-mount-paths` skips duplicate and ancestor/child conflict rejection. When both switches are set, mount path normalization is skipped entirely.
 
 ## Single Target Command Table
 

@@ -122,6 +122,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_disable),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_set_fd_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_mount_dir),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_disable_mount_path_normalization),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_allow_overlapping_mount_paths),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_set_argv0),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_noinherit_system_environment),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_delete_system_environment),

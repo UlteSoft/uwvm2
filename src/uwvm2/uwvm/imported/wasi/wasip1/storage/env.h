@@ -139,6 +139,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     /// @brief     Add/replace environment variables (wins over wasip1_delete_system_environment).
     inline ::uwvm2::utils::container::vector<wasip1_add_environment_t> wasip1_add_environment{};  // [global]
 
+    /// @brief     Store raw WASI Preview 1 mount paths instead of normalized guest paths.
+    inline bool wasip1_disable_mount_path_normalization{};  // [global]
+
+    /// @brief     Allow duplicate or overlapping WASI Preview 1 mount guest paths.
+    inline bool wasip1_allow_overlapping_mount_paths{};  // [global]
+
     /// @brief     The storage of final WASI Preview 1 environment variables ("key=value").
     inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_environment_storage{};  // [global]
 

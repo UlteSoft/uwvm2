@@ -72,6 +72,8 @@ export import :wasip1_global_expose_host_api;
 export import :wasip1_global_disable;
 export import :wasip1_global_set_fd_limit;
 export import :wasip1_global_mount_dir;
+export import :wasip1_disable_mount_path_normalization;
+export import :wasip1_allow_overlapping_mount_paths;
 export import :wasip1_global_set_argv0;
 export import :wasip1_global_noinherit_system_environment;
 export import :wasip1_global_delete_system_environment;

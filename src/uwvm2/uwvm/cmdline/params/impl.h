@@ -72,6 +72,8 @@
 # include "wasip1_global_disable.h"
 # include "wasip1_global_set_fd_limit.h"
 # include "wasip1_global_mount_dir.h"
+# include "wasip1_disable_mount_path_normalization.h"
+# include "wasip1_allow_overlapping_mount_paths.h"
 # include "wasip1_global_set_argv0.h"
 # include "wasip1_global_noinherit_system_environment.h"
 # include "wasip1_global_delete_system_environment.h"
