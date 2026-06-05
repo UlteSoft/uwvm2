@@ -104,6 +104,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         bool argv0_is_set{};
         ::uwvm2::utils::container::u8string argv0_storage{};
 
+        bool force_args_is_set{};
+        ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> force_argument_storage{};
+
         bool trace_wasip1_call{};
         bool trace_wasip1_call_is_set{};
         ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t trace_wasip1_output_target{};
@@ -132,8 +135,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         [[nodiscard]] inline bool has_override() const noexcept
         {
             return this->enabled_is_set || this->expose_host_api_is_set || this->noinherit_system_environment_is_set || this->disable_utf8_check_is_set ||
-                   this->fd_limit_is_set || this->argv0_is_set || this->trace_wasip1_call_is_set || !this->delete_system_environment.empty() ||
-                   !this->add_or_replace_environment.empty() || !this->mount_dir_roots.empty()
+                   this->fd_limit_is_set || this->argv0_is_set || this->force_args_is_set || this->trace_wasip1_call_is_set ||
+                   !this->delete_system_environment.empty() || !this->add_or_replace_environment.empty() || !this->mount_dir_roots.empty()
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
                    || !this->preopen_sockets.empty()
 #  endif
@@ -178,8 +181,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     /// @brief     The storage of final WASI Preview 1 arguments.
     inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_argument_storage{};  // [global]
 
+    /// @brief     Whether the global-default WASI Preview 1 argv[0] was explicitly overridden.
+    inline bool wasip1_argv0_is_set{};  // [global]
+
     /// @brief     Override for WASI Preview 1 argv[0].
     inline ::uwvm2::utils::container::u8string wasip1_argv0_storage{};  // [global]
+
+    /// @brief     Whether the global-default WASI Preview 1 argv vector is explicitly replaced.
+    inline bool wasip1_force_args_is_set{};  // [global]
+
+    /// @brief     Complete global-default WASI Preview 1 argv vector supplied by `--wasip1-global-force-args`.
+    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_force_argument_storage{};  // [global]
 
     /// @brief     Default WasiPreview1 environment
     inline wasip1_env_type default_wasip1_env{};  // [global]

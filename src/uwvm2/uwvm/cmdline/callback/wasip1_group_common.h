@@ -58,7 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
                                                                       ::uwvm2::utils::container::u8string_view& group_name) noexcept
         {
-            if(group_arg == para_end || group_arg->type != parameter_type::arg) [[unlikely]]
+            if(group_arg == para_end || !wasip1_module_details::is_argument_result(group_arg->type)) [[unlikely]]
             {
                 return wasip1_module_details::print_usage_error(parameter, u8"Missing group name.");
             }
@@ -73,7 +73,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
                                                                        ::uwvm2::utils::container::u8string_view& module_name) noexcept
         {
-            if(module_arg == para_end || module_arg->type != parameter_type::arg) [[unlikely]]
+            if(module_arg == para_end || !wasip1_module_details::is_argument_result(module_arg->type)) [[unlikely]]
             {
                 return wasip1_module_details::print_usage_error(parameter, u8"Missing module name.");
             }

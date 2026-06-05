@@ -83,6 +83,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             enable_utf8_check,
             trace,
             set_argv0,
+            force_args,
             set_fd_limit,
             delete_system_environment,
             add_or_replace_environment,
@@ -107,6 +108,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             else if(text == u8"enable-utf8-check") { action = target_action_t::enable_utf8_check; }
             else if(text == u8"trace") { action = target_action_t::trace; }
             else if(text == u8"set-argv0") { action = target_action_t::set_argv0; }
+            else if(text == u8"force-args") { action = target_action_t::force_args; }
             else if(text == u8"set-fd-limit") { action = target_action_t::set_fd_limit; }
             else if(text == u8"delete-system-environment") { action = target_action_t::delete_system_environment; }
             else if(text == u8"add-or-replace-environment") { action = target_action_t::add_or_replace_environment; }
@@ -145,6 +147,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::uwvm2::utils::cmdline::print_usage(parameter),
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
+
+        [[nodiscard]] inline constexpr bool
+            is_argument_result(::uwvm2::utils::cmdline::parameter_parsing_results_type type) noexcept
+        {
+            return type == ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg ||
+                   type == ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
+        }
+
+        [[nodiscard]] inline bool parse_size_t(::uwvm2::utils::container::u8string_view text, ::std::size_t& value) noexcept
+        {
+            auto const [next, err]{::fast_io::parse_by_scan(text.cbegin(), text.cend(), value)};
+            return err == ::fast_io::parse_code::ok && next == text.cend();
+        }
+
+        inline void force_args_pretreatment(char8_t const* const*& argv_curr,
+                                            char8_t const* const* argv_end,
+                                            ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr,
+                                            ::std::size_t leading_args_before_count) noexcept
+        {
+            auto curr{argv_curr + 1u};
+
+            for(::std::size_t i{}; i != leading_args_before_count; ++i)
+            {
+                if(curr == argv_end || *curr == nullptr) [[unlikely]]
+                {
+                    argv_curr = curr;
+                    return;
+                }
+
+                auto const arg_str{::uwvm2::utils::container::u8cstring_view{::fast_io::mnp::os_c_str(*curr)}};
+                pr.emplace_back_unchecked(arg_str, nullptr, ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg);
+                ++curr;
+            }
+
+            if(curr == argv_end || *curr == nullptr) [[unlikely]]
+            {
+                argv_curr = curr;
+                return;
+            }
+
+            auto const count_str{::uwvm2::utils::container::u8cstring_view{::fast_io::mnp::os_c_str(*curr)}};
+            pr.emplace_back_unchecked(count_str, nullptr, ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg);
+            ++curr;
+
+            ::std::size_t arg_count{};
+            if(!parse_size_t(count_str, arg_count))
+            {
+                argv_curr = curr;
+                return;
+            }
+
+            for(::std::size_t i{}; i != arg_count; ++i)
+            {
+                if(curr == argv_end || *curr == nullptr) [[unlikely]]
+                {
+                    argv_curr = curr;
+                    return;
+                }
+
+                auto const arg_str{::uwvm2::utils::container::u8cstring_view{::fast_io::mnp::os_c_str(*curr)}};
+                pr.emplace_back_unchecked(arg_str, nullptr, ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg);
+                ++curr;
+            }
+
+            argv_curr = curr;
         }
 
         [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
@@ -618,9 +686,58 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     return print_usage_error(parameter,
                                              u8"Duplicate or conflicting module action. Cannot set argv0 more than once for the same WASI Preview 1 target.");
                 }
+                if(target.force_args_is_set) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
+                }
                 target.argv0_storage = ::uwvm2::utils::container::u8string{extra1->str};
                 target.argv0_is_set = true;
                 mark_consumed(extra1);
+                return parameter_return_type::def;
+            }
+            case target_action_t::force_args:
+            {
+                if(extra1 == para_end || !is_argument_result(extra1->type)) [[unlikely]]
+                {
+                    return print_usage_error(parameter, u8"Missing force-args count.");
+                }
+
+                ::std::size_t arg_count{};
+                if(!parse_size_t(::uwvm2::utils::container::u8string_view{extra1->str}, arg_count)) [[unlikely]]
+                {
+                    return print_usage_error(parameter, u8"Invalid force-args count (size_t).");
+                }
+
+                if(target.argv0_is_set) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
+                }
+                if(target.force_args_is_set) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Duplicate module action. Cannot set force-args more than once for the same WASI Preview 1 target.");
+                }
+
+                ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> force_args{};
+                force_args.reserve(arg_count);
+
+                auto last{extra1};
+                auto arg_curr{extra1 + 1u};
+                for(::std::size_t i{}; i != arg_count; ++i, ++arg_curr)
+                {
+                    if(arg_curr == para_end || !is_argument_result(arg_curr->type)) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing force-args value.");
+                    }
+                    force_args.emplace_back(::uwvm2::utils::container::u8string{arg_curr->str});
+                    last = arg_curr;
+                }
+
+                target.force_argument_storage = ::std::move(force_args);
+                target.force_args_is_set = true;
+                mark_consumed(last);
                 return parameter_return_type::def;
             }
             case target_action_t::set_fd_limit:

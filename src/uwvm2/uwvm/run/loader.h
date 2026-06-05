@@ -257,7 +257,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             for(auto& group_state: ::uwvm2::uwvm::imported::wasi::wasip1::storage::configured_wasip1_groups)
             {
-                if(!group_state.has_override()) [[unlikely]] { continue; }
+                // A configured WASI target must always receive an initialized
+                // environment, even when it only exists to bind a module to a
+                // single/group target and has no explicit overrides. Runtime
+                // dispatch switches imported WASI calls to the target env when
+                // a binding exists; leaving that env default-constructed would
+                // drop inherited argv/env/fd state such as the `--run` argv.
                 if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(group_state)) [[unlikely]]
                 {
                     return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);

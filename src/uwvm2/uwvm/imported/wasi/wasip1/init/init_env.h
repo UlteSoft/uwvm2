@@ -193,31 +193,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             using u8string = ::uwvm2::utils::container::u8string;
             using u8string_view = ::uwvm2::utils::container::u8string_view;
 
-            auto const wasm_file_ppos{::uwvm2::uwvm::cmdline::wasm_file_ppos};
-            auto const use_custom_argv0{!wasip1_argv0_storage.empty()};
-
             wasip1_argument_storage.clear();
             env.argv.clear();
 
-            if(wasm_file_ppos != nullptr || use_custom_argv0)
+            if(wasip1_force_args_is_set)
             {
-                auto const& pr{::uwvm2::uwvm::cmdline::parsing_result};
-                auto const parsed_wasi_argv_size{wasm_file_ppos == nullptr ? 0uz : static_cast<::std::size_t>(pr.end() - wasm_file_ppos)};
-                auto const wasi_argv_size{parsed_wasi_argv_size + static_cast<::std::size_t>(wasm_file_ppos == nullptr && use_custom_argv0)};
-
-                wasip1_argument_storage.reserve(wasi_argv_size);
-                env.argv.reserve(wasi_argv_size);
-
-                if(use_custom_argv0) { wasip1_argument_storage.emplace_back(wasip1_argv0_storage); }
-
-                if(wasm_file_ppos != nullptr)
-                {
-                    auto curr{wasm_file_ppos + static_cast<::std::ptrdiff_t>(use_custom_argv0)};
-                    for(; curr != pr.end(); ++curr) { wasip1_argument_storage.emplace_back(u8string{curr->str}); }
-                }
-
-                for(auto const& arg: wasip1_argument_storage) { env.argv.emplace_back_unchecked(u8string_view{arg.data(), arg.size()}); }
+                // `force-args` is a complete argv replacement for the current
+                // WASI target. It intentionally ignores the `--run` argv tail
+                // and cannot be combined with `set-argv0` for the same target.
+                wasip1_argument_storage.reserve(wasip1_force_argument_storage.size());
+                env.argv.reserve(wasip1_force_argument_storage.size());
+                for(auto const& arg: wasip1_force_argument_storage) { wasip1_argument_storage.emplace_back(arg); }
             }
+            else
+            {
+                auto const wasm_file_ppos{::uwvm2::uwvm::cmdline::wasm_file_ppos};
+                auto const use_custom_argv0{wasip1_argv0_is_set};
+
+                if(wasm_file_ppos != nullptr || use_custom_argv0)
+                {
+                    auto const& pr{::uwvm2::uwvm::cmdline::parsing_result};
+                    auto const parsed_wasi_argv_size{wasm_file_ppos == nullptr ? 0uz : static_cast<::std::size_t>(pr.end() - wasm_file_ppos)};
+                    auto const wasi_argv_size{parsed_wasi_argv_size + static_cast<::std::size_t>(wasm_file_ppos == nullptr && use_custom_argv0)};
+
+                    wasip1_argument_storage.reserve(wasi_argv_size);
+                    env.argv.reserve(wasi_argv_size);
+
+                    if(use_custom_argv0) { wasip1_argument_storage.emplace_back(wasip1_argv0_storage); }
+
+                    if(wasm_file_ppos != nullptr)
+                    {
+                        auto curr{wasm_file_ppos + static_cast<::std::ptrdiff_t>(use_custom_argv0)};
+                        for(; curr != pr.end(); ++curr) { wasip1_argument_storage.emplace_back(u8string{curr->str}); }
+                    }
+                }
+            }
+
+            for(auto const& arg: wasip1_argument_storage) { env.argv.emplace_back_unchecked(u8string_view{arg.data(), arg.size()}); }
         }
 
         // ====== Environment variables ======
@@ -887,7 +899,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         auto const saved_noinherit_system_environment{wasip1_noinherit_system_environment};
         auto saved_delete_system_environment{::std::move(wasip1_delete_system_environment)};
         auto saved_add_or_replace_environment{::std::move(wasip1_add_or_replace_environment)};
+        auto const saved_argv0_is_set{wasip1_argv0_is_set};
         auto saved_argv0_storage{::std::move(wasip1_argv0_storage)};
+        auto const saved_force_args_is_set{wasip1_force_args_is_set};
+        auto saved_force_argument_storage{::std::move(wasip1_force_argument_storage)};
         auto saved_environment_storage{::std::move(wasip1_environment_storage)};
         auto saved_argument_storage{::std::move(wasip1_argument_storage)};
 
@@ -927,7 +942,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             state.noinherit_system_environment_is_set ? state.noinherit_system_environment : saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(combined_delete_system_environment);
         wasip1_add_or_replace_environment = ::std::move(combined_add_or_replace_environment);
-        wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{saved_argv0_storage};
+        wasip1_argv0_is_set = state.argv0_is_set;
+        wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{};
+        wasip1_force_args_is_set = state.force_args_is_set;
+        wasip1_force_argument_storage = state.force_args_is_set ? state.force_argument_storage : ::uwvm2::utils::container::vector<u8string>{};
 
         state.env.mount_dir_roots = ::std::move(saved_default_mount_dir_roots);
         state.env.mount_dir_roots.reserve(global_mount_dir_count + module_mount_dir_count);
@@ -941,7 +959,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         wasip1_noinherit_system_environment = saved_noinherit_system_environment;
         wasip1_delete_system_environment = ::std::move(saved_delete_system_environment);
         wasip1_add_or_replace_environment = ::std::move(saved_add_or_replace_environment);
+        wasip1_argv0_is_set = saved_argv0_is_set;
         wasip1_argv0_storage = ::std::move(saved_argv0_storage);
+        wasip1_force_args_is_set = saved_force_args_is_set;
+        wasip1_force_argument_storage = ::std::move(saved_force_argument_storage);
         wasip1_argument_storage = ::std::move(saved_argument_storage);
         wasip1_environment_storage = ::std::move(saved_environment_storage);
 
