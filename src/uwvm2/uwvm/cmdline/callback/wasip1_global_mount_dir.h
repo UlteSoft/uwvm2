@@ -63,12 +63,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
     namespace wasip1_global_mount_dir_details
     {
+        // Result for lexical normalization of the guest-visible WASI preopen name.
+        // `valid == false` means the path used a relative `..` component that would
+        // escape above the relative preopen root. Absolute paths clamp `..` at `/`,
+        // matching the usual POSIX lexical shape for absolute paths.
         struct mount_path_normalization_result
         {
             bool valid{};
             ::uwvm2::utils::container::u8string normalized{};
         };
 
+        // Normalize only the WASI guest mount path. This is a lexical transform
+        // over the guest-visible preopen name, not a host filesystem operation.
+        // Do not use realpath-style canonicalization here: symlinks, case-folding,
+        // drive letters, and other host path rules are outside the WASI preopen
+        // namespace. The host directory has already been opened as a directory
+        // capability before this point.
+        //
+        // Rules:
+        // - collapse repeated `/`;
+        // - remove `.` components;
+        // - resolve `..` within the guest preopen root;
+        // - remove trailing separators, except that `/` stays `/`;
+        // - normalize an empty relative result to `.`.
+        //
+        // The normalized value is used both for storage (unless explicitly
+        // disabled) and for component-aware duplicate/overlap checks.
         [[nodiscard]] inline mount_path_normalization_result normalize_mount_path(::uwvm2::utils::container::u8string_view path) noexcept
         {
             mount_path_normalization_result result{};
@@ -137,6 +157,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return result;
         }
 
+        // Component-aware prefix test for normalized guest mount paths. A plain
+        // string prefix is not sufficient: `/usr` must overlap `/usr/lib`, but
+        // it must not overlap `/usrbin`.
         [[nodiscard]] inline constexpr bool starts_with_mount_path(::uwvm2::utils::container::u8string_view path,
                                                                    ::uwvm2::utils::container::u8string_view prefix) noexcept
         {
@@ -478,6 +501,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_disable_mount_path_normalization};
         auto const allow_overlapping_mount_paths{
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_allow_overlapping_mount_paths};
+
+        // The two command-line switches are intentionally independent. The
+        // storage policy controls which guest path spelling reaches the WASIp1
+        // preopen table, while the overlap policy controls whether uwvm rejects
+        // ambiguous preopen layouts before the guest starts:
+        // - default: normalize for storage and for duplicate/overlap checking;
+        // - disable normalization only: store the raw guest path, but still
+        //   normalize a temporary value for the safety check;
+        // - allow overlapping only: normalize stored paths, but skip duplicate
+        //   and ancestor/child rejection;
+        // - both switches: skip the normalization pipeline completely.
         bool const need_normalized_wasidir{!disable_mount_path_normalization || !allow_overlapping_mount_paths};
 
         ::uwvm2::utils::container::u8string normalized_wasidir_storage{};
@@ -496,13 +530,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         // No pattern processing allowed for security reasons. Any extra free-form args are ignored here.
 
-        // Conflict check with existing mounts: disallow prefix conflicts both directions
+        // Reject duplicate and ancestor/child mount names by default. WASIp1
+        // preopens are independent directory capabilities rather than a POSIX
+        // mount namespace, so an overlapping layout such as `/` and `/lib` can
+        // make logically equivalent POSIX paths resolve through different
+        // preopens. The check is performed on normalized guest names even when
+        // raw-name storage is requested, because the protection is about path
+        // equivalence, not the spelling stored in the preopen table.
         if(!allow_overlapping_mount_paths)
         {
             for(auto const& mr: env.mount_dir_roots)
             {
                 auto const& existing{mr.preload_dir};
                 ::uwvm2::utils::container::u8string_view const existing_sv{existing.data(), existing.size()};
+                // Existing entries may have been stored raw when normalization
+                // was disabled for storage, so compare a temporary normalized
+                // value instead of trusting the stored spelling.
                 auto existing_normalized_result{wasip1_global_mount_dir_details::normalize_mount_path(existing_sv)};
                 if(!existing_normalized_result.valid) [[unlikely]]
                 {
@@ -528,7 +571,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                         normalized_wasidir,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8" already mounted.\n\n",
+                                        u8" already mounted. Use ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        u8"--wasip1-allow-overlapping-mount-paths",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" to disable the overlapping mount-path check.\n\n",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
                 }
@@ -549,7 +596,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                         u8" and ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                         existing_norm,
-                                        u8"\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8". Use ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        u8"--wasip1-allow-overlapping-mount-paths",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" to disable the overlapping mount-path check.\n\n",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
                 }

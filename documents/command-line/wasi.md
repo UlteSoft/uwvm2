@@ -79,6 +79,16 @@ Mount guest paths are normalized by default before they are stored and before ov
 
 `--wasip1-disable-mount-path-normalization` changes storage only: the raw guest path is stored in the preopen table. If overlapping mount paths are still disallowed, uwvm still normalizes paths internally for the conflict check. `--wasip1-allow-overlapping-mount-paths` skips duplicate and ancestor/child conflict rejection. When both switches are set, mount path normalization is skipped entirely.
 
+### Mount Path Safety Notes
+
+These two switches are compatibility escape hatches. Use them only when the guest runtime and the preopen layout are intentionally relying on raw WASI capability behavior rather than a POSIX-like mount namespace.
+
+Disabling mount path normalization can make different spellings of the same logical guest path remain distinct in the preopen table. Examples include `/lib`, `//lib///`, `/./lib`, and `/a/../lib`. POSIX-like guest runtimes such as wasi-libc commonly normalize application paths before matching preopens, so storing raw unnormalized preopen names can make a path fail to match the preopen the user expected, or match a different normalized shape than the command line appears to describe.
+
+Allowing overlapping mount paths can break POSIX path equivalence for guests that expose `open`/`openat` style APIs. For example, mounting one host directory at `/` and another at `/lib` can make `open("/lib/file")` resolve through the `/lib` preopen while `openat(open("/"), "lib/file")` resolves through the real `lib` subdirectory inside the `/` preopen. This follows WASI's independent directory-capability model, but it is surprising for POSIX-like code and can give the false impression that a more specific preopen masks or replaces a subtree of its parent.
+
+Using both switches together disables the two protections at once: raw unnormalized names are stored, and duplicate or ancestor/child relationships are not rejected. This may be appropriate for low-level WASI tests, but it is risky for general POSIX-like workloads. The ambiguity is documented in [Wasmtime issue #13544](https://github.com/bytecodealliance/wasmtime/issues/13544); uwvm rejects normalized overlaps by default to make this behavior explicit.
+
 ## Single Target Command Table
 
 All single commands require a module name. The module name must be non-empty and valid according to the Wasm text-format name validation path.
