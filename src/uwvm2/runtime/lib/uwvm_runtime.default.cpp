@@ -424,6 +424,24 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
+        // Keep the exit flag in a trivial namespace-scope object, not as a
+        // member of runtime_process_exit_state. A scalar with constant
+        // initialization is zero-initialized with the static storage image
+        // before any .init_array dynamic-initialization code runs, and it has
+        // no destructor, so no __cxa_atexit entry is registered for it.
+        //
+        // runtime_process_exit_state is intentionally a non-trivially
+        // destructible sentinel. Its destructor is registered through the
+        // static-initialization path (__cxa_atexit on the Itanium C++ ABI).
+        // Because the sentinel is defined after g_runtime in this translation
+        // unit, its atexit destructor runs before g_runtime is destroyed. If
+        // the flag were a sentinel member, that same destructor would set the
+        // member and then end the sentinel object's lifetime; g_runtime's later
+        // destructor would read a member of an already-destroyed object, which
+        // is undefined behavior and can be optimized incorrectly in release
+        // builds. The separate trivial bool stays valid while static
+        // destructors run and lets compiled_module_record avoid LLVM MCJIT
+        // teardown during process exit.
         inline bool g_runtime_process_exiting{};  // [global]
 
         struct runtime_process_exit_state
