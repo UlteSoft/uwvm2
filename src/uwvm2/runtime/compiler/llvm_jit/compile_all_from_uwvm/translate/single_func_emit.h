@@ -2259,6 +2259,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
         ::uwvm2::utils::container::make_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
     if(module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
+    // Full JIT and tier-2 JIT run cross-function optimization pipelines that may inline Wasm callees into their callers.
+    // Keep compact DWARF metadata so trap reporting can reconstruct the logical Wasm stack after native frames disappear.
     module_storage.llvm_di_builder = ::uwvm2::utils::container::make_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
     if(module_storage.llvm_di_builder == nullptr) [[unlikely]] { return false; }
 
@@ -2400,6 +2402,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
     if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*state.llvm_public_entry_function); }
     if(state.emit_unwind_call_stack_frames && state.llvm_di_builder != nullptr && state.llvm_di_file != nullptr)
     {
+        // This subprogram name is intentionally machine-parseable by the runtime unwind reporter.  When LLVM inlines this
+        // function, the emitted DWARF inline chain is the only reliable source for the original Wasm function index stack.
         auto const line{static_cast<unsigned>(local_func_storage.function_index + 1uz)};
         auto const di_name{::uwvm2::utils::container::concat_uwvm("uwvm-inline:m=", local_func_storage.module_id, ":f=", local_func_storage.function_index)};
         state.llvm_di_subprogram =
@@ -2860,6 +2864,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             ::llvm::DISubprogram* raw_di_subprogram{};
             if(state.emit_unwind_call_stack_frames && state.llvm_di_builder != nullptr && state.llvm_di_file != nullptr)
             {
+                // Raw ABI wrappers are not Wasm frames, but full/tier-2 optimization can inline the public Wasm entry into
+                // them.  Give wrappers a non-parseable debug scope so DWARF still records the inlined Wasm frame chain.
                 auto const line{static_cast<unsigned>(function_index_uz + 1uz)};
                 auto const raw_di_name{::uwvm2::utils::container::concat_uwvm("uwvm-raw-inline-anchor:m=",
                                                                               local_func_storage_ptr->module_id,

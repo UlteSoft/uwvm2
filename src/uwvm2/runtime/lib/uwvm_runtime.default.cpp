@@ -1536,6 +1536,9 @@ namespace uwvm2::runtime::lib
             auto const print_debug_inline_frames{
                 [&](::std::uintptr_t ip) noexcept -> bool
                 {
+                    // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
+                    // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
+                    // they are available and print only the parseable Wasm frame records.
                     bool printed{};
                     ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
                                                           ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
