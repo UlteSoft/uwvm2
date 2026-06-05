@@ -368,19 +368,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
     }
 
-    template <typename ScanManipulator>
     /**
      * @brief   Run a fast_io scanner and require it to consume the whole input range.
      * @details Entry argument parsing must reject partial literals such as `123abc`.  This helper centralizes the
      *          "parse succeeded and stopped exactly at `last`" check for integer and floating-point scanners.
      */
+    template <typename ScanManipulator>
     [[nodiscard]] inline constexpr bool wasm_entry_scan_exact(char8_t const* first, char8_t const* last, ScanManipulator scan_manipulator) noexcept
     {
         auto const [next, err]{::fast_io::parse_by_scan(first, last, scan_manipulator)};
         return err == ::fast_io::parse_code::ok && next == last;
     }
 
-    template <bool allow_signed_decimal, typename Out, typename Unsigned>
     /**
      * @brief   Parse an integer entry argument into the exact wasm integer storage type.
      * @details Accepted forms are signed decimal when `allow_signed_decimal` is true, plus unsigned decimal, hexadecimal,
@@ -394,6 +393,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @param   out                  Receives the parsed value on success.
      * @return  true when the whole token was parsed successfully, false otherwise.
      */
+    template <bool allow_signed_decimal, typename Out, typename Unsigned>
     [[nodiscard]] inline constexpr bool parse_wasm_entry_integer(::uwvm2::utils::container::u8string_view str, Out & out) noexcept
     {
         static_assert(sizeof(Out) == sizeof(Unsigned));
@@ -424,12 +424,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return false;
     }
 
-    template <typename... Args>
     /**
      * @brief Emit a fatal `--wasm-set-start-func` diagnostic and terminate.
      * @details This helper keeps all explicit-entry fatal paths formatted consistently and guarantees that callers do
      *          not continue after an invalid user-specified entry function or entry argument.
      */
+    template <typename... Args>
     [[noreturn]] inline void wasm_set_start_func_fatal(Args && ... args) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -468,13 +468,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return parse_wasm_entry_integer<true, wasm_i64, wasm_u64>(str, out);
     }
 
-    template <typename T>
     /**
      * @brief   Parse a floating-point literal from a half-open UTF-8 range.
      * @details The fast-float path accepts the normal fast_io floating scanner and, when available, fast_io hexfloat
      *          syntax as well.  The fallback path uses `std::from_chars` in general format.  In every case, partial
      *          consumption is rejected.
      */
+    template <typename T>
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
@@ -492,12 +492,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return false;
     }
 
-    template <typename T>
     /**
      * @brief   Parse an entry argument as `float` or `double`.
      * @details In addition to the core floating syntax accepted by `parse_wasm_entry_float_range`, this helper accepts
      *          a trailing `f`/`F` suffix so command-line users can write familiar single-precision literals.
      */
+    template <typename T>
     [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T & out) noexcept
     {
         auto first{str.cbegin()};
@@ -534,11 +534,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return {u8"unknown literal"};
     }
 
-    template <typename Output, typename ValueTypePtr>
     /**
      * @brief Print a wasm function type span as `(type, type, ...)`.
      * @details Used in diagnostics where a full function signature is more helpful than only a raw arity count.
      */
+    template <typename Output, typename ValueTypePtr>
     inline void print_wasm_entry_type_span(Output & output, ValueTypePtr begin, ValueTypePtr end) noexcept
     {
         ::fast_io::io::perr(output, u8"(");
@@ -555,12 +555,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::io::perr(output, u8")");
     }
 
-    template <typename Output>
     /**
      * @brief Print the standard UWVM informational prefix to an existing output stream.
      * @details This helper is used while a multi-line diagnostic already holds the output-stream lock, so it accepts
      *          the caller's stream reference rather than reacquiring the global logger.
      */
+    template <typename Output>
     inline void print_wasm_entry_info_prefix(Output & output) noexcept
     {
         ::fast_io::io::perr(output,
@@ -571,18 +571,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
     }
 
-    template <typename FunctionType, typename Tokens>
     /**
      * @brief Emit a detailed fatal diagnostic for explicit-entry arity mismatch.
      * @details The diagnostic prints the selected function signature and a best-effort classification of every supplied
      *          token.  The entire multi-line record is emitted while holding the logger lock to avoid interleaving with
      *          other verbose/runtime output.
      */
+    template <typename FunctionType, typename Tokens>
     [[noreturn]] inline void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
                                                                       FunctionType const& ft,
                                                                       Tokens const& argument_tokens) noexcept
     {
         auto const param_count{static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)};
+        auto const argument_token_count{argument_tokens.size()};
+
         // Emit this multi-part diagnostic under one stream lock, then write through the unlocked stream reference.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
         ::fast_io::operations::decay::stream_ref_decay_lock_guard u8log_output_lg{
@@ -605,7 +607,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8" argument(s), got ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            argument_tokens.size(),
+                            argument_token_count,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8".\n");
         print_wasm_entry_info_prefix(u8log_output_ul);
@@ -616,10 +618,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::io::perr(u8log_output_ul, u8"\n");
         print_wasm_entry_info_prefix(u8log_output_ul);
         ::fast_io::io::perr(u8log_output_ul, u8"input types:   (");
-        for(::std::size_t i{}; i != argument_tokens.size(); ++i)
+        for(::std::size_t i{}; i != argument_token_count; ++i)
         {
             if(i != 0uz) { ::fast_io::io::perr(u8log_output_ul, u8", "); }
-            // The loop bound is exactly `argument_tokens.size()`, so this unchecked lookup is range-proven here.
+            // The loop bound is exactly `argument_token_count`, so this unchecked lookup is range-proven here.
             auto const arg{argument_tokens.index_unchecked(i)};
             ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -636,13 +638,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::fast_terminate();
     }
 
-    template <typename T>
     /**
      * @brief   Append a trivially-copyable wasm ABI value into an entry buffer.
      * @details Values are copied byte-for-byte into a compact buffer.  The buffer layout intentionally avoids alignment
      *          assumptions because it crosses the front-end/runtime-library boundary as `std::byte*` plus byte length.
      *          Bounds failures indicate an internal size-calculation bug and terminate immediately.
      */
+    template <typename T>
     inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
@@ -651,12 +653,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         offset += sizeof(T);
     }
 
-    template <typename T>
     /**
      * @brief   Read a trivially-copyable wasm ABI value from an entry buffer.
      * @details This is the inverse of `write_wasm_entry_value` and is used only for verbose diagnostics after packing.
      *          It uses `memcpy` so the diagnostic path does not impose alignment requirements on the packed ABI buffer.
      */
+    template <typename T>
     [[nodiscard]] inline T read_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> const& buffer, ::std::size_t& offset) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
@@ -737,13 +739,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
     }
 
-    template <typename Output, typename Signed, typename Unsigned>
     /**
      * @brief   Print one integer entry value in several debugging-friendly bases.
      * @details Both the signed value and the raw unsigned bit pattern are displayed.  This is important for wasm integer
      *          arguments because command-line users may intentionally pass a raw bit pattern whose signed decimal spelling
      *          is not the most useful representation.
      */
+    template <typename Output, typename Signed, typename Unsigned>
     inline void print_wasm_entry_integer_formats(Output & output, Signed value) noexcept
     {
         static_assert(sizeof(Signed) == sizeof(Unsigned));
@@ -771,13 +773,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
     }
 
-    template <typename Output>
     /**
      * @brief   Print a verbose record for one packed explicit-entry argument.
      * @details The function re-reads the packed bytes rather than reparsing the original token, so the verbose output
      *          reports exactly what will be handed to the runtime entry ABI.  For floating-point values it prints both
      *          numeric and raw-bit forms.
      */
+    template <typename Output>
     inline void print_wasm_entry_argument_verbose(Output & output,
                                                   ::uwvm2::utils::container::vector<::std::byte> const& buffer,
                                                   ::std::size_t& offset,
@@ -866,13 +868,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::io::perr(output, u8"\n");
     }
 
-    template <typename FunctionType, typename Tokens>
     /**
      * @brief   Print the resolved `--wasm-set-start-func` entry configuration.
      * @details The log contains both local-defined and import-inclusive function indices because the command-line option
      *          accepts a local-defined index, while the runtime library consumes the import-inclusive wasm function index.
      *          The multi-line record is emitted under one logger lock to preserve readability in verbose concurrent runs.
      */
+    template <typename FunctionType, typename Tokens>
     inline void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
                                                   ::std::size_t function_index,
                                                   ::std::size_t import_count,
@@ -971,7 +973,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
     }
 
-    template <typename ValueTypePtr>
     /**
      * @brief   Calculate the byte length needed for a packed entry ABI type span.
      * @details Each supported wasm scalar is laid out tightly using its natural wasm storage width.  Unsupported value
@@ -983,6 +984,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @param   is_result Selects whether diagnostics say "parameter" or "result".
      * @return  Required packed ABI byte length.
      */
+    template <typename ValueTypePtr>
     [[nodiscard]] inline ::std::size_t calculate_wasm_entry_abi_bytes(ValueTypePtr begin, ValueTypePtr end, bool is_result) noexcept
     {
         ::std::size_t total{};
