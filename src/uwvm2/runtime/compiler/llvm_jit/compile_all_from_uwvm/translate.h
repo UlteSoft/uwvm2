@@ -92,6 +92,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 # endif
         UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
 
+    extern "C++"
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+# endif
+        UWVM_NOINLINE void llvm_jit_memory_out_of_bounds_trap(::std::size_t memory_idx,
+                                                              ::std::uint_least64_t memory_static_offset,
+                                                              ::std::uint_least64_t memory_offset,
+                                                              ::std::uint_least32_t offset_65_bit,
+                                                              ::std::uint_least64_t memory_length,
+                                                              ::std::size_t memory_type_size) noexcept;
+
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 
     extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;

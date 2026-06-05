@@ -328,6 +328,60 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
 }
 
+[[nodiscard]] inline ::llvm::FunctionType* get_llvm_memory_out_of_bounds_trap_bridge_function_type(::llvm::LLVMContext& llvm_context) noexcept
+{
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
+    auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+    return ::llvm::FunctionType::get(
+        ::llvm::Type::getVoidTy(llvm_context),
+        {llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type},
+        false);
+}
+
+inline void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
+                                                ::std::size_t memory_idx,
+                                                ::std::uint_least64_t memory_static_offset,
+                                                ::llvm::Value* memory_offset,
+                                                ::llvm::Value* offset_65_bit,
+                                                ::llvm::Value* memory_length,
+                                                ::std::size_t memory_type_size)
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto function_type{get_llvm_memory_out_of_bounds_trap_bridge_function_type(llvm_context)};
+    if(function_type == nullptr) [[unlikely]] { return; }
+
+    auto llvm_intptr_type{function_type->getParamType(0u)};
+    auto llvm_i64_type{function_type->getParamType(1u)};
+    auto llvm_i32_type{function_type->getParamType(3u)};
+    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap))};
+    auto bridge_pointer{::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type))};
+    if(bridge_pointer == nullptr) [[unlikely]] { return; }
+
+    auto memory_offset_arg{memory_offset == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
+                                                    : ir_builder.CreateIntCast(memory_offset, llvm_i64_type, false)};
+    auto offset_65_bit_arg{offset_65_bit == nullptr ? ::llvm::ConstantInt::get(llvm_i32_type, 0u)
+                                                    : ir_builder.CreateZExtOrTrunc(offset_65_bit, llvm_i32_type)};
+    auto memory_length_arg{memory_length == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
+                                                    : ir_builder.CreateIntCast(memory_length, llvm_i64_type, false)};
+
+    auto trap_call{ir_builder.CreateCall(function_type,
+                                         bridge_pointer,
+                                         {::llvm::ConstantInt::get(llvm_intptr_type, memory_idx),
+                                          ::llvm::ConstantInt::get(llvm_i64_type, memory_static_offset),
+                                          memory_offset_arg,
+                                          offset_65_bit_arg,
+                                          memory_length_arg,
+                                          ::llvm::ConstantInt::get(llvm_intptr_type, memory_type_size)})};
+    trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+    apply_llvm_jit_host_calling_conv(trap_call);
+
+    auto anchor_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
+    auto anchor{::llvm::InlineAsm::get(anchor_function_type, "", "~{memory}", true)};
+    auto anchor_call{ir_builder.CreateCall(anchor_function_type, anchor)};
+    anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+}
+
 inline void
     emit_llvm_conditional_trap(::llvm::Module&, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind)
 {
@@ -352,6 +406,35 @@ inline void
 
 inline void emit_llvm_conditional_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition)
 { emit_llvm_conditional_trap(llvm_module, ir_builder, condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind::runtime_invariant_failure); }
+
+inline void emit_llvm_conditional_memory_out_of_bounds_trap(::llvm::Module&,
+                                                            ::llvm::IRBuilder<>& ir_builder,
+                                                            ::llvm::Value* condition,
+                                                            ::std::size_t memory_idx,
+                                                            ::std::uint_least64_t memory_static_offset,
+                                                            ::llvm::Value* memory_offset,
+                                                            ::llvm::Value* offset_65_bit,
+                                                            ::llvm::Value* memory_length,
+                                                            ::std::size_t memory_type_size)
+{
+    if(condition == nullptr) [[unlikely]] { return; }
+
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto function{current_block == nullptr ? nullptr : current_block->getParent()};
+    if(function == nullptr) [[unlikely]] { return; }
+
+    auto& llvm_context{ir_builder.getContext()};
+    auto trap_block{::llvm::BasicBlock::Create(llvm_context, "memory.oob.trap", function)};
+    auto continue_block{::llvm::BasicBlock::Create(llvm_context, "memory.oob.cont", function)};
+
+    ir_builder.CreateCondBr(condition, trap_block, continue_block);
+
+    ir_builder.SetInsertPoint(trap_block);
+    emit_llvm_memory_out_of_bounds_trap(ir_builder, memory_idx, memory_static_offset, memory_offset, offset_65_bit, memory_length, memory_type_size);
+    ir_builder.CreateUnreachable();
+
+    ir_builder.SetInsertPoint(continue_block);
+}
 
 inline void emit_llvm_divide_by_zero_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* divisor)
 {
@@ -1492,12 +1575,32 @@ inline void llvm_jit_store_little_endian_integer(::std::byte* memory_ptr, UInt v
 inline void llvm_jit_memory_bridge_trap() noexcept
 { ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds); }
 
+inline void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
+                                        validation_module_traits_t::wasm_u32 static_offset,
+                                        llvm_jit_wasm32_effective_offset_t effective_offset,
+                                        ::std::size_t memory_length,
+                                        ::std::size_t access_size) noexcept
+{
+    ::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap(memory_idx,
+                                                              static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                                                              effective_offset.offset,
+                                                              effective_offset.offset_65_bit ? 1u : 0u,
+                                                              static_cast<::std::uint_least64_t>(memory_length),
+                                                              access_size);
+    ::fast_io::fast_terminate();
+}
+
 template <typename MemoryT, typename Fn>
 [[nodiscard]] inline bool
-    llvm_jit_try_checked_memory_access(MemoryT const& memory, llvm_jit_wasm32_effective_offset_t effective_offset, ::std::size_t access_size, Fn&& fn)
+    llvm_jit_try_checked_memory_access(MemoryT const& memory,
+                                       llvm_jit_wasm32_effective_offset_t effective_offset,
+                                       ::std::size_t access_size,
+                                       ::std::size_t& memory_length_out,
+                                       Fn&& fn)
 {
     auto const checked_access{[&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept
                               {
+                                  memory_length_out = memory_length;
                                   if(memory_begin == nullptr || effective_offset.offset_65_bit || access_size > memory_length ||
                                      effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - access_size))
                                   {
@@ -1532,11 +1635,15 @@ inline void llvm_jit_with_checked_memory_access(::std::uintptr_t memory_address,
                                                 ::std::size_t access_size,
                                                 Fn&& fn)
 {
-    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
-    if(memory_p == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
-
     auto const effective_offset{llvm_jit_compute_wasm32_effective_offset(address, static_offset)};
-    if(!llvm_jit_try_checked_memory_access(*memory_p, effective_offset, access_size, ::std::forward<Fn>(fn))) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
+    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    if(memory_p == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(0uz, static_offset, effective_offset, 0uz, access_size); }
+
+    ::std::size_t memory_length{};
+    if(!llvm_jit_try_checked_memory_access(*memory_p, effective_offset, access_size, memory_length, ::std::forward<Fn>(fn))) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap(0uz, static_offset, effective_offset, memory_length, access_size);
+    }
 }
 
 template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
@@ -4656,12 +4763,18 @@ template <typename CreateValue>
                     auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
                     auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
+                    auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
 
-                    emit_llvm_conditional_trap(
+                    emit_llvm_conditional_memory_out_of_bounds_trap(
                         *llvm_module,
                         ir_builder,
-                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
-                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
+                        ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
+                        0uz,
+                        static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                        effective_offset,
+                        offset_out_of_range,
+                        memory_length_load,
+                        access_size);
                 }
                 else if(memory0_access_info.mmap_uses_partial_protection)
                 {
@@ -4690,12 +4803,18 @@ template <typename CreateValue>
                     auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
                     auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
+                    auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
 
-                    emit_llvm_conditional_trap(
+                    emit_llvm_conditional_memory_out_of_bounds_trap(
                         *llvm_module,
                         ir_builder,
-                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
-                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
+                        ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
+                        0uz,
+                        static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                        effective_offset,
+                        offset_out_of_range,
+                        memory_length_load,
+                        access_size);
                     ir_builder.CreateBr(partial_continue_block);
                     ir_builder.SetInsertPoint(partial_continue_block);
                 }
@@ -4785,12 +4904,18 @@ template <typename CreateValue>
                 auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
                 auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
                 auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
+                auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
 
-                emit_llvm_conditional_trap(
+                emit_llvm_conditional_memory_out_of_bounds_trap(
                     *llvm_module,
                     ir_builder,
-                    ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
-                    ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
+                    ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
+                    memory0_access_info.local_imported_memory_index,
+                    static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                    effective_offset,
+                    offset_out_of_range,
+                    snapshot.byte_length,
+                    access_size);
 
                 auto effective_offset_intptr{ir_builder.CreateIntCast(effective_offset, llvm_intptr_type, false)};
                 auto memory_address{ir_builder.CreateAdd(snapshot.memory_begin_address, effective_offset_intptr, "local_imported.memory.addr.int")};

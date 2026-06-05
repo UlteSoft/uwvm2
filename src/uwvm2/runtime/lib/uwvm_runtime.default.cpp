@@ -126,6 +126,7 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
+# include <uwvm2/object/memory/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/compile_cu_from_lazy_validator/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
@@ -1585,6 +1586,9 @@ namespace uwvm2::runtime::lib
             ::std::size_t last_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t first_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t first_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
+            ::uwvm2::utils::container::vector<call_stack_frame> trap_ip_frames{};
+            ::std::size_t backtrace_replay_index{::std::numeric_limits<::std::size_t>::max()};
+            bool backtrace_replay_active{true};
             auto const suppressed_frame{get_suppressed_call_stack_frame()};
             bool printing_backtrace_frames{};
 
@@ -1592,6 +1596,38 @@ namespace uwvm2::runtime::lib
                 [&](::std::size_t module_id, ::std::size_t function_index) noexcept
                 {
                     if(module_id == suppressed_frame.module_id && function_index == suppressed_frame.function_index) { return; }
+                    if(printing_backtrace_frames && backtrace_replay_active && !trap_ip_frames.empty())
+                    {
+                        auto const matches_trap_ip_frame{
+                            [&](::std::size_t index) noexcept
+                            {
+                                auto const& frame{trap_ip_frames.index_unchecked(index)};
+                                return frame.module_id == module_id && frame.function_index == function_index;
+                            }};
+
+                        if(backtrace_replay_index == (::std::numeric_limits<::std::size_t>::max)())
+                        {
+                            for(::std::size_t i{}; i != trap_ip_frames.size(); ++i)
+                            {
+                                if(matches_trap_ip_frame(i))
+                                {
+                                    backtrace_replay_index = i + 1uz;
+                                    return;
+                                }
+                            }
+                            backtrace_replay_active = false;
+                        }
+                        else if(backtrace_replay_index < trap_ip_frames.size() && matches_trap_ip_frame(backtrace_replay_index))
+                        {
+                            ++backtrace_replay_index;
+                            return;
+                        }
+                        else
+                        {
+                            backtrace_replay_active = false;
+                        }
+                    }
+
                     if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
                     if(printing_backtrace_frames && printed_frame_count > 1uz && module_id == first_printed_module_id &&
                        function_index == first_printed_function_index)
@@ -1608,6 +1644,7 @@ namespace uwvm2::runtime::lib
                         }
                         last_printed_module_id = module_id;
                         last_printed_function_index = function_index;
+                        if(!printing_backtrace_frames) { trap_ip_frames.push_back(call_stack_frame{module_id, function_index}); }
                         ++printed_frame_count;
                     }
                 }};
@@ -1778,6 +1815,53 @@ namespace uwvm2::runtime::lib
             terminate_func();
             ::std::atomic_signal_fence(::std::memory_order_seq_cst);
         }
+
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        inline void store_llvm_jit_trap_context(llvm_jit_trap_kind k, ::std::uintptr_t return_address) noexcept
+        {
+# if defined(UWVM_USE_THREAD_LOCAL)
+            llvm_jit_last_trap_kind = k;
+            llvm_jit_trap_return_address = return_address;
+# else
+            get_llvm_jit_last_trap_kind() = k;
+            get_llvm_jit_trap_return_address() = return_address;
+# endif
+        }
+
+        [[nodiscard, maybe_unused]] inline constexpr ::std::uintptr_t llvm_jit_signal_trap_return_address(::std::uintptr_t instruction_address) noexcept
+        {
+            if(instruction_address == 0u) { return 0u; }
+            if(instruction_address == (::std::numeric_limits<::std::uintptr_t>::max)()) [[unlikely]] { return instruction_address; }
+            return instruction_address + 1u;
+        }
+#endif
+
+        inline void print_memory_out_of_bounds_trap(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
+        {
+            print_trap_fatal_message(trap_kind::memory_out_of_bounds);
+            dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
+            ::uwvm2::object::memory::error::output_memory_error(memerr);
+        }
+
+#if defined(UWVM_SUPPORT_MMAP)
+        inline void print_mmap_memory_out_of_bounds_trap(::uwvm2::object::memory::error::mmap_memory_error_t const& memerr) noexcept
+        {
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+            store_llvm_jit_trap_context(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds,
+                                        llvm_jit_signal_trap_return_address(memerr.instruction_address));
+# endif
+            print_trap_fatal_message(trap_kind::memory_out_of_bounds);
+            dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
+            ::uwvm2::object::memory::error::output_mmap_memory_error(memerr);
+        }
+
+        inline void ensure_memory_signal_trap_bridge_initialized() noexcept
+        {
+            ::uwvm2::object::memory::signal::set_mmap_memory_out_of_bounds_handler(print_mmap_memory_out_of_bounds_trap);
+        }
+#else
+        inline constexpr void ensure_memory_signal_trap_bridge_initialized() noexcept {}
+#endif
 
 #ifdef UWVM_CPP_EXCEPTIONS
         [[noreturn]] inline void print_and_terminate_compile_validation_error(::uwvm2::utils::container::u8string_view module_name,
@@ -7988,11 +8072,7 @@ namespace uwvm2::runtime::lib
         inline void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
         inline void trap_memory_out_of_bounds(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
-        {
-            print_trap_fatal_message(trap_kind::memory_out_of_bounds);
-            dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
-            ::uwvm2::object::memory::error::output_memory_error(memerr);
-        }
+        { print_memory_out_of_bounds_trap(memerr); }
 
         template <bool TryTieredJit, typename... Args>
         UWVM_ALWAYS_INLINE inline void execute_defined_for_bridge(Args&&... args) noexcept
@@ -8469,6 +8549,7 @@ namespace uwvm2::runtime::lib
 
         inline void compile_all_modules_if_needed(bool initialize_interpreter_bridges) noexcept
         {
+            ensure_memory_signal_trap_bridge_initialized();
 
 #if !defined(UWVM_RUNTIME_HAS_BACKEND)
             static_cast<void>(initialize_interpreter_bridges);
@@ -9407,6 +9488,7 @@ namespace uwvm2::runtime::lib
         inline void initialize_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
         {
 
+            ensure_memory_signal_trap_bridge_initialized();
             ensure_bridges_initialized();
 
             if(g_runtime.lazy_initialized.load(::std::memory_order_acquire)) { return; }
@@ -9736,6 +9818,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         inline void initialize_llvm_jit_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
         {
+            ensure_memory_signal_trap_bridge_initialized();
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -10262,24 +10345,12 @@ namespace uwvm2::runtime::lib
 # endif
     UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
     {
-# if defined(UWVM_USE_THREAD_LOCAL)
-        llvm_jit_last_trap_kind = k;
-# else
-        get_llvm_jit_last_trap_kind() = k;
-# endif
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
-#  if defined(UWVM_USE_THREAD_LOCAL)
-        llvm_jit_trap_return_address = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
-#  else
-        get_llvm_jit_trap_return_address() = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
-#  endif
+        auto const return_address{reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0))};
 # else
-#  if defined(UWVM_USE_THREAD_LOCAL)
-        llvm_jit_trap_return_address = 0u;
-#  else
-        get_llvm_jit_trap_return_address() = 0u;
-#  endif
+        constexpr ::std::uintptr_t return_address{};
 # endif
+        store_llvm_jit_trap_context(k, return_address);
         switch(k)
         {
             case llvm_jit_trap_kind::unreachable:
@@ -10333,6 +10404,34 @@ namespace uwvm2::runtime::lib
                 return;
             }
         }
+    }
+
+    UWVM_NOINLINE void llvm_jit_memory_out_of_bounds_trap(::std::size_t memory_idx,
+                                                          ::std::uint_least64_t memory_static_offset,
+                                                          ::std::uint_least64_t memory_offset,
+                                                          ::std::uint_least32_t offset_65_bit,
+                                                          ::std::uint_least64_t memory_length,
+                                                          ::std::size_t memory_type_size) noexcept
+    {
+# if UWVM_HAS_BUILTIN(__builtin_return_address)
+        auto const return_address{reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0))};
+# else
+        constexpr ::std::uintptr_t return_address{};
+# endif
+        store_llvm_jit_trap_context(llvm_jit_trap_kind::memory_out_of_bounds, return_address);
+
+        ::uwvm2::object::memory::error::memory_error_t const memerr{
+            .memory_idx = memory_idx,
+            .memory_offset = {.offset = memory_offset, .offset_65_bit = offset_65_bit != 0u},
+            .memory_static_offset = memory_static_offset,
+            .memory_length = memory_length,
+            .memory_type_size = memory_type_size};
+        print_memory_out_of_bounds_trap(memerr);
+
+        using terminate_func_t = void (*)() noexcept;
+        terminate_func_t volatile terminate_func{::fast_io::fast_terminate};
+        terminate_func();
+        ::std::atomic_signal_fence(::std::memory_order_seq_cst);
     }
 
     void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept

@@ -37,6 +37,12 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // platfrom
 # include <signal.h>
+# if !(defined(_WIN32) || defined(__CYGWIN__)) && defined(__has_include)
+#  if __has_include(<ucontext.h>)
+#   include <ucontext.h>
+#   define UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
+#  endif
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/uwvm_predefine/io/impl.h>
@@ -90,9 +96,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         ::std::size_t memory_idx{};
     };
 
+    using mmap_memory_out_of_bounds_func_t = void (*)(::uwvm2::object::memory::error::mmap_memory_error_t const&) noexcept;
+
     namespace detail
     {
         inline ::uwvm2::utils::container::vector<protected_memory_segment_t> segments{};  // [global]
+        inline mmap_memory_out_of_bounds_func_t mmap_memory_out_of_bounds_func{};         // [global]
 
         struct signal_handlers_t
         {
@@ -119,18 +128,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return static_cast<::std::size_t>(seg.end - seg.begin);
         }
 
-        inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t make_mmap_memory_error(protected_memory_segment_t const& seg,
-                                                                                                    ::std::byte const* fault_addr) noexcept
+        inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t
+            make_mmap_memory_error(protected_memory_segment_t const& seg,
+                                   ::std::byte const* fault_addr,
+                                   ::std::uintptr_t instruction_address) noexcept
         {
             auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};
 
             return {.memory_idx = seg.memory_idx,
                     .memory_offset = static_cast<::std::uint_least64_t>(offset),
-                    .memory_length = static_cast<::std::uint_least64_t>(memory_length)};
+                    .memory_length = static_cast<::std::uint_least64_t>(memory_length),
+                    .instruction_address = instruction_address};
         }
 
-        inline constexpr bool handle_fault_address(::std::byte const* fault_addr) noexcept
+        inline bool handle_fault_address(::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
 
@@ -138,7 +150,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             {
                 if(seg.begin <= fault_addr && fault_addr < seg.end)
                 {
-                    auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr)};
+                    auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr, instruction_address)};
+                    if(auto const handler{mmap_memory_out_of_bounds_func}; handler != nullptr) [[likely]]
+                    {
+                        handler(mmapmemerr);
+                        ::fast_io::fast_terminate();
+                        ::std::unreachable();
+                    }
+
                     ::uwvm2::object::memory::error::output_mmap_memory_error_and_terminate(mmapmemerr);
                     ::std::unreachable();
                 }
@@ -148,7 +167,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 # if defined(_WIN32) || defined(__CYGWIN__)
-        inline constexpr ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
+        inline ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             if(exception_pointers == nullptr || exception_pointers->ExceptionRecord == nullptr) [[unlikely]] { return 0 /*EXCEPTION_CONTINUE_SEARCH*/; }
 
@@ -164,8 +183,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                 if(exception_pointers->ExceptionRecord->NumberParameters >= 2u)
                 {
                     auto const fault_addr{reinterpret_cast<::std::byte const*>(exception_pointers->ExceptionRecord->ExceptionInformation[1u])};
+                    auto const instruction_address{reinterpret_cast<::std::uintptr_t>(exception_pointers->ExceptionRecord->ExceptionAddress)};
 
-                    if(handle_fault_address(fault_addr)) { return -1 /*EXCEPTION_CONTINUE_EXECUTION*/; }
+                    if(handle_fault_address(fault_addr, instruction_address)) { return -1 /*EXCEPTION_CONTINUE_EXECUTION*/; }
                 }
             }
 
@@ -173,7 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 #  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
-        inline constexpr ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
+        inline ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             auto const ret{vectored_exception_handler(exception_pointers)};
             if(ret != 0) { return ret; }
@@ -185,7 +205,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 #  endif
 
-        inline constexpr void install_signal_handler() noexcept
+        inline void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
 
@@ -222,6 +242,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
 # else
+        [[nodiscard]] inline ::std::uintptr_t get_signal_instruction_address(void* context) noexcept
+        {
+#  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
+            if(context == nullptr) [[unlikely]] { return 0u; }
+            auto const uctx{static_cast<::ucontext_t const*>(context)};
+
+#   if defined(__linux__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RIP]);
+#   elif defined(__linux__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_EIP]);
+#   elif defined(__linux__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.pc);
+#   elif defined(__linux__) && defined(__arm__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_pc);
+#   elif defined(__linux__) && defined(__riscv) && __riscv_xlen == 64
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.__gregs[REG_PC]);
+#   elif defined(__APPLE__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rip);
+#   elif defined(__APPLE__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__pc);
+#   else
+            static_cast<void>(uctx);
+            return 0u;
+#   endif
+#  else
+            static_cast<void>(context);
+            return 0u;
+#  endif
+        }
+
         inline constexpr void dispatch_previous_handler(int signal, ::siginfo_t* siginfo, void* context, struct ::sigaction const& previous) noexcept
         {
             if(previous.sa_flags & SA_SIGINFO)
@@ -251,11 +301,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             previous.sa_handler(signal);
         }
 
-        inline constexpr void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
+        inline void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
+            auto const instruction_address{get_signal_instruction_address(context)};
 
-            if(handle_fault_address(fault_addr)) { return; }
+            if(handle_fault_address(fault_addr, instruction_address)) { return; }
 
             if(signal == SIGSEGV && signal_handlers.has_previous_sigsegv)
             {
@@ -336,6 +387,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     ///             are performed. This design ensures that the signal/exception handler can traverse the
     ///             global segments container without additional synchronization, as there are no
     ///             concurrent structural modifications.
+
+    inline constexpr void set_mmap_memory_out_of_bounds_handler(mmap_memory_out_of_bounds_func_t func) noexcept
+    { detail::mmap_memory_out_of_bounds_func = func; }
 
     inline constexpr void register_protected_segment(::std::byte const* begin,
                                                      ::std::byte const* end,

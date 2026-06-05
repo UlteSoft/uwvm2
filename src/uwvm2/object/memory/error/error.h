@@ -133,6 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
         ::std::size_t memory_idx{};
         ::std::uint_least64_t memory_offset{};
         ::std::uint_least64_t memory_length{};
+        ::std::uintptr_t instruction_address{};
     };
 
     inline constexpr void output_mmap_memory_error(mmap_memory_error_t const& memerr) noexcept
