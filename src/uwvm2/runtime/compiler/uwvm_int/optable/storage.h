@@ -57,6 +57,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_invalid_conversion_to_integer_func{};  // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_integer_divide_by_zero_func{};         // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_integer_overflow_func{};               // [global]
+    inline ::uwvm2::runtime::compiler::uwvm_int::optable::memory_out_of_bounds_func_t trap_memory_out_of_bounds_func{};  // [global]
+    inline ::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func_t memory_oom_func{};                           // [global]
 }
 #endif
 

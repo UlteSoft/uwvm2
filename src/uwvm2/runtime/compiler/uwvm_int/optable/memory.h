@@ -40,6 +40,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 # include "define.h"
+# include "storage.h"
 # include "register_ring.h"
 #endif
 
@@ -322,11 +323,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                     ::std::size_t memory_length,
                                                                     ::std::size_t wasm_bytes) noexcept
         {
-            ::uwvm2::object::memory::error::output_memory_error_and_terminate({.memory_idx = memory_idx,
-                                                                               .memory_offset = effective_offset,
-                                                                               .memory_static_offset = memory_static_offset,
-                                                                               .memory_length = static_cast<::std::uint_least64_t>(memory_length),
-                                                                               .memory_type_size = wasm_bytes});
+            ::uwvm2::object::memory::error::memory_error_t const memerr{.memory_idx = memory_idx,
+                                                                        .memory_offset = effective_offset,
+                                                                        .memory_static_offset = memory_static_offset,
+                                                                        .memory_length = static_cast<::std::uint_least64_t>(memory_length),
+                                                                        .memory_type_size = wasm_bytes};
+            if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func == nullptr) [[unlikely]]
+            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func(memerr);
+            ::fast_io::fast_terminate();
+        }
+
+        UWVM_GNU_COLD [[noreturn]] inline void memory_oom_terminate() noexcept
+        {
+            if(::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func == nullptr) [[unlikely]]
+            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func();
+            ::fast_io::fast_terminate();
         }
 
         template <typename MemoryT>

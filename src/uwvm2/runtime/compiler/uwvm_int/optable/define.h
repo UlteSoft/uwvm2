@@ -374,6 +374,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Functions called when unreachable do not require the `noreturn` keyword, as some embedded plugin systems cannot utilize this option.
     using unreachable_func_t = void (*)() noexcept;
 
+    using memory_out_of_bounds_func_t = void (*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
+
+    using memory_oom_func_t = void (*)() noexcept;
+
     /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
     ///          the arguments and writes the return result back onto the operand stack.
     using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;

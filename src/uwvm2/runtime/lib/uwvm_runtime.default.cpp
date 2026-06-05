@@ -545,6 +545,14 @@ namespace uwvm2::runtime::lib
             capi_function_t const* capi_function{};
         };
 
+        struct suppressed_call_stack_frame_t
+        {
+            inline static constexpr ::std::size_t invalid_id{::std::numeric_limits<::std::size_t>::max()};
+
+            ::std::size_t module_id{invalid_id};
+            ::std::size_t function_index{invalid_id};
+        };
+
 #if defined(UWVM_USE_THREAD_LOCAL)
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #  ifdef UWVM
@@ -564,9 +572,21 @@ namespace uwvm2::runtime::lib
 # endif
         inline thread_local preload_call_context_t g_preload_call_context{};  // [global] [thread_local]
 
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        inline thread_local suppressed_call_stack_frame_t g_suppressed_call_stack_frame{};  // [global] [thread_local]
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return g_call_stack; }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return g_preload_call_context; }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline suppressed_call_stack_frame_t& get_suppressed_call_stack_frame() noexcept
+        { return g_suppressed_call_stack_frame; }
 
         inline void erase_current_thread_state() noexcept {}
 #else
@@ -581,6 +601,7 @@ namespace uwvm2::runtime::lib
         {
             call_stack_tls_state call_stack{};
             preload_call_context_t preload_call_context{};
+            suppressed_call_stack_frame_t suppressed_call_stack_frame{};
         };
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
@@ -624,6 +645,9 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return get_thread_state().preload_call_context; }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline suppressed_call_stack_frame_t& get_suppressed_call_stack_frame() noexcept
+        { return get_thread_state().suppressed_call_stack_frame; }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
 #endif
@@ -874,6 +898,18 @@ namespace uwvm2::runtime::lib
         inline thread_local ::std::uintptr_t llvm_jit_trap_return_address{};  // [global] [thread-local]
 # else
         inline ::std::uintptr_t llvm_jit_trap_return_address{};  // [global]
+# endif
+# if defined(UWVM_USE_THREAD_LOCAL)
+#  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#   ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#   else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#   endif
+#  endif
+        inline thread_local llvm_jit_trap_kind llvm_jit_last_trap_kind{};      // [global] [thread-local]
+# else
+        inline llvm_jit_trap_kind llvm_jit_last_trap_kind{};  // [global]
 # endif
 
         [[nodiscard]] inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
@@ -1514,18 +1550,22 @@ namespace uwvm2::runtime::lib
         }
 
         template <typename Output>
-        inline void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul, ::std::size_t& printed_frame_count) noexcept
+        inline void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul,
+                                                                    ::std::size_t& printed_frame_count,
+                                                                    trap_kind current_trap_kind) noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t last_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t first_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t first_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
+            auto const suppressed_frame{get_suppressed_call_stack_frame()};
             bool printing_backtrace_frames{};
 
             auto const print_wasm_frame{
                 [&](::std::size_t module_id, ::std::size_t function_index) noexcept
                 {
+                    if(module_id == suppressed_frame.module_id && function_index == suppressed_frame.function_index) { return; }
                     if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
                     if(printing_backtrace_frames && printed_frame_count > 1uz && module_id == first_printed_module_id &&
                        function_index == first_printed_function_index)
@@ -1591,9 +1631,14 @@ namespace uwvm2::runtime::lib
             auto const print_resolved_unwind_ip{
                 [&](::std::uintptr_t ip) noexcept
                 {
+                    auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
+                    if(current_trap_kind == trap_kind::call_indirect_type_mismatch && printed_frame_count != 0uz && resolved.entry != nullptr &&
+                       resolved.entry->raw_entry)
+                    {
+                        return;
+                    }
                     if(print_debug_inline_frames(ip)) { return; }
 
-                    auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
                     if(resolved.entry == nullptr) { return; }
                     print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);
                 }};
@@ -1606,6 +1651,12 @@ namespace uwvm2::runtime::lib
             }
 
             auto const backtrace{capture_llvm_jit_unwind_backtrace(0uz)};
+            if(printed_frame_count > 1uz &&
+               (llvm_jit_last_trap_kind == llvm_jit_trap_kind::call_indirect_type_mismatch ||
+                current_trap_kind == trap_kind::call_indirect_type_mismatch))
+            {
+                return;
+            }
             printing_backtrace_frames = true;
             for(::std::size_t i{}; i != backtrace.size; ++i)
             {
@@ -1622,7 +1673,7 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
-        inline constexpr void dump_call_stack_for_trap() noexcept
+        inline constexpr void dump_call_stack_for_trap(trap_kind current_trap_kind) noexcept
         {
             // No copies will be made here.
             auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
@@ -1642,18 +1693,21 @@ namespace uwvm2::runtime::lib
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
             auto const& frames{get_call_stack().frames};
+            auto const suppressed_frame{get_suppressed_call_stack_frame()};
             auto const n{frames.size()};
             ::std::size_t printed_frame_count{};
             for(::std::size_t i{}; i != n; ++i)
             {
-                auto const& fr{frames.index_unchecked(n - 1uz - i)};
-                if(dump_call_stack_frame_for_trap(u8log_output_ul, i, fr.module_id, fr.function_index)) { ++printed_frame_count; }
+                auto const frame_index{n - 1uz - i};
+                auto const& fr{frames.index_unchecked(frame_index)};
+                if(fr.module_id == suppressed_frame.module_id && fr.function_index == suppressed_frame.function_index) { continue; }
+                if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, fr.module_id, fr.function_index)) { ++printed_frame_count; }
             }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             if(printed_frame_count == 0uz && runtime_llvm_jit_unwind_call_stack_requested())
             {
-                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count);
+                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count, current_trap_kind);
             }
 #endif
 
@@ -1663,7 +1717,7 @@ namespace uwvm2::runtime::lib
 #if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
         [[clang::disable_tail_calls]]
 #endif
-        UWVM_NOINLINE inline void trap_fatal(trap_kind k) noexcept
+        inline void print_trap_fatal_message(trap_kind k) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -1677,8 +1731,16 @@ namespace uwvm2::runtime::lib
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8")\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
 
-            dump_call_stack_for_trap();
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+#endif
+        UWVM_NOINLINE inline void trap_fatal(trap_kind k) noexcept
+        {
+            print_trap_fatal_message(k);
+
+            dump_call_stack_for_trap(k);
 
             using terminate_func_t = void (*)() noexcept;
             terminate_func_t volatile terminate_func{::fast_io::fast_terminate};
@@ -7865,6 +7927,19 @@ namespace uwvm2::runtime::lib
 
         inline void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
+        inline void trap_memory_out_of_bounds(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
+        {
+            print_trap_fatal_message(trap_kind::memory_out_of_bounds);
+            dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
+            ::uwvm2::object::memory::error::output_memory_error(memerr);
+        }
+
+        inline void memory_oom_callback() noexcept
+        {
+            print_trap_fatal_message(trap_kind::runtime_invariant_failure);
+            dump_call_stack_for_trap(trap_kind::runtime_invariant_failure);
+        }
+
         template <bool TryTieredJit, typename... Args>
         UWVM_ALWAYS_INLINE inline void execute_defined_for_bridge(Args&&... args) noexcept
         {
@@ -8118,7 +8193,19 @@ namespace uwvm2::runtime::lib
                         if(!match)
                         {
                             auto const expected_sig{sig_from_ft(expected_ft_ptr)};
-                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
+                            {
+                                auto const base{module.local_defined_function_vec_storage.data()};
+                                auto const local_n{module.local_defined_function_vec_storage.size()};
+                                if(base != nullptr && def_ptr >= base && def_ptr < base + local_n)
+                                {
+                                    auto& suppressed_frame{get_suppressed_call_stack_frame()};
+                                    suppressed_frame.module_id = wasm_module_id;
+                                    suppressed_frame.function_index =
+                                        module.imported_function_vec_storage.size() + static_cast<::std::size_t>(def_ptr - base);
+                                }
+                                trap_fatal(trap_kind::call_indirect_type_mismatch);
+                            }
                         }
                     }
 
@@ -8184,7 +8271,18 @@ namespace uwvm2::runtime::lib
                         if(!match)
                         {
                             auto const expected_sig{sig_from_ft(expected_ft_ptr)};
-                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
+                            {
+                                auto const base{module.imported_function_vec_storage.data()};
+                                auto const imp_n{module.imported_function_vec_storage.size()};
+                                if(base != nullptr && imp_ptr >= base && imp_ptr < base + imp_n)
+                                {
+                                    auto& suppressed_frame{get_suppressed_call_stack_frame()};
+                                    suppressed_frame.module_id = wasm_module_id;
+                                    suppressed_frame.function_index = static_cast<::std::size_t>(imp_ptr - base);
+                                }
+                                trap_fatal(trap_kind::call_indirect_type_mismatch);
+                            }
                         }
                     }
 
@@ -8301,6 +8399,8 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func = trap_memory_out_of_bounds;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::memory_oom_func = memory_oom_callback;
 
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                 ::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func = tiered_try_enter_loop_osr;
@@ -10109,6 +10209,7 @@ namespace uwvm2::runtime::lib
 # endif
     UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
     {
+        llvm_jit_last_trap_kind = k;
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
         llvm_jit_trap_return_address = reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0));
 # else
