@@ -142,6 +142,7 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/uwvm/crtmain/global/process_time.h>
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
 #endif
 
@@ -10569,6 +10570,7 @@ namespace uwvm2::runtime::lib
 # endif
 
         auto const lazy_exec_start{lazy_log_enabled ? lazy_clock_now() : ::fast_io::unix_timestamp{}};
+        ::uwvm2::uwvm::global::record_total_wasm_time_start();
 # if defined(UWVM_RUNTIME_LLVM_JIT)
         if(llvm_jit_lazy_backend)
         {
@@ -10670,6 +10672,7 @@ namespace uwvm2::runtime::lib
         if(entry_result_on_stack && result_bytes != 0uz) { ::std::memcpy(cfg.entry_abi_buffers.result_buffer, host_stack_base, result_bytes); }
 # endif
 
+        ::uwvm2::uwvm::global::record_total_wasm_time_end();
         auto const lazy_exec_end{lazy_log_enabled ? lazy_clock_now() : ::fast_io::unix_timestamp{}};
         erase_current_thread_state();
         g_runtime.lazy_scheduler.stop();
@@ -10788,6 +10791,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         if(runtime_compiler_requests_llvm_jit_translation())
         {
+            ::uwvm2::uwvm::global::record_total_wasm_time_start();
             if(try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
                                                              llvm_jit_entry_function_index,
                                                              cfg.entry_abi_buffers.result_buffer,
@@ -10795,9 +10799,11 @@ namespace uwvm2::runtime::lib
                                                              cfg.entry_abi_buffers.param_buffer,
                                                              param_bytes))
             {
+                ::uwvm2::uwvm::global::record_total_wasm_time_end();
                 erase_current_thread_state();
                 return;
             }
+            ::uwvm2::uwvm::global::discard_total_wasm_time_record();
 
             if(runtime_compiler_requires_llvm_jit_execution()) [[unlikely]]
             {
@@ -10853,7 +10859,9 @@ namespace uwvm2::runtime::lib
         try
 # endif
         {
+            ::uwvm2::uwvm::global::record_total_wasm_time_start();
             call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+            ::uwvm2::uwvm::global::record_total_wasm_time_end();
         }
 # ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
