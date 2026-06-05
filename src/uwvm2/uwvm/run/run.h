@@ -896,7 +896,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             // body_indent (begin)
                             u8"              "
                             // body_indent (end)
-                            u8"local-defined func index: " ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            u8"local-defined func index: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             local_function_index,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8"\n"
@@ -945,7 +946,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     u8"                  "
                                     // argument_indent (end)
                 );
-                
+
                 print_wasm_entry_argument_verbose(u8log_output_ul,
                                                   param_buffer,
                                                   offset,
