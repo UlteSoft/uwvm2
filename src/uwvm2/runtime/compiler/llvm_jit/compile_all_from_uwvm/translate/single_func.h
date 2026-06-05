@@ -21,6 +21,9 @@ struct llvm_jit_module_storage_t
     bool emitted{};
     ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
     ::uwvm2::utils::container::owned_ptr<::llvm::Module> llvm_module{};
+    ::uwvm2::utils::container::owned_ptr<::llvm::DIBuilder> llvm_di_builder{};
+    ::llvm::DIFile* llvm_di_file{};
+    ::llvm::DICompileUnit* llvm_di_compile_unit{};
 
     llvm_jit_module_storage_t() = default;
     llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) = delete;
@@ -32,12 +35,18 @@ struct llvm_jit_module_storage_t
         if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
 
         llvm_module.reset();
+        llvm_di_builder.reset();
         llvm_context_holder.reset();
 
         emitted = other.emitted;
         llvm_context_holder = ::std::move(other.llvm_context_holder);
         llvm_module = ::std::move(other.llvm_module);
+        llvm_di_builder = ::std::move(other.llvm_di_builder);
+        llvm_di_file = other.llvm_di_file;
+        llvm_di_compile_unit = other.llvm_di_compile_unit;
         other.emitted = false;
+        other.llvm_di_file = nullptr;
+        other.llvm_di_compile_unit = nullptr;
         return *this;
     }
 };
@@ -1277,6 +1286,8 @@ namespace details
     {
         module_storage.emitted = module_storage.llvm_context_holder != nullptr && module_storage.llvm_module != nullptr;
         if(!module_storage.emitted) { return true; }
+
+        if(module_storage.llvm_di_builder != nullptr) { module_storage.llvm_di_builder->finalize(); }
 
         if(!verify_llvm_jit_module(*module_storage.llvm_module, verify_llvm_jit_ir)) [[unlikely]]
         {

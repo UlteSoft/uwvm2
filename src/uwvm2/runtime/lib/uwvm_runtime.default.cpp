@@ -48,10 +48,15 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Analysis/TargetTransformInfo.h>
 #  include <llvm/ADT/StringMap.h>
+#  include <llvm/DebugInfo/DIContext.h>
+#  include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
+#  include <llvm/ExecutionEngine/JITEventListener.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #  include <llvm/InitializePasses.h>
+#  include <llvm/IR/DIBuilder.h>
+#  include <llvm/IR/DebugInfoMetadata.h>
 #  include <llvm/IR/IRBuilder.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/IR/Module.h>
@@ -330,6 +335,13 @@ namespace uwvm2::runtime::lib
             ::std::size_t function_index{};
             bool raw_entry{};
         };
+
+        struct llvm_jit_debug_object
+        {
+            ::llvm::object::OwningBinary<::llvm::object::ObjectFile> object{};
+            ::std::unique_ptr<::llvm::LoadedObjectInfo> loaded_info{};
+            ::std::unique_ptr<::llvm::DWARFContext> dwarf_context{};
+        };
 #endif
 
         struct runtime_global_state
@@ -346,6 +358,7 @@ namespace uwvm2::runtime::lib
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::utils::container::vector<llvm_jit_unwind_entry> llvm_jit_unwind_entries{};
+            ::uwvm2::utils::container::vector<::std::unique_ptr<llvm_jit_debug_object>> llvm_jit_debug_objects{};
             ::uwvm2::utils::thread::lazy_compile_scheduler llvm_jit_urgent_scheduler{};
             ::std::atomic_flag llvm_jit_urgent_start_lock = ATOMIC_FLAG_INIT;
             ::std::atomic_size_t llvm_jit_urgent_request_count{};
@@ -899,6 +912,73 @@ namespace uwvm2::runtime::lib
             ::std::sort(entries.begin(), entries.end(), [](auto const& lhs, auto const& rhs) constexpr noexcept { return lhs.address < rhs.address; });
         }
 
+        [[nodiscard]] inline bool parse_llvm_jit_inline_frame_name(::std::string const& name,
+                                                                    ::std::size_t& module_id,
+                                                                    ::std::size_t& function_index) noexcept
+        {
+            constexpr ::std::string_view prefix{"uwvm-inline:m="};
+            constexpr ::std::string_view middle{":f="};
+            if(name.size() <= prefix.size() || name.compare(0uz, prefix.size(), prefix.data(), prefix.size()) != 0) { return false; }
+
+            auto const mid_pos{name.find(middle, prefix.size())};
+            if(mid_pos == ::std::string::npos) { return false; }
+
+            auto const parse_size{
+                [](char const* begin, char const* end, ::std::size_t& out) noexcept -> bool
+                {
+                    if(begin == end) { return false; }
+                    ::std::size_t value{};
+                    auto const [next, err]{::fast_io::parse_by_scan(begin, end, ::fast_io::mnp::dec_get<true, false>(value))};
+                    if(err != ::fast_io::parse_code::ok || next != end) { return false; }
+                    out = value;
+                    return true;
+                }};
+
+            ::std::size_t parsed_module_id{};
+            ::std::size_t parsed_function_index{};
+            if(!parse_size(name.data() + prefix.size(), name.data() + mid_pos, parsed_module_id)) { return false; }
+            if(!parse_size(name.data() + mid_pos + middle.size(), name.data() + name.size(), parsed_function_index)) { return false; }
+
+            module_id = parsed_module_id;
+            function_index = parsed_function_index;
+            return true;
+        }
+
+        class uwvm_llvm_jit_debug_listener final : public ::llvm::JITEventListener
+        {
+        public:
+            void notifyObjectLoaded(ObjectKey, ::llvm::object::ObjectFile const& obj, ::llvm::RuntimeDyld::LoadedObjectInfo const& loaded) override
+            {
+                auto debug_object{loaded.getObjectForDebug(obj)};
+                if(debug_object.getBinary() == nullptr) { return; }
+                auto loaded_info{loaded.clone()};
+                if(loaded_info == nullptr) { return; }
+
+                auto dwarf_context{::llvm::DWARFContext::create(*debug_object.getBinary(),
+                                                                 ::llvm::DWARFContext::ProcessDebugRelocations::Process,
+                                                                 loaded_info.get(),
+                                                                 "",
+                                                                 [](auto) {},
+                                                                 [](auto) {},
+                                                                 true)};
+                if(dwarf_context == nullptr) { return; }
+
+                auto record{::std::make_unique<llvm_jit_debug_object>()};
+                if(record == nullptr) { return; }
+
+                record->object = ::std::move(debug_object);
+                record->loaded_info = ::std::move(loaded_info);
+                record->dwarf_context = ::std::move(dwarf_context);
+                g_runtime.llvm_jit_debug_objects.push_back(::std::move(record));
+            }
+        };
+
+        [[nodiscard]] inline uwvm_llvm_jit_debug_listener& get_uwvm_llvm_jit_debug_listener() noexcept
+        {
+            static uwvm_llvm_jit_debug_listener listener{};
+            return listener;
+        }
+
         struct resolved_llvm_jit_unwind_entry
         {
             llvm_jit_unwind_entry const* entry{};
@@ -1437,18 +1517,69 @@ namespace uwvm2::runtime::lib
         inline void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul, ::std::size_t& printed_frame_count) noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
+            ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
+            ::std::size_t last_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
+
+            auto const print_wasm_frame{
+                [&](::std::size_t module_id, ::std::size_t function_index) noexcept
+                {
+                    if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
+
+                    if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, module_id, function_index))
+                    {
+                        last_printed_module_id = module_id;
+                        last_printed_function_index = function_index;
+                        ++printed_frame_count;
+                    }
+                }};
+
+            auto const print_debug_inline_frames{
+                [&](::std::uintptr_t ip) noexcept -> bool
+                {
+                    bool printed{};
+                    ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
+                                                          ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
+                    ::llvm::object::SectionedAddress addresses[]{
+                        {ip, ::llvm::object::SectionedAddress::UndefSection},
+                        {ip + 1u, ::llvm::object::SectionedAddress::UndefSection},
+                    };
+
+                    for(auto const& debug_object: g_runtime.llvm_jit_debug_objects)
+                    {
+                        if(debug_object == nullptr || debug_object->dwarf_context == nullptr) { continue; }
+
+                        for(auto const address: addresses)
+                        {
+                            auto const inline_info{debug_object->dwarf_context->getInliningInfoForAddress(address, specifier)};
+                            auto const frame_count{inline_info.getNumberOfFrames()};
+                            if(frame_count == 0u) { continue; }
+
+                            bool matched{};
+                            for(unsigned i{}; i != frame_count; ++i)
+                            {
+                                ::std::size_t module_id{};
+                                ::std::size_t function_index{};
+                                if(!parse_llvm_jit_inline_frame_name(inline_info.getFrame(i).FunctionName, module_id, function_index)) { continue; }
+                                print_wasm_frame(module_id, function_index);
+                                printed = true;
+                                matched = true;
+                            }
+
+                            if(matched) { return true; }
+                        }
+                    }
+
+                    return printed;
+                }};
+
             auto const print_resolved_unwind_ip{
                 [&](::std::uintptr_t ip) noexcept
                 {
+                    if(print_debug_inline_frames(ip)) { return; }
+
                     auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
                     if(resolved.entry == nullptr) { return; }
-                    if(dump_call_stack_frame_for_trap(u8log_output_ul,
-                                                      printed_frame_count,
-                                                      resolved.entry->module_id,
-                                                      resolved.entry->function_index))
-                    {
-                        ++printed_frame_count;
-                    }
+                    print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);
                 }};
 
             if(llvm_jit_trap_return_address != 0u)
@@ -7590,6 +7721,7 @@ namespace uwvm2::runtime::lib
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
+            if(runtime_llvm_jit_unwind_call_stack_requested()) { llvm_jit_engine->RegisterJITEventListener(::std::addressof(get_uwvm_llvm_jit_debug_listener())); }
             auto const finalize_start_time{llvm_jit_materialize_runtime_log_now()};
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-start module=\"", rec.module_name, u8"\"");
             llvm_jit_engine->finalizeObject();

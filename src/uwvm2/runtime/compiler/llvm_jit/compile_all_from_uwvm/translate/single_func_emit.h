@@ -2220,6 +2220,10 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::uwvm2::utils::container::vector<::std::size_t> local_offsets{};
     ::llvm::LLVMContext* llvm_context_holder{};
     ::llvm::Module* llvm_module{};
+    ::llvm::DIBuilder* llvm_di_builder{};
+    ::llvm::DIFile* llvm_di_file{};
+    ::llvm::DICompileUnit* llvm_di_compile_unit{};
+    ::llvm::DISubprogram* llvm_di_subprogram{};
     ::llvm::Function* llvm_function{};
     ::llvm::Function* llvm_public_entry_function{};
     ::llvm::BasicBlock* tiered_core_entry_block{};
@@ -2253,7 +2257,23 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const llvm_module_name{get_llvm_wasm_ir_module_name(runtime_module)};
     module_storage.llvm_module =
         ::uwvm2::utils::container::make_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
-    return module_storage.llvm_module != nullptr;
+    if(module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
+
+    module_storage.llvm_di_builder = ::uwvm2::utils::container::make_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
+    if(module_storage.llvm_di_builder == nullptr) [[unlikely]] { return false; }
+
+    module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Debug Info Version", ::llvm::DEBUG_METADATA_VERSION);
+    module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Dwarf Version", 4);
+
+    module_storage.llvm_di_file = module_storage.llvm_di_builder->createFile(get_llvm_string_ref(llvm_module_name), ".");
+    module_storage.llvm_di_compile_unit =
+        module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C,
+                                                          module_storage.llvm_di_file,
+                                                          "uwvm2-llvm-jit",
+                                                          false,
+                                                          "",
+                                                          0);
+    return module_storage.llvm_di_file != nullptr && module_storage.llvm_di_compile_unit != nullptr;
 }
 
 [[nodiscard]] inline bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
@@ -2338,6 +2358,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
     state.llvm_context_holder = module_storage.llvm_context_holder.get();
     auto& llvm_context{*state.llvm_context_holder};
     state.llvm_module = module_storage.llvm_module.get();
+    state.llvm_di_builder = module_storage.llvm_di_builder.get();
+    state.llvm_di_file = module_storage.llvm_di_file;
+    state.llvm_di_compile_unit = module_storage.llvm_di_compile_unit;
 
     ::uwvm2::utils::container::vector<::llvm::Type*> llvm_parameter_types{};
     llvm_parameter_types.reserve(func_parameter_count_uz);
@@ -2375,6 +2398,22 @@ struct runtime_local_func_llvm_jit_emit_state_t
     if(state.llvm_public_entry_function == nullptr) [[unlikely]] { return false; }
     apply_llvm_jit_wasm_calling_conv(*state.llvm_public_entry_function);
     if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*state.llvm_public_entry_function); }
+    if(state.emit_unwind_call_stack_frames && state.llvm_di_builder != nullptr && state.llvm_di_file != nullptr)
+    {
+        auto const line{static_cast<unsigned>(local_func_storage.function_index + 1uz)};
+        auto const di_name{::uwvm2::utils::container::concat_uwvm("uwvm-inline:m=", local_func_storage.module_id, ":f=", local_func_storage.function_index)};
+        state.llvm_di_subprogram =
+            state.llvm_di_builder->createFunction(state.llvm_di_file,
+                                                  get_llvm_string_ref(di_name),
+                                                  get_llvm_string_ref(function_name),
+                                                  state.llvm_di_file,
+                                                  line,
+                                                  state.llvm_di_builder->createSubroutineType(state.llvm_di_builder->getOrCreateTypeArray({})),
+                                                  line,
+                                                  ::llvm::DINode::FlagZero,
+                                                  ::llvm::DISubprogram::SPFlagDefinition);
+        state.llvm_public_entry_function->setSubprogram(state.llvm_di_subprogram);
+    }
 
     if(emit_tiered_loop_reentry_entries)
     {
@@ -2425,6 +2464,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     state.ir_builder = ::uwvm2::utils::container::make_owned<::llvm::IRBuilder<>>(body_init_block);
+    if(state.llvm_di_subprogram != nullptr)
+    {
+        auto const line{static_cast<unsigned>(local_func_storage.function_index + 1uz)};
+        state.ir_builder->SetCurrentDebugLocation(::llvm::DILocation::get(llvm_context, line, 1u, state.llvm_di_subprogram));
+    }
     if(state.emit_call_stack_frames && !emit_tiered_loop_reentry_entries &&
        !emit_runtime_local_func_llvm_jit_call_stack_push(*state.ir_builder, local_func_storage.module_id, local_func_storage.function_index)) [[unlikely]]
     {
@@ -2813,6 +2857,26 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(raw_entry_function == nullptr) [[unlikely]] { return false; }
             apply_llvm_jit_host_calling_conv(*raw_entry_function);
             if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*raw_entry_function); }
+            ::llvm::DISubprogram* raw_di_subprogram{};
+            if(state.emit_unwind_call_stack_frames && state.llvm_di_builder != nullptr && state.llvm_di_file != nullptr)
+            {
+                auto const line{static_cast<unsigned>(function_index_uz + 1uz)};
+                auto const raw_di_name{::uwvm2::utils::container::concat_uwvm("uwvm-raw-inline-anchor:m=",
+                                                                              local_func_storage_ptr->module_id,
+                                                                              ":f=",
+                                                                              function_index_uz)};
+                raw_di_subprogram =
+                    state.llvm_di_builder->createFunction(state.llvm_di_file,
+                                                          get_llvm_string_ref(raw_di_name),
+                                                          get_llvm_string_ref(raw_entry_function_name),
+                                                          state.llvm_di_file,
+                                                          line,
+                                                          state.llvm_di_builder->createSubroutineType(state.llvm_di_builder->getOrCreateTypeArray({})),
+                                                          line,
+                                                          ::llvm::DINode::FlagZero,
+                                                          ::llvm::DISubprogram::SPFlagDefinition);
+                raw_entry_function->setSubprogram(raw_di_subprogram);
+            }
 
             auto const abi_layout{get_runtime_wasm_call_abi_layout(*function_type_ptr)};
             if(!abi_layout.valid) [[unlikely]] { return false; }
@@ -2824,6 +2888,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
             auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", raw_entry_function)};
             ::llvm::IRBuilder<> raw_ir_builder(entry_block);
+            if(raw_di_subprogram != nullptr)
+            {
+                auto const line{static_cast<unsigned>(function_index_uz + 1uz)};
+                raw_ir_builder.SetCurrentDebugLocation(::llvm::DILocation::get(llvm_context, line, 1u, raw_di_subprogram));
+            }
 
             auto const result_buffer_address{raw_entry_function->getArg(1u)};
             auto const result_bytes{raw_entry_function->getArg(2u)};
