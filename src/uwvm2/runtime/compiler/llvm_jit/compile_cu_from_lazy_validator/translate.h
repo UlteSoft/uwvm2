@@ -904,11 +904,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             {
                 for(auto const local_function_index: claimed_group) { validate_function_if_needed(curr_module, options, local_function_index, err); }
 
-                llvm_jit_module_storage_t llvm_ir_storage{};
-                if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]] { ::fast_io::fast_terminate(); }
-
                 compile_option emit_options{options.compile_options};
                 emit_options.route_wasm_calls_through_runtime_bridge = true;
+                llvm_jit_module_storage_t llvm_ir_storage{};
+                if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage, emit_options.emit_unwind_call_stack_frames))
+                    [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
                 for(auto const local_function_index: claimed_group)
                 {
                     auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
@@ -959,11 +962,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             validate_function_if_needed(curr_module, options, local_function_index, err);
 
-            llvm_jit_module_storage_t llvm_ir_storage{};
-            if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]] { ::fast_io::fast_terminate(); }
-
             compile_option emit_options{options.compile_options};
             emit_options.route_wasm_calls_through_runtime_bridge = true;
+            llvm_jit_module_storage_t llvm_ir_storage{};
+            if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage, emit_options.emit_unwind_call_stack_frames)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
             materialized.local_func = all_details::compile_all_from_uwvm_local_func(curr_module,
                                                                                     storage.validation_module,
                                                                                     emit_options,

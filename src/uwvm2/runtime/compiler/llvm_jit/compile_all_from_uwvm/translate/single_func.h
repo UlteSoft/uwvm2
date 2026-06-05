@@ -1588,7 +1588,8 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
     auto const compile_local_functions_serially{
         [&]() UWVM_THROWS
         {
-            auto const emit_llvm_jit_active{details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module)};
+            auto const emit_llvm_jit_active{
+                details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module, options.emit_unwind_call_stack_frames)};
             for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
             {
                 storage.local_funcs.index_unchecked(local_function_idx) =
@@ -1617,7 +1618,7 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
         return storage;
     }
 
-    if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module))
+    if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module, options.emit_unwind_call_stack_frames))
     {
         compile_local_functions_serially();
         return storage;
@@ -1629,7 +1630,7 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
     bool prepared_task_llvm_jit_modules{true};
     for(auto& task_llvm_jit_module: task_llvm_jit_modules)
     {
-        if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, task_llvm_jit_module))
+        if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, task_llvm_jit_module, options.emit_unwind_call_stack_frames))
         {
             prepared_task_llvm_jit_modules = false;
             break;
@@ -1694,7 +1695,8 @@ inline full_function_symbol_t compile_all_from_uwvm_single_func(::uwvm2::uwvm::r
     auto const validation_module{details::build_runtime_validation_module(curr_module)};
 
     storage.local_funcs.reserve(1uz);
-    auto const emit_llvm_jit_active{details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module)};
+    auto const emit_llvm_jit_active{
+        details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module, options.emit_unwind_call_stack_frames)};
     storage.local_funcs.push_back(details::compile_all_from_uwvm_local_func(curr_module,
                                                                             validation_module,
                                                                             options,

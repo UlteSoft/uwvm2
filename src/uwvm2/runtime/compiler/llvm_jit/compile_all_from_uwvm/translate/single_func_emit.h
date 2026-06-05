@@ -2248,7 +2248,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 };
 
 [[nodiscard]] inline bool try_prepare_runtime_llvm_jit_module_storage(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                      llvm_jit_module_storage_t& module_storage)
+                                                                      llvm_jit_module_storage_t& module_storage,
+                                                                      bool emit_unwind_call_stack_frames = false)
 {
     module_storage = {};
     module_storage.llvm_context_holder = ::uwvm2::utils::container::make_delete_owned<::llvm::LLVMContext>();
@@ -2259,23 +2260,28 @@ struct runtime_local_func_llvm_jit_emit_state_t
         ::uwvm2::utils::container::make_delete_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
     if(module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
-    // Full JIT and tier-2 JIT run cross-function optimization pipelines that may inline Wasm callees into their callers.
-    // Keep compact DWARF metadata so trap reporting can reconstruct the logical Wasm stack after native frames disappear.
-    module_storage.llvm_di_builder = ::uwvm2::utils::container::make_delete_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
-    if(module_storage.llvm_di_builder == nullptr) [[unlikely]] { return false; }
+    if(emit_unwind_call_stack_frames)
+    {
+        // Full JIT and tier-2 JIT run cross-function optimization pipelines that may inline Wasm callees into their callers.
+        // Keep compact DWARF metadata so trap reporting can reconstruct the logical Wasm stack after native frames disappear.
+        module_storage.llvm_di_builder = ::uwvm2::utils::container::make_delete_owned<::llvm::DIBuilder>(*module_storage.llvm_module);
+        if(module_storage.llvm_di_builder == nullptr) [[unlikely]] { return false; }
 
-    module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Debug Info Version", ::llvm::DEBUG_METADATA_VERSION);
-    module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Dwarf Version", 4);
+        module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Debug Info Version", ::llvm::DEBUG_METADATA_VERSION);
+        module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, "Dwarf Version", 4);
 
-    module_storage.llvm_di_file = module_storage.llvm_di_builder->createFile(get_llvm_string_ref(llvm_module_name), ".");
-    module_storage.llvm_di_compile_unit =
-        module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C,
-                                                          module_storage.llvm_di_file,
-                                                          "uwvm2-llvm-jit",
-                                                          false,
-                                                          "",
-                                                          0);
-    return module_storage.llvm_di_file != nullptr && module_storage.llvm_di_compile_unit != nullptr;
+        module_storage.llvm_di_file = module_storage.llvm_di_builder->createFile(get_llvm_string_ref(llvm_module_name), ".");
+        module_storage.llvm_di_compile_unit =
+            module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C,
+                                                              module_storage.llvm_di_file,
+                                                              "uwvm2-llvm-jit",
+                                                              false,
+                                                              "",
+                                                              0);
+        return module_storage.llvm_di_file != nullptr && module_storage.llvm_di_compile_unit != nullptr;
+    }
+
+    return true;
 }
 
 [[nodiscard]] inline bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
