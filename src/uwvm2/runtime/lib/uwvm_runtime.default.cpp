@@ -1838,9 +1838,9 @@ namespace uwvm2::runtime::lib
 
         inline void print_memory_out_of_bounds_trap(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
         {
+            ::uwvm2::object::memory::error::output_memory_error_line(memerr);
             print_trap_fatal_message(trap_kind::memory_out_of_bounds);
             dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
-            ::uwvm2::object::memory::error::output_memory_error(memerr);
         }
 
 #if defined(UWVM_SUPPORT_MMAP)
@@ -1850,9 +1850,9 @@ namespace uwvm2::runtime::lib
             store_llvm_jit_trap_context(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds,
                                         llvm_jit_signal_trap_return_address(memerr.instruction_address));
 # endif
+            ::uwvm2::object::memory::error::output_mmap_memory_error_line(memerr);
             print_trap_fatal_message(trap_kind::memory_out_of_bounds);
             dump_call_stack_for_trap(trap_kind::memory_out_of_bounds);
-            ::uwvm2::object::memory::error::output_mmap_memory_error(memerr);
         }
 
         inline void ensure_memory_signal_trap_bridge_initialized() noexcept
