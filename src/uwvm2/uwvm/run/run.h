@@ -401,6 +401,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const last{str.cend()};
         if(first == last) [[unlikely]] { return false; }
 
+        // Scan in the order users normally write entry arguments: signed decimal first, then unsigned decimal, followed
+        // by explicit-base unsigned forms (`0x`, `0b`, `0o`).  Bare leading-zero octal spellings such as `0777` are
+        // intentionally rejected; callers must use `0o777` when they want octal.  There is no need to pre-check prefixes
+        // here because fast_io scanners fail quickly on non-matching input, and `wasm_entry_scan_exact` rejects partial
+        // matches after each attempted scan.
+        //
+        // fast_io scanners only write to the target on a successful scan; no initialization needed.
+
         if constexpr(allow_signed_decimal)
         {
             Out signed_value;  // no init necessary
@@ -470,14 +478,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     /**
      * @brief   Parse a floating-point literal from a half-open UTF-8 range.
-     * @details The fast-float path accepts the normal fast_io floating scanner and, when available, fast_io hexfloat
-     *          syntax as well.  The fallback path uses `std::from_chars` in general format.  In every case, partial
-     *          consumption is rejected.
+     * @details The normal decimal scanner uses fast_io when fast_float is enabled and falls back to
+     *          `std::from_chars` otherwise.  fast_io hexfloat scanning is still available without fast_float, so the
+     *          hexfloat path is always attempted.  In every case, partial consumption is rejected.
      */
     template <typename T>
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
+
+        // Scan ordinary floating-point syntax.
 # if defined(FAST_IO_NOT_USE_FAST_FLOAT)
         auto const char_first{reinterpret_cast<char const*>(first)};
         auto const char_last{reinterpret_cast<char const*>(last)};
@@ -486,9 +496,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # else
         auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
         if(err == ::fast_io::parse_code::ok && next == last) { return true; }
+# endif
+
+        // Scan binary floating-point syntax, which must use the 0x-prefixed hexfloat form.
         auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat_get<true, true>(out))};
         if(hex_err == ::fast_io::parse_code::ok && hex_next == last) { return true; }
-# endif
+
         return false;
     }
 
