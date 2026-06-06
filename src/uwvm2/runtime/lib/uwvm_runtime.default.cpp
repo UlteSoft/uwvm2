@@ -247,6 +247,8 @@ namespace uwvm2::runtime::lib
         using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
         using llvm_jit_memory_manager_owner_t =
             typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
+        using llvm_jit_function_address_name_t =
+            ::std::remove_cvref_t<typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::getFunctionAddress)>::type>;
 
         using llvm_jit_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
         using llvm_jit_lazy_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_module_storage_t;
@@ -8726,6 +8728,10 @@ namespace uwvm2::runtime::lib
                     [&](::uwvm2::utils::container::string const& function_name) noexcept -> ::std::uintptr_t
                     {
                         namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+                        llvm_jit_function_address_name_t function_address_name{function_name.data(), function_name.data() + function_name.size()};
+                        auto const direct_function_address{llvm_jit_engine->getFunctionAddress(function_address_name)};
+                        if(direct_function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(direct_function_address); }
+
                         auto found_function{llvm_jit_engine->FindFunctionNamed(llvm_jit_translate_details::get_llvm_string_ref(function_name))};
                         if(found_function != nullptr && !found_function->isDeclaration()) [[likely]]
                         {
