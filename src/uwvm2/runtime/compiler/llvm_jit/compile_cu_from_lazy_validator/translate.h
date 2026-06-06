@@ -246,6 +246,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         };
 
         using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
+        using llvm_jit_memory_manager_owner_t =
+            typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
 
         namespace all_compile = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm;
         namespace all_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -561,7 +563,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                        ::uwvm2::utils::container::make_delete_owned<
+                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                            .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
@@ -662,7 +667,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                        ::uwvm2::utils::container::make_delete_owned<
+                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                            .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());

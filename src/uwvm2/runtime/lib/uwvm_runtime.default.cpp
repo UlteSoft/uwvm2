@@ -245,6 +245,8 @@ namespace uwvm2::runtime::lib
         };
 
         using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
+        using llvm_jit_memory_manager_owner_t =
+            typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
 
         using llvm_jit_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
         using llvm_jit_lazy_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_module_storage_t;
@@ -379,8 +381,8 @@ namespace uwvm2::runtime::lib
         struct llvm_jit_debug_object
         {
             ::llvm::object::OwningBinary<::llvm::object::ObjectFile> object{};
-            ::std::unique_ptr<::llvm::LoadedObjectInfo> loaded_info{};
-            ::std::unique_ptr<::llvm::DWARFContext> dwarf_context{};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::LoadedObjectInfo> loaded_info{};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::DWARFContext> dwarf_context{};
         };
 #endif
 
@@ -399,7 +401,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::utils::container::vector<llvm_jit_unwind_entry> llvm_jit_unwind_entries{};
             ::uwvm2::utils::container::vector<llvm_jit_code_range> llvm_jit_code_ranges{};
-            ::uwvm2::utils::container::vector<::std::unique_ptr<llvm_jit_debug_object>> llvm_jit_debug_objects{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::delete_owned_ptr<llvm_jit_debug_object>> llvm_jit_debug_objects{};
             ::uwvm2::utils::thread::lazy_compile_scheduler llvm_jit_urgent_scheduler{};
             ::std::atomic_flag llvm_jit_urgent_start_lock = ATOMIC_FLAG_INIT;
             ::std::atomic_size_t llvm_jit_urgent_request_count{};
@@ -1136,12 +1138,12 @@ namespace uwvm2::runtime::lib
                                                                  true)};
                 if(dwarf_context == nullptr) { return; }
 
-                auto record{::std::make_unique<llvm_jit_debug_object>()};
+                auto record{::uwvm2::utils::container::make_delete_owned<llvm_jit_debug_object>()};
                 if(record == nullptr) { return; }
 
                 record->object = ::std::move(debug_object);
-                record->loaded_info = ::std::move(loaded_info);
-                record->dwarf_context = ::std::move(dwarf_context);
+                record->loaded_info.reset(loaded_info.release());
+                record->dwarf_context.reset(dwarf_context.release());
                 g_runtime.llvm_jit_debug_objects.push_back(::std::move(record));
             }
         };
@@ -1498,7 +1500,7 @@ namespace uwvm2::runtime::lib
             if(!ensure_llvm_jit_native_target_initialized()) [[unlikely]] { return false; }
 
             ::llvm::LLVMContext context{};
-            auto module{::std::make_unique<::llvm::Module>("uwvm2_runtime_llvm_jit_unwind_probe", context)};
+            auto module{::uwvm2::utils::container::make_delete_owned<::llvm::Module>("uwvm2_runtime_llvm_jit_unwind_probe", context)};
 
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(::llvm::CodeGenOptLevel::None);
@@ -1559,7 +1561,10 @@ namespace uwvm2::runtime::lib
                 ::llvm::EngineBuilder(llvm_module_owner_t{module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(::llvm::CodeGenOptLevel::None)
-                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                        ::uwvm2::utils::container::make_delete_owned<
+                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                            .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
@@ -8617,8 +8622,10 @@ namespace uwvm2::runtime::lib
                         .setOptLevel(codegen_opt_level)
                         .setMCPU(host_cpu_name)
                         .setMAttrs(host_target_attributes)
-                        .setMCJITMemoryManager(
-                            ::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                        .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                            ::uwvm2::utils::container::make_delete_owned<
+                                ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                                .release()})
                         .create(target_machine.get());
             }
             else
@@ -8629,8 +8636,10 @@ namespace uwvm2::runtime::lib
                         .setOptLevel(codegen_opt_level)
                         .setMCPU(host_cpu_name)
                         .setMAttrs(host_target_attributes)
-                        .setMCJITMemoryManager(
-                            ::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                        .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                            ::uwvm2::utils::container::make_delete_owned<
+                                ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                                .release()})
                         .create(target_machine.get());
             }
             if(raw_engine == nullptr) [[unlikely]]
