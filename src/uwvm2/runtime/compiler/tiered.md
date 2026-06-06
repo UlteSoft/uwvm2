@@ -123,6 +123,28 @@ Pure modes do not request or observe the Tier 2 scheduler unit:
   tiered background readiness is tracked separately by `tiered_full_ready` to
   avoid data races.
 
+## Call-Stack Reporting
+
+Tiered execution uses the same runtime call-stack policy as the LLVM JIT modes.
+The default `-Rllvm-call-stack auto` policy selects native unwind reporting when
+the generated-code self-check passes; otherwise it falls back to instruction
+frames. Explicit `-Rllvm-call-stack unwind` requires the native unwind path to
+be available, while `instruction` remains the conservative diagnostic fallback.
+
+Unwind reporting does not require release uwvm host code to be built with
+unwind tables. Generated Wasm functions carry registered unwind metadata,
+disable tail calls, and keep frame pointers when unwind reporting is active.
+When a generated function traps through a runtime bridge, the runtime records
+the JIT caller return address and frame pointer at that bridge boundary, seeds
+libunwind from the JIT context, and resolves only IPs that fall inside loaded
+JIT text sections. This avoids walking through host uwvm frames that may be
+built with `-fno-unwind-tables -fno-asynchronous-unwind-tables`, and prevents
+non-JIT host or sanitizer frames from being reported as Wasm frames.
+
+Instruction reporting is still useful when native unwind support is missing or
+for debugging a platform-specific unwinder issue, but it is not the default
+fast path for control-flow-heavy workloads.
+
 ## Scheduling Policy
 
 Tier 0 interpreter lazy translation is not enqueued in the shared lazy compile
