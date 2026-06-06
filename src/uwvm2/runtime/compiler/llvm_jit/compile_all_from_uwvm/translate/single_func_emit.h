@@ -165,17 +165,29 @@ inline void apply_llvm_jit_platform_function_attrs([[maybe_unused]] ::llvm::Func
 #endif
 }
 
+inline void apply_llvm_jit_semantic_function_attrs(::llvm::Function& function) noexcept
+{
+    // WebAssembly MVP `call` always creates an ordinary call boundary.  LLVM must not infer a sibling/tail call from
+    // native target profitability, because Wasm tail-call semantics are represented by separate tail-call proposal opcodes.
+    function.addFnAttr("disable-tail-calls", "true");
+}
+
+inline void apply_llvm_jit_common_function_attrs(::llvm::Function& function) noexcept
+{
+    apply_llvm_jit_platform_function_attrs(function);
+    apply_llvm_jit_semantic_function_attrs(function);
+}
+
 inline void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Function& function)
 {
     function.setUWTableKind(::llvm::UWTableKind::Async);
-    function.addFnAttr("disable-tail-calls", "true");
     function.addFnAttr("frame-pointer", "all");
 }
 
 inline void apply_llvm_jit_calling_conv(::llvm::Function& function, ::llvm::CallingConv::ID calling_conv) noexcept
 {
     function.setCallingConv(calling_conv);
-    apply_llvm_jit_platform_function_attrs(function);
+    apply_llvm_jit_common_function_attrs(function);
 }
 
 inline void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept { call_inst.setCallingConv(calling_conv); }

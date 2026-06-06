@@ -1525,7 +1525,6 @@ namespace uwvm2::runtime::lib
 #  endif
             auto* const probe_function{
                 ::llvm::Function::Create(probe_type, ::llvm::GlobalValue::ExternalLinkage, "uwvm2_runtime_llvm_jit_live_unwind_probe", *module)};
-            probe_function->addFnAttr(::llvm::Attribute::NoInline);
             probe_function->setUWTableKind(::llvm::UWTableKind::Async);
             probe_function->addFnAttr("disable-tail-calls", "true");
             probe_function->addFnAttr("frame-pointer", "all");
@@ -1825,67 +1824,19 @@ namespace uwvm2::runtime::lib
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
             ::std::size_t last_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
-            ::std::size_t first_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
-            ::std::size_t first_printed_function_index{::std::numeric_limits<::std::size_t>::max()};
-            ::uwvm2::utils::container::vector<call_stack_frame> trap_ip_frames{};
-            ::std::size_t backtrace_replay_index{::std::numeric_limits<::std::size_t>::max()};
-            bool backtrace_replay_active{true};
             auto const suppressed_frame{get_suppressed_call_stack_frame()};
-            bool printing_backtrace_frames{};
 
             auto const print_wasm_frame{
                 [&](::std::size_t module_id, ::std::size_t function_index) noexcept
                 {
                     if(module_id == suppressed_frame.module_id && function_index == suppressed_frame.function_index) { return; }
-                    if(printing_backtrace_frames && backtrace_replay_active && !trap_ip_frames.empty())
-                    {
-                        auto const matches_trap_ip_frame{
-                            [&](::std::size_t index) noexcept
-                            {
-                                auto const& frame{trap_ip_frames.index_unchecked(index)};
-                                return frame.module_id == module_id && frame.function_index == function_index;
-                            }};
-
-                        if(backtrace_replay_index == (::std::numeric_limits<::std::size_t>::max)())
-                        {
-                            for(::std::size_t i{}; i != trap_ip_frames.size(); ++i)
-                            {
-                                if(matches_trap_ip_frame(i))
-                                {
-                                    backtrace_replay_index = i + 1uz;
-                                    return;
-                                }
-                            }
-                            backtrace_replay_active = false;
-                        }
-                        else if(backtrace_replay_index < trap_ip_frames.size() && matches_trap_ip_frame(backtrace_replay_index))
-                        {
-                            ++backtrace_replay_index;
-                            return;
-                        }
-                        else
-                        {
-                            backtrace_replay_active = false;
-                        }
-                    }
 
                     if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
-                    if(printing_backtrace_frames && printed_frame_count > 1uz && module_id == first_printed_module_id &&
-                       function_index == first_printed_function_index)
-                    {
-                        return;
-                    }
 
                     if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, module_id, function_index))
                     {
-                        if(printed_frame_count == 0uz)
-                        {
-                            first_printed_module_id = module_id;
-                            first_printed_function_index = function_index;
-                        }
                         last_printed_module_id = module_id;
                         last_printed_function_index = function_index;
-                        if(!printing_backtrace_frames) { trap_ip_frames.push_back(call_stack_frame{module_id, function_index}); }
                         ++printed_frame_count;
                     }
                 }};
@@ -1975,7 +1926,6 @@ namespace uwvm2::runtime::lib
             {
                 return;
             }
-            printing_backtrace_frames = true;
             for(::std::size_t i{}; i != backtrace.size; ++i)
             {
                 auto const ip{backtrace.frames[i]};
