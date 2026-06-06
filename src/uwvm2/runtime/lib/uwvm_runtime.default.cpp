@@ -31,6 +31,7 @@
 # include <limits>
 # include <memory>
 # include <new>
+# include <string>
 # include <type_traits>
 # include <utility>
 // macro
@@ -48,6 +49,8 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Analysis/TargetTransformInfo.h>
 #  include <llvm/ADT/StringMap.h>
+#  include <llvm/Bitcode/BitcodeReader.h>
+#  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/DebugInfo/DIContext.h>
 #  include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -56,6 +59,7 @@
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/DIBuilder.h>
+#  include <llvm/IR/Constants.h>
 #  include <llvm/IR/DebugInfoMetadata.h>
 #  include <llvm/IR/IRBuilder.h>
 #  include <llvm/IR/LegacyPassManager.h>
@@ -63,10 +67,13 @@
 #  include <llvm/IR/PassManager.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
+#  include <llvm/Object/ObjectFile.h>
 #  include <llvm/PassRegistry.h>
 #  include <llvm/Passes/OptimizationLevel.h>
 #  include <llvm/Passes/PassBuilder.h>
+#  include <llvm/Support/CodeGen.h>
 #  include <llvm/Support/DynamicLibrary.h>
+#  include <llvm/Support/MemoryBuffer.h>
 #  include <llvm/Support/SourceMgr.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
@@ -229,7 +236,8 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool
             try_materialize_runtime_module_llvm_jit(compiled_module_record& rec,
                                                     bool publish_full_ready = true,
-                                                    ::llvm::CodeGenOptLevel default_codegen_opt_level = ::llvm::CodeGenOptLevel::Aggressive) noexcept;
+                                                    ::llvm::CodeGenOptLevel default_codegen_opt_level = ::llvm::CodeGenOptLevel::Aggressive,
+                                                    ::std::size_t extra_materialize_threads = (::std::numeric_limits<::std::size_t>::max)()) noexcept;
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         [[nodiscard]] inline bool tiered_runtime_active() noexcept;
         [[nodiscard]] inline bool tiered_t0_enabled() noexcept;
@@ -3290,7 +3298,7 @@ namespace uwvm2::runtime::lib
                 return;
             }
 
-            if(!try_materialize_runtime_module_llvm_jit(*rec, false, ::llvm::CodeGenOptLevel::Less)) [[unlikely]]
+            if(!try_materialize_runtime_module_llvm_jit(*rec, false, ::llvm::CodeGenOptLevel::Less, 0uz)) [[unlikely]]
             {
                 mark_tiered_full_compile_failed(*rec);
                 return;
@@ -7683,11 +7691,426 @@ namespace uwvm2::runtime::lib
             ::fast_io::fast_terminate();
         }
 
+        inline void run_runtime_llvm_jit_legacy_light_function_pipeline(::llvm::Module& module, ::llvm::TargetMachine& target_machine)
+        {
+            ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
+            function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
+            function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
+            function_pass_manager.add(::llvm::createInstructionCombiningPass());
+            function_pass_manager.add(::llvm::createReassociatePass());
+            function_pass_manager.add(::llvm::createGVNPass());
+            function_pass_manager.add(::llvm::createCFGSimplificationPass());
+            function_pass_manager.add(::llvm::createLICMPass());
+            function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
+            function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
+
+            function_pass_manager.doInitialization();
+            for(auto& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                function_pass_manager.run(function);
+            }
+            function_pass_manager.doFinalization();
+        }
+
+        [[nodiscard]] inline ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>
+            make_runtime_llvm_jit_materialize_target_machine(::uwvm2::utils::container::string const& host_cpu_name,
+                                                             ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const&
+                                                                 host_target_attribute_storage,
+                                                             ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
+            append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
+
+            ::llvm::EngineBuilder target_builder{};
+            target_builder.setEngineKind(::llvm::EngineKind::JIT)
+                .setOptLevel(codegen_opt_level)
+                .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
+                .setMAttrs(host_target_attributes);
+
+            return ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{target_builder.selectTarget()};
+        }
+
+        struct runtime_llvm_jit_legacy_light_task_preopt_context
+        {
+            ::uwvm2::utils::container::string host_cpu_name{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> host_target_attribute_storage{};
+            ::llvm::CodeGenOptLevel codegen_opt_level{};
+            ::std::atomic_size_t optimized_task_modules{};
+        };
+
+        [[nodiscard]] inline bool optimize_runtime_llvm_jit_legacy_light_task_module_pre_link(
+            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::llvm_jit_module_storage_t& module_storage,
+            void* opaque) noexcept
+        {
+            auto* const context{static_cast<runtime_llvm_jit_legacy_light_task_preopt_context*>(opaque)};
+            if(context == nullptr || module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
+
+            auto target_machine{make_runtime_llvm_jit_materialize_target_machine(context->host_cpu_name,
+                                                                                 context->host_target_attribute_storage,
+                                                                                 context->codegen_opt_level)};
+            if(target_machine == nullptr) [[unlikely]] { return false; }
+
+            module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple());
+            module_storage.llvm_module->setDataLayout(target_machine->createDataLayout());
+            run_runtime_llvm_jit_legacy_light_function_pipeline(*module_storage.llvm_module, *target_machine);
+            context->optimized_task_modules.fetch_add(1uz, ::std::memory_order_relaxed);
+            return true;
+        }
+
+        enum class runtime_llvm_jit_parallel_object_emit_result : unsigned
+        {
+            not_applicable,
+            success,
+            failed
+        };
+
+        [[nodiscard]] inline bool serialize_runtime_llvm_jit_module_bitcode(::llvm::Module& module,
+                                                                            ::uwvm2::utils::container::string& output) noexcept
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            output.clear();
+            llvm_jit_translate_details::raw_uwvm_string_ostream bitcode_stream(output);
+            ::llvm::WriteBitcodeToFile(module, bitcode_stream);
+            return true;
+        }
+
+        [[nodiscard]] inline bool runtime_llvm_jit_function_name_in_range(
+            ::llvm::StringRef name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+            ::std::size_t begin,
+            ::std::size_t end) noexcept
+        {
+            for(::std::size_t i{begin}; i != end; ++i)
+            {
+                auto const& curr{function_names.index_unchecked(i)};
+                if(name.size() != curr.size()) { continue; }
+                if(name.size() == 0u) { return true; }
+                if(::std::memcmp(name.data(), curr.data(), name.size()) == 0) { return true; }
+            }
+            return false;
+        }
+
+        [[nodiscard]] inline bool runtime_llvm_jit_name_in_list(
+            ::llvm::StringRef name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& names) noexcept
+        {
+            for(auto const& curr: names)
+            {
+                if(name.size() != curr.size()) { continue; }
+                if(name.size() == 0u) { return true; }
+                if(::std::memcmp(name.data(), curr.data(), name.size()) == 0) { return true; }
+            }
+            return false;
+        }
+
+        inline void expose_runtime_llvm_jit_partition_symbol(::llvm::GlobalValue& global_value) noexcept
+        {
+            if(global_value.hasLocalLinkage()) { global_value.setLinkage(::llvm::GlobalValue::ExternalLinkage); }
+            global_value.setVisibility(::llvm::GlobalValue::HiddenVisibility);
+            global_value.setDSOLocal(true);
+        }
+
+        inline void drop_runtime_llvm_jit_partition_global_definition(::llvm::GlobalVariable& global_variable) noexcept
+        {
+            if(global_variable.isDeclaration()) { return; }
+            expose_runtime_llvm_jit_partition_symbol(global_variable);
+            global_variable.setInitializer(nullptr);
+        }
+
+        inline void collect_runtime_llvm_jit_partition_exposed_symbol_from_value(
+            ::llvm::Value const* value,
+            ::std::size_t source_task_index,
+            ::llvm::StringMap<::std::size_t> const& function_task_indices,
+            ::llvm::StringMap<char>& exposed_symbol_names) noexcept
+        {
+            if(value == nullptr) { return; }
+
+            auto const* const stripped_value{value->stripPointerCasts()};
+            if(auto const* const global_value{::llvm::dyn_cast<::llvm::GlobalValue>(stripped_value)})
+            {
+                if(global_value->isDeclaration()) { return; }
+
+                auto const name{global_value->getName()};
+                if(name.empty()) { return; }
+
+                if(::llvm::isa<::llvm::Function>(global_value))
+                {
+                    auto const target_task_it{function_task_indices.find(name)};
+                    if(target_task_it != function_task_indices.end() && target_task_it->getValue() != source_task_index)
+                    {
+                        exposed_symbol_names[name] = 0;
+                    }
+                }
+                else if(source_task_index != 0uz)
+                {
+                    exposed_symbol_names[name] = 0;
+                }
+                return;
+            }
+
+            auto const* const constant_value{::llvm::dyn_cast<::llvm::Constant>(stripped_value)};
+            if(constant_value == nullptr) { return; }
+
+            for(auto const& operand: constant_value->operands())
+            {
+                collect_runtime_llvm_jit_partition_exposed_symbol_from_value(operand.get(),
+                                                                             source_task_index,
+                                                                             function_task_indices,
+                                                                             exposed_symbol_names);
+            }
+        }
+
+        inline void collect_runtime_llvm_jit_partition_exposed_symbols(
+            ::llvm::Module& module,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+            ::std::size_t functions_per_task,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& exposed_symbol_names)
+        {
+            ::llvm::StringMap<::std::size_t> function_task_indices{};
+            for(::std::size_t function_index{}; function_index != function_names.size(); ++function_index)
+            {
+                auto const& function_name{function_names.index_unchecked(function_index)};
+                auto task_index{function_index / functions_per_task};
+                function_task_indices[::llvm::StringRef{function_name.data(), function_name.size()}] = task_index;
+            }
+
+            ::llvm::StringMap<char> exposed_symbol_name_map{};
+            for(auto const& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+
+                auto const source_task_it{function_task_indices.find(function.getName())};
+                if(source_task_it == function_task_indices.end()) { continue; }
+                auto const source_task_index{source_task_it->getValue()};
+
+                for(auto const& basic_block: function)
+                {
+                    for(auto const& instruction: basic_block)
+                    {
+                        for(auto const& operand: instruction.operands())
+                        {
+                            collect_runtime_llvm_jit_partition_exposed_symbol_from_value(operand.get(),
+                                                                                         source_task_index,
+                                                                                         function_task_indices,
+                                                                                         exposed_symbol_name_map);
+                        }
+                    }
+                }
+            }
+
+            for(auto const& global_variable: module.globals())
+            {
+                if(global_variable.isDeclaration() || !global_variable.hasInitializer()) { continue; }
+                collect_runtime_llvm_jit_partition_exposed_symbol_from_value(global_variable.getInitializer(),
+                                                                             0uz,
+                                                                             function_task_indices,
+                                                                             exposed_symbol_name_map);
+            }
+
+            exposed_symbol_names.clear();
+            exposed_symbol_names.reserve(exposed_symbol_name_map.size());
+            for(auto const& exposed_symbol_name: exposed_symbol_name_map)
+            {
+                auto const key{exposed_symbol_name.getKey()};
+                exposed_symbol_names.emplace_back(key.data(), key.data() + key.size());
+            }
+        }
+
+        struct runtime_llvm_jit_parallel_object_emit_failure_state
+        {
+            ::std::atomic_bool failed{};
+        };
+
+        inline ::uwvm2::utils::thread::scheduled_task make_runtime_llvm_jit_parallel_object_emit_task(
+            ::uwvm2::utils::container::string const& source_bitcode,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& exposed_symbol_names,
+            ::std::size_t begin,
+            ::std::size_t end,
+            bool owns_global_definitions,
+            ::uwvm2::utils::container::string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+            ::llvm::CodeGenOptLevel codegen_opt_level,
+            bool verify_llvm_jit_ir,
+            ::uwvm2::utils::container::string& object_output,
+            runtime_llvm_jit_parallel_object_emit_failure_state& failure_state)
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            if(failure_state.failed.load(::std::memory_order_acquire)) { co_return; }
+
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                ::llvm::LLVMContext context{};
+                auto parsed_module_expected{
+                    ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(llvm_jit_translate_details::get_llvm_string_ref(source_bitcode),
+                                                                     "uwvm2-llvm-jit-object-emit-source"),
+                                             context)};
+                if(!parsed_module_expected) [[unlikely]]
+                {
+                    ::llvm::consumeError(parsed_module_expected.takeError());
+                    failure_state.failed.store(true, ::std::memory_order_release);
+                    co_return;
+                }
+
+                auto module{::std::move(*parsed_module_expected)};
+                for(auto& function: *module)
+                {
+                    if(function.isDeclaration()) { continue; }
+
+                    auto const function_name{function.getName()};
+                    if(runtime_llvm_jit_function_name_in_range(function_name, function_names, begin, end))
+                    {
+                        if(runtime_llvm_jit_name_in_list(function_name, exposed_symbol_names))
+                        {
+                            expose_runtime_llvm_jit_partition_symbol(function);
+                        }
+                    }
+                    else
+                    {
+                        expose_runtime_llvm_jit_partition_symbol(function);
+                        function.deleteBody();
+                    }
+                }
+
+                for(auto& global_variable: module->globals())
+                {
+                    if(owns_global_definitions)
+                    {
+                        if(!global_variable.isDeclaration() && runtime_llvm_jit_name_in_list(global_variable.getName(), exposed_symbol_names))
+                        {
+                            expose_runtime_llvm_jit_partition_symbol(global_variable);
+                        }
+                    }
+                    else
+                    {
+                        drop_runtime_llvm_jit_partition_global_definition(global_variable);
+                    }
+                }
+                if(!owns_global_definitions) { module->setModuleInlineAsm(""); }
+
+                auto target_machine{
+                    make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, codegen_opt_level)};
+                if(target_machine == nullptr) [[unlikely]]
+                {
+                    failure_state.failed.store(true, ::std::memory_order_release);
+                    co_return;
+                }
+                if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
+
+                module->setTargetTriple(target_machine->getTargetTriple());
+                module->setDataLayout(target_machine->createDataLayout());
+                if(verify_llvm_jit_ir && ::llvm::verifyModule(*module)) [[unlikely]]
+                {
+                    failure_state.failed.store(true, ::std::memory_order_release);
+                    co_return;
+                }
+
+                ::llvm::legacy::PassManager pass_manager{};
+                ::llvm::SmallVector<char, 0> object_buffer{};
+                ::llvm::raw_svector_ostream object_stream(object_buffer);
+                if(target_machine->addPassesToEmitFile(pass_manager, object_stream, nullptr, ::llvm::CodeGenFileType::ObjectFile)) [[unlikely]]
+                {
+                    failure_state.failed.store(true, ::std::memory_order_release);
+                    co_return;
+                }
+
+                pass_manager.run(*module);
+                object_output = ::uwvm2::utils::container::string{object_buffer.begin(), object_buffer.end()};
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(...)
+            {
+                failure_state.failed.store(true, ::std::memory_order_release);
+            }
+# endif
+
+            co_return;
+        }
+
+        [[nodiscard]] inline runtime_llvm_jit_parallel_object_emit_result emit_runtime_llvm_jit_objects_parallel(
+            ::llvm::Module& module,
+            ::uwvm2::utils::container::string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+            ::llvm::CodeGenOptLevel codegen_opt_level,
+            bool verify_llvm_jit_ir,
+            ::std::size_t extra_compile_threads,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& object_outputs,
+            ::std::size_t& defined_function_count) noexcept
+        {
+            defined_function_count = 0uz;
+            object_outputs.clear();
+            if(extra_compile_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
+
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> function_names{};
+            for(auto const& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                auto const name{function.getName()};
+                if(name.empty()) { continue; }
+                function_names.emplace_back(name.data(), name.data() + name.size());
+            }
+            defined_function_count = function_names.size();
+            if(function_names.size() <= 1uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
+
+            auto const effective_extra_threads{::uwvm2::utils::thread::clamp_extra_worker_count(function_names.size(), extra_compile_threads)};
+            if(effective_extra_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
+
+            ::uwvm2::utils::container::string source_bitcode{};
+            if(!serialize_runtime_llvm_jit_module_bitcode(module, source_bitcode)) [[unlikely]]
+            {
+                return runtime_llvm_jit_parallel_object_emit_result::failed;
+            }
+
+            auto const task_count{effective_extra_threads + 1uz};
+            auto const functions_per_task{function_names.size() / task_count + static_cast<::std::size_t>(function_names.size() % task_count != 0uz)};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> exposed_symbol_names{};
+            collect_runtime_llvm_jit_partition_exposed_symbols(module, function_names, functions_per_task, exposed_symbol_names);
+            object_outputs.resize(task_count);
+
+            ::uwvm2::utils::thread::scheduled_task_batch task_batch{task_count};
+            runtime_llvm_jit_parallel_object_emit_failure_state failure_state{};
+            for(::std::size_t task_index{}; task_index != task_count; ++task_index)
+            {
+                auto const begin{task_index * functions_per_task};
+                auto end{begin + functions_per_task};
+                if(end > function_names.size()) { end = function_names.size(); }
+
+                auto task{make_runtime_llvm_jit_parallel_object_emit_task(source_bitcode,
+                                                                          function_names,
+                                                                          exposed_symbol_names,
+                                                                          begin,
+                                                                          end,
+                                                                          task_index == 0uz,
+                                                                          host_cpu_name,
+                                                                          host_target_attribute_storage,
+                                                                          codegen_opt_level,
+                                                                          verify_llvm_jit_ir,
+                                                                          object_outputs.index_unchecked(task_index),
+                                                                          failure_state)};
+                ::std::construct_at(task_batch.handles.buffer + task_batch.handle_count, task.release());
+                ++task_batch.handle_count;
+            }
+
+            ::uwvm2::utils::thread::native_thread_pool thread_pool{};
+            thread_pool.run(task_batch, effective_extra_threads);
+            if(failure_state.failed.load(::std::memory_order_acquire)) { return runtime_llvm_jit_parallel_object_emit_result::failed; }
+
+            return runtime_llvm_jit_parallel_object_emit_result::success;
+        }
+
         [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module,
                                                                    ::llvm::TargetMachine& target_machine,
                                                                    runtime_llvm_jit_full_pipeline_kind pipeline,
                                                                    ::llvm::CodeGenOptLevel codegen_opt_level,
-                                                                   bool verify_llvm_jit_ir) noexcept
+                                                                   bool verify_llvm_jit_ir,
+                                                                   bool legacy_light_preoptimized) noexcept
         {
             if(verify_llvm_jit_ir)
             {
@@ -7704,24 +8127,7 @@ namespace uwvm2::runtime::lib
 
             if(pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)
             {
-                ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
-                function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
-                function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
-                function_pass_manager.add(::llvm::createInstructionCombiningPass());
-                function_pass_manager.add(::llvm::createReassociatePass());
-                function_pass_manager.add(::llvm::createGVNPass());
-                function_pass_manager.add(::llvm::createCFGSimplificationPass());
-                function_pass_manager.add(::llvm::createLICMPass());
-                function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
-                function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
-
-                function_pass_manager.doInitialization();
-                for(auto& function: module)
-                {
-                    if(function.isDeclaration()) { continue; }
-                    function_pass_manager.run(function);
-                }
-                function_pass_manager.doFinalization();
+                if(!legacy_light_preoptimized) { run_runtime_llvm_jit_legacy_light_function_pipeline(module, target_machine); }
             }
             else
             {
@@ -7763,11 +8169,16 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool try_materialize_runtime_module_llvm_jit(compiled_module_record& rec,
                                                                           bool publish_full_ready,
-                                                                          ::llvm::CodeGenOptLevel default_codegen_opt_level) noexcept
+                                                                          ::llvm::CodeGenOptLevel default_codegen_opt_level,
+                                                                          ::std::size_t extra_materialize_threads) noexcept
         {
 # if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             static_cast<void>(publish_full_ready);
 # endif
+            if(extra_materialize_threads == (::std::numeric_limits<::std::size_t>::max)())
+            {
+                extra_materialize_threads = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved;
+            }
             auto const llvm_jit_materialize_runtime_log_now{[]() noexcept
                                                             {
                                                                 ::fast_io::unix_timestamp ts{};
@@ -7917,7 +8328,9 @@ namespace uwvm2::runtime::lib
                                                  *target_machine,
                                                  full_materialize_strategy.pipeline,
                                                  codegen_opt_level,
-                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction)) [[unlikely]]
+                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
+                                                 rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized &&
+                                                     full_materialize_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
@@ -7930,14 +8343,96 @@ namespace uwvm2::runtime::lib
                                                   u8"\" time=",
                                                   llvm_jit_materialize_runtime_log_now() - optimize_start_time);
 
-            auto raw_engine{
-                ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
-                    .setEngineKind(::llvm::EngineKind::JIT)
-                    .setOptLevel(codegen_opt_level)
-                    .setMCPU(host_cpu_name)
-                    .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
-                    .create(target_machine.get())};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> parallel_object_outputs{};
+            ::std::size_t parallel_object_defined_function_count{};
+            bool use_parallel_objects{};
+            if(extra_materialize_threads != 0uz)
+            {
+                auto const object_emit_start_time{llvm_jit_materialize_runtime_log_now()};
+                llvm_jit_materialize_runtime_log_line(u8"object-emit-start module=\"",
+                                                      rec.module_name,
+                                                      u8"\" extra_threads=",
+                                                      extra_materialize_threads);
+                auto const object_emit_result{emit_runtime_llvm_jit_objects_parallel(
+                    *merged_module,
+                    ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()},
+                    host_target_attribute_storage,
+                    codegen_opt_level,
+                    !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
+                    extra_materialize_threads,
+                    parallel_object_outputs,
+                    parallel_object_defined_function_count)};
+                if(object_emit_result == runtime_llvm_jit_parallel_object_emit_result::success)
+                {
+                    use_parallel_objects = true;
+                    ::std::size_t object_bytes{};
+                    for(auto const& object_output: parallel_object_outputs) { object_bytes += object_output.size(); }
+                    llvm_jit_materialize_runtime_log_line(u8"object-emit-end module=\"",
+                                                          rec.module_name,
+                                                          u8"\" functions=",
+                                                          parallel_object_defined_function_count,
+                                                          u8" objects=",
+                                                          parallel_object_outputs.size(),
+                                                          u8" bytes=",
+                                                          object_bytes,
+                                                          u8" time=",
+                                                          llvm_jit_materialize_runtime_log_now() - object_emit_start_time);
+                }
+                else if(object_emit_result == runtime_llvm_jit_parallel_object_emit_result::failed)
+                {
+                    llvm_jit_materialize_runtime_log_line(u8"object-emit-fallback module=\"",
+                                                          rec.module_name,
+                                                          u8"\" reason=emit-failed time=",
+                                                          llvm_jit_materialize_runtime_log_now() - object_emit_start_time);
+                    parallel_object_outputs.clear();
+                }
+                else
+                {
+                    llvm_jit_materialize_runtime_log_line(u8"object-emit-skip module=\"",
+                                                          rec.module_name,
+                                                          u8"\" reason=not-applicable time=",
+                                                          llvm_jit_materialize_runtime_log_now() - object_emit_start_time);
+                }
+            }
+
+            ::llvm::ExecutionEngine* raw_engine{};
+            if(use_parallel_objects)
+            {
+                auto engine_module{
+                    ::uwvm2::utils::container::make_delete_owned<::llvm::Module>(merged_module->getName(), *llvm_context_holder)};
+                if(engine_module == nullptr) [[unlikely]]
+                {
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        llvm_jit_materialize_error(u8"LLVM JIT engine module creation failed for module=\"", rec.module_name, u8"\".");
+                    }
+                    return false;
+                }
+                engine_module->setTargetTriple(target_machine->getTargetTriple());
+                engine_module->setDataLayout(target_machine->createDataLayout());
+                merged_module.reset();
+                raw_engine =
+                    ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
+                        .setEngineKind(::llvm::EngineKind::JIT)
+                        .setOptLevel(codegen_opt_level)
+                        .setMCPU(host_cpu_name)
+                        .setMAttrs(host_target_attributes)
+                        .setMCJITMemoryManager(
+                            ::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                        .create(target_machine.get());
+            }
+            else
+            {
+                raw_engine =
+                    ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
+                        .setEngineKind(::llvm::EngineKind::JIT)
+                        .setOptLevel(codegen_opt_level)
+                        .setMCPU(host_cpu_name)
+                        .setMAttrs(host_target_attributes)
+                        .setMCJITMemoryManager(
+                            ::std::make_unique<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
+                        .create(target_machine.get());
+            }
             if(raw_engine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -7950,6 +8445,59 @@ namespace uwvm2::runtime::lib
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
             if(runtime_llvm_jit_unwind_call_stack_requested()) { llvm_jit_engine->RegisterJITEventListener(::std::addressof(get_uwvm_llvm_jit_debug_listener())); }
+            if(use_parallel_objects)
+            {
+                auto const object_load_start_time{llvm_jit_materialize_runtime_log_now()};
+                llvm_jit_materialize_runtime_log_line(u8"object-load-start module=\"",
+                                                      rec.module_name,
+                                                      u8"\" objects=",
+                                                      parallel_object_outputs.size());
+                for(::std::size_t object_index{}; object_index != parallel_object_outputs.size(); ++object_index)
+                {
+                    auto const& object_output{parallel_object_outputs.index_unchecked(object_index)};
+                    auto object_buffer{
+                        ::llvm::MemoryBuffer::getMemBufferCopy(
+                            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(object_output),
+                            "uwvm2-llvm-jit-object")};
+                    if(object_buffer == nullptr) [[unlikely]]
+                    {
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            llvm_jit_materialize_error(u8"LLVM JIT object buffer creation failed for module=\"", rec.module_name, u8"\".");
+                        }
+                        return false;
+                    }
+
+                    auto object_file_expected{::llvm::object::ObjectFile::createObjectFile(object_buffer->getMemBufferRef())};
+                    if(!object_file_expected) [[unlikely]]
+                    {
+                        ::llvm::consumeError(object_file_expected.takeError());
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            llvm_jit_materialize_error(u8"LLVM JIT object parse failed for module=\"", rec.module_name, u8"\".");
+                        }
+                        return false;
+                    }
+
+                    llvm_jit_engine->addObjectFile(::llvm::object::OwningBinary<::llvm::object::ObjectFile>{::std::move(*object_file_expected),
+                                                                                                            ::std::move(object_buffer)});
+                    if(llvm_jit_engine->hasError()) [[unlikely]]
+                    {
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            llvm_jit_materialize_error(u8"LLVM JIT object load failed for module=\"",
+                                                       rec.module_name,
+                                                       u8"\": ",
+                                                       ::fast_io::mnp::code_cvt(llvm_jit_engine->getErrorMessage()));
+                        }
+                        return false;
+                    }
+                }
+                llvm_jit_materialize_runtime_log_line(u8"object-load-end module=\"",
+                                                      rec.module_name,
+                                                      u8"\" time=",
+                                                      llvm_jit_materialize_runtime_log_now() - object_load_start_time);
+            }
             auto const finalize_start_time{llvm_jit_materialize_runtime_log_now()};
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-start module=\"", rec.module_name, u8"\"");
             llvm_jit_engine->finalizeObject();
@@ -7969,6 +8517,10 @@ namespace uwvm2::runtime::lib
                     [&](::uwvm2::utils::container::string const& function_name) noexcept -> ::std::uintptr_t
                     {
                         namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+                        ::std::string function_name_std{function_name.data(), function_name.data() + function_name.size()};
+                        auto const direct_function_address{llvm_jit_engine->getFunctionAddress(function_name_std)};
+                        if(direct_function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(direct_function_address); }
+
                         auto found_function{llvm_jit_engine->FindFunctionNamed(llvm_jit_translate_details::get_llvm_string_ref(function_name))};
                         if(found_function != nullptr && !found_function->isDeclaration()) [[likely]]
                         {
@@ -9157,6 +9709,38 @@ namespace uwvm2::runtime::lib
                         llvm_jit_opt.curr_wasm_id = module_id;
                         llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
                         configure_runtime_llvm_jit_call_stack_policy(llvm_jit_opt);
+                        runtime_llvm_jit_legacy_light_task_preopt_context legacy_light_task_preopt_context{};
+                        bool legacy_light_task_preopt_enabled{};
+                        if(effective_module_extra_compile_threads != 0uz)
+                        {
+                            auto const full_translation_strategy{
+                                resolve_runtime_llvm_jit_full_materialize_strategy(::llvm::CodeGenOptLevel::Aggressive)};
+                            if(full_translation_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light &&
+                               ensure_llvm_jit_native_target_initialized())
+                            {
+                                auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+                                legacy_light_task_preopt_context.host_cpu_name =
+                                    ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()};
+                                legacy_light_task_preopt_context.host_target_attribute_storage = get_llvm_jit_host_target_attribute_storage();
+                                legacy_light_task_preopt_context.codegen_opt_level = full_translation_strategy.codegen_opt_level;
+                                llvm_jit_opt.llvm_jit_task_module_pre_link_callback =
+                                    ::std::addressof(optimize_runtime_llvm_jit_legacy_light_task_module_pre_link);
+                                llvm_jit_opt.llvm_jit_task_module_pre_link_callback_context =
+                                    ::std::addressof(legacy_light_task_preopt_context);
+                                legacy_light_task_preopt_enabled = true;
+
+                                if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
+                                {
+                                    ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                          u8"[llvm-jit-full] legacy-light-task-preopt-start module=\"",
+                                                          rec.module_name,
+                                                          u8"\" extra_threads=",
+                                                          effective_module_extra_compile_threads,
+                                                          u8" codegen_opt=",
+                                                          get_runtime_llvm_jit_codegen_opt_level_name(full_translation_strategy.codegen_opt_level));
+                                }
+                            }
+                        }
                         auto const llvm_jit_translation_start_time{runtime_compile_threads_verbose_now()};
                         rec.llvm_jit_compiled = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_all_from_uwvm(
                             *rec.runtime_module,
@@ -9172,6 +9756,17 @@ namespace uwvm2::runtime::lib
                             effective_compile_task_split_conf
 #  endif
                         );
+                        if(legacy_light_task_preopt_enabled && ::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
+                        {
+                            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                  u8"[llvm-jit-full] legacy-light-task-preopt-end module=\"",
+                                                  rec.module_name,
+                                                  u8"\" tasks=",
+                                                  legacy_light_task_preopt_context.optimized_task_modules.load(::std::memory_order_relaxed),
+                                                  u8" applied=",
+                                                  ::fast_io::mnp::cond(rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized
+                                                      ,u8"yes",u8"no"));
+                        }
                         runtime_compile_threads_verbose_done(llvm_jit_translation_start_time,
                                                              u8"LLVM JIT IR translation for module \"",
                                                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
@@ -9212,7 +9807,8 @@ namespace uwvm2::runtime::lib
                                                              u8"\". ");
                     }
                     auto const llvm_jit_materialize_start_time{runtime_compile_threads_verbose_now()};
-                    if(!try_materialize_runtime_module_llvm_jit(rec)) [[unlikely]]
+                    if(!try_materialize_runtime_module_llvm_jit(
+                           rec, true, ::llvm::CodeGenOptLevel::Aggressive, effective_module_extra_compile_threads)) [[unlikely]]
                     {
                         if(runtime_compiler_requires_llvm_jit_execution())
                         {

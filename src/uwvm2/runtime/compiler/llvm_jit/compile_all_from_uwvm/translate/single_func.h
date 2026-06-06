@@ -51,10 +51,13 @@ struct llvm_jit_module_storage_t
     }
 };
 
+using llvm_jit_task_module_pre_link_callback_t = bool (*)(llvm_jit_module_storage_t&, void*) noexcept;
+
 struct full_function_symbol_t
 {
     ::uwvm2::utils::container::vector<local_func_storage_t> local_funcs{};
     llvm_jit_module_storage_t llvm_jit_module{};
+    bool llvm_jit_task_modules_pre_link_optimized{};
     ::std::size_t local_count{};
     ::std::size_t local_bytes_max{};
     ::std::size_t local_bytes_zeroinit_end{};
@@ -77,6 +80,8 @@ struct compile_option
     bool emit_tiered_loop_reentry_entries{};
     bool emit_call_stack_frames{true};
     bool emit_unwind_call_stack_frames{};
+    llvm_jit_task_module_pre_link_callback_t llvm_jit_task_module_pre_link_callback{};
+    void* llvm_jit_task_module_pre_link_callback_context{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -1245,6 +1250,44 @@ namespace details
         co_return;
     }
 
+    inline ::uwvm2::utils::thread::scheduled_task
+        make_llvm_jit_task_module_pre_link_callback_task(llvm_jit_module_storage_t& task_module_storage,
+                                                         compile_option const& options,
+                                                         ::std::atomic_bool& failed)
+    {
+        if(failed.load(::std::memory_order_acquire)) { co_return; }
+
+        if(options.llvm_jit_task_module_pre_link_callback != nullptr &&
+           !options.llvm_jit_task_module_pre_link_callback(task_module_storage, options.llvm_jit_task_module_pre_link_callback_context))
+        {
+            failed.store(true, ::std::memory_order_release);
+        }
+
+        co_return;
+    }
+
+    [[nodiscard]] inline bool run_llvm_jit_task_module_pre_link_callback(
+        ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages,
+        compile_option const& options,
+        ::std::size_t effective_extra_compile_threads)
+    {
+        if(options.llvm_jit_task_module_pre_link_callback == nullptr) { return true; }
+        if(task_module_storages.empty()) { return true; }
+
+        ::std::atomic_bool failed{};
+        ::uwvm2::utils::thread::scheduled_task_batch task_batch{task_module_storages.size()};
+        for(auto& task_module_storage: task_module_storages)
+        {
+            auto task{make_llvm_jit_task_module_pre_link_callback_task(task_module_storage, options, failed)};
+            ::std::construct_at(task_batch.handles.buffer + task_batch.handle_count, task.release());
+            ++task_batch.handle_count;
+        }
+
+        ::uwvm2::utils::thread::native_thread_pool thread_pool{};
+        thread_pool.run(task_batch, effective_extra_compile_threads);
+        return !failed.load(::std::memory_order_acquire);
+    }
+
     [[nodiscard]] inline bool link_llvm_jit_module_fragments(llvm_jit_module_storage_t& merged_module_storage,
                                                              ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages)
     {
@@ -1671,18 +1714,32 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
     }
 #endif
 
+    bool llvm_jit_task_modules_pre_link_optimized{};
+    if(options.llvm_jit_task_module_pre_link_callback != nullptr)
+    {
+        if(!details::run_llvm_jit_task_module_pre_link_callback(task_llvm_jit_modules, options, effective_extra_compile_threads))
+        {
+            compile_local_functions_serially();
+            return storage;
+        }
+        llvm_jit_task_modules_pre_link_optimized = true;
+    }
+
     if(!details::link_llvm_jit_module_fragments(storage.llvm_jit_module, task_llvm_jit_modules))
     {
+        storage.llvm_jit_task_modules_pre_link_optimized = false;
         compile_local_functions_serially();
         return storage;
     }
 
     if(!details::finalize_runtime_llvm_jit_module_storage(storage.llvm_jit_module, options.verify_llvm_jit_ir))
     {
+        storage.llvm_jit_task_modules_pre_link_optimized = false;
         compile_local_functions_serially();
         return storage;
     }
 
+    storage.llvm_jit_task_modules_pre_link_optimized = llvm_jit_task_modules_pre_link_optimized;
     return storage;
 }
 
