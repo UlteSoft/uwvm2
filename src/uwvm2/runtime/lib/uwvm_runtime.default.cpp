@@ -8752,13 +8752,13 @@ namespace uwvm2::runtime::lib
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
                 ::uwvm2::utils::container::u8string_view const runtime_full_translation_main_thread_message{
-                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will run on the main thread only. "}
+                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full IR translation will run on the main thread only. "}
                                                  : ::uwvm2::utils::container::u8string_view{u8"Runtime full translation will run on the main thread only. "}};
                 ::uwvm2::utils::container::u8string_view const runtime_full_translation_parallel_prefix{
-                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will use up to "}
+                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full IR translation will use up to "}
                                                  : ::uwvm2::utils::container::u8string_view{u8"Runtime full translation will use up to "}};
                 ::uwvm2::utils::container::u8string_view const runtime_full_translation_fixed_prefix{
-                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will use "}
+                    compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full IR translation will use "}
                                                  : ::uwvm2::utils::container::u8string_view{u8"Runtime full translation will use "}};
                 if(effective_extra_compile_threads == 0uz) { runtime_compile_threads_verbose_info(runtime_full_translation_main_thread_message); }
                 else if(adaptive_runtime_compile_threads_policy_active)
@@ -8934,7 +8934,7 @@ namespace uwvm2::runtime::lib
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, compile_uwvm_int_translation ? UWVM_COLOR_U8_LT_GREEN : UWVM_COLOR_U8_YELLOW),
                     uwvm_int_translation_state,
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                    u8", llvm-jit-translation=",
+                    u8", llvm-jit-ir-translation=",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, compile_llvm_jit_translation ? UWVM_COLOR_U8_LT_GREEN : UWVM_COLOR_U8_YELLOW),
                     llvm_jit_translation_state,
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -8944,10 +8944,10 @@ namespace uwvm2::runtime::lib
                 {
                     runtime_compile_threads_verbose_info(
                         compile_uwvm_int_translation
-                            ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT translation artifacts will also be generated during full translation. "}
-                            : ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will be generated without uwvm-int full artifacts. "});
+                            ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT IR translation artifacts will also be generated during full translation. "}
+                            : ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full IR translation will be generated without uwvm-int full artifacts. "});
                     runtime_compile_threads_verbose_info(
-                        u8"Current LLVM JIT translation parallelizes Wasm-to-LLVM IR emission across task modules and links them back into one module before optimization/materialization, so runtime compile-thread scheduling can also reduce LLVM translation time while keeping the final aggressive whole-module optimization path unchanged. ");
+                        u8"Current LLVM JIT IR translation parallelizes Wasm-to-LLVM IR emission across task modules and links them back into one module before optimization/materialization, so runtime compile-thread scheduling can also reduce LLVM JIT IR translation time while keeping the final aggressive whole-module optimization path unchanged. ");
                 }
             }
 
@@ -9147,7 +9147,7 @@ namespace uwvm2::runtime::lib
                     {
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                         {
-                            runtime_compile_threads_verbose_info(u8"Begin LLVM JIT translation for module \"",
+                            runtime_compile_threads_verbose_info(u8"Begin LLVM JIT IR translation for module \"",
                                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                                  rec.module_name,
                                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -9173,7 +9173,7 @@ namespace uwvm2::runtime::lib
 #  endif
                         );
                         runtime_compile_threads_verbose_done(llvm_jit_translation_start_time,
-                                                             u8"LLVM JIT translation for module \"",
+                                                             u8"LLVM JIT IR translation for module \"",
                                                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                              rec.module_name,
                                                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
