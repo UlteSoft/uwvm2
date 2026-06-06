@@ -16,10 +16,12 @@ The tiered backend has three execution tiers:
 
    Tier 0 is the latency tier. When execution reaches a function whose LLVM
    native entry is not ready, the runtime compiles or reuses the `uwvm-int`
-   lazy execution unit and immediately runs the interpreter result. It must not
-   wait for LLVM. Loop OSR polls are intentionally lightweight: the interpreter
-   reads the smallest required state, exits immediately on a miss, and only
-   transfers to native code when a ready reentry is already published.
+   lazy execution unit and normally runs the interpreter result without waiting
+   for LLVM. The current entry path has one small-module exception: very small
+   loop-shaped functions may compile Tier 1 inline so micro workloads can reach
+   native code immediately. Loop OSR polls are intentionally lightweight: the
+   interpreter reads the smallest required state, exits immediately on a miss,
+   and only transfers to native code when a ready reentry is already published.
 
 2. **Tier 1: LLVM lazy JIT**
 
@@ -135,13 +137,15 @@ the scheduler. The Tier 2 translation itself runs with zero nested compile
 threads because it already occupies a runtime compile worker; this avoids
 oversubscribing the machine while the main program is executing.
 
-Tiered loop OSR can use a separate one-worker urgent scheduler when the module
-is large enough for OSR polling, currently at least 512 local functions. Small
-modules keep loop OSR on the normal scheduler to avoid adding another worker to
-short benchmarks. If the urgent scheduler is available, loop OSR first tries to
-enqueue the LLVM lazy request there; otherwise, or when that enqueue fails, the
-request goes through the normal lazy scheduler. The request carries no extra
-staleness callback state.
+Tiered entry and loop OSR requests may use a separate one-worker urgent
+scheduler when that scheduler is running. Entry-triggered Tier 1 requests prefer
+the urgent lane for modules below 512 local functions, for large-long-run
+modules, or for compile units of at least 1024 bytes. Loop OSR prefers the
+urgent lane for modules with at least 512 local functions, for large-long-run
+modules, for small modules that have already proven long-running, or for
+medium-sized modules whose OSR target is at least 4096 bytes. Otherwise, or when
+urgent enqueue fails, the request goes through the normal lazy scheduler. The
+request carries no extra staleness callback state.
 
 The default Tier 2 codegen optimization level is `Less` (LLVM O1), matching the
 lazy tier. Use `-Rllvm-policy` for preset tuning, `-Rllvm-lazy-policy` for
@@ -155,6 +159,8 @@ With `--runtime-compiler-log`, tiered summaries include:
 - sampled interpreter fallback counts;
 - sampled interpreter fallback and entry miss counters used by the large-module
   long-run gate;
+- large-loop sample counts and the number of modules classified as
+  large-long-run;
 - loop OSR callback, ready, and miss counts;
 - loop OSR deferral counts from the counter-only request gate;
 - urgent OSR request and scheduler counters;
@@ -165,7 +171,10 @@ The log names use the `tiered_full_*` prefix for full-tier data and
 
 ## Correctness Rules
 
-- The interpreter result is always used when LLVM native code is not ready.
+- When Tier 0 is enabled, the interpreter result is used when LLVM native code
+  is not ready, except for the explicit small-loop inline Tier 1 fast path.
+  When Tier 0 is disabled, the runtime synchronously materializes Tier 1
+  instead.
 - Native target tables are the only handoff mechanism between tiers; code does
   not patch machine code in place.
 - Tier 2 never routes Wasm calls through the tiered bridge. It emits the normal
@@ -186,60 +195,65 @@ CPU from hot large modules that are still benefiting from targeted lazy Tier 1
 functions, while still promoting small workloads that repeatedly return to
 native tiered code.
 
-Tier 1 policy is counter-only: elapsed time is reported in logs, but it does
-not decide when tiering happens. Ordinary function-entry misses require 32768
-estimated misses on the same local function before the bridge enqueues LLVM
-work for small modules. The threshold scales up for large modules: modules with
-at least 512 local functions require 16384 entry misses, modules with at least
-1024 local functions require 65536 entry misses, and modules with at least 8192
-local functions require 1048576 entry misses until the module is classified as
-a large long-running module. For modules with fewer than 4096 local functions,
-small compile units are deliberately held back instead of promoted early:
-compile units of up to 128/512/1024 bytes require at least
-262144/65536/32768 misses. This avoids paying LLVM stop-time cost for tiny
-helpers in short programs.
+Tier 1 entry policy is counter-only: elapsed time is reported in logs, but it
+does not decide when tiering happens. The current baseline entry thresholds are
+8192 estimated misses for modules below 128 local functions, 16384 below 512,
+65536 for modules with at least 512 local functions, and 262144 for modules
+with at least 8192 local functions before large-long-run adjustments. Function
+size then clamps the threshold: compile units of at least 4096 bytes require at
+least 32768 estimated misses, units of at least 8192 bytes require at least
+131072, and units of at least 32768 bytes are kept out of entry-triggered lazy
+LLVM. Small compile units can lower the threshold: for modules below 128 local
+functions, code sizes up to 128/512/1024 bytes use thresholds no higher than
+2048/4096/8192; below 512 functions, sizes up to 128/512 bytes use thresholds
+no higher than 4096/8192. Modules with 512 through 4095 local functions lower
+thresholds for code sizes up to 128/512 bytes to at most 8192/16384.
 
-Modules at CPython scale, currently modules with at least 8192 local functions,
-use sampled module-level counters to separate startup noise from true long
-runs. A module enters the large-long-run state only after sampled interpreter
-fallbacks or sampled entry misses reach 4194304, or after successful native
-tiered switches reach 1048576. Once active, small top-hot compile units lower
-their entry thresholds to 65536/131072/262144/524288 misses for code sizes up
-to 128/512/1024/4096 bytes. Larger compile units keep the conservative
-large-module thresholds. Compile units of at least 4096/8192 bytes require at
-least 65536/262144 entry misses, and compile units of at least 32768 bytes are
-kept out of entry-triggered lazy LLVM. This keeps short CPython startup scripts
-from starting LLVM work, while allowing long-running Python loops to promote a
-small set of top-hot functions without using elapsed time as a policy input.
+The large-long-run gate is aimed at CPython-scale modules and huge loop
+sentinels. Modules with at least 8192 local functions use sampled module-level
+counters to separate startup noise from true long runs. A module enters the
+large-long-run state after sampled interpreter fallbacks or sampled entry misses
+reach 1048576, after successful native tiered switches reach 262144, or after a
+large-loop sentinel sample is observed. For modules with at least 8192 local
+functions, once active, small top-hot compile units lower their entry thresholds
+to at most 8192/16384/32768/65536 misses for code sizes up to
+128/512/1024/4096 bytes. Larger compile units keep the conservative
+large-module thresholds. This keeps short CPython startup scripts from starting
+broad LLVM work, while allowing long-running Python loops to promote a small set
+of top-hot functions without using elapsed time as a policy input.
 
-Entry hotness counters are sampled for larger modules to keep the miss path
-cheap while preserving a counter-based policy. Modules with fewer than 512 local
-functions count every miss, modules with at least 512/1024/8192 local functions
-use entry probe strides of 2/4/16 respectively. The counter is advanced by the
-stride on sampled misses, so thresholds continue to be expressed as estimated
-miss counts rather than elapsed time.
+Entry hotness counters are sampled to keep the miss path cheap while preserving
+a counter-based policy. Modules below 128 local functions use probe stride 4,
+modules with at least 128 and below 1024 local functions use stride 8, and
+modules with at least 1024 local functions use stride 16. The counter is
+advanced by the stride on sampled misses, so thresholds continue to be expressed
+as estimated miss counts rather than wall-clock time.
 
 Loop and block OSR use mutable bytecode immediates as local counters. Loop
-headers in functions of at least 4096 bytes poll after 4 iterations and then
-retry every 64 missed polls, and require 512 expired polls before reaching the
-runtime OSR gate. Functions of at least 1024 bytes poll after 16 iterations,
-retry every 128 missed polls, and require 2048 expired polls before reaching
-the gate. Smaller functions poll every 1024 iterations and require 2048 expired
-polls before reaching the gate. Block polls keep the older 8192-block cadence,
-but use request-count thresholds of 512, 512, or 64 expired polls for large,
-medium, and small functions respectively. Functions of at least 32768 bytes do
-not get OSR polls, because CPython-scale tests showed that compiling a hot
-large interpreter function can cost more than the remaining execution it saves.
+headers in functions of at least 32768 bytes use the large-loop sentinel policy:
+poll after 256 iterations, retry every 256 missed polls, and emit a runtime
+signal after 16 local expirations. Functions of at least 4096 bytes poll after
+4 iterations, retry every 64 missed polls, and require 512 local expirations
+before reaching the runtime OSR gate. Functions of at least 1536 bytes poll
+after 8 iterations, retry every 128 missed polls, and require 256 local
+expirations. Functions of at least 1024 bytes poll after 16 iterations, retry
+every 128 missed polls, and require 2048 local expirations. Smaller functions
+poll every 1024 iterations and require 2048 local expirations. Block polls keep
+an 8192-block cadence, but their request-count thresholds are 512 for functions
+of at least 1024 bytes and 64 for smaller functions. Block-triggered OSR is
+disabled for functions of at least 32768 bytes; those are sampled by the
+large-loop sentinel path instead.
 
 After the bytecode-local OSR counter expires, a per-function runtime counter
-decides whether to request LLVM. Small and medium modules request on the first
-runtime OSR signal. Huge loop sentinel functions, currently functions of at
-least 32768 bytes, use an earlier counter-only urgent Tier 1 path: their local
-poll runs at a 256-iteration cadence after an initial 256 iterations, emits a
-runtime signal after 16 local expirations, and requests LLVM after 131072 runtime
-signals. This replaces the old 262144-runtime-signal gate that let CPython-style
-eval loops run mostly in Tier 0. The request remains asynchronous and urgent;
-the interpreter continues until a ready loop reentry is published.
+decides whether to request LLVM. Most eligible modules request on the first
+runtime OSR signal. For modules with 16 to 127 local functions that have not
+yet proven long-running, the threshold is higher for cold small modules: large
+compile units can request after 2 or 4 runtime signals, while smaller compile
+units use an estimated work gate based on 8 MiB of interpreted work and are
+clamped between 512 and 65535 signals. Huge loop sentinel functions require
+131072 runtime OSR signals before requesting LLVM. The request remains
+asynchronous unless the policy chooses an inline or wait-for-urgent path; the
+interpreter continues until a ready loop reentry is published.
 
 When a loop OSR request is queued, the interpreter continues to poll the
 runtime through the same countdown path while the LLVM unit remains in the
