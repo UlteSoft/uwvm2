@@ -136,7 +136,7 @@ struct llvm_jit_memory_snapshot_values_t
 }
 
 // LLVM raw_ostream adapter for uwvm's string container.  This is used when LLVM diagnostics or IR dumps need to be
-// accumulated without switching to std::string ownership.
+// accumulated without switching away from uwvm string ownership.
 class raw_uwvm_string_ostream : public ::llvm::raw_ostream
 {
     // Destination buffer owned by the caller.

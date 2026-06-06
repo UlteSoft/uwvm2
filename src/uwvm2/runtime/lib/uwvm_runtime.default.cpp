@@ -31,7 +31,6 @@
 # include <limits>
 # include <memory>
 # include <new>
-# include <string>
 # include <type_traits>
 # include <utility>
 // macro
@@ -1073,16 +1072,20 @@ namespace uwvm2::runtime::lib
             return ip >= range.begin && ip < range.end;
         }
 
-        [[nodiscard]] inline bool parse_llvm_jit_inline_frame_name(::std::string const& name,
+        [[nodiscard]] inline bool parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::string_view name,
                                                                     ::std::size_t& module_id,
                                                                     ::std::size_t& function_index) noexcept
         {
-            constexpr ::std::string_view prefix{"uwvm-inline:m="};
-            constexpr ::std::string_view middle{":f="};
-            if(name.size() <= prefix.size() || name.compare(0uz, prefix.size(), prefix.data(), prefix.size()) != 0) { return false; }
+            constexpr char prefix[]{"uwvm-inline:m="};
+            constexpr char middle[]{":f="};
+            constexpr ::std::size_t prefix_size{sizeof(prefix) - 1uz};
+            constexpr ::std::size_t middle_size{sizeof(middle) - 1uz};
+            if(name.size() <= prefix_size || ::std::memcmp(name.data(), prefix, prefix_size) != 0) { return false; }
 
-            auto const mid_pos{name.find(middle, prefix.size())};
-            if(mid_pos == ::std::string::npos) { return false; }
+            auto const name_begin{name.data()};
+            auto const name_end{name_begin + name.size()};
+            auto const middle_begin{::std::search(name_begin + prefix_size, name_end, middle, middle + middle_size)};
+            if(middle_begin == name_end) { return false; }
 
             auto const parse_size{
                 [](char const* begin, char const* end, ::std::size_t& out) noexcept -> bool
@@ -1097,8 +1100,8 @@ namespace uwvm2::runtime::lib
 
             ::std::size_t parsed_module_id{};
             ::std::size_t parsed_function_index{};
-            if(!parse_size(name.data() + prefix.size(), name.data() + mid_pos, parsed_module_id)) { return false; }
-            if(!parse_size(name.data() + mid_pos + middle.size(), name.data() + name.size(), parsed_function_index)) { return false; }
+            if(!parse_size(name_begin + prefix_size, middle_begin, parsed_module_id)) { return false; }
+            if(!parse_size(middle_begin + middle_size, name_end, parsed_function_index)) { return false; }
 
             module_id = parsed_module_id;
             function_index = parsed_function_index;
@@ -1870,7 +1873,9 @@ namespace uwvm2::runtime::lib
                             {
                                 ::std::size_t module_id{};
                                 ::std::size_t function_index{};
-                                if(!parse_llvm_jit_inline_frame_name(inline_info.getFrame(i).FunctionName, module_id, function_index)) { continue; }
+                                auto const& frame_name{inline_info.getFrame(i).FunctionName};
+                                auto const frame_name_view{::uwvm2::utils::container::string_view{frame_name.data(), frame_name.size()}};
+                                if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
                                 print_wasm_frame(module_id, function_index);
                                 printed = true;
                                 matched = true;
@@ -8712,10 +8717,6 @@ namespace uwvm2::runtime::lib
                     [&](::uwvm2::utils::container::string const& function_name) noexcept -> ::std::uintptr_t
                     {
                         namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
-                        ::std::string function_name_std{function_name.data(), function_name.data() + function_name.size()};
-                        auto const direct_function_address{llvm_jit_engine->getFunctionAddress(function_name_std)};
-                        if(direct_function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(direct_function_address); }
-
                         auto found_function{llvm_jit_engine->FindFunctionNamed(llvm_jit_translate_details::get_llvm_string_ref(function_name))};
                         if(found_function != nullptr && !found_function->isDeclaration()) [[likely]]
                         {
