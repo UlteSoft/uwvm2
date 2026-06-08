@@ -1510,8 +1510,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return;
         }
 
-        // `auto_compile` is deliberately not a general runtime mode knob.  It exists only as the `-Rint` shortcut policy;
-        // custom JIT/tiered invocations must choose their mode explicitly so they do not inherit interpreter-specific tuning.
+        // `auto_compile` is deliberately not a general runtime mode knob.  It is the uwvm-int auto policy used by `-Rint`
+        // and by `-Rcc int` when `-Rcm` is omitted; JIT/tiered invocations must choose their mode explicitly.
         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only) [[unlikely]]
         {
@@ -1521,8 +1521,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                 u8"[fatal] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint). Use -Rcm lazy|full with -Rcc jit|tiered "
-                                u8"to select LLVM-JIT or tiered runtime modes explicitly. ",
+                                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint, or -Rcc int without -Rcm). "
+                                u8"Use -Rcm lazy|full with -Rcc jit|tiered to select LLVM-JIT or tiered runtime modes explicitly. ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(runtime)\n\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -1550,8 +1550,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
-            // Keep the auto decision visible under verbose logging so benchmark runs can explain why `-Rint` behaved like
-            // `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
+            // Keep the auto decision visible under verbose logging so benchmark runs can explain why the uwvm-int auto
+            // policy behaved like `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
             ::fast_io::io::perr(
                 ::uwvm2::uwvm::io::u8log_output,
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -1559,7 +1559,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                 u8"[info]  ",
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"Rint auto selected ",
+                u8"uwvm-int auto selected ",
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                 ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -1748,8 +1748,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-        // Resolve `-Rint` auto after loading/import initialization, when executable and preloaded Wasm byte spans are known,
-        // but before the runtime dispatch switch where only concrete lazy/full modes should remain.
+        // Resolve uwvm-int auto after loading/import initialization, when executable and preloaded Wasm byte spans are
+        // known, but before the runtime dispatch switch where only concrete lazy/full modes should remain.
         resolve_runtime_int_auto_mode();
 # endif
 
@@ -1797,7 +1797,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                             u8"[fatal] ",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                             u8"auto_compile runtime mode was not resolved before runtime dispatch. auto_compile is only supported by the "
-                                            u8"uwvm-int shortcut (-Rint), and LLVM-JIT/tiered backends require an explicit runtime mode (-Rcm lazy|full). ",
+                                            u8"uwvm-int auto policy (-Rint, or -Rcc int without -Rcm), and LLVM-JIT/tiered backends require an explicit "
+                                            u8"runtime mode (-Rcm lazy|full). ",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                             u8"(runtime)\n\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));

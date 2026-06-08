@@ -13,7 +13,7 @@ Source focus:
 | Command | Aliases | Arguments | Repeatability | Availability | Behavior |
 | --- | --- | --- | --- | --- | --- |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy|lazy+verification|full]` | Once | Runtime backend support | Set only the runtime compilation mode axis. |
-| `--runtime-custom-compiler` | `-Rcc` | `[int|tiered|jit|debug-int]` | Once | Compiled backend dependent | Set only the runtime compiler backend axis. |
+| `--runtime-custom-compiler` | `-Rcc` | `[int|tiered|jit|debug-int]` | Once | Compiled backend dependent | Set the runtime compiler backend axis; `int` defaults to auto lazy/full when no custom mode is specified. |
 | `--runtime-debug-int` | `-RDint` | None | Once | `UWVM_RUNTIME_DEBUG_INTERPRETER` | Shortcut: full compilation with debug interpreter. |
 | `--runtime-int` | `-Rint` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Shortcut: auto lazy/full selection with UWVM interpreter. |
 | `--runtime-jit` | `-Rjit` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: lazy compilation with LLVM JIT. |
@@ -41,7 +41,8 @@ Default storage values:
 - Compiler defaults to `uwvm_interpreter_llvm_jit_tiered` when tiered support is compiled, otherwise to `llvm_jit_only` when LLVM JIT support is compiled,
   otherwise to `uwvm_interpreter_only` when interpreter support is compiled, otherwise to `none_backend`.
 
-The shortcuts write both axes. The custom commands write one axis each.
+The shortcuts write both axes. The custom commands normally write one axis each; `--runtime-custom-compiler int` also default-fills the mode axis with
+`auto_compile` when `--runtime-custom-mode` is omitted.
 
 ## Runtime Shortcut Commands
 
@@ -55,9 +56,10 @@ Shortcut mapping:
 | `--runtime-aot` | `full_compile` | `llvm_jit_only` |
 | `--runtime-debug-int` | `full_compile` | `debug_interpreter` |
 
-`--runtime-int` auto policy:
+UWVM interpreter auto policy:
 
-- `auto_compile` is an internal shortcut mode for `--runtime-int` only; LLVM-JIT and tiered backends must use explicit `lazy` or `full` modes.
+- `auto_compile` is used by `--runtime-int`, and by `--runtime-custom-compiler int` when no explicit `--runtime-custom-mode` is supplied.
+- LLVM-JIT and tiered backends must use explicit `lazy` or `full` modes.
 - Without preloaded Wasm modules, select `full_compile` when the executable Wasm file is at most 1 MiB; otherwise select `lazy_compile`.
 - With preloaded Wasm modules, select `full_compile` when executable plus preloaded Wasm bytes total at most 256 KiB; otherwise select `lazy_compile`.
 - `--log-verbose` prints the selected mode, executable Wasm bytes, preloaded Wasm bytes, total Wasm bytes, threshold, and policy.
@@ -123,7 +125,9 @@ Accepted values depend on compiled backends:
 Notes:
 
 - A value for a backend that was not compiled is not accepted, because the usage string and callback are built with feature macros.
-- The option sets only the compiler axis.
+- The option normally sets only the compiler axis.
+- `int` defaults the mode axis to `auto_compile` when no explicit `--runtime-custom-mode` is supplied, matching `--runtime-int`.
+- An explicit `--runtime-custom-mode lazy|lazy+verification|full` before or after `--runtime-custom-compiler int` remains explicit and does not use auto.
 - It has an `is_exist` guard.
 
 Example:
