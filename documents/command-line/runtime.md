@@ -13,8 +13,8 @@ Source focus:
 | Command | Aliases | Arguments | Repeatability | Availability | Behavior |
 | --- | --- | --- | --- | --- | --- |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy|lazy+verification|full]` | Once | Runtime backend support | Set only the runtime compilation mode axis. |
-| `--runtime-custom-compiler` | `-Rcc` | `[int|tiered|jit|debug-int]` | Once | Compiled backend dependent | Set the runtime compiler backend axis; `int` defaults to auto lazy/full when no custom mode is specified. |
-| `--runtime-debug-int` | `-RDint` | None | Once | `UWVM_RUNTIME_DEBUG_INTERPRETER` | Shortcut: full compilation with debug interpreter. |
+| `--runtime-custom-compiler` | `-Rcc` | `[int|tiered|jit|debug-int]` | Once | Compiled backend dependent | Set the runtime compiler backend axis; `int` defaults to uwvm-int auto lazy/full when no custom mode is specified. `debug-int` appears only when `--debug-int=y` is configured. |
+| `--runtime-debug-int` | `-RDint` | None | Once | `UWVM_RUNTIME_DEBUG_INTERPRETER` (`--debug-int=y`; disabled by default) | Shortcut: selects full compilation with debug interpreter; executable dispatch currently reports this backend as unsupported. |
 | `--runtime-int` | `-Rint` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Shortcut: auto lazy/full selection with UWVM interpreter. |
 | `--runtime-jit` | `-Rjit` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: lazy compilation with LLVM JIT. |
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
@@ -41,8 +41,12 @@ Default storage values:
 - Compiler defaults to `uwvm_interpreter_llvm_jit_tiered` when tiered support is compiled, otherwise to `llvm_jit_only` when LLVM JIT support is compiled,
   otherwise to `uwvm_interpreter_only` when interpreter support is compiled, otherwise to `none_backend`.
 
-The shortcuts write both axes. The custom commands normally write one axis each; `--runtime-custom-compiler int` also default-fills the mode axis with
-`auto_compile` when `--runtime-custom-mode` is omitted.
+The shortcuts write both axes. The custom commands normally write one axis each, with one interpreter-specific default:
+
+- `--runtime-custom-compiler int` also default-fills the mode axis with `auto_compile` when `--runtime-custom-mode` is omitted.
+- `--runtime-custom-compiler jit` and `tiered` do not use `auto_compile`; when `--runtime-custom-mode` is omitted they use the current mode value, normally the storage default `lazy_compile`.
+- `--runtime-custom-compiler debug-int` is compiled only when Xmake config `--debug-int=y` is used. It does not use `auto_compile`; if its inherited mode is not `full_compile`, runtime normalization forces `full_compile` and uses the runtime-warning policy. Executable dispatch currently reports debug interpreter as unsupported.
+- `--runtime-custom-mode` remains explicit in either argument order. `--runtime-custom-mode full --runtime-custom-compiler int` and `--runtime-custom-compiler int --runtime-custom-mode full` both run concrete `full_compile`, not auto.
 
 ## Runtime Shortcut Commands
 
@@ -54,15 +58,30 @@ Shortcut mapping:
 | `--runtime-jit` | `lazy_compile` | `llvm_jit_only` |
 | `--runtime-tiered` | `lazy_compile` | `uwvm_interpreter_llvm_jit_tiered` |
 | `--runtime-aot` | `full_compile` | `llvm_jit_only` |
-| `--runtime-debug-int` | `full_compile` | `debug_interpreter` |
+| `--runtime-debug-int` | `full_compile` | `debug_interpreter` when compiled with `--debug-int=y`; currently rejected by executable dispatch |
 
 UWVM interpreter auto policy:
 
 - `auto_compile` is used by `--runtime-int`, and by `--runtime-custom-compiler int` when no explicit `--runtime-custom-mode` is supplied.
-- LLVM-JIT and tiered backends must use explicit `lazy` or `full` modes.
+- `auto_compile` is not a public custom-mode argument; it is resolved internally before runtime dispatch.
+- LLVM-JIT and tiered backends never use `auto_compile`. Use `--runtime-custom-mode lazy|lazy+verification|full` when their mode must be controlled explicitly.
 - Without preloaded Wasm modules, select `full_compile` when the executable Wasm file is at most 1 MiB; otherwise select `lazy_compile`.
 - With preloaded Wasm modules, select `full_compile` when executable plus preloaded Wasm bytes total at most 256 KiB; otherwise select `lazy_compile`.
-- `--log-verbose` prints the selected mode, executable Wasm bytes, preloaded Wasm bytes, total Wasm bytes, threshold, and policy.
+- `--log-verbose` prints `uwvm-int auto selected lazy|full compile for uwvm-int` with executable Wasm bytes, preloaded Wasm bytes, total Wasm bytes, threshold, and policy.
+
+Verbose example:
+
+```text
+uwvm: [info]  uwvm-int auto selected full compile for uwvm-int (main-wasm-bytes=241035, preload-wasm-bytes=0, total-wasm-bytes=241035, threshold=1048576, policy=main-only). [timestamp] (verbose)
+```
+
+Supported execution combinations:
+
+- `auto_compile`: uwvm-int only, from `--runtime-int` or `--runtime-custom-compiler int` without `--runtime-custom-mode`.
+- `lazy_compile` and `lazy_compile_with_full_code_verification`: `int`, `jit`, and `tiered`.
+- `full_compile`: `int` and `jit`.
+- `full_compile + tiered` is rejected because tiered execution is a lazy/tiered strategy.
+- `debug-int` is accepted by command-line parsing only when configured with `--debug-int=y`, but executable dispatch currently reports the debug interpreter backend as unsupported. The default Xmake configuration keeps it disabled.
 
 Conflict rules enforced by callbacks:
 
@@ -83,6 +102,8 @@ Valid:
 
 ```bash
 uwvm --runtime-custom-mode lazy --runtime-custom-compiler jit --run app.wasm
+uwvm --runtime-custom-compiler int --log-verbose --run app.wasm
+uwvm --runtime-custom-compiler int --runtime-custom-mode lazy --run app.wasm
 ```
 
 Invalid:
@@ -90,6 +111,7 @@ Invalid:
 ```bash
 uwvm --runtime-jit --runtime-aot --run app.wasm
 uwvm --runtime-jit --runtime-custom-mode full --run app.wasm
+uwvm --runtime-custom-mode full --runtime-custom-compiler tiered --run app.wasm
 ```
 
 ## `--runtime-custom-mode`
@@ -120,20 +142,24 @@ Accepted values depend on compiled backends:
 - `int`: UWVM interpreter backend.
 - `tiered`: UWVM interpreter plus LLVM JIT tiered backend.
 - `jit`: LLVM JIT backend.
-- `debug-int`: debug interpreter backend.
+- `debug-int`: debug interpreter backend; available only with Xmake `--debug-int=y`, disabled by default, and executable dispatch currently reports this backend as unsupported.
 
 Notes:
 
 - A value for a backend that was not compiled is not accepted, because the usage string and callback are built with feature macros.
 - The option normally sets only the compiler axis.
 - `int` defaults the mode axis to `auto_compile` when no explicit `--runtime-custom-mode` is supplied, matching `--runtime-int`.
+- `jit` and `tiered` do not default to auto. If no custom mode is supplied, they inherit the current mode value, normally `lazy_compile`.
+- `debug-int` does not default to auto. When compiled with `--debug-int=y`, if no custom mode is supplied it inherits `lazy_compile` and is then normalized to `full_compile` by the debug-interpreter runtime rule; executable dispatch then reports the backend as unsupported.
 - An explicit `--runtime-custom-mode lazy|lazy+verification|full` before or after `--runtime-custom-compiler int` remains explicit and does not use auto.
 - It has an `is_exist` guard.
 
 Example:
 
 ```bash
+uwvm --runtime-custom-compiler int --log-verbose --run app.wasm
 uwvm --runtime-custom-mode full --runtime-custom-compiler int --run app.wasm
+uwvm --runtime-custom-compiler int --runtime-custom-mode full --run app.wasm
 ```
 
 ## `--runtime-compiler-log`
@@ -386,6 +412,24 @@ Custom mode/backend pair:
 uwvm \
   --runtime-custom-mode lazy+verification \
   --runtime-custom-compiler tiered \
+  --run app.wasm
+```
+
+UWVM interpreter with automatic lazy/full selection:
+
+```bash
+uwvm \
+  --runtime-custom-compiler int \
+  --log-verbose \
+  --run app.wasm
+```
+
+UWVM interpreter with explicit full compile:
+
+```bash
+uwvm \
+  --runtime-custom-compiler int \
+  --runtime-custom-mode full \
   --run app.wasm
 ```
 

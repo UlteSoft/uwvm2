@@ -197,9 +197,10 @@ Controls the execution jit backend selection.
 
 Controls whether the debug int backend is enabled (build-time define `UWVM_ENABLE_DEBUG_INT`).
 
-- **Default:** `y`
-- **Impact:** Intended for development/debug builds; may have runtime overhead or extra checks/logging depending on implementation.
+- **Default:** `n`
+- **Impact:** Disabled by default because the debug interpreter executable runtime path is not implemented yet. Enabling it exposes `--runtime-debug-int` and `-Rcc debug-int` for implementation work, but executable dispatch still rejects the backend until that runtime path is completed.
 - **Example:**
+  - `xmake f --debug-int=y`
   - `xmake f --debug-int=n`
 
 ### `--enable-uwvm-int-combine-ops=MODE`
