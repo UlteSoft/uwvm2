@@ -37,8 +37,14 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // platfrom
 # include <signal.h>
+# pragma push_macro("UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT")
+# undef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
 # if !(defined(_WIN32) || defined(__CYGWIN__)) && defined(__has_include)
-#  if __has_include(<ucontext.h>)
+#  if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && __has_include(<sys/ucontext.h>)
+/// Darwin's <ucontext.h> exposes deprecated context routines and errors without _XOPEN_SOURCE; <sys/ucontext.h> still provides signal ucontext_t.
+#   include <sys/ucontext.h>
+#   define UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
+#  elif __has_include(<ucontext.h>)
 #   include <ucontext.h>
 #   define UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
 #  endif
@@ -125,7 +131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         inline ::uwvm2::utils::container::vector<protected_memory_segment_t> segments{};  // [global]
 
         /// @brief  Optional process-wide hook for translating mmap memory faults to a runtime-specific action.
-        inline mmap_memory_out_of_bounds_func_t mmap_memory_out_of_bounds_func{};         // [global]
+        inline mmap_memory_out_of_bounds_func_t mmap_memory_out_of_bounds_func{};  // [global]
 
         /// @brief      Previous platform handlers saved when UWVM installs its own fault handler.
         /// @details    The signal layer only consumes faults that belong to registered protected segments.
@@ -174,9 +180,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @param      instruction_address Best-effort program counter of the faulting instruction.
         /// @return     Diagnostic data consumed by the default reporter or a custom out-of-bounds hook.
         inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t
-            make_mmap_memory_error(protected_memory_segment_t const& seg,
-                                   ::std::byte const* fault_addr,
-                                   ::std::uintptr_t instruction_address) noexcept
+            make_mmap_memory_error(protected_memory_segment_t const& seg, ::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
         {
             auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};
@@ -309,11 +313,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief      Extract the faulting instruction address from a POSIX ucontext, when supported.
         /// @details    The exact register field is OS and architecture specific. Unsupported targets return
         ///             zero, which keeps diagnostics valid while omitting the instruction address.
-        [[nodiscard]] inline ::std::uintptr_t get_signal_instruction_address(void* context) noexcept
+        [[nodiscard]] inline ::std::uintptr_t get_signal_instruction_address([[maybe_unused]] void* context) noexcept
         {
 #  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
             if(context == nullptr) [[unlikely]] { return 0u; }
-            auto const uctx{static_cast<::ucontext_t const*>(context)};
+            [[maybe_unused]] auto const uctx{static_cast<::ucontext_t const*>(context)};
 
 #   if defined(__linux__) && defined(__x86_64__)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RIP]);
@@ -436,11 +440,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #   elif defined(__APPLE__) && defined(__aarch64__)
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__pc);
 #   else
-            static_cast<void>(uctx);
+            // static_cast<void>(uctx);
             return 0u;
 #   endif
 #  else
-            static_cast<void>(context);
+            // static_cast<void>(context);
             return 0u;
 #  endif
         }
@@ -636,6 +640,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #endif
 
 #ifndef UWVM_MODULE
+// platfrom
+# pragma pop_macro("UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT")
 // macro
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>

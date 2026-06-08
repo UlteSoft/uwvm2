@@ -15,7 +15,9 @@ local llvm_jit_required_components = {
     "transformutils",
     "instcombine",
     "bitreader",
-    "bitwriter"
+    "bitwriter",
+    "object",
+    "debuginfodwarf"
 }
 
 local llvm_jit_optional_components = {
@@ -32,10 +34,12 @@ local llvm_component_link_names = {
     bitreader = { "LLVMBitReader" },
     bitwriter = { "LLVMBitWriter" },
     core = { "LLVMCore" },
+    debuginfodwarf = { "LLVMDebugInfoDWARF" },
     executionengine = { "LLVMExecutionEngine" },
     instcombine = { "LLVMInstCombine" },
     linker = { "LLVMLinker" },
     mcjit = { "LLVMMCJIT" },
+    object = { "LLVMObject" },
     passes = { "LLVMPasses" },
     runtimedyld = { "LLVMRuntimeDyld" },
     scalaropts = { "LLVMScalarOpts" },
@@ -842,7 +846,7 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system"
 
     local cache_key = table.concat({
-        "llvm-jit-v14",
+        "llvm-jit-v15",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",

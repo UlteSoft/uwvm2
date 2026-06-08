@@ -122,6 +122,23 @@ function def_build(opt)
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()
+			for _, field in ipairs({
+				"linkdirs",
+				"frameworkdirs",
+				"frameworks",
+				"links",
+				"syslinks",
+				"ldflags",
+				"shflags"
+			}) do
+				for _, value in ipairs(llvm_jit_options[field] or {}) do
+					if field == "ldflags" or field == "shflags" then
+						target:add(field, value, { force = true })
+					else
+						target:add(field, value)
+					end
+				end
+			end
 			utility.add_linkflags_to_target(target, llvm_jit_options.native_codegen_linkflags, "links")
 		end)
 	end
