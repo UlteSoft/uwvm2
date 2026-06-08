@@ -8534,8 +8534,8 @@ namespace uwvm2::runtime::lib
                                                   runtime_llvm_jit_unwind_backend_name(),
                                                   u8" unwind_check=",
                                                   runtime_llvm_jit_unwind_check_requested()
-                                                      ? ::uwvm2::utils::container::u8string_view{u8"live-jit"}
-                                                      : (runtime_llvm_jit_unwind_call_stack_requested() ? ::uwvm2::utils::container::u8string_view{u8"skipped"}
+                                                      ? ::uwvm2::utils::container::u8string_view{u8"live"}
+                                                      : (runtime_llvm_jit_unwind_call_stack_requested() ? ::uwvm2::utils::container::u8string_view{u8"static"}
                                                                                                         : ::uwvm2::utils::container::u8string_view{u8"off"}),
                                                   u8" unwind_replace_frames=",
                                                   runtime_llvm_jit_unwind_can_replace_instruction_frames() ? ::uwvm2::utils::container::u8string_view{u8"yes"}
