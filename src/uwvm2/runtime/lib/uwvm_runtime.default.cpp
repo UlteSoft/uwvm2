@@ -1715,6 +1715,16 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline runtime_llvm_jit_unwind_probe_status runtime_llvm_jit_checked_unwind_probe_status() noexcept
         { return runtime_llvm_jit_checked_unwind_probe_result().status; }
 
+        [[nodiscard]] inline runtime_llvm_jit_unwind_probe_status runtime_llvm_jit_static_unwind_probe_status() noexcept
+        {
+# if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
+            return runtime_llvm_jit_unwind_probe_status::no_backend;
+# else
+            if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) { return runtime_llvm_jit_unwind_probe_status::no_frame_replacement; }
+            return runtime_llvm_jit_unwind_probe_status::ok;
+# endif
+        }
+
         inline void runtime_llvm_jit_auto_unwind_fallback_warning_once(runtime_llvm_jit_unwind_probe_status st) noexcept
         {
             static bool warned{};
@@ -1766,7 +1776,9 @@ namespace uwvm2::runtime::lib
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             return runtime_llvm_jit_call_stack_t::instruction;
 # else
-            auto const st{runtime_llvm_jit_checked_unwind_probe_status()};
+            // Auto mode is on the startup hot path; avoid materializing a throwaway MCJIT probe here.
+            // An explicit `-Rllvm-call-stack unwind` still performs the live check before committing to unwind mode.
+            auto const st{runtime_llvm_jit_static_unwind_probe_status()};
             if(st == runtime_llvm_jit_unwind_probe_status::ok) { return runtime_llvm_jit_call_stack_t::unwind; }
             runtime_llvm_jit_auto_unwind_fallback_warning_once(st);
             return runtime_llvm_jit_call_stack_t::instruction;
@@ -1785,8 +1797,7 @@ namespace uwvm2::runtime::lib
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
             auto const requested{runtime_mode::global_runtime_llvm_jit_call_stack};
-            return requested != runtime_mode::runtime_llvm_jit_call_stack_t::unwind_uncheck &&
-                   get_runtime_llvm_jit_effective_call_stack_mode() == runtime_mode::runtime_llvm_jit_call_stack_t::unwind;
+            return requested == runtime_mode::runtime_llvm_jit_call_stack_t::unwind;
         }
 
         [[noreturn]] inline void runtime_llvm_jit_unwind_call_stack_fatal(::uwvm2::utils::container::u8string_view reason) noexcept
