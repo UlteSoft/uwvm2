@@ -10738,6 +10738,8 @@ namespace uwvm2::runtime::lib
                     tiered_backend ? ::llvm::CodeGenOptLevel::Less :
 # endif
                                    ::llvm::CodeGenOptLevel::Less);
+                rec.llvm_jit_lazy_compile_options.jit_event_listener =
+                    opt.emit_unwind_call_stack_frames ? ::std::addressof(get_uwvm_llvm_jit_debug_listener()) : nullptr;
                 rec.llvm_jit_lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
                 if(lazy_validation_mode == llvm_jit_lazy_validation_mode_t::validate_on_lazy_compile &&
                    rec.llvm_jit_lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]

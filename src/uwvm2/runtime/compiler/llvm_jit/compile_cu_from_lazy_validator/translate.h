@@ -77,6 +77,11 @@
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+namespace llvm
+{
+    class JITEventListener;
+}
+
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator
 {
     using runtime_module_storage_t = ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t;
@@ -205,6 +210,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         parser_module_storage_t const* validator_module_storage{};
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
         ::llvm::CodeGenOptLevel codegen_opt_level{::llvm::CodeGenOptLevel::Less};
+        ::llvm::JITEventListener* jit_event_listener{};
     };
 
     struct lazy_compile_request_context
@@ -578,6 +584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+            if(options.jit_event_listener != nullptr) { engine->RegisterJITEventListener(options.jit_event_listener); }
             engine->finalizeObject();
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -682,6 +689,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+            if(options.jit_event_listener != nullptr) { engine->RegisterJITEventListener(options.jit_event_listener); }
             engine->finalizeObject();
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
