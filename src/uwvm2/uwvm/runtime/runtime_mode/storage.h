@@ -107,7 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
     /// @brief   Whether the runtime mode is code interpreted.
-    /// @details lazy_compile + uwvm_interpreter_only
+    /// @details auto_compile + uwvm_interpreter_only
     inline bool is_runtime_mode_code_int_existed{};  // [global]
 #endif
 

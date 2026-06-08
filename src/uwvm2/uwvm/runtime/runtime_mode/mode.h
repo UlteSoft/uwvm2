@@ -48,6 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
     enum class runtime_mode_t : unsigned
     {
+        auto_compile,
         lazy_compile,
         lazy_compile_with_full_code_verification,
         full_compile

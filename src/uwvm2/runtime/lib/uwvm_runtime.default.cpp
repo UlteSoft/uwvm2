@@ -7565,6 +7565,7 @@ namespace uwvm2::runtime::lib
         {
             switch(mode)
             {
+                case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile: return u8"auto_compile";
                 case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile: return u8"lazy_compile";
                 case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     return u8"lazy_compile_with_full_code_verification";

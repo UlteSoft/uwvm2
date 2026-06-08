@@ -1463,6 +1463,135 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 #endif
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+    // `-Rint` is a shortcut-only auto mode. Prefer full translation for ordinary executable-only uwvm-int runs because full
+    // translation is cheap; prefer lazy for preload-heavy runs so cold preload code is not translated up front.
+    //
+    // The two thresholds intentionally model different costs:
+    // - main-only: the executable module is hot by definition, so full translation usually pays for itself up to a larger size;
+    // - preload-total: full mode translates every loaded Wasm module, including preloads that may never be called, so use a lower cap.
+    inline constexpr ::std::size_t runtime_int_auto_main_full_threshold{1024uz * 1024uz};
+    inline constexpr ::std::size_t runtime_int_auto_preload_total_full_threshold{256uz * 1024uz};
+
+    [[nodiscard]] inline constexpr ::std::size_t saturating_add_size(::std::size_t lhs, ::std::size_t rhs) noexcept
+    {
+        // A malicious or unusual process configuration should not make size accounting wrap and accidentally select the
+        // smaller/full threshold.  Saturating to max keeps overflow on the conservative lazy side.
+        constexpr auto max_size{::std::numeric_limits<::std::size_t>::max()};
+        if(max_size - lhs < rhs) [[unlikely]] { return max_size; }
+        return lhs + rhs;
+    }
+
+    [[nodiscard]] inline ::std::size_t loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf) noexcept
+    {
+        // Use the parser's module span instead of re-statting paths.  At this point all executable/preload Wasm files have
+        // already been loaded, and the span describes the exact byte range that participated in parsing.
+        switch(wf.binfmt_ver)
+        {
+            case 1u:
+            {
+                auto const& module_storage{wf.wasm_module_storage.wasm_binfmt_ver1_storage};
+                auto const module_begin{module_storage.module_span.module_begin};
+                auto const module_end{module_storage.module_span.module_end};
+                if(module_begin == nullptr || module_end == nullptr || module_end < module_begin) [[unlikely]] { return 0uz; }
+                return static_cast<::std::size_t>(module_end - module_begin);
+            }
+            [[unlikely]] default:
+            {
+                return 0uz;
+            }
+        }
+    }
+
+    inline void resolve_runtime_int_auto_mode() noexcept
+    {
+        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile)
+        {
+            return;
+        }
+
+        // `auto_compile` is deliberately not a general runtime mode knob.  It exists only as the `-Rint` shortcut policy;
+        // custom JIT/tiered invocations must choose their mode explicitly so they do not inherit interpreter-specific tuning.
+        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
+           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                u8"[fatal] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint). Use -Rcm lazy|full with -Rcc jit|tiered "
+                                u8"to select LLVM-JIT or tiered runtime modes explicitly. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(runtime)\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::fast_terminate();
+        }
+
+        auto const main_wasm_bytes{loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::storage::execute_wasm)};
+        ::std::size_t preload_wasm_bytes{};
+        for(auto const& preloaded_wasm: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        {
+            preload_wasm_bytes = saturating_add_size(preload_wasm_bytes, loaded_wasm_file_byte_size(preloaded_wasm));
+        }
+
+        auto const total_wasm_bytes{saturating_add_size(main_wasm_bytes, preload_wasm_bytes)};
+        auto const has_preload_wasm{!::uwvm2::uwvm::wasm::storage::preloaded_wasm.empty()};
+
+        // With preloads, total loaded Wasm size is the relevant full-compile cost because full mode translates all loaded
+        // Wasm modules.  Without preloads, the executable module size is the useful hot-code proxy.
+        auto const threshold{has_preload_wasm ? runtime_int_auto_preload_total_full_threshold : runtime_int_auto_main_full_threshold};
+        auto const selected_full{has_preload_wasm ? total_wasm_bytes <= threshold : main_wasm_bytes <= threshold};
+
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode =
+            selected_full ? ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
+                          : ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
+
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            // Keep the auto decision visible under verbose logging so benchmark runs can explain why `-Rint` behaved like
+            // `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
+            ::fast_io::io::perr(
+                ::uwvm2::uwvm::io::u8log_output,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                u8"uwvm: ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                u8"[info]  ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8"Rint auto selected ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8" compile for uwvm-int (main-wasm-bytes=",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                main_wasm_bytes,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8", preload-wasm-bytes=",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                preload_wasm_bytes,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8", total-wasm-bytes=",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                total_wasm_bytes,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8", threshold=",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                threshold,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                ::fast_io::mnp::cond(has_preload_wasm, u8", policy=preload-total", u8", policy=main-only"),
+                u8"). ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                u8"[",
+                ::uwvm2::uwvm::io::get_local_realtime(),
+                u8"] ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                u8"(verbose)\n",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+    }
+#endif
+
     /**
      * @brief   Execute the requested UWVM action.
      * @details This is the top-level driver called by the CRT entry wrapper.  It first performs loader-level work that is
@@ -1618,6 +1747,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 # endif
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        // Resolve `-Rint` auto after loading/import initialization, when executable and preloaded Wasm byte spans are known,
+        // but before the runtime dispatch switch where only concrete lazy/full modes should remain.
+        resolve_runtime_int_auto_mode();
+# endif
+
         // Resolve global execution knobs after runtime storage exists.  Entry resolution needs runtime function type
         // storage, and compile-thread resolution publishes the value consumed by full-translation runtime code.
         resolve_runtime_compile_threads();
@@ -1650,6 +1785,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 // that strategy.  Each branch validates unsupported mode/backend combinations before calling runtime lib.
                 switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode)
                 {
+                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile:
+                    {
+                        // `auto_compile` must be resolved before dispatch.  Reaching this branch means a future code path
+                        // introduced auto mode without going through `resolve_runtime_int_auto_mode()`, or tried to combine
+                        // it with a non-int backend.  Fail loudly instead of silently treating it like lazy/full.
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"auto_compile runtime mode was not resolved before runtime dispatch. auto_compile is only supported by the "
+                                            u8"uwvm-int shortcut (-Rint), and LLVM-JIT/tiered backends require an explicit runtime mode (-Rcm lazy|full). ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8"(runtime)\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+
+                        break;
+                    }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
