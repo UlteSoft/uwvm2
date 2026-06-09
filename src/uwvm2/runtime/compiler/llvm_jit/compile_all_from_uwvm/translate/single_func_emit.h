@@ -2079,12 +2079,17 @@ inline void llvm_jit_with_checked_memory_access(::std::uintptr_t memory_address,
     }
 }
 
-// Native memory load bridge used when direct LLVM loads are not legal or profitable.  It performs Wasm bounds checks,
-// endian conversion, integer extension, and bit-preserving float loads.
+// Native memory load bridge used when direct LLVM loads are not legal or profitable.  It receives the runtime native-memory
+// object address, the static memarg offset, and the Wasm32 dynamic address.  The bridge centralizes the exact fallback
+// semantics that direct IR must match: checked effective-address computation, snapshot/guard-aware bounds checking,
+// unaligned little-endian byte loads, integer sign/zero extension, and bit-preserving floating-point reconstruction.
 template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
 [[nodiscard]] inline ResultType
     llvm_jit_memory_load_bridge(::std::uintptr_t memory_address, validation_module_traits_t::wasm_u32 static_offset, runtime_wasm_i32 address)
 {
+    // The checked-access wrapper either invokes the lambda with an in-bounds byte pointer or reports a memory trap that
+    // terminates execution.  Keeping a default-initialized result makes the function structurally total for the compiler,
+    // while successful accesses overwrite it before returning.
     ResultType result{};
     llvm_jit_with_checked_memory_access(
         memory_address,
@@ -2093,10 +2098,15 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
         LoadBytes,
         [&](::std::byte* memory_begin, ::std::size_t effective_offset) noexcept
         {
+            // At this point the runtime memory snapshot/guard is active and the range `[effective_offset, +LoadBytes)` is
+            // known in-bounds.  The helper still reads through `std::byte` + memcpy so host alignment never leaks into Wasm
+            // semantics.
             auto load_ptr{memory_begin + effective_offset};
 
             if constexpr(::std::same_as<ResultType, runtime_wasm_i32>)
             {
+                // i32.load8/16_s and i32.load8/16_u load fewer bytes than the result type.  Wasm defines the extension
+                // explicitly, so choose signed or unsigned widening from the loaded little-endian payload.
                 if constexpr(LoadBytes == 1uz)
                 {
                     auto const value{llvm_jit_load_little_endian_integer<::std::uint_least8_t>(load_ptr)};
@@ -2120,11 +2130,15 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
                 }
                 else if constexpr(LoadBytes == 4uz)
                 {
+                    // Full-width integer loads are bit-preserving: read the four little-endian bytes and reinterpret them
+                    // as the runtime i32 payload without an arithmetic conversion step.
                     result = ::std::bit_cast<runtime_wasm_i32>(llvm_jit_load_little_endian_integer<::std::uint_least32_t>(load_ptr));
                 }
             }
             else if constexpr(::std::same_as<ResultType, runtime_wasm_i64>)
             {
+                // i64.load8/16/32_s and i64.load8/16/32_u mirror the i32 path but widen to 64 bits.  The intermediate
+                // signed type is chosen to the loaded width so sign extension happens exactly once and at the Wasm width.
                 if constexpr(LoadBytes == 1uz)
                 {
                     auto const value{llvm_jit_load_little_endian_integer<::std::uint_least8_t>(load_ptr)};
@@ -2160,16 +2174,20 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
                 }
                 else if constexpr(LoadBytes == 8uz)
                 {
+                    // Full-width i64 load is also bit-preserving; no signedness is involved for the 8-byte form.
                     result = ::std::bit_cast<runtime_wasm_i64>(llvm_jit_load_little_endian_integer<::std::uint_least64_t>(load_ptr));
                 }
             }
             else if constexpr(::std::same_as<ResultType, runtime_wasm_f32>)
             {
+                // Floating-point loads are not numeric conversions.  WebAssembly loads raw IEEE-754 payload bytes from
+                // memory, so NaN payloads, sign bits, and signed zero must survive unchanged.
                 static_assert(LoadBytes == 4uz);
                 result = ::std::bit_cast<runtime_wasm_f32>(llvm_jit_load_little_endian_integer<::std::uint_least32_t>(load_ptr));
             }
             else if constexpr(::std::same_as<ResultType, runtime_wasm_f64>)
             {
+                // Same payload-preserving rule for f64; only the loaded byte width changes.
                 static_assert(LoadBytes == 8uz);
                 result = ::std::bit_cast<runtime_wasm_f64>(llvm_jit_load_little_endian_integer<::std::uint_least64_t>(load_ptr));
             }
