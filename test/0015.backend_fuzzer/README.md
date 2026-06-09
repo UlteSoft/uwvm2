@@ -104,6 +104,10 @@ Useful environment variables:
 - `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
   also honored.
 - `UWVM_BACKEND_LIBFUZZER_USE_LLD=0`: disable `-fuse-ld=lld`.
+- `UWVM_BACKEND_LIBFUZZER_PROGRESS=0`: silence libFuzzer target build
+  heartbeat.
+- `UWVM_BACKEND_LIBFUZZER_PROGRESS_INTERVAL`: heartbeat interval in seconds,
+  default `10`.
 - `LLVM_CONFIG`: llvm-config path for building the JIT-enabled runner.
 - `CXX`: C++ compiler used by `build_runner.py`.
 

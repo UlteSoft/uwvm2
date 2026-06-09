@@ -7,6 +7,7 @@ import argparse
 import os
 import shlex
 import subprocess
+import time
 from pathlib import Path
 
 from build_runner import (
@@ -26,6 +27,37 @@ def env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value not in {"", "0", "false", "False", "no", "NO", "off", "OFF"}
+
+
+def env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if not value:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
+def run_with_progress(cmd: list[str]) -> int:
+    progress = env_bool("UWVM_BACKEND_LIBFUZZER_PROGRESS", True)
+    interval = max(env_float("UWVM_BACKEND_LIBFUZZER_PROGRESS_INTERVAL", 10.0), 1.0)
+    if not progress:
+        return subprocess.run(cmd).returncode
+
+    print(
+        "INFO: backend libFuzzer build command started "
+        "(set UWVM_BACKEND_LIBFUZZER_PROGRESS=0 to silence heartbeat)",
+        flush=True,
+    )
+    start = time.monotonic()
+    proc = subprocess.Popen(cmd)
+    while proc.poll() is None:
+        time.sleep(interval)
+        if proc.poll() is None:
+            elapsed = int(time.monotonic() - start)
+            print(f"INFO: still building backend libFuzzer target ({elapsed}s elapsed)", flush=True)
+    return proc.returncode
 
 
 def main() -> int:
@@ -125,9 +157,9 @@ def main() -> int:
     if args.sysroot:
         print("INFO: sysroot=", args.sysroot, sep="")
     print("INFO: use-lld=", int(args.use_lld), sep="")
-    proc = subprocess.run(cmd)
-    if proc.returncode != 0:
-        return proc.returncode
+    rc = run_with_progress(cmd)
+    if rc != 0:
+        return rc
     print(out)
     return 0
 

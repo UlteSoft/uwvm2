@@ -40,6 +40,8 @@ Options:
 
 Environment:
   UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix llvm-jit-lazy ..."
+  UWVM_BACKEND_LIBFUZZER_PROGRESS=0
+  UWVM_BACKEND_LIBFUZZER_PROGRESS_INTERVAL=10
   CXX=clang++
   SYSROOT=/path/to/MacOSX.sdk
   LLVM_CONFIG=/path/to/llvm-config
