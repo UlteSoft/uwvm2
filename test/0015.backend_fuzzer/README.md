@@ -100,6 +100,8 @@ Useful environment variables:
 - `UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS`: extra linker flags for the runner.
 - `UWVM_BACKEND_LIBFUZZER_MODES`: space- or comma-separated mode list for the
   libFuzzer target. Defaults to all backend modes.
+- `UWVM_BACKEND_LIBFUZZER_TRACE=1`: print input size and backend mode before
+  each execution. This is useful when reducing a crash.
 - `UWVM_BACKEND_LIBFUZZER_SANITIZERS`: default `fuzzer,address,undefined`.
 - `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
   also honored.
@@ -114,3 +116,5 @@ Useful environment variables:
 `run_backend_fuzzer.sh` also accepts repeated `--define`, `--extra-cxxflag`,
 and `--extra-ldflag` arguments. These are intended for targeted llvm-jit or
 runtime macro probes that are not worth making first-class matrix dimensions.
+Known crashes can be skipped during long libFuzzer runs by passing
+`-ignore_crashes=1` after `--`.

@@ -845,6 +845,7 @@ namespace
         "tiered-no-t0",
         "tiered-no-t2",
     };
+    bool g_trace{};
 
     void set_modes_from_env()
     {
@@ -870,19 +871,29 @@ namespace
         if(!cur.empty()) { modes.push_back(cur); }
         if(!modes.empty()) { g_modes = ::std::move(modes); }
     }
+
+    [[nodiscard]] bool env_enabled(char const* name) noexcept
+    {
+        char const* env{::std::getenv(name)};
+        return env != nullptr && *env != '\0' && ::std::strcmp(env, "0") != 0 && ::std::strcmp(env, "false") != 0 && ::std::strcmp(env, "no") != 0;
+    }
 }  // namespace
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
     set_modes_from_env();
+    g_trace = env_enabled("UWVM_BACKEND_LIBFUZZER_TRACE");
     return 0;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t size)
 {
+    if(size == 0uz) { return 0; }
+    if(g_trace) { ::std::cerr << "backend-libfuzzer: input-size=" << size << '\n'; }
     auto c{project_input(data, size)};
     for(auto const& mode: g_modes)
     {
+        if(g_trace) { ::std::cerr << "backend-libfuzzer: mode=" << mode << '\n'; }
         if(mode == "uwvm-int-ring-matrix") { run_ring_matrix(c); }
         else { run_runtime_mode(c, mode); }
     }
