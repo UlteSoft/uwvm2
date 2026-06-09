@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 FUZZ_CASES="${UWVM_BACKEND_FUZZ_CASES:-32}"
-FUZZ_SEED="${UWVM_BACKEND_FUZZ_SEED:-0xC0DEF00D}"
+FUZZ_SEED="${UWVM_BACKEND_FUZZ_SEED:-}"
 WABT_ROOT="${UWVM_BACKEND_FUZZER_WABT_ROOT:-${ROOT_DIR}/build/test/third-parties/wabt}"
 WORK_ROOT="${UWVM_BACKEND_FUZZER_WORK_DIR:-${ROOT_DIR}/build/test/0015.backend_fuzzer/matrix}"
 
@@ -39,7 +39,7 @@ Environment:
   UWVM_BACKEND_MATRIX_MEMORY_MODELS="default mmap single-thread-alloc multi-thread-alloc"
   UWVM_BACKEND_MATRIX_THREAD_LOCAL_MODES="0 1"
   UWVM_BACKEND_FUZZ_CASES=32
-  UWVM_BACKEND_FUZZ_SEED=0xC0DEF00D
+  UWVM_BACKEND_FUZZ_SEED=0xC0DEF00D   # unset to generate a random seed
   UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0|1
   UWVM_BACKEND_FUZZER_MODES="uwvm-int-ring-matrix uwvm-int-lazy ..."
   UWVM_BACKEND_FUZZER_WABT_ROOT=build/test/third-parties/wabt
@@ -48,6 +48,13 @@ Environment:
 The matrix is fully shell/Python driven; it does not configure, build, or query
 xmake.
 EOF
+}
+
+random_seed() {
+  python3 - <<'PY'
+import secrets
+print(hex(secrets.randbits(64)))
+PY
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -63,6 +70,11 @@ fi
 if [[ "${#COMBINE_MODES[@]}" -eq 0 || "${#DELAY_MODES[@]}" -eq 0 || "${#MEMORY_MODELS[@]}" -eq 0 || "${#THREAD_LOCAL_MODES[@]}" -eq 0 ]]; then
   echo "ERR: matrix dimensions cannot be empty" >&2
   exit 2
+fi
+
+if [[ -z "${FUZZ_SEED}" ]]; then
+  FUZZ_SEED="$(random_seed)"
+  echo "INFO: generated backend fuzzer seed = ${FUZZ_SEED}"
 fi
 
 mkdir -p -- "${ROOT_DIR}/build"

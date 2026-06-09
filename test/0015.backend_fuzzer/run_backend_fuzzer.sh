@@ -7,7 +7,7 @@ ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 WABT_ROOT="${UWVM_BACKEND_FUZZER_WABT_ROOT:-${ROOT_DIR}/build/test/third-parties/wabt}"
 WORK_DIR="${UWVM_BACKEND_FUZZER_WORK_DIR:-${ROOT_DIR}/build/test/0015.backend_fuzzer}"
 FUZZ_CASES="${UWVM_BACKEND_FUZZ_CASES:-32}"
-FUZZ_SEED="${UWVM_BACKEND_FUZZ_SEED:-0xC0DEF00D}"
+FUZZ_SEED="${UWVM_BACKEND_FUZZ_SEED:-}"
 COMBINE="${UWVM_BACKEND_FUZZER_COMBINE:-none}"
 DELAY="${UWVM_BACKEND_FUZZER_DELAY:-none}"
 MEMORY_MODEL="${UWVM_BACKEND_FUZZER_MEMORY_MODEL:-default}"
@@ -47,7 +47,7 @@ Options:
   --wabt-root <path>   WABT checkout/build root. Default: build/test/third-parties/wabt.
   --work-dir <path>    Generated corpus/build/log directory. Default: build/test/0015.backend_fuzzer.
   --fuzz-cases <n>     Random non-trap cases to generate. Default: 32.
-  --seed <n>           Random seed accepted by Python int(..., 0). Default: 0xC0DEF00D.
+  --seed <n>           Random seed accepted by Python int(..., 0). Default: random.
   --combine <mode>     uwvm-int combine macros: none|soft|heavy|extra.
   --delay <mode>       uwvm-int delay-local macros: none|soft|heavy.
   --memory-model <m>   default|mmap|single-thread-alloc|multi-thread-alloc.
@@ -74,6 +74,13 @@ Environment:
 This runner does not call xmake and does not execute the uwvm CLI. It builds a
 direct-storage C++ runner and compares it with WABT.
 EOF
+}
+
+random_seed() {
+  python3 - <<'PY'
+import secrets
+print(hex(secrets.randbits(64)))
+PY
 }
 
 while (($#)); do
@@ -179,6 +186,13 @@ case "${USE_THREAD_LOCAL}" in
   0|false|FALSE|no|NO|off|OFF|'') USE_THREAD_LOCAL=0 ;;
   *) echo "ERR: unsupported thread-local toggle: ${USE_THREAD_LOCAL}" >&2; exit 2 ;;
 esac
+
+if [[ -z "${FUZZ_SEED}" ]]; then
+  FUZZ_SEED="$(random_seed)"
+  echo "INFO: generated backend fuzzer seed = ${FUZZ_SEED}"
+else
+  echo "INFO: backend fuzzer seed = ${FUZZ_SEED}"
+fi
 
 resolve_path() {
   local p="$1"

@@ -60,10 +60,30 @@ WABT is cloned and built automatically under `build/test/third-parties/wabt` if
 `wasm-validate` or `wasm-interp` are missing. WABT is invoked with post-MVP
 features disabled, so cases are checked as Wasm MVP/1.0.
 
+Run the LLVM libFuzzer target:
+
+```bash
+CXX="$(command -v clang++)" \
+SYSROOT="$(xcrun --sdk macosx --show-sdk-path)" \
+UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix llvm-jit-lazy tiered" \
+test/0015.backend_fuzzer/run_backend_libfuzzer.sh \
+  --memory-model single-thread-alloc \
+  --no-use-thread-local \
+  -- \
+  -max_total_time=300
+```
+
+`backend_libfuzzer.cc` maps arbitrary input bytes to a valid Wasm code body
+instead of treating bytes as a raw Wasm module. The generated code is
+self-checking: wrong codegen reaches `unreachable`, which libFuzzer records as
+a crash. The launcher runs libFuzzer in a single process by default. When
+`SYSROOT` is set, the build uses `--sysroot=$SYSROOT` and `-fuse-ld=lld`.
+
 Useful environment variables:
 
 - `UWVM_BACKEND_FUZZ_CASES`: random non-trap cases, default `32`.
-- `UWVM_BACKEND_FUZZ_SEED`: deterministic seed, default `0xC0DEF00D`.
+- `UWVM_BACKEND_FUZZ_SEED`: deterministic seed. If unset, a random seed is
+  generated and printed; generated corpora also write it to `cases/seed.txt`.
 - `UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0`: skip fixed trap cases.
 - `UWVM_BACKEND_FUZZER_MODES`: space- or comma-separated mode list.
 - `UWVM_BACKEND_FUZZER_WABT_ROOT`: WABT checkout/build root.
@@ -78,6 +98,12 @@ Useful environment variables:
   comma-separated. Entries may include or omit `-D`.
 - `UWVM_BACKEND_FUZZER_EXTRA_CXXFLAGS`: extra compiler flags for the runner.
 - `UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS`: extra linker flags for the runner.
+- `UWVM_BACKEND_LIBFUZZER_MODES`: space- or comma-separated mode list for the
+  libFuzzer target. Defaults to all backend modes.
+- `UWVM_BACKEND_LIBFUZZER_SANITIZERS`: default `fuzzer,address,undefined`.
+- `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
+  also honored.
+- `UWVM_BACKEND_LIBFUZZER_USE_LLD=0`: disable `-fuse-ld=lld`.
 - `LLVM_CONFIG`: llvm-config path for building the JIT-enabled runner.
 - `CXX`: C++ compiler used by `build_runner.py`.
 

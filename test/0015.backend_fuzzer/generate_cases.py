@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import secrets
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -553,7 +554,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", required=True, type=Path)
     ap.add_argument("--cases", type=int, default=64)
-    ap.add_argument("--seed", type=lambda s: int(s, 0), default=0xC0DEF00D)
+    ap.add_argument("--seed", type=lambda s: int(s, 0), default=None)
     ap.add_argument("--include-traps", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()
@@ -569,7 +570,8 @@ def main() -> int:
     corpus_dir.mkdir(parents=True, exist_ok=True)
     generated_dir.mkdir(parents=True, exist_ok=True)
 
-    cases = make_cases(args.cases, args.seed, args.include_traps)
+    seed = args.seed if args.seed is not None else secrets.randbits(64)
+    cases = make_cases(args.cases, seed, args.include_traps)
     manifest = []
     for idx, case in enumerate(cases):
         wasm_path = corpus_dir / f"{idx:04d}.{case.name.split('.', 1)[1]}.wasm"
@@ -586,7 +588,8 @@ def main() -> int:
     flat = flatten_cases(cases)
     write_header(generated_dir / "backend_fuzzer_cases.inc", flat)
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print(f"generated {len(cases)} cases in {out_dir}")
+    (out_dir / "seed.txt").write_text(f"{hex(seed)}\n", encoding="utf-8")
+    print(f"generated {len(cases)} cases in {out_dir} seed={hex(seed)}")
     return 0
 
 
