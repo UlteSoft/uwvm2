@@ -1467,11 +1467,18 @@ inline void llvm_jit_local_imported_global_set_bridge(::std::uintptr_t local_imp
 // Short aliases for runtime types used repeatedly by memory/table bridge templates below.
 using runtime_native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
 using runtime_wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+using runtime_wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
 using runtime_wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+using runtime_wasm_u64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
 using runtime_wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 using runtime_wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 using runtime_table_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t;
 using runtime_table_elem_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t;
+
+static_assert(sizeof(::std::uint_least32_t) == sizeof(runtime_wasm_u32));
+static_assert(sizeof(::std::uint_least64_t) == sizeof(runtime_wasm_u64));
+static_assert(sizeof(runtime_wasm_u32) == sizeof(runtime_wasm_f32));
+static_assert(sizeof(runtime_wasm_u64) == sizeof(runtime_wasm_f64));
 
 // Result of resolving a table element for call_indirect.  This separates "table slot is empty" from "slot is present but
 // cannot be converted to a same-module direct call".
