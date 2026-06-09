@@ -111,6 +111,10 @@ struct llvm_jit_memory_snapshot_values_t
 [[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string const& str) noexcept
 { return get_llvm_string_ref(::uwvm2::utils::container::string_view{str.data(), str.size()}); }
 
+// LLVM StringRef borrows bytes, so accepting an owning string temporary would immediately dangle.
+[[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string&&) noexcept = delete;
+[[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string const&&) noexcept = delete;
+
 // Check whether a basic block is already closed.  Most helpers call this before adding branches to avoid invalid LLVM IR.
 [[nodiscard]] inline bool llvm_jit_basic_block_has_terminator(::llvm::BasicBlock const* block) noexcept
 {
@@ -143,17 +147,18 @@ class raw_uwvm_string_ostream : public ::llvm::raw_ostream
     ::uwvm2::utils::container::string& output;
 
     // Append bytes exactly as LLVM provides them; no encoding transformation is performed.
-    void write_impl(char const* ptr, ::std::size_t size) override { output.append(ptr, size); }
+    inline constexpr void write_impl(char const* ptr, ::std::size_t size) noexcept override { output.append(ptr, size); }
 
     // LLVM uses current_pos() for stream bookkeeping and reserve hints.
-    [[nodiscard]] ::std::uint64_t current_pos() const override { return output.size(); }
+    [[nodiscard]] inline constexpr ::std::uint64_t current_pos() const noexcept override { return output.size(); }
 
 public:
     // `unbuffered = true` keeps LLVM writes immediately visible in `output`.
-    explicit raw_uwvm_string_ostream(::uwvm2::utils::container::string& str) : ::llvm::raw_ostream{true}, output{str} {}
+    inline constexpr explicit raw_uwvm_string_ostream(::uwvm2::utils::container::string& str) noexcept : ::llvm::raw_ostream{true}, output{str} {}
 
     // Preserve LLVM's reserveExtraSpace contract while mapping sizes back to uwvm's container type.
-    void reserveExtraSpace(::std::uint64_t extra_size) override { output.reserve(static_cast<::std::size_t>(this->tell() + extra_size)); }
+    inline constexpr void reserveExtraSpace(::std::uint64_t extra_size) noexcept override
+    { output.reserve(static_cast<::std::size_t>(this->tell() + extra_size)); }
 };
 
 // Return the canonical Wasm byte encoding for a runtime scalar type.  Switches use the byte encoding so parser and JIT
@@ -460,10 +465,9 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
     auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
-    return ::llvm::FunctionType::get(
-        ::llvm::Type::getVoidTy(llvm_context),
-        {llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type},
-        false);
+    return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context),
+                                     {llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type},
+                                     false);
 }
 
 // Emit a detailed out-of-bounds memory trap.  Null dynamic values are replaced with zero to keep trap emission robust in
@@ -483,14 +487,14 @@ inline void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
     auto llvm_intptr_type{function_type->getParamType(0u)};
     auto llvm_i64_type{function_type->getParamType(1u)};
     auto llvm_i32_type{function_type->getParamType(3u)};
-    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap))};
+    auto llvm_address{
+        ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap))};
     auto bridge_pointer{::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type))};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto memory_offset_arg{memory_offset == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
                                                     : ir_builder.CreateIntCast(memory_offset, llvm_i64_type, false)};
-    auto offset_65_bit_arg{offset_65_bit == nullptr ? ::llvm::ConstantInt::get(llvm_i32_type, 0u)
-                                                    : ir_builder.CreateZExtOrTrunc(offset_65_bit, llvm_i32_type)};
+    auto offset_65_bit_arg{offset_65_bit == nullptr ? ::llvm::ConstantInt::get(llvm_i32_type, 0u) : ir_builder.CreateZExtOrTrunc(offset_65_bit, llvm_i32_type)};
     auto memory_length_arg{memory_length == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
                                                     : ir_builder.CreateIntCast(memory_length, llvm_i64_type, false)};
 
@@ -1859,12 +1863,11 @@ inline void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
 
 // Run a memory access under the backend's required snapshot/guard discipline and call `fn` only after bounds checks pass.
 template <typename MemoryT, typename Fn>
-[[nodiscard]] inline bool
-    llvm_jit_try_checked_memory_access(MemoryT const& memory,
-                                       llvm_jit_wasm32_effective_offset_t effective_offset,
-                                       ::std::size_t access_size,
-                                       ::std::size_t& memory_length_out,
-                                       Fn&& fn)
+[[nodiscard]] inline bool llvm_jit_try_checked_memory_access(MemoryT const& memory,
+                                                             llvm_jit_wasm32_effective_offset_t effective_offset,
+                                                             ::std::size_t access_size,
+                                                             ::std::size_t& memory_length_out,
+                                                             Fn&& fn)
 {
     // The common checked path records the length used for diagnostics, validates the effective range, and then executes
     // the caller's load/store lambda on a raw byte pointer.
@@ -2772,12 +2775,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
         module_storage.llvm_di_file = module_storage.llvm_di_builder->createFile(get_llvm_string_ref(llvm_module_name), ".");
         module_storage.llvm_di_compile_unit =
-            module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C,
-                                                              module_storage.llvm_di_file,
-                                                              "uwvm2-llvm-jit",
-                                                              false,
-                                                              "",
-                                                              0);
+            module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C, module_storage.llvm_di_file, "uwvm2-llvm-jit", false, "", 0);
         return module_storage.llvm_di_file != nullptr && module_storage.llvm_di_compile_unit != nullptr;
     }
 
@@ -3400,10 +3398,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 // Raw ABI wrappers are not Wasm frames, but full/tier-2 optimization can inline the public Wasm entry into
                 // them.  Give wrappers a non-parseable debug scope so DWARF still records the inlined Wasm frame chain.
                 auto const line{static_cast<unsigned>(function_index_uz + 1uz)};
-                auto const raw_di_name{::uwvm2::utils::container::concat_uwvm("uwvm-raw-inline-anchor:m=",
-                                                                              local_func_storage_ptr->module_id,
-                                                                              ":f=",
-                                                                              function_index_uz)};
+                auto const raw_di_name{
+                    ::uwvm2::utils::container::concat_uwvm("uwvm-raw-inline-anchor:m=", local_func_storage_ptr->module_id, ":f=", function_index_uz)};
                 raw_di_subprogram =
                     state.llvm_di_builder->createFunction(state.llvm_di_file,
                                                           get_llvm_string_ref(raw_di_name),
@@ -5278,16 +5274,15 @@ template <typename CreateValue>
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
                     auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
 
-                    emit_llvm_conditional_memory_out_of_bounds_trap(
-                        *llvm_module,
-                        ir_builder,
-                        ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
-                        0uz,
-                        static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
-                        effective_offset,
-                        offset_out_of_range,
-                        memory_length_load,
-                        access_size);
+                    emit_llvm_conditional_memory_out_of_bounds_trap(*llvm_module,
+                                                                    ir_builder,
+                                                                    ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
+                                                                    0uz,
+                                                                    static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                                                                    effective_offset,
+                                                                    offset_out_of_range,
+                                                                    memory_length_load,
+                                                                    access_size);
                 }
                 else if(memory0_access_info.mmap_uses_partial_protection)
                 {
@@ -5320,16 +5315,15 @@ template <typename CreateValue>
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
                     auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
 
-                    emit_llvm_conditional_memory_out_of_bounds_trap(
-                        *llvm_module,
-                        ir_builder,
-                        ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
-                        0uz,
-                        static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
-                        effective_offset,
-                        offset_out_of_range,
-                        memory_length_load,
-                        access_size);
+                    emit_llvm_conditional_memory_out_of_bounds_trap(*llvm_module,
+                                                                    ir_builder,
+                                                                    ir_builder.CreateOr(offset_out_of_range, ir_builder.CreateOr(memory_too_small, access_oob)),
+                                                                    0uz,
+                                                                    static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
+                                                                    effective_offset,
+                                                                    offset_out_of_range,
+                                                                    memory_length_load,
+                                                                    access_size);
                     ir_builder.CreateBr(partial_continue_block);
                     ir_builder.SetInsertPoint(partial_continue_block);
                 }
