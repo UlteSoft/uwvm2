@@ -32,6 +32,24 @@ namespace
     namespace int_compiler = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm;
     namespace int_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
 
+#if !defined(UWVM_DISABLE_INT) && (defined(UWVM_USE_DEFAULT_INT) || defined(UWVM_USE_UWVM_INT))
+# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 1
+#else
+# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 0
+#endif
+
+#if !defined(UWVM_DISABLE_JIT) && (defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT))
+# define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 1
+#else
+# define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 0
+#endif
+
+#if UWVM_BACKEND_FUZZER_HAS_UWVM_INT && UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
+# define UWVM_BACKEND_FUZZER_HAS_TIERED 1
+#else
+# define UWVM_BACKEND_FUZZER_HAS_TIERED 0
+#endif
+
     using value_type_t = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
     using wasm_byte_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
     using module_t = storage::wasm_module_storage_t;
@@ -583,7 +601,7 @@ namespace
         rtmode::runtime_scheduling_policy_existed = true;
         rtmode::global_runtime_scheduling_policy = rtmode::runtime_scheduling_policy_t::function_count;
         rtmode::global_runtime_scheduling_size = 1uz;
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if UWVM_BACKEND_FUZZER_HAS_TIERED
         rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = false;
         rtmode::runtime_tiered_disable_llvm_full_jit = false;
 #endif
@@ -626,7 +644,7 @@ namespace
         {
             rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if UWVM_BACKEND_FUZZER_HAS_TIERED
             rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = true;
 #endif
             return;
@@ -635,7 +653,7 @@ namespace
         {
             rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if UWVM_BACKEND_FUZZER_HAS_TIERED
             rtmode::runtime_tiered_disable_llvm_full_jit = true;
 #endif
             return;
@@ -647,7 +665,7 @@ namespace
     void run_runtime_mode(fuzz_case const& c, ::std::string_view mode)
     {
         configure_mode(mode);
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+#if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
         ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
 #endif
         direct_module_owner owner{};
