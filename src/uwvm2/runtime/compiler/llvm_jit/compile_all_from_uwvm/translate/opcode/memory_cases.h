@@ -1,10 +1,14 @@
 // Memory opcode validation cases.
 // Load/store instructions carry a `memarg` immediate encoded as two unsigned LEB128 values:
 // `align` is the log2 alignment hint and `offset` is the static address offset.  The validation
-// helpers consume those immediates, require memory 0 to exist for MVP Wasm, enforce the maximum
-// legal alignment exponent for the access width, and validate the operand-stack contract.  The JIT
-// path records the validated instruction byte range so the emit pass can reparse the same memarg
-// and generate either direct-memory IR or a runtime memory bridge call.
+// helpers consume those immediates, require memory 0 to exist for WebAssembly 1.0/MVP, enforce the
+// maximum legal alignment exponent for the access width, and validate the operand-stack contract.
+// The JIT path records the validated instruction byte range so the emit pass can reparse the same
+// memarg and generate either direct-memory IR or a runtime memory bridge call.
+//
+// WebAssembly 1.0/MVP has one default memory and i32 addresses.  Multi-memory must thread the
+// selected memory index through validation and emission; memory64 must update the address,
+// memory.size, and memory.grow stack types together with LLVM effective-address lowering.
 
 // i32.load
 // Stack effect: (i32 address) -> (i32).  Validates a 4-byte integer load with max alignment
@@ -433,9 +437,10 @@ case wasm1_code::i64_store32:
 }
 
 // memory.size
-// Stack effect: () -> (i32 current_pages).  MVP Wasm still encodes a memory index immediate; this
-// validator decodes it as LEB128, requires the decoded value to be zero, and then pushes the current
-// page-count result type.
+// Stack effect: () -> (i32 current_pages).  WebAssembly 1.0/MVP still encodes a memory index
+// immediate; this validator decodes it as LEB128, requires the decoded value to be zero, and then
+// pushes the current page-count result type.  Multi-memory will relax the zero restriction, and
+// memory64 must revisit the result type.
 case wasm1_code::memory_size:
 {
     // memory.size memidx ...
@@ -454,9 +459,10 @@ case wasm1_code::memory_size:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // MVP keeps `memory.size` on memory 0 only, but the immediate is still represented as an
-    // unsigned LEB128 memory index in the binary stream. The correct validation contract is to
-    // decode first and then require the decoded value to be zero.
+    // WebAssembly 1.0/MVP keeps `memory.size` on memory 0 only, but the immediate is still represented as an unsigned
+    // LEB128 memory index in the binary stream. The correct validation contract is to decode first and then require the
+    // decoded value to be zero.  Future multi-memory support should replace this with selected-memory existence/type
+    // validation instead of removing the decode step.
     //
     // This compiler-integrated validator intentionally mirrors the standalone validator so both
     // paths accept the same set of well-formed MVP binaries, including non-canonical zero LEB128
@@ -519,7 +525,8 @@ case wasm1_code::memory_size:
 
 // memory.grow
 // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1).  The immediate follows the
-// same MVP memory-index rule as `memory.size`, and the delta operand must be i32.
+// same WebAssembly 1.0/MVP memory-index rule as `memory.size`, and the delta operand must be i32.
+// Multi-memory must select the requested memory; memory64 must revisit the delta/result types.
 case wasm1_code::memory_grow:
 {
     // memory.grow memidx ...
@@ -538,8 +545,9 @@ case wasm1_code::memory_grow:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // `memory.grow` uses the same reserved memidx rule. Keep this logic aligned with the standard
-    // validator: malformed LEB128 is invalid encoding; well-formed non-zero memidx is illegal MVP use.
+    // `memory.grow` uses the same WebAssembly 1.0/MVP reserved memidx rule. Keep this logic aligned with the standard
+    // validator: malformed LEB128 is invalid encoding; well-formed non-zero memidx is illegal MVP use.  Future
+    // multi-memory support must turn this into selected-memory validation and pass the chosen index to the emitter.
     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
 
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;

@@ -1,4 +1,6 @@
-// Floating-point numeric operators and numeric conversions.
+// Floating-point numeric operators and numeric conversions for WebAssembly 1.0/MVP scalar values.
+// Future proposal value spaces must add their own opcode decode and stack tags rather than assuming these f32/f64/i32/i64
+// cases describe the expanded type system.
 // `validate_numeric_unary` / `validate_numeric_binary` consume the opcode byte, enforce the
 // WebAssembly operand-stack contract, and push the validated result type.  The LLVM JIT path
 // mirrors that stack effect with runtime stack-value tags, then emits the corresponding LLVM IR

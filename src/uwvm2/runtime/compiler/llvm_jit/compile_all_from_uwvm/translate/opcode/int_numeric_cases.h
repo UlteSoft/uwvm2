@@ -1,4 +1,6 @@
-// Integer numeric operators.
+// Integer numeric operators for WebAssembly 1.0/MVP scalar i32/i64 values.
+// Proposal opcodes such as SIMD or saturating/nontrapping conversions live in extended opcode spaces and must extend the
+// dispatch layer plus stack-value model before being routed through this MVP numeric family.
 // `validate_numeric_unary` / `validate_numeric_binary` consume the opcode byte, validate the
 // current WebAssembly operand stack, and push the result type.  The inline LLVM JIT path then emits
 // an IR operation with matching runtime stack-value tags.  The cases below avoid LLVM undefined

@@ -1,3 +1,7 @@
+// Control-flow opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+// This file is included directly inside the validator switch, so proposal/prefixed control opcodes must extend the
+// dispatch layer and LLVM control-flow lowering at the same time.
+
 case wasm1_code::unreachable:
 {
     // `unreachable` makes the operand stack "polymorphic" (per Wasm validation rules):
@@ -92,7 +96,9 @@ case wasm1_code::block:
     // [     safe    ] unsafe (could be the section_end)
     //                 ^^ op_begin
 
-    // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
+    // WebAssembly 1.0/MVP blocktype is either 0x40 (empty) or one scalar value type.  Multi-value blocktypes can also
+    // encode a type index with parameters/results; when enabling that proposal, update this parser, runtime block-result
+    // storage, branch label arity validation, and LLVM PHI/result lowering together.
     runtime_block_result_type block_result{};
 
     switch(blocktype_byte)
@@ -190,7 +196,9 @@ case wasm1_code::loop:
     // [    safe    ] unsafe (could be the section_end)
     //                ^^ code_curr
 
-    // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
+    // WebAssembly 1.0/MVP blocktype is either 0x40 (empty) or one scalar value type.  Multi-value blocktypes can also
+    // encode a type index with parameters/results; when enabling that proposal, update this parser, runtime block-result
+    // storage, branch label arity validation, and LLVM loop-entry/latch lowering together.
     runtime_block_result_type block_result{};
 
     switch(blocktype_byte)
@@ -290,7 +298,9 @@ case wasm1_code::if_:
     // [   safe   ] unsafe (could be the section_end)
     //              ^^ code_curr
 
-    // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
+    // WebAssembly 1.0/MVP blocktype is either 0x40 (empty) or one scalar value type.  Multi-value blocktypes can also
+    // encode a type index with parameters/results; when enabling that proposal, update this parser, if/else result
+    // merging, branch arity validation, and LLVM PHI/result lowering together.
     runtime_block_result_type block_result{};
 
     switch(blocktype_byte)

@@ -4,6 +4,10 @@
 // dispatcher-local emit helpers.  The helpers prefer direct linear-memory IR on supported little-
 // endian configurations and fall back to typed runtime bridges when direct access is unavailable,
 // unsafe, imported, or otherwise not profitable.
+//
+// WebAssembly 1.0/MVP memory instructions target default memory 0 and use i32 addresses.  Multi-memory must pass the
+// decoded memory index into these helpers instead of relying on cached memory0 state, and memory64 must widen the address,
+// memory.size, and memory.grow IR/result handling together with validation.
 
 // i32.load
 // Emits a 4-byte little-endian integer load from memory0 and pushes an i32.  The bridge fallback
@@ -506,8 +510,9 @@ case wasm1_code::i64_store32:
 }
 
 // memory.size
-// Emits the current memory0 size in Wasm pages as an i32.  Validation already proved the MVP
-// memory index is zero; this replay still decodes it to keep the emit cursor synchronized.
+// Emits the current memory0 size in Wasm pages as an i32.  Validation already proved the WebAssembly 1.0/MVP memory index
+// is zero; this replay still decodes it to keep the emit cursor synchronized.  Multi-memory/memory64 must replace the
+// hard-coded zero check with selected-memory and widened-result lowering.
 case wasm1_code::memory_size:
 {
     ++code_curr;
@@ -518,8 +523,10 @@ case wasm1_code::memory_size:
 }
 
 // memory.grow
-// Emits WebAssembly's grow result: old page count on success or -1 on failure.  The helper can
-// synthesize definitely-failing cases in IR and otherwise delegates to the memory growth bridge.
+// Emits WebAssembly's grow result: old page count on success or -1 on failure.  The helper can synthesize
+// definitely-failing cases in IR and otherwise delegates to the memory growth bridge.  This is still the WebAssembly
+// 1.0/MVP memory0/i32 form; future multi-memory/memory64 support must thread the selected memory index and widened page
+// type through the bridge ABI.
 case wasm1_code::memory_grow:
 {
     ++code_curr;

@@ -1,3 +1,7 @@
+// Constants and comparison opcode validation/emission cases for WebAssembly 1.0/MVP scalar values.
+// Future reference, SIMD, or other proposal value spaces must add their opcode decoding and stack tags explicitly instead
+// of assuming these MVP numeric cases cover the expanded type system.
+
 case wasm1_code::i32_const:
 {
     // i32.const i32 ...

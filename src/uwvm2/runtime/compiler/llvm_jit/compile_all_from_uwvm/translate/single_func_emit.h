@@ -190,6 +190,9 @@ public:
 [[nodiscard]] inline ::llvm::PointerType* get_llvm_pointer_type(::llvm::Type* pointee_type, unsigned address_space = 0u) noexcept
 {
     if(pointee_type == nullptr) [[unlikely]] { return nullptr; }
+
+    // LLVM's address-space type is `unsigned`; keep this helper's public signature aligned with LLVM rather than
+    // widening to size_t and then truncating at every call site.
     return ::llvm::PointerType::get(pointee_type->getContext(), address_space);
 }
 
@@ -219,6 +222,7 @@ public:
     if(current_function == nullptr || current_function->empty()) [[unlikely]] { return nullptr; }
 
     auto& entry_block{current_function->getEntryBlock()};
+    // Use a short-lived builder so the caller's insertion point remains exactly where expression emission expects it.
     ::llvm::IRBuilder<> entry_builder{&entry_block, entry_block.getFirstInsertionPt()};
     return entry_builder.CreateAlloca(allocated_type, array_size, name);
 }
@@ -261,6 +265,7 @@ inline void apply_llvm_jit_semantic_function_attrs(::llvm::Function& function) n
 {
     // WebAssembly MVP `call` always creates an ordinary call boundary.  LLVM must not infer a sibling/tail call from
     // native target profitability, because Wasm tail-call semantics are represented by separate tail-call proposal opcodes.
+    // LLVM exposes this as a string-valued semantic attribute rather than a stable enum attribute on the Function API.
     function.addFnAttr("disable-tail-calls", "true");
 }
 
@@ -394,6 +399,8 @@ inline ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call
     if(masked_right == nullptr) [[unlikely]] { return nullptr; }
 
     auto bit_width_value{::llvm::ConstantInt::get(right->getType(), bit_width)};
+    // A zero rotate count must not become a shift by the full bit width.  Mask the inverse count as well so both LLVM
+    // shifts stay in range for every Wasm-defined rotate count.
     auto inverse_shift{emit_llvm_shift_count_mask(ir_builder, ir_builder.CreateSub(bit_width_value, masked_right), bit_width)};
     return ir_builder.CreateOr(ir_builder.CreateShl(left, masked_right), ir_builder.CreateLShr(left, inverse_shift));
 }
@@ -410,6 +417,7 @@ inline ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call
     if(masked_right == nullptr) [[unlikely]] { return nullptr; }
 
     auto bit_width_value{::llvm::ConstantInt::get(right->getType(), bit_width)};
+    // The inverse shift has the same out-of-range hazard as the primary count, especially for rotate-by-zero.
     auto inverse_shift{emit_llvm_shift_count_mask(ir_builder, ir_builder.CreateSub(bit_width_value, masked_right), bit_width)};
     return ir_builder.CreateOr(ir_builder.CreateLShr(left, masked_right), ir_builder.CreateShl(left, inverse_shift));
 }
@@ -462,6 +470,10 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
 // length, and access size so diagnostics can report the exact failed access.
 [[nodiscard]] inline ::llvm::FunctionType* get_llvm_memory_out_of_bounds_trap_bridge_function_type(::llvm::LLVMContext& llvm_context) noexcept
 {
+    // Match the C++ bridge ABI exactly instead of reusing one generic integer width:
+    // - size_t/uintptr_t fields use the host pointer-sized integer so 32-bit and 64-bit hosts keep their native ABI.
+    // - Wasm address/length diagnostics are fixed 64-bit values and must not be truncated on 32-bit hosts.
+    // - The overflow/carry diagnostic is a uint_least32_t-sized flag, so the IR signature keeps it as i32.
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
     auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
@@ -484,6 +496,9 @@ inline void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
     auto function_type{get_llvm_memory_out_of_bounds_trap_bridge_function_type(llvm_context)};
     if(function_type == nullptr) [[unlikely]] { return; }
 
+    // Reuse the exact parameter types from the bridge signature for constants and casts below.  That keeps the call
+    // operands ABI-identical to `get_llvm_memory_out_of_bounds_trap_bridge_function_type` even if the bridge signature is
+    // adjusted later, and avoids duplicating integer-width assumptions in the emission path.
     auto llvm_intptr_type{function_type->getParamType(0u)};
     auto llvm_i64_type{function_type->getParamType(1u)};
     auto llvm_i32_type{function_type->getParamType(3u)};
@@ -530,6 +545,8 @@ inline void
     auto trap_block{::llvm::BasicBlock::Create(llvm_context, "wasmTrap", function)};
     auto continue_block{::llvm::BasicBlock::Create(llvm_context, "wasmTrapCont", function)};
 
+    // Emit an explicit diamond instead of relying on a select-like helper: traps are control effects and must dominate the
+    // dangerous LLVM instruction that follows on the continue edge.
     ir_builder.CreateCondBr(condition, trap_block, continue_block);
 
     ir_builder.SetInsertPoint(trap_block);
@@ -564,6 +581,8 @@ inline void emit_llvm_conditional_memory_out_of_bounds_trap(::llvm::Module&,
     auto trap_block{::llvm::BasicBlock::Create(llvm_context, "memory.oob.trap", function)};
     auto continue_block{::llvm::BasicBlock::Create(llvm_context, "memory.oob.cont", function)};
 
+    // Keep the detailed trap on its own block so all diagnostic operands are evaluated before the edge becomes
+    // unreachable, while normal memory code continues in a clean successor block.
     ir_builder.CreateCondBr(condition, trap_block, continue_block);
 
     ir_builder.SetInsertPoint(trap_block);
@@ -630,6 +649,8 @@ inline void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::ll
 
     ir_builder.SetInsertPoint(end_block);
     auto phi{ir_builder.CreatePHI(int_type, 2u)};
+    // The overflow edge contributes the Wasm-defined zero result without executing LLVM `srem` on the poison-producing
+    // signed-min / -1 pair.
     phi->addIncoming(::llvm::ConstantInt::get(int_type, 0u), pre_overflow_block);
     phi->addIncoming(no_overflow_value, no_overflow_block);
     return phi;
@@ -642,12 +663,14 @@ inline void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::ll
 
     if(nan->getType()->isFloatTy())
     {
+        // IEEE-754 quiet bit for binary32 significands.
         auto int_value{ir_builder.CreateBitCast(nan, ::llvm::Type::getInt32Ty(ir_builder.getContext()))};
         auto quiet_mask{::llvm::ConstantInt::get(int_value->getType(), 0x00400000u)};
         return ir_builder.CreateBitCast(ir_builder.CreateOr(int_value, quiet_mask), nan->getType());
     }
     if(nan->getType()->isDoubleTy())
     {
+        // IEEE-754 quiet bit for binary64 significands.
         auto int_value{ir_builder.CreateBitCast(nan, ::llvm::Type::getInt64Ty(ir_builder.getContext()))};
         auto quiet_mask{::llvm::ConstantInt::get(int_value->getType(), 0x0008000000000000ull)};
         return ir_builder.CreateBitCast(ir_builder.CreateOr(int_value, quiet_mask), nan->getType());
@@ -667,6 +690,8 @@ inline void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::ll
     auto is_left_less_than_right{ir_builder.CreateFCmpOLT(left, right)};
     auto is_left_greater_than_right{ir_builder.CreateFCmpOGT(left, right)};
 
+    // Ordered comparisons handle normal unequal operands.  The final bitwise tie case is reached for equal operands,
+    // including signed zeros, where Wasm requires a deterministic zero sign.
     return ir_builder.CreateSelect(
         is_left_nan,
         quiet_llvm_nan(ir_builder, left),
@@ -694,6 +719,8 @@ inline void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::ll
     auto is_left_less_than_right{ir_builder.CreateFCmpOLT(left, right)};
     auto is_left_greater_than_right{ir_builder.CreateFCmpOGT(left, right)};
 
+    // The NaN arms run before ordered comparisons because FCmpO* predicates are false for NaNs; the final bitwise tie
+    // rule is what distinguishes Wasm max from many host `fmax` implementations.
     return ir_builder.CreateSelect(
         is_left_nan,
         quiet_llvm_nan(ir_builder, left),
@@ -745,6 +772,8 @@ template <typename Float>
 
     if(func_index_uz < import_func_count)
     {
+        // Imported function records carry their declared type even when their eventual target is a host bridge or another
+        // module.  That declaration is the type the Wasm caller was validated against.
         auto const& imported_rec{runtime_module.imported_function_vec_storage.index_unchecked(func_index_uz)};
         auto import_type_ptr{imported_rec.import_type_ptr};
         if(import_type_ptr == nullptr || import_type_ptr->imports.type != validation_module_traits_t::external_types::func) [[unlikely]] { return nullptr; }
@@ -787,10 +816,7 @@ struct runtime_direct_callee_resolution_t
         if(::std::addressof(other_module) == ::std::addressof(runtime_module)) { continue; }
 
         auto const imported_function_count{other_module.imported_function_vec_storage.size()};
-        if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound)
-        {
-            return (::std::numeric_limits<::std::size_t>::max)();
-        }
+        if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound) { return (::std::numeric_limits<::std::size_t>::max)(); }
         bound += imported_function_count;
     }
     return bound;
@@ -814,6 +840,8 @@ struct runtime_direct_callee_resolution_t
 
     if(func_index_uz >= import_func_count)
     {
+        // Local defined functions can be converted directly from module function index to local storage index; no import
+        // forwarding chain is involved.
         auto const local_func_index{func_index_uz - import_func_count};
         if(local_func_index >= local_func_count) [[unlikely]] { return {}; }
 
@@ -848,9 +876,13 @@ struct runtime_direct_callee_resolution_t
                 result.function_type_ptr = defined_func_ptr->function_type_ptr;
                 if(local_func_begin == nullptr || defined_func_ptr < local_func_begin || defined_func_ptr >= local_func_begin + local_func_count)
                 {
+                    // The target is a valid defined function, but not one stored in this module's local-function array.
+                    // Keep the type so the caller can still use the raw ABI path safely.
                     return result;
                 }
 
+                // Pointer identity is the only reliable way to prove that an import-forwarded target is in this module;
+                // convert the pointer back into the public module function index only after the range check above.
                 auto const local_func_index{static_cast<::std::size_t>(defined_func_ptr - local_func_begin)};
                 if(import_func_count > static_cast<::std::size_t>(::std::numeric_limits<validation_module_traits_t::wasm_u32>::max()) ||
                    local_func_index > static_cast<::std::size_t>(::std::numeric_limits<validation_module_traits_t::wasm_u32>::max()) - import_func_count)
@@ -992,16 +1024,25 @@ struct runtime_direct_callee_resolution_t
     auto const result_begin{wasm_function_type.result.begin};
     auto const result_end{wasm_function_type.result.end};
 
+    // Runtime type storage represents parameters/results as half-open pointer ranges.  A null begin pointer is valid only
+    // for an empty range; any other null-backed range would make the type descriptor unusable for IR construction.
     if(parameter_begin == nullptr && parameter_begin != parameter_end) [[unlikely]] { return nullptr; }
     if(result_begin == nullptr && result_begin != result_end) [[unlikely]] { return nullptr; }
 
+    // Pointer subtraction is performed only after the null/empty invariant above has been checked.  The counts drive both
+    // LLVM parameter vector allocation and the supported Wasm result ABI decision below.
     auto const parameter_count{parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(parameter_end - parameter_begin)};
     auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+
+    // The typed JIT entry ABI returns either void or one scalar directly.  Multi-value Wasm results require a different
+    // lowering strategy, so rejecting them here prevents later code from fabricating an invalid LLVM signature.
     if(result_count > 1uz) [[unlikely]] { return nullptr; }
 
     ::uwvm2::utils::container::vector<::llvm::Type*> llvm_parameter_types{};
     llvm_parameter_types.reserve(parameter_count);
 
+    // Preserve Wasm parameter order exactly.  Each Wasm value type must map to a concrete LLVM scalar type accepted by
+    // this MVP emitter; a null mapping means the runtime type descriptor contains an unsupported or corrupted value kind.
     for(::std::size_t parameter_index{}; parameter_index != parameter_count; ++parameter_index)
     {
         auto llvm_parameter_type{
@@ -1010,6 +1051,8 @@ struct runtime_direct_callee_resolution_t
         llvm_parameter_types.push_back(llvm_parameter_type);
     }
 
+    // Zero-result Wasm functions are represented as LLVM void.  A single Wasm result is returned as the corresponding
+    // LLVM scalar, matching the direct typed-call path and avoiding a raw result-buffer ABI for same-module calls.
     ::llvm::Type* llvm_result_type{::llvm::Type::getVoidTy(llvm_context)};
     if(result_count == 1uz)
     {
@@ -1017,6 +1060,8 @@ struct runtime_direct_callee_resolution_t
         if(llvm_result_type == nullptr) [[unlikely]] { return nullptr; }
     }
 
+    // Wasm function types have a fixed arity.  The final `false` explicitly disables LLVM varargs so verifier/type checks
+    // catch any call-site arity mismatch instead of treating extra operands as native variadic arguments.
     return ::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false);
 }
 
@@ -1078,16 +1123,23 @@ struct runtime_direct_callee_resolution_t
     auto const result_begin{wasm_function_type.result.begin};
     auto const result_end{wasm_function_type.result.end};
 
+    // Raw bridge layout uses the same pointer-range invariants as the typed LLVM signature conversion, but returns an
+    // invalid layout object so callers can keep their own fallback/error policy.
     if(parameter_begin == nullptr && parameter_begin != parameter_end) [[unlikely]] { return {}; }
     if(result_begin == nullptr && result_begin != result_end) [[unlikely]] { return {}; }
 
     auto const parameter_count{parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(parameter_end - parameter_begin)};
     auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+
+    // The typed JIT entry ABI returns either void or one scalar directly.  Multi-value Wasm results require a different
+    // lowering strategy, so rejecting them here prevents later code from fabricating an invalid LLVM signature.
     if(result_count > 1uz) [[unlikely]] { return {}; }
 
     ::std::size_t parameter_bytes{};
     for(::std::size_t parameter_index{}; parameter_index != parameter_count; ++parameter_index)
     {
+        // Check every scalar while accumulating byte counts.  A malformed value kind or size_t overflow would make the
+        // raw byte-buffer ABI ambiguous, so the whole layout is rejected.
         auto const abi_size{get_runtime_wasm_value_type_abi_size(static_cast<runtime_operand_stack_value_type>(parameter_begin[parameter_index]))};
         if(abi_size == 0uz || parameter_bytes > ::std::numeric_limits<::std::size_t>::max() - abi_size) [[unlikely]] { return {}; }
         parameter_bytes += abi_size;
@@ -1125,6 +1177,8 @@ struct runtime_direct_callee_resolution_t
     ::llvm::Value* param_buffer_address{::llvm::ConstantInt::get(llvm_intptr_type, 0u)};
     if(abi_layout.parameter_bytes != 0uz)
     {
+        // The parameter buffer lives in the generated frame.  Its integer address is passed to the bridge, but ownership
+        // stays entirely inside this LLVM function.
         auto param_buffer{create_llvm_jit_entry_block_alloca(ir_builder,
                                                              llvm_i8_type,
                                                              ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes),
@@ -1153,6 +1207,7 @@ struct runtime_direct_callee_resolution_t
     ::llvm::Value* result_buffer_address{::llvm::ConstantInt::get(llvm_intptr_type, 0u)};
     if(abi_layout.result_count == 1uz)
     {
+        // Results are allocated with their final LLVM scalar type so the post-call load is typed and verifier-friendly.
         auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
         if(llvm_result_type == nullptr) [[unlikely]] { return {}; }
         result_buffer = create_llvm_jit_entry_block_alloca(ir_builder, llvm_result_type, nullptr, result_buffer_name);
@@ -1196,6 +1251,7 @@ struct runtime_direct_callee_resolution_t
 
     for(::std::size_t i{}; i != left_param_count; ++i)
     {
+        // The runtime canonicalizes neither type objects nor duplicate declarations, so equality is structural by byte.
         if(left_param_begin[i] != right_param_begin[i]) { return false; }
     }
 
@@ -1228,6 +1284,8 @@ struct runtime_direct_callee_resolution_t
     ::std::size_t canonical_index{type_index_uz};
     for(::std::size_t i{}; i != type_index_uz; ++i)
     {
+        // The first equal type wins.  This lets call_indirect compare compact ids while preserving Wasm's structural type
+        // equality rule for duplicate entries in the type section.
         if(runtime_wasm_function_types_equal(type_begin[i], target_type))
         {
             canonical_index = i;
@@ -1288,6 +1346,8 @@ struct runtime_global_access_info_t
         imported_global_storage_t const* curr{::std::addressof(imported_global_rec)};
         for(;;)
         {
+            // Runtime initialization owns cycle rejection for import chains.  This loop therefore follows links until a
+            // concrete storage provider is found, while still treating null or unknown links as corrupted storage.
             if(curr == nullptr) [[unlikely]] { return {}; }
 
             switch(curr->link_kind)
@@ -1346,6 +1406,8 @@ struct runtime_global_access_info_t
     {
         case runtime_operand_stack_value_type::i32:
         {
+            // The global storage union is intentionally addressed at the active scalar member so LLVM sees the exact load
+            // or store type and does not need to reason about the containing union object.
             storage_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(global_storage_ptr->storage.i32));
             break;
         }
@@ -1446,6 +1508,8 @@ struct runtime_call_indirect_callee_resolution_t
         auto curr{::std::addressof(runtime_module.imported_table_vec_storage.index_unchecked(table_index_uz))};
         for(;;)
         {
+            // Table imports use the same forwarding model as globals/functions: a valid initialized graph ends at a
+            // defined table, while null/unknown links are treated as runtime-storage corruption.
             if(curr == nullptr) [[unlikely]] { return nullptr; }
 
             switch(curr->link_kind)
@@ -1494,6 +1558,8 @@ struct runtime_call_indirect_callee_resolution_t
             auto imported_func_ptr{elem.storage.imported_ptr};
             if(imported_func_ptr == nullptr) { return result; }
 
+            // An imported function reference can be an empty table slot, a host/imported target, or a forwarding alias to
+            // a current-module function.  Resolve only far enough to decide whether direct typed calls are legal.
             auto import_type_ptr{imported_func_ptr->import_type_ptr};
             if(import_type_ptr == nullptr || import_type_ptr->imports.type != validation_module_traits_t::external_types::func ||
                import_type_ptr->imports.storage.function == nullptr) [[unlikely]]
@@ -1604,6 +1670,8 @@ template <typename Memory>
             {
                 case ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32:
                 {
+                    // Full guard/protection layouts reserve additional address space beyond the declared maximum.  Limit
+                    // direct exposure to the portion the backend can protect without wraparound ambiguity.
                     constexpr auto max_full_protection_wasm32_length_half{::uwvm2::object::memory::linear::max_full_protection_wasm32_length / 2u};
                     return static_cast<::std::size_t>(max_full_protection_wasm32_length_half);
                 }
@@ -1650,6 +1718,8 @@ inline void populate_runtime_memory_access_info_mmap_fields(runtime_memory_acces
         result.mmap_requires_dynamic_bounds = memory.require_dynamic_determination_memory_size();
         if(!result.mmap_requires_dynamic_bounds)
         {
+            // If hardware protection covers the complete usable range, generated loads/stores can skip explicit dynamic
+            // bounds checks for the common path.  Partial protection still needs a high-offset software check.
             if constexpr(sizeof(::std::uintptr_t) >= sizeof(::std::uint_least64_t))
             {
                 result.mmap_uses_partial_protection = memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64;
@@ -1736,6 +1806,8 @@ inline void populate_runtime_memory_access_info_mmap_fields(runtime_memory_acces
         imported_memory_storage_t const* curr{::std::addressof(imported_memory_rec)};
         for(;;)
         {
+            // Imported memories may resolve to native storage or to a local-imported provider.  The latter keeps all
+            // actual memory accesses behind provider bridge calls because the provider owns locking and growth policy.
             if(curr == nullptr) [[unlikely]] { return {}; }
 
             switch(curr->link_kind)
@@ -1802,15 +1874,7 @@ struct llvm_jit_wasm32_effective_offset_t
 template <typename Integer>
 [[nodiscard]] inline bool llvm_jit_add_overflow(Integer left, Integer right, Integer& result) noexcept
 {
-    if constexpr(requires { __builtin_add_overflow(left, right, ::std::addressof(result)); })
-    {
-        return __builtin_add_overflow(left, right, ::std::addressof(result));
-    }
-    else
-    {
-        result = static_cast<Integer>(left + right);
-        return result < left;
-    }
+    return ::uwvm2::imported::wasi::wasip1::func::add_overflow(left, right, result);
 }
 
 // Compute the effective offset for a Wasm32 memory access.  Keeping the overflow bit separate lets bridge traps report
@@ -2357,6 +2421,8 @@ template <typename FunctionPtr>
 {
     if(function_type == nullptr) [[unlikely]] { return nullptr; }
 
+    // LLVM IR cannot carry a C++ function pointer directly.  Cast through an integer with the host pointer width, then
+    // back to an LLVM function pointer whose signature matches the bridge declaration used at the call site.
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(function_pointer))};
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
@@ -2396,6 +2462,8 @@ template <typename FunctionPtr>
 template <typename Immediate>
 [[nodiscard]] inline bool parse_wasm_leb128_immediate(::std::byte const*& code_curr, ::std::byte const* code_end, Immediate& immediate)
 {
+    // fast_io's scanner operates on character pointers.  The may-alias char8_t view lets us parse the byte slice
+    // directly without copying while preserving the original std::byte cursor API used by the dispatcher.
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
     auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
                                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
@@ -2415,6 +2483,8 @@ template <typename UInt>
     immediate = 0;
     for(::std::size_t byte_index{}; byte_index != sizeof(UInt); ++byte_index)
     {
+        // Wasm immediates are always little-endian, independent of the host.  Assemble by bytes so f32/f64 constants keep
+        // their exact IEEE payload bits.
         immediate |= static_cast<UInt>(::std::to_integer<::std::uint_least8_t>(code_curr[byte_index])) << (byte_index * 8u);
     }
 
@@ -2506,7 +2576,9 @@ struct llvm_jit_branch_target_t
 [[nodiscard]] inline runtime_operand_stack_value_type get_runtime_block_single_result_type(runtime_block_result_type result) noexcept
 { return get_runtime_block_result_count(result) == 1uz ? result.begin[0] : runtime_operand_stack_value_type{}; }
 
-// Parse the MVP blocktype encoding used by block/loop/if.  This fast path supports empty and single-value block results.
+// Parse the WebAssembly 1.0/MVP blocktype encoding used by block/loop/if.  This fast path supports only empty and
+// single-value block results; multi-value/type-index blocktypes must extend this parser, control-stack result storage, and
+// LLVM PHI/result lowering together.
 [[nodiscard]] inline bool
     parse_wasm_block_result_type(::std::byte const*& code_curr, ::std::byte const* code_end, runtime_block_result_type& block_result) noexcept
 {
@@ -2849,11 +2921,15 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const func_result_count_uz{func_result_begin == nullptr ? 0uz : static_cast<::std::size_t>(func_result_end - func_result_begin)};
     auto const defined_local_count_uz{static_cast<::std::size_t>(wasm_code_ptr->all_local_count)};
     auto const all_local_count_uz{func_parameter_count_uz + defined_local_count_uz};
+    // The current typed LLVM function ABI is intentionally WebAssembly 1.0/MVP-shaped for 0/1 result functions.  Future
+    // multi-value support must add a multi-result ABI/result-buffer strategy before removing this guard.
     if(func_result_count_uz > 1uz) [[unlikely]] { return false; }
 
     state.local_offsets.reserve(all_local_count_uz);
     ::std::size_t local_bytes{};
     state.local_types.reserve(all_local_count_uz);
+    // Build the flattened local layout once.  The same type list drives LLVM allocas, while byte offsets define the raw
+    // serialized-local ABI used by tiered OSR reentry wrappers.
     for(::std::size_t i{}; i != func_parameter_count_uz; ++i)
     {
         auto const vt{static_cast<runtime_operand_stack_value_type>(func_parameter_begin[i])};
@@ -2921,6 +2997,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
     else
     {
+        // Preparation may run after declaration pre-creation.  Reusing an already defined body would merge two emissions
+        // into one LLVM function, so only empty declarations are accepted.
         if(state.llvm_public_entry_function->getFunctionType() != llvm_function_type || !state.llvm_public_entry_function->empty()) [[unlikely]]
         {
             return false;
@@ -2997,6 +3075,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
         body_init_block = ::llvm::BasicBlock::Create(llvm_context, "tiered.normal.init", state.llvm_function);
         if(body_init_block == nullptr) [[unlikely]] { return false; }
         state.tiered_core_normal_init_block = body_init_block;
+        // The real entry block is reserved for the OSR dispatch switch finalized later; ordinary function initialization
+        // starts in this separate block.
     }
 
     state.ir_builder = ::uwvm2::utils::container::make_delete_owned<::llvm::IRBuilder<>>(body_init_block);
@@ -3010,6 +3090,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
     {
         return false;
     }
+    // In tiered mode the public wrapper owns logical call-stack push/pop.  The internal core may be entered through OSR,
+    // so pushing inside the core would create duplicate or unbalanced logical frames.
 
     state.local_pointers.reserve(state.local_types.size());
     for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
@@ -3066,6 +3148,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                    .is_reachable = true,
                                    .end_block_has_incoming = false});
     state.branch_target_stack.push_back({.params = state.function_result, .block = state.return_block, .phi = state.return_phi, .control_stack_index = 0uz});
+    // The implicit function label sits at branch depth equal to the outermost target.  `return` reuses the same branch
+    // machinery as `br` by selecting this first branch-target entry.
     state.valid = true;
     return true;
 }
@@ -3086,6 +3170,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     // Seal the synthetic function return block.  If there are no incoming edges for a result-returning function, the body
     // was unreachable and the return block must become unreachable rather than returning an undef value.
+    // Finalization runs only after the implicit function context has been closed by `end`, so no more branch incoming
+    // edges can be added after this point.
     ir_builder.SetInsertPoint(state.return_block);
     if(state.func_result_count_uz == 0uz)
     {
@@ -3130,6 +3216,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(llvm_i8_ptr_type == nullptr) [[unlikely]] { return false; }
 
             ::llvm::IRBuilder<> entry_builder(state.tiered_core_entry_block);
+            // The normal entry id is zero; OSR ids start at one so a default switch target naturally represents the
+            // ordinary function entry path.
             auto switch_inst{entry_builder.CreateSwitch(state.tiered_core_entry_id_arg,
                                                         state.tiered_core_normal_init_block,
                                                         static_cast<unsigned>(state.tiered_loop_reentries.size()))};
@@ -3204,6 +3292,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             core_arguments.reserve(public_function->arg_size() + 2uz);
             core_arguments.push_back(::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), 0u));
             core_arguments.push_back(::llvm::ConstantInt::get(llvm_intptr_type, 0u));
+            // Hidden core arguments come first, followed by the public Wasm parameters unchanged.  Entry id zero tells
+            // the core to run normal local initialization instead of OSR local restore.
             for(auto& arg: public_function->args()) { core_arguments.push_back(::std::addressof(arg)); }
 
             auto core_call{apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, core_arguments))};
@@ -3340,6 +3430,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 auto const parameter_begin{function_type_ptr->parameter.begin};
                 for(::std::size_t parameter_index{}; parameter_index != abi_layout.parameter_count; ++parameter_index)
                 {
+                    // OSR reentry restores execution state from serialized locals, not from the original function
+                    // parameters.  Default parameter values satisfy the core signature while the restored locals provide
+                    // the live values used after the target loop point.
                     auto llvm_param_type{
                         get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(parameter_begin[parameter_index]))};
                     if(llvm_param_type == nullptr) [[unlikely]] { return false; }
@@ -3461,6 +3554,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 return false;
             }
 
+            // Raw callers are outside LLVM's typed verifier.  Validate buffer sizes and required non-null addresses in IR
+            // before unpacking bytes so a bad runtime contract becomes a trap instead of unchecked memory access.
             emit_llvm_conditional_trap(*llvm_module,
                                        raw_ir_builder,
                                        raw_ir_builder.CreateICmpNE(param_bytes, ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)));
@@ -3512,6 +3607,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             auto typed_call{apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
             if(abi_layout.result_count == 1uz)
             {
+                // Store the typed return value back into the caller-provided raw result buffer, completing the raw ABI
+                // adaptation in the opposite direction from parameter unpacking.
                 auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
                 if(llvm_result_type == nullptr || llvm_function->getReturnType() != llvm_result_type) [[unlikely]] { return false; }
 
@@ -3587,6 +3684,8 @@ inline void mark_runtime_local_func_llvm_jit_branch_target_has_incoming(runtime_
     if(get_runtime_block_result_count(target.params) == 1uz)
     {
         if(target.phi == nullptr) [[unlikely]] { return false; }
+        // Add the PHI incoming edge before creating the branch; the current insertion block is still the predecessor at
+        // this point.
         target.phi->addIncoming(branch_value.value, current_block);
     }
 
@@ -3603,6 +3702,8 @@ inline void enter_runtime_local_func_llvm_jit_unreachable_control_context(runtim
 
     auto& current_context{state.control_stack.back()};
     while(state.operand_stack.size() > current_context.outer_stack_size) { state.operand_stack.pop_back(); }
+    // Wasm unreachable code is stack-polymorphic.  Keep only the operands visible outside the current construct and let
+    // subsequent non-control instructions be skipped until a structural boundary is reached.
     current_context.is_reachable = false;
     state.unreachable_control_depth = 0uz;
 }
@@ -3894,6 +3995,8 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     state.control_stack.back().is_reachable = continuation_reachable;
     if(!continuation_reachable)
     {
+        // LLVM still requires a terminator in the merge block even when no edge reaches it.  Remove an unused PHI first
+        // so the block is structurally valid.
         if(end_block != nullptr && !llvm_jit_basic_block_has_terminator(end_block))
         {
             if(end_phi != nullptr && end_phi->getNumIncomingValues() == 0u) { end_phi->eraseFromParent(); }
@@ -3908,6 +4011,8 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     if(get_runtime_block_result_count(block_result) == 1uz)
     {
         if(end_phi == nullptr) [[unlikely]] { return false; }
+        // A reachable structured merge contributes its single result to the enclosing operand stack, matching Wasm's
+        // block result semantics.
         state.operand_stack.push_back({.type = get_runtime_block_single_result_type(block_result), .value = end_phi});
     }
     return true;
@@ -4110,6 +4215,8 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto const result_begin{wasm_function_type.result.begin};
     prepared.arguments.resize(prepared.abi_layout.parameter_count);
 
+    // The Wasm operand stack places the last argument on top.  Fill the LLVM argument vector from the back so the final
+    // call operands are back in source-order parameter layout.
     for(::std::size_t parameter_index{prepared.abi_layout.parameter_count}; parameter_index != 0uz; --parameter_index)
     {
         auto const argument{state.operand_stack.back()};
@@ -4203,6 +4310,8 @@ template <typename EmitBridgeCallFromBuffers>
     ::llvm::Value* result_value{};
     if(raw_call_buffers.result_buffer != nullptr)
     {
+        // The bridge writes raw bytes into an alloca with the final scalar type, so this load recreates the typed SSA
+        // result expected by the rest of the Wasm operand stack.
         result_value = ir_builder.CreateLoad(raw_call_buffers.result_buffer->getAllocatedType(), raw_call_buffers.result_buffer);
     }
 
@@ -4235,6 +4344,8 @@ template <typename EmitBridgeCallFromBuffers>
         result_buffer_name,
         [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) -> ::llvm::CallInst*
         {
+            // Pass the module address and original module function index to the runtime.  The runtime owns import
+            // resolution for host/dynamic targets that cannot be represented by a typed LLVM declaration.
             auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
             return emit_runtime_local_func_llvm_jit_runtime_bridge_call(
                 state,
@@ -4377,6 +4488,8 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto typed_entry_address{ir_builder.CreateLoad(llvm_intptr_type, target_ptr, "call.lazy.typed.entry.addr")};
     if(state.lazy_defined_targets_are_atomic) { typed_entry_address->setAtomic(::llvm::AtomicOrdering::Acquire); }
 
+    // The typed entry pointer may be published after this function is compiled.  Split at runtime: use the typed ABI when
+    // available, otherwise fall back to the raw target record for lazy materialization.
     auto fast_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.fast", llvm_function)};
     auto slow_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.slow", llvm_function)};
     auto merge_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.merge", llvm_function)};
@@ -4406,6 +4519,8 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     if(prepared_call.has_result)
     {
         if(fast_call == nullptr || raw_target_result.result_value == nullptr) [[unlikely]] { return {}; }
+        // Both paths implement the same Wasm call.  Merge their typed results so the caller sees one SSA value regardless
+        // of whether the target had already been tiered.
         auto result_phi{ir_builder.CreatePHI(fast_call->getType(), 2u, "call.lazy.typed.result")};
         result_phi->addIncoming(fast_call, fast_end_block);
         result_phi->addIncoming(raw_target_result.result_value, slow_end_block);
@@ -4516,7 +4631,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     return true;
 }
 
-// Lower Wasm `select` as an LLVM select over an i32 non-zero condition.
+// Lower WebAssembly 1.0/MVP untyped `select` as an LLVM select over an i32 non-zero condition.  Typed select/reference
+// types require extra immediate decoding and value-tag/LLVM-type support before this lowering can be reused.
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_select(runtime_local_func_llvm_jit_emit_state_t& state)
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
@@ -4791,7 +4907,9 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 }
 
 // Lower Wasm `call_indirect`.  The generated code checks table bounds, null element, and canonical type id before choosing
-// a typed entry fast path or raw-entry fallback for the selected table element.
+// a typed entry fast path or raw-entry fallback for the selected table element.  WebAssembly 1.0/MVP normally selects the
+// default table; reference-types/multi-table support must keep the decoded table index, runtime table storage, and this
+// selected-table lowering in sync.
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_call_indirect(runtime_local_func_llvm_jit_emit_state_t& state,
                                                                              validation_module_traits_t::wasm_u32 type_index,
                                                                              validation_module_traits_t::wasm_u32 table_index)
@@ -4822,6 +4940,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         return false;
     }
 
+    // In Wasm, call_indirect's table selector is evaluated after the call arguments, so it is the top stack operand.  Pop
+    // it first, then reuse the normal call-operand preparation for the remaining arguments.
     auto const selector{state.operand_stack.back()};
     state.operand_stack.pop_back();
     if(selector.type != runtime_operand_stack_value_type::i32 || selector.value == nullptr) [[unlikely]] { return false; }
@@ -4841,6 +4961,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto table_view_begin{runtime_module_ptr->llvm_jit_call_indirect_table_views.data()};
     if(table_view_begin == nullptr) [[unlikely]] { return false; }
 
+    // The table view is a compact runtime-maintained snapshot: one entry per table with a target-record base address and
+    // current size.  The selected target record then carries raw and optional typed entry addresses.
     auto raw_entry_function_type{get_llvm_runtime_raw_call_target_entry_function_type(llvm_context)};
     auto raw_target_struct_type{get_llvm_runtime_raw_call_target_struct_type(llvm_context)};
     auto table_view_struct_type{get_llvm_runtime_call_indirect_table_view_struct_type(llvm_context)};
@@ -4902,6 +5024,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
                                ir_builder.CreateICmpNE(encoded_type_id, ::llvm::ConstantInt::get(llvm_i32_type, expected_type_id)),
                                ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_type_mismatch);
 
+    // After bounds/null/type checks, the raw entry is always callable.  The typed entry is an optimization for targets
+    // whose exact LLVM signature is already available.
     auto current_block{ir_builder.GetInsertBlock()};
     if(current_block == nullptr || current_block->getParent() == nullptr) [[unlikely]] { return false; }
 
@@ -5055,8 +5179,9 @@ template <typename CreateValue>
     // Push a typed LLVM value onto the transient operand stack.
     auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) { operand_stack.push_back({.type = type, .value = value}); }};
 
-    // Resolve and cache memory 0 on first use.  Memory instructions depend on this returning either a native memory record
-    // or a local-imported provider; unresolved memory disables inline emission for that instruction.
+    // Resolve and cache memory 0 on first use.  WebAssembly 1.0/MVP memory instructions target the default memory, so a
+    // single cached record is sufficient here.  Multi-memory must replace this with selected-memory resolution, and
+    // memory64 must also widen the effective-address/data-path assumptions used by the memory emit helpers.
     auto const ensure_memory0_access_info{[&]()
                                           {
                                               if(memory0_access_info_resolved)
@@ -5275,6 +5400,9 @@ template <typename CreateValue>
                 auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
                 auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
 
+                // Preserve the runtime's Wasm32 effective-address convention: the dynamic i32 address is sign-extended
+                // before adding the unsigned static memarg offset, and negative/high results are handled by the checks
+                // below.
                 auto effective_offset{ir_builder.CreateAdd(ir_builder.CreateSExt(address_value, llvm_i64_type),
                                                            ::llvm::ConstantInt::get(llvm_i64_type, static_cast<::std::uint_least32_t>(static_offset)))};
                 auto stable_memory_begin{
@@ -5293,6 +5421,8 @@ template <typename CreateValue>
                     auto memory_length_i64{ir_builder.CreateZExt(memory_length_load, llvm_i64_type)};
                     auto access_size_i64{::llvm::ConstantInt::get(llvm_i64_type, access_size)};
                     auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
+                    // Compute max offset in IR even when memory is smaller than the access width; the separate
+                    // `memory_too_small` predicate keeps the underflowed value from making the access look valid.
                     auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
                     auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
@@ -5322,6 +5452,8 @@ template <typename CreateValue>
                     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
                     if(current_function == nullptr) [[unlikely]] { return nullptr; }
 
+                    // Low offsets stay on the hardware-protected fast path.  Only offsets outside that protected prefix
+                    // split to a software bounds check before rejoining at the same pointer-formation logic.
                     auto partial_check_block{::llvm::BasicBlock::Create(llvm_context, "memory.partial.check", current_function)};
                     auto partial_continue_block{::llvm::BasicBlock::Create(llvm_context, "memory.partial.cont", current_function)};
                     ir_builder.CreateCondBr(needs_dynamic_bounds_check, partial_check_block, partial_continue_block);
@@ -5334,6 +5466,7 @@ template <typename CreateValue>
                     auto memory_length_i64{ir_builder.CreateZExt(memory_length_load, llvm_i64_type)};
                     auto access_size_i64{::llvm::ConstantInt::get(llvm_i64_type, access_size)};
                     auto memory_too_small{ir_builder.CreateICmpULT(memory_length_i64, access_size_i64)};
+                    // Same underflow-safe max-offset pattern as the full dynamic-bounds path.
                     auto max_access_offset{ir_builder.CreateSub(memory_length_i64, access_size_i64)};
                     auto access_oob{ir_builder.CreateICmpUGT(effective_offset, max_access_offset)};
                     auto offset_out_of_range{ir_builder.CreateOr(effective_negative, effective_too_large)};
@@ -5351,6 +5484,8 @@ template <typename CreateValue>
                     ir_builder.SetInsertPoint(partial_continue_block);
                 }
 
+                // Form the final byte pointer only after any required software checks have dominated this point.  For
+                // fully protected mmap memories, invalid addresses are intentionally left to the guard mapping.
                 auto memory_begin_address{ir_builder.CreatePtrToInt(stable_memory_begin, llvm_intptr_type)};
                 auto effective_offset_intptr{ir_builder.CreateIntCast(effective_offset, llvm_intptr_type, false)};
                 auto memory_address{ir_builder.CreateAdd(memory_begin_address, effective_offset_intptr, "memory.addr.int")};
@@ -5367,6 +5502,8 @@ template <typename CreateValue>
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return result; }
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            // The provider writes snapshot outputs through host bridge pointer arguments.  Entry-block allocas give LLVM
+            // stable addresses for those out-parameters and make the following loads explicit in IR.
             auto memory_begin_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, "local_imported.memory.begin.addr.slot")};
             auto byte_length_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, "local_imported.memory.byte_length.slot")};
             if(memory_begin_slot == nullptr || byte_length_slot == nullptr) [[unlikely]] { return result; }
@@ -5806,6 +5943,8 @@ template <typename CreateValue>
                                                      ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_load_type)),
                                                      "memory.load")};
                 load_inst->setAlignment(memory_alignment);
+                // Guest memory can be externally observed or invalidated through runtime growth/trap mechanics.  Mark the
+                // direct load volatile so LLVM does not invent or eliminate memory traffic around those checks.
                 load_inst->setVolatile(true);
 
                 if(load_bytes == 4uz) { return load_inst; }
@@ -6016,6 +6155,8 @@ template <typename CreateValue>
                 ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? "memory.grow.local_imported.runtime" : "memory.grow.runtime", current_function)};
             auto grow_merge_block{
                 ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? "memory.grow.local_imported.merge" : "memory.grow.merge", current_function)};
+            // Some callers may choose to skip a static fail pre-check.  In that case the non-zero edge jumps directly to
+            // the runtime bridge, while the block structure stays uniform for the merge logic below.
             auto non_zero_target{definitely_fail == nullptr
                                      ? grow_runtime_block
                                      : ::llvm::BasicBlock::Create(llvm_context,
@@ -6042,6 +6183,8 @@ template <typename CreateValue>
             ir_builder.CreateBr(grow_merge_block);
 
             ir_builder.SetInsertPoint(grow_merge_block);
+            // The PHI exactly mirrors Wasm's three observable outcomes: zero-delta returns the old/current page count,
+            // pre-known limit failure returns -1, and runtime/provider growth returns its bridge result.
             auto grow_result_phi{ir_builder.CreatePHI(llvm_i32_type, 3u, local_imported_path ? "memory.grow.local_imported.result" : "memory.grow.result")};
             grow_result_phi->addIncoming(current_page_count, grow_zero_block);
             grow_result_phi->addIncoming(::llvm::ConstantInt::getSigned(llvm_i32_type, -1), grow_fail_block);
