@@ -1871,10 +1871,81 @@ struct llvm_jit_wasm32_effective_offset_t
 };
 
 // Portable checked addition used by the 32-bit fallback effective-offset computation.
-template <typename Integer>
-[[nodiscard]] inline bool llvm_jit_add_overflow(Integer left, Integer right, Integer& result) noexcept
+template <::std::unsigned_integral I>
+UWVM_ALWAYS_INLINE inline constexpr bool llvm_jit_add_overflow(I a, I b, I& result) noexcept
 {
-    return ::uwvm2::imported::wasi::wasip1::func::add_overflow(left, right, result);
+# if defined(_MSC_VER) && !defined(__clang__)
+    if UWVM_IF_NOT_CONSTEVAL
+    {
+#  if defined(_M_X64) && !(defined(_M_ARM64EC) || defined(__arm64ec__))
+        if constexpr(::std::same_as<I, ::std::uint64_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u64(false, a, b, ::std::addressof(result));
+        }
+        else if constexpr(::std::same_as<I, ::std::uint32_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u32(false, a, b, ::std::addressof(result));
+        }
+        else if constexpr(::std::same_as<I, ::std::uint16_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u16(false, a, b, ::std::addressof(result));
+        }
+        else if constexpr(::std::same_as<I, ::std::uint8_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u8(false, a, b, ::std::addressof(result));
+        }
+        else
+        {
+            // msvc's `_addcarry_u32` does not specialize for `unsigned long`
+            result = static_cast<I>(a + b);
+            return result < a;
+        }
+
+#  elif defined(_M_X32)
+        if constexpr(::std::same_as<I, ::std::uint32_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u32(false, a, b, ::std::addressof(result));
+        }
+        else if constexpr(::std::same_as<I, ::std::uint16_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u16(false, a, b, ::std::addressof(result));
+        }
+        else if constexpr(::std::same_as<I, ::std::uint8_t>)
+        {
+            // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+            return ::fast_io::intrinsics::msvc::x86::_addcarry_u8(false, a, b, ::std::addressof(result));
+        }
+        else
+        {
+            result = static_cast<I>(a + b);
+            return result < a;
+        }
+
+#  else  // ARM, ARM64, ARM64ec
+        result = static_cast<I>(a + b);
+        return result < a;
+#  endif
+    }
+    else
+    {
+        result = static_cast<I>(a + b);
+        return result < a;
+    }
+
+# elif UWVM_HAS_BUILTIN(__builtin_add_overflow)
+    // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
+    return __builtin_add_overflow(a, b, ::std::addressof(result));
+
+# else
+    result = static_cast<I>(a + b);
+    return result < a;
+# endif
 }
 
 // Compute the effective offset for a Wasm32 memory access.  Keeping the overflow bit separate lets bridge traps report

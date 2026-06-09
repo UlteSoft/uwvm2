@@ -65,7 +65,6 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
-# include <uwvm2/imported/wasi/wasip1/func/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
