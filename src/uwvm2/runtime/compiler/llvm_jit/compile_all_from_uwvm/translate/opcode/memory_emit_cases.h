@@ -1,3 +1,13 @@
+// Memory opcode LLVM emission cases.
+// These cases replay the byte range already accepted by validation: they advance past the opcode,
+// decode the same `align` and `offset` memarg immediates, and hand the semantic parameters to the
+// dispatcher-local emit helpers.  The helpers prefer direct linear-memory IR on supported little-
+// endian configurations and fall back to typed runtime bridges when direct access is unavailable,
+// unsafe, imported, or otherwise not profitable.
+
+// i32.load
+// Emits a 4-byte little-endian integer load from memory0 and pushes an i32.  The bridge fallback
+// performs the same Wasm bounds check and byte-order handling as direct-memory IR.
 case wasm1_code::i32_load:
 {
     ++code_curr;
@@ -17,6 +27,9 @@ case wasm1_code::i32_load:
     }
     break;
 }
+
+// i64.load
+// Emits an 8-byte little-endian integer load and pushes an i64.
 case wasm1_code::i64_load:
 {
     ++code_curr;
@@ -36,6 +49,10 @@ case wasm1_code::i64_load:
     }
     break;
 }
+
+// f32.load
+// Emits a 4-byte load whose bits are interpreted as f32; NaN payloads and signed-zero encodings are
+// preserved because the load is bit-based rather than a numeric conversion.
 case wasm1_code::f32_load:
 {
     ++code_curr;
@@ -55,6 +72,9 @@ case wasm1_code::f32_load:
     }
     break;
 }
+
+// f64.load
+// Emits an 8-byte load whose bits are interpreted as f64.
 case wasm1_code::f64_load:
 {
     ++code_curr;
@@ -74,6 +94,9 @@ case wasm1_code::f64_load:
     }
     break;
 }
+
+// i32.load8_s
+// Emits a one-byte load and sign-extends the byte to i32.
 case wasm1_code::i32_load8_s:
 {
     ++code_curr;
@@ -93,6 +116,9 @@ case wasm1_code::i32_load8_s:
     }
     break;
 }
+
+// i32.load8_u
+// Emits a one-byte load and zero-extends the byte to i32.
 case wasm1_code::i32_load8_u:
 {
     ++code_curr;
@@ -112,6 +138,9 @@ case wasm1_code::i32_load8_u:
     }
     break;
 }
+
+// i32.load16_s
+// Emits a two-byte little-endian load and sign-extends the halfword to i32.
 case wasm1_code::i32_load16_s:
 {
     ++code_curr;
@@ -131,6 +160,9 @@ case wasm1_code::i32_load16_s:
     }
     break;
 }
+
+// i32.load16_u
+// Emits a two-byte little-endian load and zero-extends the halfword to i32.
 case wasm1_code::i32_load16_u:
 {
     ++code_curr;
@@ -150,6 +182,9 @@ case wasm1_code::i32_load16_u:
     }
     break;
 }
+
+// i64.load8_s
+// Emits a one-byte load and sign-extends the byte to i64.
 case wasm1_code::i64_load8_s:
 {
     ++code_curr;
@@ -169,6 +204,9 @@ case wasm1_code::i64_load8_s:
     }
     break;
 }
+
+// i64.load8_u
+// Emits a one-byte load and zero-extends the byte to i64.
 case wasm1_code::i64_load8_u:
 {
     ++code_curr;
@@ -188,6 +226,9 @@ case wasm1_code::i64_load8_u:
     }
     break;
 }
+
+// i64.load16_s
+// Emits a two-byte little-endian load and sign-extends the halfword to i64.
 case wasm1_code::i64_load16_s:
 {
     ++code_curr;
@@ -207,6 +248,9 @@ case wasm1_code::i64_load16_s:
     }
     break;
 }
+
+// i64.load16_u
+// Emits a two-byte little-endian load and zero-extends the halfword to i64.
 case wasm1_code::i64_load16_u:
 {
     ++code_curr;
@@ -226,6 +270,9 @@ case wasm1_code::i64_load16_u:
     }
     break;
 }
+
+// i64.load32_s
+// Emits a four-byte little-endian load and sign-extends the word to i64.
 case wasm1_code::i64_load32_s:
 {
     ++code_curr;
@@ -245,6 +292,9 @@ case wasm1_code::i64_load32_s:
     }
     break;
 }
+
+// i64.load32_u
+// Emits a four-byte little-endian load and zero-extends the word to i64.
 case wasm1_code::i64_load32_u:
 {
     ++code_curr;
@@ -264,6 +314,10 @@ case wasm1_code::i64_load32_u:
     }
     break;
 }
+
+// i32.store
+// Emits a full-width 4-byte integer store.  The value operand is popped above the i32 address,
+// matching WebAssembly's `(address, value)` store stack order.
 case wasm1_code::i32_store:
 {
     ++code_curr;
@@ -282,6 +336,9 @@ case wasm1_code::i32_store:
     }
     break;
 }
+
+// i64.store
+// Emits a full-width 8-byte integer store.
 case wasm1_code::i64_store:
 {
     ++code_curr;
@@ -300,6 +357,9 @@ case wasm1_code::i64_store:
     }
     break;
 }
+
+// f32.store
+// Emits a 4-byte store of the f32 payload bits, preserving the exact IEEE representation.
 case wasm1_code::f32_store:
 {
     ++code_curr;
@@ -318,6 +378,9 @@ case wasm1_code::f32_store:
     }
     break;
 }
+
+// f64.store
+// Emits an 8-byte store of the f64 payload bits.
 case wasm1_code::f64_store:
 {
     ++code_curr;
@@ -336,6 +399,9 @@ case wasm1_code::f64_store:
     }
     break;
 }
+
+// i32.store8
+// Emits a one-byte store containing the low 8 bits of the i32 value.
 case wasm1_code::i32_store8:
 {
     ++code_curr;
@@ -354,6 +420,9 @@ case wasm1_code::i32_store8:
     }
     break;
 }
+
+// i32.store16
+// Emits a two-byte little-endian store containing the low 16 bits of the i32 value.
 case wasm1_code::i32_store16:
 {
     ++code_curr;
@@ -372,6 +441,9 @@ case wasm1_code::i32_store16:
     }
     break;
 }
+
+// i64.store8
+// Emits a one-byte store containing the low 8 bits of the i64 value.
 case wasm1_code::i64_store8:
 {
     ++code_curr;
@@ -390,6 +462,9 @@ case wasm1_code::i64_store8:
     }
     break;
 }
+
+// i64.store16
+// Emits a two-byte little-endian store containing the low 16 bits of the i64 value.
 case wasm1_code::i64_store16:
 {
     ++code_curr;
@@ -408,6 +483,9 @@ case wasm1_code::i64_store16:
     }
     break;
 }
+
+// i64.store32
+// Emits a four-byte little-endian store containing the low 32 bits of the i64 value.
 case wasm1_code::i64_store32:
 {
     ++code_curr;
@@ -426,6 +504,10 @@ case wasm1_code::i64_store32:
     }
     break;
 }
+
+// memory.size
+// Emits the current memory0 size in Wasm pages as an i32.  Validation already proved the MVP
+// memory index is zero; this replay still decodes it to keep the emit cursor synchronized.
 case wasm1_code::memory_size:
 {
     ++code_curr;
@@ -434,6 +516,10 @@ case wasm1_code::memory_size:
     if(!parse_wasm_leb128_immediate(code_curr, code_end, memory_index) || memory_index != 0u || !emit_memory_size_call()) [[unlikely]] { return result; }
     break;
 }
+
+// memory.grow
+// Emits WebAssembly's grow result: old page count on success or -1 on failure.  The helper can
+// synthesize definitely-failing cases in IR and otherwise delegates to the memory growth bridge.
 case wasm1_code::memory_grow:
 {
     ++code_curr;

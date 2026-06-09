@@ -1,3 +1,14 @@
+// Memory opcode validation cases.
+// Load/store instructions carry a `memarg` immediate encoded as two unsigned LEB128 values:
+// `align` is the log2 alignment hint and `offset` is the static address offset.  The validation
+// helpers consume those immediates, require memory 0 to exist for MVP Wasm, enforce the maximum
+// legal alignment exponent for the access width, and validate the operand-stack contract.  The JIT
+// path records the validated instruction byte range so the emit pass can reparse the same memarg
+// and generate either direct-memory IR or a runtime memory bridge call.
+
+// i32.load
+// Stack effect: (i32 address) -> (i32).  Validates a 4-byte integer load with max alignment
+// exponent 2; the actual little-endian read and bounds handling are emitted later.
 case wasm1_code::i32_load:
 {
     validate_mem_load(u8"i32.load", 2u, curr_operand_stack_value_type::i32);
@@ -13,6 +24,10 @@ case wasm1_code::i32_load:
 
     break;
 }
+
+// i64.load
+// Stack effect: (i32 address) -> (i64).  Validates an 8-byte integer load with max alignment
+// exponent 3.
 case wasm1_code::i64_load:
 {
     validate_mem_load(u8"i64.load", 3u, curr_operand_stack_value_type::i64);
@@ -28,6 +43,10 @@ case wasm1_code::i64_load:
 
     break;
 }
+
+// f32.load
+// Stack effect: (i32 address) -> (f32).  Validates a 4-byte floating-point load; the payload bits
+// are interpreted as IEEE-754 f32 by the emit/runtime path.
 case wasm1_code::f32_load:
 {
     validate_mem_load(u8"f32.load", 2u, curr_operand_stack_value_type::f32);
@@ -43,6 +62,10 @@ case wasm1_code::f32_load:
 
     break;
 }
+
+// f64.load
+// Stack effect: (i32 address) -> (f64).  Validates an 8-byte floating-point load from linear
+// memory.
 case wasm1_code::f64_load:
 {
     validate_mem_load(u8"f64.load", 3u, curr_operand_stack_value_type::f64);
@@ -58,6 +81,10 @@ case wasm1_code::f64_load:
 
     break;
 }
+
+// i32.load8_s
+// Stack effect: (i32 address) -> (i32).  Validates a one-byte load whose byte is sign-extended to
+// i32 by the JIT emitter or runtime bridge.
 case wasm1_code::i32_load8_s:
 {
     validate_mem_load(u8"i32.load8_s", 0u, curr_operand_stack_value_type::i32);
@@ -73,6 +100,10 @@ case wasm1_code::i32_load8_s:
 
     break;
 }
+
+// i32.load8_u
+// Stack effect: (i32 address) -> (i32).  Validates a one-byte load whose byte is zero-extended to
+// i32.
 case wasm1_code::i32_load8_u:
 {
     validate_mem_load(u8"i32.load8_u", 0u, curr_operand_stack_value_type::i32);
@@ -88,6 +119,9 @@ case wasm1_code::i32_load8_u:
 
     break;
 }
+
+// i32.load16_s
+// Stack effect: (i32 address) -> (i32).  Validates a two-byte load with sign-extension to i32.
 case wasm1_code::i32_load16_s:
 {
     validate_mem_load(u8"i32.load16_s", 1u, curr_operand_stack_value_type::i32);
@@ -103,6 +137,9 @@ case wasm1_code::i32_load16_s:
 
     break;
 }
+
+// i32.load16_u
+// Stack effect: (i32 address) -> (i32).  Validates a two-byte load with zero-extension to i32.
 case wasm1_code::i32_load16_u:
 {
     validate_mem_load(u8"i32.load16_u", 1u, curr_operand_stack_value_type::i32);
@@ -118,6 +155,9 @@ case wasm1_code::i32_load16_u:
 
     break;
 }
+
+// i64.load8_s
+// Stack effect: (i32 address) -> (i64).  Validates a one-byte load with sign-extension to i64.
 case wasm1_code::i64_load8_s:
 {
     validate_mem_load(u8"i64.load8_s", 0u, curr_operand_stack_value_type::i64);
@@ -133,6 +173,9 @@ case wasm1_code::i64_load8_s:
 
     break;
 }
+
+// i64.load8_u
+// Stack effect: (i32 address) -> (i64).  Validates a one-byte load with zero-extension to i64.
 case wasm1_code::i64_load8_u:
 {
     validate_mem_load(u8"i64.load8_u", 0u, curr_operand_stack_value_type::i64);
@@ -148,6 +191,9 @@ case wasm1_code::i64_load8_u:
 
     break;
 }
+
+// i64.load16_s
+// Stack effect: (i32 address) -> (i64).  Validates a two-byte load with sign-extension to i64.
 case wasm1_code::i64_load16_s:
 {
     validate_mem_load(u8"i64.load16_s", 1u, curr_operand_stack_value_type::i64);
@@ -163,6 +209,9 @@ case wasm1_code::i64_load16_s:
 
     break;
 }
+
+// i64.load16_u
+// Stack effect: (i32 address) -> (i64).  Validates a two-byte load with zero-extension to i64.
 case wasm1_code::i64_load16_u:
 {
     validate_mem_load(u8"i64.load16_u", 1u, curr_operand_stack_value_type::i64);
@@ -178,6 +227,9 @@ case wasm1_code::i64_load16_u:
 
     break;
 }
+
+// i64.load32_s
+// Stack effect: (i32 address) -> (i64).  Validates a four-byte load with sign-extension to i64.
 case wasm1_code::i64_load32_s:
 {
     validate_mem_load(u8"i64.load32_s", 2u, curr_operand_stack_value_type::i64);
@@ -193,6 +245,9 @@ case wasm1_code::i64_load32_s:
 
     break;
 }
+
+// i64.load32_u
+// Stack effect: (i32 address) -> (i64).  Validates a four-byte load with zero-extension to i64.
 case wasm1_code::i64_load32_u:
 {
     validate_mem_load(u8"i64.load32_u", 2u, curr_operand_stack_value_type::i64);
@@ -208,6 +263,9 @@ case wasm1_code::i64_load32_u:
 
     break;
 }
+
+// i32.store
+// Stack effect: (i32 address, i32 value) -> ().  Validates a full-width 4-byte integer store.
 case wasm1_code::i32_store:
 {
     validate_mem_store(u8"i32.store", 2u, curr_operand_stack_value_type::i32);
@@ -223,6 +281,9 @@ case wasm1_code::i32_store:
 
     break;
 }
+
+// i64.store
+// Stack effect: (i32 address, i64 value) -> ().  Validates a full-width 8-byte integer store.
 case wasm1_code::i64_store:
 {
     validate_mem_store(u8"i64.store", 3u, curr_operand_stack_value_type::i64);
@@ -238,6 +299,10 @@ case wasm1_code::i64_store:
 
     break;
 }
+
+// f32.store
+// Stack effect: (i32 address, f32 value) -> ().  Validates a 4-byte floating-point store; the
+// value's exact IEEE bit pattern is written by the emit/runtime path.
 case wasm1_code::f32_store:
 {
     validate_mem_store(u8"f32.store", 2u, curr_operand_stack_value_type::f32);
@@ -253,6 +318,9 @@ case wasm1_code::f32_store:
 
     break;
 }
+
+// f64.store
+// Stack effect: (i32 address, f64 value) -> ().  Validates an 8-byte floating-point store.
 case wasm1_code::f64_store:
 {
     validate_mem_store(u8"f64.store", 3u, curr_operand_stack_value_type::f64);
@@ -268,6 +336,10 @@ case wasm1_code::f64_store:
 
     break;
 }
+
+// i32.store8
+// Stack effect: (i32 address, i32 value) -> ().  Validates a one-byte store; the stored byte is the
+// low 8 bits of the i32 value.
 case wasm1_code::i32_store8:
 {
     validate_mem_store(u8"i32.store8", 0u, curr_operand_stack_value_type::i32);
@@ -283,6 +355,10 @@ case wasm1_code::i32_store8:
 
     break;
 }
+
+// i32.store16
+// Stack effect: (i32 address, i32 value) -> ().  Validates a two-byte store; the stored bytes are
+// the low 16 bits of the i32 value.
 case wasm1_code::i32_store16:
 {
     validate_mem_store(u8"i32.store16", 1u, curr_operand_stack_value_type::i32);
@@ -298,6 +374,10 @@ case wasm1_code::i32_store16:
 
     break;
 }
+
+// i64.store8
+// Stack effect: (i32 address, i64 value) -> ().  Validates a one-byte store from the low 8 bits of
+// the i64 value.
 case wasm1_code::i64_store8:
 {
     validate_mem_store(u8"i64.store8", 0u, curr_operand_stack_value_type::i64);
@@ -313,6 +393,10 @@ case wasm1_code::i64_store8:
 
     break;
 }
+
+// i64.store16
+// Stack effect: (i32 address, i64 value) -> ().  Validates a two-byte store from the low 16 bits of
+// the i64 value.
 case wasm1_code::i64_store16:
 {
     validate_mem_store(u8"i64.store16", 1u, curr_operand_stack_value_type::i64);
@@ -328,6 +412,10 @@ case wasm1_code::i64_store16:
 
     break;
 }
+
+// i64.store32
+// Stack effect: (i32 address, i64 value) -> ().  Validates a four-byte store from the low 32 bits
+// of the i64 value.
 case wasm1_code::i64_store32:
 {
     validate_mem_store(u8"i64.store32", 2u, curr_operand_stack_value_type::i64);
@@ -343,6 +431,11 @@ case wasm1_code::i64_store32:
 
     break;
 }
+
+// memory.size
+// Stack effect: () -> (i32 current_pages).  MVP Wasm still encodes a memory index immediate; this
+// validator decodes it as LEB128, requires the decoded value to be zero, and then pushes the current
+// page-count result type.
 case wasm1_code::memory_size:
 {
     // memory.size memidx ...
@@ -423,6 +516,10 @@ case wasm1_code::memory_size:
 
     break;
 }
+
+// memory.grow
+// Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1).  The immediate follows the
+// same MVP memory-index rule as `memory.size`, and the delta operand must be i32.
 case wasm1_code::memory_grow:
 {
     // memory.grow memidx ...
