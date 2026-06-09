@@ -3029,7 +3029,13 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const func_parameter_count_uz{func_parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(func_parameter_end - func_parameter_begin)};
     auto const func_result_count_uz{func_result_begin == nullptr ? 0uz : static_cast<::std::size_t>(func_result_end - func_result_begin)};
     auto const defined_local_count_uz{static_cast<::std::size_t>(wasm_code_ptr->all_local_count)};
+    // This total drives vector reservations, alloca creation, and OSR local snapshot offsets; reject wraparound before
+    // any of those layouts can diverge from the validated Wasm local count.
+    if(func_parameter_count_uz > (::std::numeric_limits<::std::size_t>::max)() - defined_local_count_uz) [[unlikely]] { return false; }
     auto const all_local_count_uz{func_parameter_count_uz + defined_local_count_uz};
+    using wasm_u32 = validation_module_traits_t::wasm_u32;
+    if(local_func_storage.function_index > static_cast<::std::size_t>((::std::numeric_limits<wasm_u32>::max)())) [[unlikely]] { return false; }
+    auto const function_index{static_cast<wasm_u32>(local_func_storage.function_index)};
     // The current typed LLVM function ABI is intentionally WebAssembly 1.0/MVP-shaped for 0/1 result functions.  Future
     // multi-value support must add a multi-result ABI/result-buffer strategy before removing this guard.
     if(func_result_count_uz > 1uz) [[unlikely]] { return false; }
@@ -3096,8 +3102,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
-    auto const function_name{
-        get_llvm_wasm_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
+    // Keep every LLVM symbol/debug name on the same checked Wasm32 function index; silent truncation here would alias
+    // two runtime functions to the same generated declaration.
+    auto const function_name{get_llvm_wasm_function_name(*runtime_module_ptr, function_index)};
     state.llvm_public_entry_function = state.llvm_module->getFunction(get_llvm_string_ref(function_name));
     if(state.llvm_public_entry_function == nullptr)
     {
@@ -3148,8 +3155,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         for(auto param_type: llvm_parameter_types) { core_parameter_types.push_back(param_type); }
 
         auto core_function_type{::llvm::FunctionType::get(llvm_result_type, core_parameter_types, false)};
-        auto const core_function_name{
-            get_llvm_wasm_tiered_core_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
+        auto const core_function_name{get_llvm_wasm_tiered_core_function_name(*runtime_module_ptr, function_index)};
         state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(core_function_name));
         if(state.llvm_function == nullptr)
         {
@@ -3212,6 +3218,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         if(llvm_local_type == nullptr) [[unlikely]] { return false; }
 
         auto local_pointer{create_llvm_jit_entry_block_alloca(*state.ir_builder, llvm_local_type, nullptr, "")};
+        if(local_pointer == nullptr) [[unlikely]] { return false; }
         state.local_pointers.push_back(local_pointer);
 
         if(local_index < func_parameter_count_uz)
@@ -3647,6 +3654,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(llvm_i8_ptr_type == nullptr) [[unlikely]] { return false; }
 
             auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", raw_entry_function)};
+            if(entry_block == nullptr) [[unlikely]] { return false; }
             ::llvm::IRBuilder<> raw_ir_builder(entry_block);
             if(raw_di_subprogram != nullptr)
             {
@@ -4586,7 +4594,7 @@ struct llvm_jit_lazy_typed_target_emit_result_t
         if(typed_entry_function_ptr == nullptr) [[unlikely]] { return {}; }
         auto typed_call{apply_llvm_jit_wasm_calling_conv(
             ir_builder.CreateCall(callee_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
-        if(prepared_call.has_result && typed_call == nullptr) [[unlikely]] { return {}; }
+        if(typed_call == nullptr) [[unlikely]] { return {}; }
         return {.valid = true, .result_value = typed_call};
     }
 
@@ -4602,6 +4610,7 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto fast_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.fast", llvm_function)};
     auto slow_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.slow", llvm_function)};
     auto merge_block{::llvm::BasicBlock::Create(llvm_context, "call.lazy.typed.merge", llvm_function)};
+    if(fast_block == nullptr || slow_block == nullptr || merge_block == nullptr) [[unlikely]] { return {}; }
 
     ir_builder.CreateCondBr(ir_builder.CreateICmpNE(typed_entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)), fast_block, slow_block);
 
@@ -4609,6 +4618,7 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto typed_entry_function_ptr{ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(callee_function_type), "call.lazy.typed.entry.ptr")};
     auto fast_call{apply_llvm_jit_wasm_calling_conv(
         ir_builder.CreateCall(callee_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
+    if(fast_call == nullptr) [[unlikely]] { return {}; }
     auto fast_end_block{ir_builder.GetInsertBlock()};
     ir_builder.CreateBr(merge_block);
 
@@ -4996,6 +5006,9 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
                                                                                     callee_resolution.func_index,
                                                                                     *callee_resolution.function_type_ptr,
                                                                                     prepared_call.arguments)};
+            // `push_runtime_local_func_llvm_jit_wasm_call_result` intentionally accepts null for void callees, so direct
+            // call emission must be checked here or a failed void call would be silently dropped from the IR.
+            if(call_value == nullptr) [[unlikely]] { return false; }
             return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
         }
 
@@ -5012,6 +5025,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     }
 
     auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call.arguments)};
+    if(call_value == nullptr) [[unlikely]] { return false; }
     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
 }
 
@@ -5142,6 +5156,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto typed_block{::llvm::BasicBlock::Create(llvm_context, "call_indirect.typed", llvm_function)};
     auto raw_block{::llvm::BasicBlock::Create(llvm_context, "call_indirect.raw", llvm_function)};
     auto merge_block{::llvm::BasicBlock::Create(llvm_context, "call_indirect.merge", llvm_function)};
+    if(typed_block == nullptr || raw_block == nullptr || merge_block == nullptr) [[unlikely]] { return false; }
 
     ir_builder.CreateCondBr(ir_builder.CreateICmpNE(typed_entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)), typed_block, raw_block);
 
@@ -5150,6 +5165,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(typed_entry_function_type), "call_indirect.typed.entry.ptr")};
     auto typed_call{apply_llvm_jit_wasm_calling_conv(
         ir_builder.CreateCall(typed_entry_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
+    if(typed_call == nullptr) [[unlikely]] { return false; }
     auto typed_end_block{ir_builder.GetInsertBlock()};
     ir_builder.CreateBr(merge_block);
 
