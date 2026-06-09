@@ -2430,11 +2430,24 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
     if(!local_imported_module->memory_access_snapshot_from_index(memory_index, snapshot)) [[unlikely]] { return false; }
 
     auto const page_size_bytes{local_imported_module->memory_page_size_from_index(memory_index)};
-    if(page_size_bytes == 0u) [[unlikely]] { return false; }
-    if(snapshot.page_count > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)() / page_size_bytes)) [[unlikely]] { return false; }
+
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+    if(!::std::has_single_bit(page_size_bytes)) [[unlikely]]
+    {
+        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        return false;
+    }
+# endif
+
+    auto const page_size_shift{static_cast<unsigned>(::std::countr_zero(page_size_bytes))};
+    if(page_size_shift >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { return false; }
+    if(snapshot.page_count > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)() >> page_size_shift)) [[unlikely]]
+    {
+        return false;
+    }
 
     *memory_begin_address_out = reinterpret_cast<::std::uintptr_t>(snapshot.memory_begin);
-    *byte_length_out = static_cast<::std::size_t>(snapshot.page_count * page_size_bytes);
+    *byte_length_out = static_cast<::std::size_t>(snapshot.page_count) << page_size_shift;
     return true;
 }
 
