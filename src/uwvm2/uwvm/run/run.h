@@ -118,15 +118,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // We currently do not provide host arguments to the default entry function; therefore, the entry must be `() -> ()`.
         // The wasm 1.0 start section already has that signature requirement by specification, and the exported fallbacks
         // intentionally use the same rule so all default-entry paths share one runtime ABI.
-        auto const resolve_import_leaf{[](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
+        // Default-entry resolution runs after runtime initialization, which has already rejected import-alias cycles.
+        // Use the initialized runtime storage size as the walk bound so deeply re-exported but valid entry functions are
+        // still discoverable while corrupted alias chains cannot loop forever.
+        auto const import_link_walk_bound{[]() noexcept -> ::std::size_t
+                                          {
+                                              ::std::size_t bound{};
+                                              for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+                                              {
+                                                  auto const imported_function_count{module_entry.second.imported_function_vec_storage.size()};
+                                                  if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound)
+                                                  {
+                                                      return (::std::numeric_limits<::std::size_t>::max)();
+                                                  }
+                                                  bound += imported_function_count;
+                                              }
+                                              return bound;
+                                          }()};
+
+        auto const resolve_import_leaf{[import_link_walk_bound](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
                                        {
-                                           constexpr ::std::size_t kMaxChain{4096uz};
-                                           for(::std::size_t steps{}; steps != kMaxChain; ++steps)
+                                           for(::std::size_t steps{};; ++steps)
                                            {
-                                               if(imp == nullptr) [[unlikely]] { return nullptr; }
+                                               // Exceeding the storage-derived bound means the chain is no longer the acyclic structure the initializer proved.
+                                               if(steps > import_link_walk_bound || imp == nullptr) [[unlikely]] { return nullptr; }
                                                if(imp->link_kind != func_link_kind::imported) { return imp; }
-                                               // Follow import forwarding until a concrete leaf is reached.  The chain limit is a defensive guard
-                                               // against malformed runtime storage; valid import graphs should already have been cycle-checked.
                                                imp = imp->target.imported_ptr;
                                            }
                                            return nullptr;

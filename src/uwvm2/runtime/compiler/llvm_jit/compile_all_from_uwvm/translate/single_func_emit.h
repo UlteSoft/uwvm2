@@ -773,6 +773,29 @@ struct runtime_direct_callee_resolution_t
     ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
 };
 
+// Runtime initialization rejects import-alias cycles and unresolved chains.  A post-initialization function alias chain
+// can therefore visit at most one imported-function record per runtime import before reaching a concrete target.  Derive
+// the defensive walk bound from runtime storage instead of using a fixed cap, so large but valid module graphs are not
+// rejected by the JIT.
+[[nodiscard]] inline ::std::size_t
+    get_runtime_imported_function_link_walk_bound(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+{
+    auto bound{runtime_module.imported_function_vec_storage.size()};
+    for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+    {
+        auto const& other_module{module_entry.second};
+        if(::std::addressof(other_module) == ::std::addressof(runtime_module)) { continue; }
+
+        auto const imported_function_count{other_module.imported_function_vec_storage.size()};
+        if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound)
+        {
+            return (::std::numeric_limits<::std::size_t>::max)();
+        }
+        bound += imported_function_count;
+    }
+    return bound;
+}
+
 // Follow imported-function forwarding records until the emitter can determine whether the target is a local defined
 // function.  Non-local host/dynamic/weak targets are valid but not directly callable by typed LLVM IR.
 [[nodiscard]] inline runtime_direct_callee_resolution_t
@@ -804,11 +827,11 @@ struct runtime_direct_callee_resolution_t
     }
 
     imported_function_storage_t const* curr{::std::addressof(runtime_module.imported_function_vec_storage.index_unchecked(func_index_uz))};
+    auto const max_link_walk_steps{get_runtime_imported_function_link_walk_bound(runtime_module)};
     for(::std::size_t steps{};; ++steps)
     {
-        // Bound the walk defensively.  A valid module has a finite acyclic link chain; exceeding the bound points to
-        // corrupted runtime storage, not guest behavior.
-        if(steps > 8192uz || curr == nullptr) [[unlikely]] { return {}; }
+        // Exceeding the storage-derived bound means the chain is no longer the acyclic structure the initializer proved.
+        if(steps > max_link_walk_steps || curr == nullptr) [[unlikely]] { return {}; }
 
         switch(curr->link_kind)
         {
