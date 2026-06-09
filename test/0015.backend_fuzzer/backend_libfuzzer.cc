@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -55,7 +56,11 @@ namespace
     using module_t = storage::wasm_module_storage_t;
     using function_type_t = storage::wasm_binfmt1_final_function_type_t;
     using code_t = storage::wasm_binfmt1_final_wasm_code_t;
+    using import_type_t = storage::wasm_binfmt1_final_import_type_t;
+    using table_type_t = storage::wasm_binfmt1_final_table_type_t;
     using memory_type_t = storage::wasm_binfmt1_final_memory_type_t;
+    using global_type_t = storage::wasm_binfmt1_final_global_type_t;
+    using local_global_type_t = storage::wasm_binfmt1_final_local_global_type_t;
     using local_entry_t = typename decltype(::std::declval<code_t&>().locals)::value_type;
     using byte_vec = ::std::vector<::std::byte>;
 
@@ -68,12 +73,92 @@ namespace
     constexpr ::std::size_t k_i64_local_count{2uz};
     constexpr ::std::size_t k_max_input_bytes{4096uz};
 
-    struct fuzz_case
+    constexpr ::std::uint32_t k_imported_function_count{1u};
+    constexpr ::std::uint32_t k_local_main_index{0u};
+    constexpr ::std::uint32_t k_local_i32_add_index{1u};
+    constexpr ::std::uint32_t k_local_i32_mix_index{2u};
+    constexpr ::std::uint32_t k_local_i32_recursive_index{3u};
+    constexpr ::std::uint32_t k_local_i64_mix_index{4u};
+    constexpr ::std::uint32_t k_local_f64_neg_index{5u};
+    constexpr ::std::size_t k_local_function_count{6uz};
+    constexpr ::std::size_t k_type_count{4uz};
+
+    constexpr ::std::uint32_t k_type_void_void{0u};
+    constexpr ::std::uint32_t k_type_i32_i32{1u};
+    constexpr ::std::uint32_t k_type_i64_i64{2u};
+    constexpr ::std::uint32_t k_type_f64_f64{3u};
+
+    [[nodiscard]] constexpr ::std::uint32_t local_function_index_to_function_index(::std::uint32_t local_index) noexcept
+    { return k_imported_function_count + local_index; }
+
+    struct local_decl_model
     {
+        ::std::uint32_t count{};
+        value_type_t type{};
+    };
+
+    struct generated_function
+    {
+        ::std::uint32_t type_index{};
         ::std::vector<::std::uint8_t> body{};
         ::std::uint32_t expr_offset{};
-        bool has_memory{};
+        ::std::array<local_decl_model, 4uz> locals{};
+        ::std::size_t local_decl_count{};
+        ::std::uint32_t all_local_count{};
     };
+
+    struct helper_model
+    {
+        ::std::uint32_t i32_add_const{};
+        ::std::uint32_t i32_mix_xor{};
+        ::std::uint32_t i32_mix_add{};
+        ::std::uint32_t i32_mix_rot{};
+        ::std::uint64_t i64_add_const{};
+        ::std::uint64_t i64_xor_const{};
+    };
+
+    struct fuzz_case
+    {
+        ::std::array<generated_function, k_local_function_count> functions{};
+        helper_model helpers{};
+        ::std::uint32_t global_initial{};
+        ::std::size_t entry_function_index{local_function_index_to_function_index(k_local_main_index)};
+        bool has_memory{};
+        bool has_table{};
+        bool has_global{true};
+        bool has_imported_function{true};
+        bool has_runtime_call_bridge{};
+    };
+
+    void append_u8(::std::vector<::std::uint8_t>& out, ::std::uint8_t v);
+    void append_uleb(::std::vector<::std::uint8_t>& out, ::std::uint64_t v);
+
+    void set_function_body(generated_function& fn,
+                           ::std::uint32_t type_index,
+                           ::std::vector<::std::uint8_t>&& expr,
+                           ::std::initializer_list<local_decl_model> locals)
+    {
+        fn.type_index = type_index;
+        fn.body.clear();
+        fn.local_decl_count = 0uz;
+        fn.all_local_count = 0u;
+        for(auto const local: locals)
+        {
+            if(local.count == 0u) { continue; }
+            fn.locals[fn.local_decl_count++] = local;
+            fn.all_local_count += local.count;
+        }
+
+        append_uleb(fn.body, fn.local_decl_count);
+        for(::std::size_t i{}; i != fn.local_decl_count; ++i)
+        {
+            auto const local{fn.locals[i]};
+            append_uleb(fn.body, local.count);
+            append_u8(fn.body, static_cast<::std::uint8_t>(local.type));
+        }
+        fn.expr_offset = static_cast<::std::uint32_t>(fn.body.size());
+        fn.body.insert(fn.body.end(), expr.begin(), expr.end());
+    }
 
     [[nodiscard]] ::std::uint32_t u32(::std::uint64_t v) noexcept
     { return static_cast<::std::uint32_t>(v); }
@@ -128,6 +213,17 @@ namespace
         }
     }
 
+    void append_le32(::std::vector<::std::uint8_t>& out, ::std::uint32_t v)
+    {
+        for(unsigned i{}; i != 4u; ++i) { append_u8(out, static_cast<::std::uint8_t>((v >> (i * 8u)) & 0xffu)); }
+    }
+
+    void append_le64(::std::vector<::std::uint8_t>& out, ::std::uint64_t v)
+    {
+        append_le32(out, static_cast<::std::uint32_t>(v));
+        append_le32(out, static_cast<::std::uint32_t>(v >> 32u));
+    }
+
     void emit_i32_const(::std::vector<::std::uint8_t>& out, ::std::uint32_t v)
     {
         append_u8(out, 0x41u);
@@ -138,6 +234,18 @@ namespace
     {
         append_u8(out, 0x42u);
         append_sleb(out, static_cast<::std::int64_t>(v));
+    }
+
+    void emit_f32_const_bits(::std::vector<::std::uint8_t>& out, ::std::uint32_t bits)
+    {
+        append_u8(out, 0x43u);
+        append_le32(out, bits);
+    }
+
+    void emit_f64_const_bits(::std::vector<::std::uint8_t>& out, ::std::uint64_t bits)
+    {
+        append_u8(out, 0x44u);
+        append_le64(out, bits);
     }
 
     void emit_local_get(::std::vector<::std::uint8_t>& out, ::std::uint32_t i)
@@ -158,10 +266,47 @@ namespace
         append_uleb(out, i);
     }
 
+    void emit_call(::std::vector<::std::uint8_t>& out, ::std::uint32_t function_index)
+    {
+        append_u8(out, 0x10u);
+        append_uleb(out, function_index);
+    }
+
+    void emit_call_indirect(::std::vector<::std::uint8_t>& out, ::std::uint32_t type_index, ::std::uint32_t table_index = 0u)
+    {
+        append_u8(out, 0x11u);
+        append_uleb(out, type_index);
+        append_uleb(out, table_index);
+    }
+
+    void emit_global_get(::std::vector<::std::uint8_t>& out, ::std::uint32_t i)
+    {
+        append_u8(out, 0x23u);
+        append_uleb(out, i);
+    }
+
+    void emit_global_set(::std::vector<::std::uint8_t>& out, ::std::uint32_t i)
+    {
+        append_u8(out, 0x24u);
+        append_uleb(out, i);
+    }
+
     void emit_memarg(::std::vector<::std::uint8_t>& out, ::std::uint32_t align, ::std::uint32_t offset = 0u)
     {
         append_uleb(out, align);
         append_uleb(out, offset);
+    }
+
+    void emit_memory_size(::std::vector<::std::uint8_t>& out)
+    {
+        append_u8(out, 0x3fu);
+        append_u8(out, 0x00u);
+    }
+
+    void emit_memory_grow(::std::vector<::std::uint8_t>& out)
+    {
+        append_u8(out, 0x40u);
+        append_u8(out, 0x00u);
     }
 
     void emit_check_i32(::std::vector<::std::uint8_t>& out, ::std::uint32_t expected)
@@ -182,6 +327,18 @@ namespace
         append_u8(out, 0x40u);
         append_u8(out, 0x00u);
         append_u8(out, 0x0bu);
+    }
+
+    void emit_check_f32_bits(::std::vector<::std::uint8_t>& out, ::std::uint32_t expected_bits)
+    {
+        append_u8(out, 0xbcu);
+        emit_check_i32(out, expected_bits);
+    }
+
+    void emit_check_f64_bits(::std::vector<::std::uint8_t>& out, ::std::uint64_t expected_bits)
+    {
+        append_u8(out, 0xbdu);
+        emit_check_i64(out, expected_bits);
     }
 
     struct input_reader
@@ -216,14 +373,89 @@ namespace
         { return n == 0uz ? 0uz : static_cast<::std::size_t>(byte()) % n; }
     };
 
+    [[nodiscard]] ::std::uint32_t helper_i32_add(helper_model const& h, ::std::uint32_t x) noexcept
+    { return x + h.i32_add_const; }
+
+    [[nodiscard]] ::std::uint32_t helper_i32_mix(helper_model const& h, ::std::uint32_t x) noexcept
+    { return rotl32(x ^ h.i32_mix_xor, h.i32_mix_rot) + h.i32_mix_add; }
+
+    [[nodiscard]] ::std::uint64_t helper_i64_mix(helper_model const& h, ::std::uint64_t x) noexcept
+    { return (x + h.i64_add_const) ^ h.i64_xor_const; }
+
+    void build_helper_functions(fuzz_case& out)
+    {
+        {
+            ::std::vector<::std::uint8_t> expr{};
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, out.helpers.i32_add_const);
+            append_u8(expr, 0x6au);
+            append_u8(expr, 0x0bu);
+            set_function_body(out.functions[k_local_i32_add_index], k_type_i32_i32, ::std::move(expr), {});
+        }
+
+        {
+            ::std::vector<::std::uint8_t> expr{};
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, out.helpers.i32_mix_xor);
+            append_u8(expr, 0x73u);
+            emit_i32_const(expr, out.helpers.i32_mix_rot);
+            append_u8(expr, 0x77u);
+            emit_i32_const(expr, out.helpers.i32_mix_add);
+            append_u8(expr, 0x6au);
+            append_u8(expr, 0x0bu);
+            set_function_body(out.functions[k_local_i32_mix_index], k_type_i32_i32, ::std::move(expr), {});
+        }
+
+        {
+            ::std::vector<::std::uint8_t> expr{};
+            emit_local_get(expr, 0u);
+            append_u8(expr, 0x45u);
+            append_u8(expr, 0x04u);
+            append_u8(expr, static_cast<::std::uint8_t>(value_type_t::i32));
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x05u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6bu);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_recursive_index));
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6au);
+            append_u8(expr, 0x0bu);
+            append_u8(expr, 0x0bu);
+            set_function_body(out.functions[k_local_i32_recursive_index], k_type_i32_i32, ::std::move(expr), {});
+        }
+
+        {
+            ::std::vector<::std::uint8_t> expr{};
+            emit_local_get(expr, 0u);
+            emit_i64_const(expr, out.helpers.i64_add_const);
+            append_u8(expr, 0x7cu);
+            emit_i64_const(expr, out.helpers.i64_xor_const);
+            append_u8(expr, 0x85u);
+            append_u8(expr, 0x0bu);
+            set_function_body(out.functions[k_local_i64_mix_index], k_type_i64_i64, ::std::move(expr), {});
+        }
+
+        {
+            ::std::vector<::std::uint8_t> expr{};
+            emit_local_get(expr, 0u);
+            append_u8(expr, 0x9au);
+            append_u8(expr, 0x0bu);
+            set_function_body(out.functions[k_local_f64_neg_index], k_type_f64_f64, ::std::move(expr), {});
+        }
+    }
+
     struct code_projector
     {
         input_reader& in;
+        fuzz_case& out;
+        bool enable_runtime_calls{};
         ::std::vector<::std::uint8_t> expr{};
         ::std::array<::std::uint32_t, k_i32_local_count> i32_locals{};
         ::std::array<::std::uint64_t, k_i64_local_count> i64_locals{};
         ::std::vector<::std::uint32_t> i32_stack{};
-        bool has_memory{};
+        ::std::uint32_t global_i32{};
+        bool grew_memory{};
 
         void init_locals()
         {
@@ -343,7 +575,7 @@ namespace
 
         void memory_segment()
         {
-            has_memory = true;
+            out.has_memory = true;
             auto const offset{static_cast<::std::uint32_t>((in.next_u32() % 4096u) & ~3u)};
             auto const value{in.next_u32()};
             emit_i32_const(expr, offset);
@@ -354,6 +586,146 @@ namespace
             append_u8(expr, 0x28u);
             emit_memarg(expr, 2u);
             emit_check_i32(expr, value);
+        }
+
+        void memory_grow_segment()
+        {
+            if(grew_memory) { return; }
+            grew_memory = true;
+            out.has_memory = true;
+
+            emit_memory_size(expr);
+            emit_check_i32(expr, 1u);
+
+            emit_i32_const(expr, 1u);
+            emit_memory_grow(expr);
+            emit_check_i32(expr, 1u);
+
+            emit_memory_size(expr);
+            emit_check_i32(expr, 2u);
+
+            auto const edge_value{in.next_u32()};
+            emit_i32_const(expr, 65536u - 4u);
+            emit_i32_const(expr, edge_value);
+            append_u8(expr, 0x36u);
+            emit_memarg(expr, 2u);
+            emit_i32_const(expr, 65536u - 4u);
+            append_u8(expr, 0x28u);
+            emit_memarg(expr, 2u);
+            emit_check_i32(expr, edge_value);
+
+            auto const cross_value{in.next_u32()};
+            emit_i32_const(expr, 65536u - 2u);
+            emit_i32_const(expr, cross_value);
+            append_u8(expr, 0x36u);
+            emit_memarg(expr, 0u);
+            emit_i32_const(expr, 65536u - 2u);
+            append_u8(expr, 0x28u);
+            emit_memarg(expr, 0u);
+            emit_check_i32(expr, cross_value);
+
+            auto const page2_value{in.next_u32()};
+            emit_i32_const(expr, (2u * 65536u) - 4u);
+            emit_i32_const(expr, page2_value);
+            append_u8(expr, 0x36u);
+            emit_memarg(expr, 2u);
+            emit_i32_const(expr, (2u * 65536u) - 4u);
+            append_u8(expr, 0x28u);
+            emit_memarg(expr, 2u);
+            emit_check_i32(expr, page2_value);
+
+            emit_i32_const(expr, 10u);
+            emit_memory_grow(expr);
+            emit_check_i32(expr, 0xffffffffu);
+        }
+
+        void global_segment()
+        {
+            out.has_global = true;
+            emit_global_get(expr, 0u);
+            emit_check_i32(expr, global_i32);
+
+            auto const next{in.next_u32()};
+            emit_i32_const(expr, next);
+            emit_global_set(expr, 0u);
+            global_i32 = next;
+
+            emit_global_get(expr, 0u);
+            emit_check_i32(expr, global_i32);
+        }
+
+        void float_segment()
+        {
+            auto const f32_payload{(in.next_u32() & 0x003fffffu) | 0x00400000u};
+            auto const f32_nan_bits{0x7f800000u | f32_payload};
+            emit_f32_const_bits(expr, f32_nan_bits);
+            emit_check_f32_bits(expr, f32_nan_bits);
+
+            emit_f64_const_bits(expr, 0x8000000000000000ull);
+            emit_check_f64_bits(expr, 0x8000000000000000ull);
+
+            emit_f64_const_bits(expr, 0x402a000000000000ull);
+            emit_f64_const_bits(expr, 0x4014000000000000ull);
+            append_u8(expr, 0xa0u);
+            append_u8(expr, 0xaau);
+            emit_check_i32(expr, 18u);
+        }
+
+        void direct_call_segment()
+        {
+            if(!enable_runtime_calls) { return; }
+            out.has_runtime_call_bridge = true;
+
+            auto const x{in.next_u32()};
+            emit_i32_const(expr, x);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_add_index));
+            emit_check_i32(expr, helper_i32_add(out.helpers, x));
+
+            auto const y{in.next_u32()};
+            emit_i32_const(expr, y);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_mix_index));
+            emit_check_i32(expr, helper_i32_mix(out.helpers, y));
+
+            auto const z{static_cast<::std::uint32_t>(in.byte() & 7u)};
+            emit_i32_const(expr, z);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_recursive_index));
+            emit_check_i32(expr, z + 1u);
+
+            auto const w{in.next_u64()};
+            emit_i64_const(expr, w);
+            emit_call(expr, local_function_index_to_function_index(k_local_i64_mix_index));
+            emit_check_i64(expr, helper_i64_mix(out.helpers, w));
+
+            auto const nan_payload{(in.next_u64() & 0x0007ffffffffffffull) | 1ull};
+            auto const nan_bits{0x7ff8000000000000ull | nan_payload};
+            emit_f64_const_bits(expr, nan_bits);
+            emit_call(expr, local_function_index_to_function_index(k_local_f64_neg_index));
+            emit_check_f64_bits(expr, nan_bits ^ 0x8000000000000000ull);
+
+            auto const imported_x{in.next_u32()};
+            emit_i32_const(expr, imported_x);
+            emit_call(expr, 0u);
+            emit_check_i32(expr, helper_i32_add(out.helpers, imported_x));
+        }
+
+        void indirect_call_segment()
+        {
+            if(!enable_runtime_calls) { return; }
+            out.has_table = true;
+            out.has_runtime_call_bridge = true;
+
+            auto const selector{static_cast<::std::uint32_t>(in.byte() & 1u)};
+            auto const x{in.next_u32()};
+            emit_i32_const(expr, x);
+            emit_i32_const(expr, selector);
+            emit_call_indirect(expr, k_type_i32_i32);
+            emit_check_i32(expr, selector == 0u ? helper_i32_add(out.helpers, x) : helper_i32_mix(out.helpers, x));
+
+            auto const y{x ^ in.next_u32()};
+            emit_i32_const(expr, y);
+            emit_i32_const(expr, selector);
+            emit_call_indirect(expr, k_type_i32_i32);
+            emit_check_i32(expr, selector == 0u ? helper_i32_add(out.helpers, y) : helper_i32_mix(out.helpers, y));
         }
 
         void i64_segment()
@@ -413,8 +785,14 @@ namespace
             i32_locals[1] = acc;
         }
 
-        [[nodiscard]] fuzz_case finish()
+        void finish()
         {
+            global_segment();
+            float_segment();
+            memory_grow_segment();
+            direct_call_segment();
+            indirect_call_segment();
+
             auto const step_count{static_cast<::std::size_t>(16u + (in.byte() & 0x7fu))};
             for(::std::size_t i{}; i != step_count; ++i)
             {
@@ -450,13 +828,33 @@ namespace
                 {
                     memory_segment();
                 }
-                else if(action < 86u)
+                else if(action < 83u)
                 {
                     i64_segment();
                 }
-                else if(action < 90u)
+                else if(action < 86u)
                 {
                     loop_segment();
+                }
+                else if(action < 89u)
+                {
+                    memory_grow_segment();
+                }
+                else if(action < 92u)
+                {
+                    global_segment();
+                }
+                else if(action < 95u)
+                {
+                    float_segment();
+                }
+                else if(action < 97u)
+                {
+                    direct_call_segment();
+                }
+                else if(action < 99u)
+                {
+                    indirect_call_segment();
                 }
                 else if(depth >= 2uz)
                 {
@@ -469,29 +867,42 @@ namespace
 
             if(i32_stack.empty()) { push_i32_local(); }
             while(i32_stack.size() > 1uz) { binary_i32(0x6au); }
-            emit_check_i32(expr, i32_stack.back());
+            auto const final_i32{i32_stack.back()};
+            emit_local_tee(expr, 0u);
+            i32_locals[0] = final_i32;
+            emit_check_i32(expr, final_i32);
+            emit_local_get(expr, 0u);
+            emit_global_set(expr, 0u);
+            global_i32 = final_i32;
             append_u8(expr, 0x0bu);
 
-            fuzz_case out{};
-            append_uleb(out.body, 2u);
-            append_uleb(out.body, k_i32_local_count);
-            append_u8(out.body, static_cast<::std::uint8_t>(value_type_t::i32));
-            append_uleb(out.body, k_i64_local_count);
-            append_u8(out.body, static_cast<::std::uint8_t>(value_type_t::i64));
-            out.expr_offset = static_cast<::std::uint32_t>(out.body.size());
-            out.body.insert(out.body.end(), expr.begin(), expr.end());
-            out.has_memory = has_memory;
-            return out;
+            set_function_body(out.functions[k_local_main_index],
+                              k_type_void_void,
+                              ::std::move(expr),
+                              {{static_cast<::std::uint32_t>(k_i32_local_count), value_type_t::i32},
+                               {static_cast<::std::uint32_t>(k_i64_local_count), value_type_t::i64}});
         }
     };
 
-    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data, ::std::size_t size)
+    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data, ::std::size_t size, bool enable_runtime_calls = true)
     {
         size = ::std::min(size, k_max_input_bytes);
         input_reader in{data, size, 0uz};
-        code_projector p{in};
+        fuzz_case out{};
+        out.helpers.i32_add_const = in.next_u32();
+        out.helpers.i32_mix_xor = in.next_u32();
+        out.helpers.i32_mix_add = in.next_u32();
+        out.helpers.i32_mix_rot = in.byte() & 31u;
+        out.helpers.i64_add_const = in.next_u64();
+        out.helpers.i64_xor_const = in.next_u64();
+        out.global_initial = in.next_u32();
+        build_helper_functions(out);
+
+        code_projector p{in, out, enable_runtime_calls};
+        p.global_i32 = out.global_initial;
         p.init_locals();
-        return p.finish();
+        p.finish();
+        return out;
     }
 
     [[nodiscard]] ::std::size_t abi_bytes(value_type_t t) noexcept
@@ -524,68 +935,157 @@ namespace
     struct direct_module_owner
     {
         ::std::array<value_type_t, 1uz> empty_type_storage{value_type_t::i32};
-        ::std::array<function_type_t, 1uz> types{};
-        ::std::array<code_t, 1uz> codes{};
-        ::std::vector<wasm_byte_t> code_bytes{};
+        ::std::array<value_type_t, 1uz> i32_type_storage{value_type_t::i32};
+        ::std::array<value_type_t, 1uz> i64_type_storage{value_type_t::i64};
+        ::std::array<value_type_t, 1uz> f64_type_storage{value_type_t::f64};
+        ::std::array<function_type_t, k_type_count> types{};
+        ::std::array<import_type_t, 1uz> imports{};
+        ::std::array<code_t, k_local_function_count> codes{};
+        ::std::array<::std::vector<wasm_byte_t>, k_local_function_count> code_bytes{};
+        ::std::array<table_type_t, 1uz> tables{};
         ::std::array<memory_type_t, 1uz> memories{};
+        ::std::array<global_type_t, 1uz> globals{};
+        ::std::array<local_global_type_t, 1uz> local_globals{};
 
         void build(fuzz_case const& c, module_t& module)
         {
-            auto& ty{types[0]};
-            ty.parameter.begin = empty_type_storage.data();
-            ty.parameter.end = empty_type_storage.data();
-            ty.result.begin = empty_type_storage.data();
-            ty.result.end = empty_type_storage.data();
+            types[k_type_void_void].parameter.begin = empty_type_storage.data();
+            types[k_type_void_void].parameter.end = empty_type_storage.data();
+            types[k_type_void_void].result.begin = empty_type_storage.data();
+            types[k_type_void_void].result.end = empty_type_storage.data();
 
-            code_bytes.clear();
-            code_bytes.reserve(c.body.size());
-            for(auto const b: c.body) { code_bytes.push_back(static_cast<wasm_byte_t>(b)); }
+            types[k_type_i32_i32].parameter.begin = i32_type_storage.data();
+            types[k_type_i32_i32].parameter.end = i32_type_storage.data() + 1uz;
+            types[k_type_i32_i32].result.begin = i32_type_storage.data();
+            types[k_type_i32_i32].result.end = i32_type_storage.data() + 1uz;
 
-            auto& code{codes[0]};
-            auto const* begin{code_bytes.data()};
-            code.body.code_begin = begin;
-            code.body.expr_begin = begin + c.expr_offset;
-            code.body.code_end = begin + code_bytes.size();
-            code.locals.clear();
-            code.locals.reserve(2uz);
-            local_entry_t i32_entry{};
-            i32_entry.count = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(k_i32_local_count);
-            i32_entry.type = value_type_t::i32;
-            code.locals.push_back_unchecked(i32_entry);
-            local_entry_t i64_entry{};
-            i64_entry.count = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(k_i64_local_count);
-            i64_entry.type = value_type_t::i64;
-            code.locals.push_back_unchecked(i64_entry);
-            code.all_local_count = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(k_i32_local_count + k_i64_local_count);
+            types[k_type_i64_i64].parameter.begin = i64_type_storage.data();
+            types[k_type_i64_i64].parameter.end = i64_type_storage.data() + 1uz;
+            types[k_type_i64_i64].result.begin = i64_type_storage.data();
+            types[k_type_i64_i64].result.end = i64_type_storage.data() + 1uz;
+
+            types[k_type_f64_f64].parameter.begin = f64_type_storage.data();
+            types[k_type_f64_f64].parameter.end = f64_type_storage.data() + 1uz;
+            types[k_type_f64_f64].result.begin = f64_type_storage.data();
+            types[k_type_f64_f64].result.end = f64_type_storage.data() + 1uz;
 
             module.type_section_storage.type_section_begin = types.data();
             module.type_section_storage.type_section_end = types.data() + types.size();
 
-            module.local_defined_function_vec_storage.reserve(1uz);
-            storage::local_defined_function_storage_t fn{};
-            fn.function_type_ptr = ::std::addressof(types[0]);
-            fn.wasm_code_ptr = ::std::addressof(codes[0]);
-            module.local_defined_function_vec_storage.push_back_unchecked(fn);
+            for(::std::size_t i{}; i != k_local_function_count; ++i)
+            {
+                auto const& src{c.functions[i]};
+                auto& bytes{code_bytes[i]};
+                bytes.clear();
+                bytes.reserve(src.body.size());
+                for(auto const b: src.body) { bytes.push_back(static_cast<wasm_byte_t>(b)); }
 
-            module.local_defined_code_vec_storage.reserve(1uz);
-            storage::local_defined_code_storage_t rec{};
-            rec.code_type_ptr = ::std::addressof(codes[0]);
-            rec.func_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(0uz));
-            module.local_defined_code_vec_storage.push_back_unchecked(rec);
+                auto& code{codes[i]};
+                auto const* begin{bytes.data()};
+                code.body.code_begin = begin;
+                code.body.expr_begin = begin + src.expr_offset;
+                code.body.code_end = begin + bytes.size();
+                code.locals.clear();
+                code.locals.reserve(src.local_decl_count);
+                for(::std::size_t j{}; j != src.local_decl_count; ++j)
+                {
+                    local_entry_t entry{};
+                    entry.count = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(src.locals[j].count);
+                    entry.type = src.locals[j].type;
+                    code.locals.push_back_unchecked(entry);
+                }
+                code.all_local_count = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(src.all_local_count);
+            }
+
+            module.local_defined_function_vec_storage.reserve(k_local_function_count);
+            for(::std::size_t i{}; i != k_local_function_count; ++i)
+            {
+                storage::local_defined_function_storage_t fn{};
+                fn.function_type_ptr = ::std::addressof(types[c.functions[i].type_index]);
+                fn.wasm_code_ptr = ::std::addressof(codes[i]);
+                module.local_defined_function_vec_storage.push_back_unchecked(fn);
+            }
+
+            module.local_defined_code_vec_storage.reserve(k_local_function_count);
+            for(::std::size_t i{}; i != k_local_function_count; ++i)
+            {
+                storage::local_defined_code_storage_t rec{};
+                rec.code_type_ptr = ::std::addressof(codes[i]);
+                rec.func_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(i));
+                module.local_defined_code_vec_storage.push_back_unchecked(rec);
+            }
+
+            if(c.has_imported_function)
+            {
+                auto& import_ty{imports[0]};
+                import_ty.imports.type = ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func;
+                import_ty.imports.storage.function = ::std::addressof(types[k_type_i32_i32]);
+
+                module.imported_function_vec_storage.reserve(1uz);
+                storage::imported_function_storage_t imported{};
+                imported.target.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(k_local_i32_add_index));
+                imported.import_type_ptr = ::std::addressof(import_ty);
+                imported.link_kind = storage::imported_function_link_kind::defined;
+                module.imported_function_vec_storage.push_back_unchecked(imported);
+            }
+
+            if(c.has_table)
+            {
+                auto& table_ty{tables[0]};
+                table_ty.limits.min = 2u;
+                table_ty.limits.present_max = true;
+                table_ty.limits.max = 2u;
+
+                module.local_defined_table_vec_storage.reserve(1uz);
+                storage::local_defined_table_storage_t table{};
+                table.table_type_ptr = ::std::addressof(table_ty);
+                table.owner_module_rt_ptr = ::std::addressof(module);
+                table.elems.resize(2uz);
+                auto& elem0{table.elems.index_unchecked(0uz)};
+                elem0.type = storage::local_defined_table_elem_storage_type_t::func_ref_defined;
+                elem0.storage.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(k_local_i32_add_index));
+                auto& elem1{table.elems.index_unchecked(1uz)};
+                elem1.type = storage::local_defined_table_elem_storage_type_t::func_ref_defined;
+                elem1.storage.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(k_local_i32_mix_index));
+                module.local_defined_table_vec_storage.push_back_unchecked(::std::move(table));
+            }
+
+#if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
+            module.llvm_jit_call_indirect_table_views.resize(module.imported_table_vec_storage.size() + module.local_defined_table_vec_storage.size());
+#endif
 
             if(c.has_memory)
             {
                 auto& mem_ty{memories[0]};
                 mem_ty.limits.min = 1u;
                 mem_ty.limits.present_max = true;
-                mem_ty.limits.max = 2u;
+                mem_ty.limits.max = 3u;
                 module.local_defined_memory_vec_storage.emplace_back();
                 auto& mem_rec{module.local_defined_memory_vec_storage.back()};
                 mem_rec.memory_type_ptr = ::std::addressof(mem_ty);
                 mem_rec.effective_limits.min = 1u;
                 mem_rec.effective_limits.present_max = true;
-                mem_rec.effective_limits.max = 2u;
+                mem_rec.effective_limits.max = 3u;
                 mem_rec.memory.init_by_page_count(1u);
+            }
+
+            if(c.has_global)
+            {
+                auto& global_ty{globals[0]};
+                global_ty.type = value_type_t::i32;
+                global_ty.is_mutable = true;
+                local_globals[0].global = global_ty;
+
+                module.local_defined_global_vec_storage.reserve(1uz);
+                storage::local_defined_global_storage_t global{};
+                global.global_type_ptr = ::std::addressof(local_globals[0].global);
+                global.local_global_type_ptr = ::std::addressof(local_globals[0]);
+                global.owner_module_rt_ptr = ::std::addressof(module);
+                global.init_state = storage::wasm_global_init_state::initialized;
+                global.global.kind = ::uwvm2::object::global::global_type::wasm_i32;
+                global.global.is_mutable = true;
+                global.global.storage.i32 = i32(c.global_initial);
+                module.local_defined_global_vec_storage.push_back_unchecked(global);
             }
         }
     };
@@ -662,7 +1162,7 @@ namespace
         ::std::abort();
     }
 
-    void run_runtime_mode(fuzz_case const& c, ::std::string_view mode)
+    [[nodiscard]] ::std::uint32_t run_runtime_mode(fuzz_case const& c, ::std::string_view mode)
     {
         configure_mode(mode);
 #if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
@@ -676,16 +1176,20 @@ namespace
         if(mode == "uwvm-int-full" || mode == "llvm-jit-full")
         {
             ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-            cfg.entry_function_index = 0u;
+            cfg.entry_function_index = c.entry_function_index;
             ::uwvm2::runtime::lib::full_compile_and_run_main_module(k_main_module_name, cfg);
         }
         else
         {
             ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-            cfg.entry_function_index = 0u;
+            cfg.entry_function_index = c.entry_function_index;
             cfg.assume_full_code_verified = true;
             ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(k_main_module_name, cfg);
         }
+
+        if(it->second.local_defined_global_vec_storage.size() == 0uz) { return 0u; }
+        auto const& global{it->second.local_defined_global_vec_storage.index_unchecked(0uz).global};
+        return static_cast<::std::uint32_t>(global.storage.i32);
     }
 
     template <::std::size_t ScalarSlots>
@@ -909,11 +1413,37 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     if(size == 0uz) { return 0; }
     if(g_trace) { ::std::cerr << "backend-libfuzzer: input-size=" << size << '\n'; }
     auto c{project_input(data, size)};
+    fuzz_case ring_case{};
+    bool ring_case_ready{};
+    bool have_runtime_observation{};
+    ::std::uint32_t runtime_observation{};
     for(auto const& mode: g_modes)
     {
         if(g_trace) { ::std::cerr << "backend-libfuzzer: mode=" << mode << '\n'; }
-        if(mode == "uwvm-int-ring-matrix") { run_ring_matrix(c); }
-        else { run_runtime_mode(c, mode); }
+        if(mode == "uwvm-int-ring-matrix")
+        {
+            if(!ring_case_ready)
+            {
+                ring_case = project_input(data, size, false);
+                ring_case_ready = true;
+            }
+            run_ring_matrix(ring_case);
+        }
+        else
+        {
+            auto const observation{run_runtime_mode(c, mode)};
+            if(!have_runtime_observation)
+            {
+                runtime_observation = observation;
+                have_runtime_observation = true;
+            }
+            else if(observation != runtime_observation)
+            {
+                ::std::cerr << "backend-libfuzzer: runtime observation mismatch: baseline=0x" << ::std::hex << runtime_observation
+                            << " mode=" << mode << " observation=0x" << observation << ::std::dec << '\n';
+                ::std::abort();
+            }
+        }
     }
     return 0;
 }
