@@ -208,6 +208,108 @@ public:
     return ::llvm::ConstantExpr::getIntToPtr(host_address_value, pointer_type);
 }
 
+// Convert a C++ runtime bridge function pointer into an LLVM pointer with the exact supplied function type.
+// The address is copied through object bytes instead of forming a ptrtoint-style LLVM constant from the function symbol:
+// COFF/MCJIT on Windows may otherwise leave local C++ bridge symbols unresolved in lazily materialized tiered modules.
+template <typename FunctionPtr>
+[[nodiscard]] inline ::std::uintptr_t get_llvm_runtime_bridge_function_address(FunctionPtr function_pointer) noexcept
+{
+    static_assert(sizeof(FunctionPtr) <= sizeof(::std::uintptr_t));
+    ::std::uintptr_t function_address{};
+    ::std::memcpy(::std::addressof(function_address), ::std::addressof(function_pointer), sizeof(FunctionPtr));
+    return function_address;
+}
+
+template <typename FunctionPtr>
+[[nodiscard]] inline ::llvm::Constant*
+    get_llvm_runtime_bridge_function_pointer(::llvm::LLVMContext& llvm_context, ::llvm::FunctionType* function_type, FunctionPtr function_pointer) noexcept
+{
+    if(function_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto const function_address{get_llvm_runtime_bridge_function_address(function_pointer)};
+    if(function_address == 0u) [[unlikely]] { return nullptr; }
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, function_address)};
+    return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
+}
+
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+// Put host addresses in the JIT module's own data section on Win64.  COFF/MCJIT may lower `load (inttoptr host_addr)`
+// or direct local C++ function constants through relocations that become zero/truncated when JIT code is allocated far
+// from the host image.  A private non-constant global is loaded RIP-relatively from JIT data and carries the full address.
+[[nodiscard]] inline ::llvm::Value* get_llvm_win64_jit_host_address_value(::llvm::IRBuilder<>& ir_builder,
+                                                                          ::std::uintptr_t host_address,
+                                                                          char const* name_prefix) noexcept
+{
+    if(host_address == 0u) [[unlikely]] { return nullptr; }
+
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
+    auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
+    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+
+    auto& llvm_context{ir_builder.getContext()};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto address_global = new ::llvm::GlobalVariable(*llvm_module,
+                                                     llvm_intptr_type,
+                                                     false,
+                                                     ::llvm::GlobalValue::PrivateLinkage,
+                                                     ::llvm::ConstantInt::get(llvm_intptr_type, host_address),
+                                                     name_prefix);
+    address_global->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);
+    address_global->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+
+    auto loaded_address{ir_builder.CreateLoad(llvm_intptr_type, address_global, "uwvm.host.addr")};
+    loaded_address->setVolatile(true);
+    loaded_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    return loaded_address;
+}
+
+[[nodiscard]] inline ::llvm::Value*
+    get_llvm_win64_jit_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
+{
+    if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, host_address, "uwvm.win64.host.ptr.")};
+    if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
+    return ir_builder.CreateIntToPtr(loaded_address, pointer_type, "uwvm.host.ptr");
+}
+#endif
+
+[[nodiscard]] inline ::llvm::Value*
+    get_llvm_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
+{
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    return get_llvm_win64_jit_host_pointer_value(ir_builder, host_address, pointer_type);
+#else
+    static_cast<void>(ir_builder);
+    return get_llvm_host_pointer_constant(host_address, pointer_type);
+#endif
+}
+
+template <typename FunctionPtr>
+[[nodiscard]] inline ::llvm::Value* get_llvm_runtime_bridge_function_pointer_value(::llvm::IRBuilder<>& ir_builder,
+                                                                                   ::llvm::FunctionType* function_type,
+                                                                                   FunctionPtr function_pointer) noexcept
+{
+    if(function_type == nullptr) [[unlikely]] { return nullptr; }
+
+    [[maybe_unused]] auto& llvm_context{ir_builder.getContext()};
+    auto const function_address{get_llvm_runtime_bridge_function_address(function_pointer)};
+    if(function_address == 0u) [[unlikely]] { return nullptr; }
+
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    // Keep this in sync with Win64 tiered/raw validation.  Direct `inttoptr` host bridge constants are not reliable on
+    // COFF/MCJIT: local C++ bridge relocations and high host addresses can be materialized as zero or truncated operands.
+    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, function_address, "uwvm.win64.bridge.")};
+    if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
+    return ir_builder.CreateIntToPtr(loaded_address, get_llvm_pointer_type(function_type), "runtime.bridge.ptr");
+#else
+    static_cast<void>(ir_builder);
+    return get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, function_pointer);
+#endif
+}
+
 // Allocate stack storage in the function entry block, regardless of the caller's current insertion point.  LLVM's mem2reg
 // and lifetime reasoning work best when all allocas are anchored at the entry.
 [[nodiscard]] inline ::llvm::AllocaInst*
@@ -238,12 +340,14 @@ public:
 #endif
 }
 
-// Internal Wasm-to-Wasm JIT calls can use a private ABI when the platform offers a faster convention.  This must remain
-// separate from host bridge calls because external C++ code cannot be required to follow the private convention.
+// Internal Wasm-to-Wasm JIT calls can use a private ABI when the platform offers a faster convention.  Keep this policy
+// in lockstep with uwvm_int/macro/push_macros.h: Windows x86_64 uses SysV only when the C++ compiler can spell the same
+// attributed function pointer, and every i686 target uses fastcall.  A generated LLVM calling convention without the
+// matching C++ pointer attribute is a silent mixed-ABI bug at the tiered/raw-entry boundary.
 [[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_wasm_calling_conv() noexcept
 {
-    // Private JIT-to-JIT calls can use a faster ABI than the public C++/raw-entry boundary.
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+#if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
+    (defined(__GNUC__) || defined(__clang__))
     return ::llvm::CallingConv::X86_64_SysV;
 #elif defined(__i386__) || defined(_M_IX86)
     return ::llvm::CallingConv::X86_FastCall;
@@ -307,6 +411,19 @@ inline void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcep
 // Mark a generated call site as crossing the host/runtime bridge ABI.
 inline ::llvm::CallInst* apply_llvm_jit_host_calling_conv(::llvm::CallInst* call_inst) noexcept
 { return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_host_calling_conv()); }
+
+// Raw Wasm entry targets are called both from generated code and from the C++ tiered runtime.  They deliberately share
+// the private Wasm ABI above, so update the runtime-side entry pointer attributes whenever this convention changes.
+[[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_raw_entry_calling_conv() noexcept
+{ return get_llvm_jit_wasm_calling_conv(); }
+
+// Mark a generated function as callable through the runtime raw-buffer ABI.
+inline void apply_llvm_jit_raw_entry_calling_conv(::llvm::Function& function) noexcept
+{ apply_llvm_jit_calling_conv(function, get_llvm_jit_raw_entry_calling_conv()); }
+
+// Mark a generated raw-entry call site.
+inline ::llvm::CallInst* apply_llvm_jit_raw_entry_calling_conv(::llvm::CallInst* call_inst) noexcept
+{ return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_raw_entry_calling_conv()); }
 
 // Mark a generated function as callable through the private Wasm-to-Wasm ABI.
 inline void apply_llvm_jit_wasm_calling_conv(::llvm::Function& function) noexcept { apply_llvm_jit_calling_conv(function, get_llvm_jit_wasm_calling_conv()); }
@@ -433,11 +550,61 @@ inline ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call
 [[nodiscard]] inline ::llvm::Constant* get_llvm_f64_constant_from_bits(::llvm::LLVMContext& llvm_context, ::std::uint_least64_t bits)
 { return ::llvm::ConstantFP::get(::llvm::Type::getDoubleTy(llvm_context), ::llvm::APFloat(::llvm::APFloat::IEEEdouble(), ::llvm::APInt(64u, bits))); }
 
-// Runtime trap bridge signature: one small integer enum describing the trap reason, no return value.
+[[nodiscard]] inline constexpr bool llvm_jit_win64_seh_explicit_trap_context_enabled() noexcept
+{
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    return true;
+#else
+    return false;
+#endif
+}
+
+[[nodiscard]] inline ::llvm::Value* emit_llvm_jit_current_frame_address(::llvm::IRBuilder<>& ir_builder, ::llvm::IntegerType* llvm_intptr_type)
+{
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto* const register_name{::llvm::MDString::get(llvm_context, "rbp")};
+    auto* const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register,
+                                      {llvm_intptr_type},
+                                      {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#else
+    auto* const frame_address_ptr{ir_builder.CreateIntrinsic(::llvm::Intrinsic::frameaddress,
+                                                             ir_builder.getPtrTy(),
+                                                             {::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder.getContext()), 0u)})};
+    return ir_builder.CreatePtrToInt(frame_address_ptr, llvm_intptr_type);
+#endif
+}
+
+[[nodiscard]] inline ::llvm::Value* emit_llvm_jit_current_stack_pointer(::llvm::IRBuilder<>& ir_builder, ::llvm::IntegerType* llvm_intptr_type)
+{
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto* const register_name{::llvm::MDString::get(llvm_context, "rsp")};
+    auto* const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register,
+                                      {llvm_intptr_type},
+                                      {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#else
+    static_cast<void>(ir_builder);
+    return ::llvm::ConstantInt::get(llvm_intptr_type, 0u);
+#endif
+}
+
+// Runtime trap bridge signature.  Win64 SEH unwind needs the generated function to pass its own frame pointer
+// explicitly; collecting that value inside the C++ helper crosses a mixed-ABI boundary and can lose the JIT caller.
 [[nodiscard]] inline ::llvm::FunctionType* get_llvm_runtime_trap_bridge_function_type(::llvm::LLVMContext& llvm_context) noexcept
 {
     auto trap_kind_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::uwvm2::runtime::lib::llvm_jit_trap_kind) * 8u))};
-    return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {trap_kind_type}, false);
+    if constexpr(llvm_jit_win64_seh_explicit_trap_context_enabled())
+    {
+        auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+        return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {trap_kind_type, llvm_intptr_type, llvm_intptr_type}, false);
+    }
+    else
+    {
+        return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {trap_kind_type}, false);
+    }
 }
 
 // Emit a call to the runtime trap handler and a compiler barrier.  The caller is responsible for placing the final
@@ -448,14 +615,19 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     auto function_type{get_llvm_runtime_trap_bridge_function_type(llvm_context)};
     if(function_type == nullptr) [[unlikely]] { return; }
 
-    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_runtime_trap))};
-    auto bridge_pointer{::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type))};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_runtime_trap)};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto trap_kind_type{function_type->getParamType(0u)};
-    auto trap_call{
-        ir_builder.CreateCall(function_type, bridge_pointer, {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))})};
+    ::uwvm2::utils::container::vector<::llvm::Value*> call_arguments{};
+    call_arguments.emplace_back(::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind)));
+    if constexpr(llvm_jit_win64_seh_explicit_trap_context_enabled())
+    {
+        auto* const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(function_type->getParamType(1u))};
+        call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
+        call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
+    }
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -478,7 +650,21 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
     auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context),
-                                     {llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type},
+                                     llvm_jit_win64_seh_explicit_trap_context_enabled()
+                                         ? ::std::initializer_list<::llvm::Type*>{llvm_intptr_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_i32_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_intptr_type,
+                                                                                  llvm_intptr_type,
+                                                                                  llvm_intptr_type}
+                                         : ::std::initializer_list<::llvm::Type*>{llvm_intptr_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_i32_type,
+                                                                                  llvm_i64_type,
+                                                                                  llvm_intptr_type},
                                      false);
 }
 
@@ -502,9 +688,8 @@ inline void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
     auto llvm_intptr_type{function_type->getParamType(0u)};
     auto llvm_i64_type{function_type->getParamType(1u)};
     auto llvm_i32_type{function_type->getParamType(3u)};
-    auto llvm_address{
-        ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap))};
-    auto bridge_pointer{::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type))};
+    auto bridge_pointer{
+        get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap)};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto memory_offset_arg{memory_offset == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
@@ -513,14 +698,20 @@ inline void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
     auto memory_length_arg{memory_length == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
                                                     : ir_builder.CreateIntCast(memory_length, llvm_i64_type, false)};
 
-    auto trap_call{ir_builder.CreateCall(function_type,
-                                         bridge_pointer,
-                                         {::llvm::ConstantInt::get(llvm_intptr_type, memory_idx),
-                                          ::llvm::ConstantInt::get(llvm_i64_type, memory_static_offset),
-                                          memory_offset_arg,
-                                          offset_65_bit_arg,
-                                          memory_length_arg,
-                                          ::llvm::ConstantInt::get(llvm_intptr_type, memory_type_size)})};
+    ::uwvm2::utils::container::vector<::llvm::Value*> call_arguments{};
+    call_arguments.emplace_back(::llvm::ConstantInt::get(llvm_intptr_type, memory_idx));
+    call_arguments.emplace_back(::llvm::ConstantInt::get(llvm_i64_type, memory_static_offset));
+    call_arguments.emplace_back(memory_offset_arg);
+    call_arguments.emplace_back(offset_65_bit_arg);
+    call_arguments.emplace_back(memory_length_arg);
+    call_arguments.emplace_back(::llvm::ConstantInt::get(llvm_intptr_type, memory_type_size));
+    if constexpr(llvm_jit_win64_seh_explicit_trap_context_enabled())
+    {
+        auto* const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(llvm_intptr_type)};
+        call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
+        call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
+    }
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -2008,7 +2199,15 @@ inline void llvm_jit_store_little_endian_integer(::std::byte* memory_ptr, UInt v
 
 // Generic memory trap bridge used when detailed access metadata is unavailable.
 inline void llvm_jit_memory_bridge_trap() noexcept
-{ ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds); }
+{
+    ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+                                                 ,
+                                                 0u,
+                                                 0u
+#endif
+    );
+}
 
 // Detailed memory trap bridge for native checked-memory access fallback paths.
 inline void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
@@ -2022,7 +2221,13 @@ inline void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
                                                               effective_offset.offset,
                                                               effective_offset.offset_65_bit ? 1u : 0u,
                                                               static_cast<::std::uint_least64_t>(memory_length),
-                                                              access_size);
+                                                              access_size
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+                                                              ,
+                                                              0u,
+                                                              0u
+#endif
+    );
     ::fast_io::fast_terminate();
 }
 
@@ -2523,20 +2728,6 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
                : static_cast<runtime_wasm_i32>(-1);
 }
 
-// Convert a C++ runtime bridge function pointer into an LLVM constant pointer with the exact supplied function type.
-template <typename FunctionPtr>
-[[nodiscard]] inline ::llvm::Constant*
-    get_llvm_runtime_bridge_function_pointer(::llvm::LLVMContext& llvm_context, ::llvm::FunctionType* function_type, FunctionPtr function_pointer) noexcept
-{
-    if(function_type == nullptr) [[unlikely]] { return nullptr; }
-
-    // LLVM IR cannot carry a C++ function pointer directly.  Cast through an integer with the host pointer width, then
-    // back to an LLVM function pointer whose signature matches the bridge declaration used at the call site.
-    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(function_pointer))};
-    return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
-}
-
 // Emit a runtime call-stack push for trap diagnostics.  This is used for public entries that represent a logical Wasm
 // function frame.
 [[nodiscard]] inline bool
@@ -2545,7 +2736,7 @@ template <typename FunctionPtr>
     auto& llvm_context{ir_builder.getContext()};
     auto llvm_size_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::size_t) * 8u))};
     auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_size_type, llvm_size_type}, false)};
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
     apply_llvm_jit_host_calling_conv(
@@ -2560,7 +2751,7 @@ template <typename FunctionPtr>
 {
     auto& llvm_context{ir_builder.getContext()};
     auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
     apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(function_type, bridge_pointer, {}));
@@ -3504,7 +3695,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     reentry_function->setLinkage(::llvm::Function::ExternalLinkage);
                 }
                 if(reentry_function == nullptr) [[unlikely]] { return false; }
-                apply_llvm_jit_host_calling_conv(*reentry_function);
+                // OSR reentry wrappers are raw Wasm-entry targets.  Keep their LLVM calling convention synchronized with
+                // the C++ `UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI` function pointer used by the tiered runtime.  On
+                // Windows x86_64 that means SysV, matching uwvm-int opfuncs; using the host Win64 ABI here silently
+                // corrupts mixed tiered reentry calls.
+                apply_llvm_jit_raw_entry_calling_conv(*reentry_function);
                 if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*reentry_function); }
 
                 auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", reentry_function)};
@@ -3622,7 +3817,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 raw_entry_function->setLinkage(::llvm::Function::ExternalLinkage);
             }
             if(raw_entry_function == nullptr) [[unlikely]] { return false; }
-            apply_llvm_jit_host_calling_conv(*raw_entry_function);
+            apply_llvm_jit_raw_entry_calling_conv(*raw_entry_function);
             if(state.emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*raw_entry_function); }
             ::llvm::DISubprogram* raw_di_subprogram{};
             if(state.emit_unwind_call_stack_frames && state.llvm_di_builder != nullptr && state.llvm_di_file != nullptr)
@@ -4395,10 +4590,9 @@ template <typename BridgeFunction>
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || bridge_function_type == nullptr) [[unlikely]] { return nullptr; }
 
-    auto& llvm_context{*state.llvm_context_holder};
     auto& ir_builder{*state.ir_builder};
 
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, bridge_function_type, bridge_function)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
     if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
     return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
 }
@@ -4464,9 +4658,12 @@ template <typename EmitBridgeCallFromBuffers>
             // Pass the module address and original module function index to the runtime.  The runtime owns import
             // resolution for host/dynamic targets that cannot be represented by a typed LLVM declaration.
             auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
+            using raw_host_api_fn_t = void (*)(void const*, ::std::uint_least32_t, void*, ::std::size_t, void const*, ::std::size_t) noexcept;
+            auto const raw_host_api{static_cast<raw_host_api_fn_t>(::uwvm2::runtime::lib::llvm_jit_call_raw_host_api)};
+
             return emit_runtime_local_func_llvm_jit_runtime_bridge_call(
                 state,
-                ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api,
+                raw_host_api,
                 bridge_function_type,
                 {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))),
                  ::llvm::ConstantInt::get(llvm_i32_type, func_index),
@@ -4503,14 +4700,15 @@ template <typename EmitBridgeCallFromBuffers>
         result_buffer_name,
         [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) -> ::llvm::CallInst*
         {
-            // Lazy target records are read at runtime.  The entry address may be patched by another tier, so acquire loads
-            // are used when the runtime declares the table atomic.
+            // Lazy target records are read at runtime and may be patched after this LLVM function has been optimized.
+            // Keep the loads volatile even in non-atomic modes: otherwise Win64 tiered/lazy code can constant-fold the
+            // initial zero entry and emit a permanent call-through-null before the first materialization.
             auto raw_entry_function_type{get_llvm_runtime_raw_call_target_entry_function_type(llvm_context)};
             auto raw_target_struct_type{get_llvm_runtime_raw_call_target_struct_type(llvm_context)};
             if(raw_entry_function_type == nullptr || raw_target_struct_type == nullptr) [[unlikely]] { return nullptr; }
 
             auto target_base_ptr{
-                get_llvm_host_pointer_constant(state.lazy_defined_raw_call_target_base_address, get_llvm_pointer_type(raw_target_struct_type))};
+                get_llvm_host_pointer_value(ir_builder, state.lazy_defined_raw_call_target_base_address, get_llvm_pointer_type(raw_target_struct_type))};
             if(target_base_ptr == nullptr) [[unlikely]] { return nullptr; }
 
             auto target_ptr{ir_builder.CreateInBoundsGEP(raw_target_struct_type,
@@ -4521,6 +4719,10 @@ template <typename EmitBridgeCallFromBuffers>
             auto context_address_ptr{ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 1u, "call.lazy.context.addr.ptr")};
             auto entry_address{ir_builder.CreateLoad(llvm_intptr_type, entry_address_ptr, "call.lazy.entry.addr")};
             auto context_address{ir_builder.CreateLoad(llvm_intptr_type, context_address_ptr, "call.lazy.context.addr")};
+            entry_address->setVolatile(true);
+            context_address->setVolatile(true);
+            entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+            context_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
             if(state.lazy_defined_targets_are_atomic)
             {
                 entry_address->setAtomic(::llvm::AtomicOrdering::Acquire);
@@ -4533,13 +4735,13 @@ template <typename EmitBridgeCallFromBuffers>
                                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::runtime_invariant_failure);
 
             auto raw_entry_function_ptr{ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), "call.lazy.entry.ptr")};
-            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
-                                                                          raw_entry_function_ptr,
-                                                                          {context_address,
-                                                                           raw_call_buffers.result_buffer_address,
-                                                                           ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
-                                                                           raw_call_buffers.param_buffer_address,
-                                                                           ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)}));
+            return apply_llvm_jit_raw_entry_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
+                                                                               raw_entry_function_ptr,
+                                                                               {context_address,
+                                                                                raw_call_buffers.result_buffer_address,
+                                                                                ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
+                                                                                raw_call_buffers.param_buffer_address,
+                                                                                ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)}));
         });
 }
 
@@ -4581,16 +4783,16 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto callee_function_type{get_llvm_function_type_from_wasm_function_type(llvm_context, wasm_function_type)};
     if(typed_entry_ptr_type == nullptr || callee_function_type == nullptr) [[unlikely]] { return {}; }
 
-    auto target_base_ptr{get_llvm_host_pointer_constant(state.lazy_defined_typed_entry_target_base_address, typed_entry_ptr_type)};
+    auto target_base_ptr{get_llvm_host_pointer_value(ir_builder, state.lazy_defined_typed_entry_target_base_address, typed_entry_ptr_type)};
     if(target_base_ptr == nullptr) [[unlikely]] { return {}; }
 
     auto const known_typed_entry_targets{reinterpret_cast<::std::uintptr_t const*>(state.lazy_defined_typed_entry_target_base_address)};
     auto const known_typed_entry_address{known_typed_entry_targets[local_function_index]};
-    if(known_typed_entry_address != 0u)
+    if(!state.lazy_defined_targets_are_atomic && known_typed_entry_address != 0u)
     {
         // If the typed entry was already known while building IR, bake it into a direct constant-pointer call and skip the
         // runtime fast/slow control-flow split.
-        auto typed_entry_function_ptr{get_llvm_host_pointer_constant(known_typed_entry_address, get_llvm_pointer_type(callee_function_type))};
+        auto typed_entry_function_ptr{get_llvm_host_pointer_value(ir_builder, known_typed_entry_address, get_llvm_pointer_type(callee_function_type))};
         if(typed_entry_function_ptr == nullptr) [[unlikely]] { return {}; }
         auto typed_call{apply_llvm_jit_wasm_calling_conv(
             ir_builder.CreateCall(callee_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
@@ -4603,6 +4805,8 @@ struct llvm_jit_lazy_typed_target_emit_result_t
                                                  {::llvm::ConstantInt::get(llvm_intptr_type, local_function_index)},
                                                  "call.lazy.typed.target.ptr")};
     auto typed_entry_address{ir_builder.CreateLoad(llvm_intptr_type, target_ptr, "call.lazy.typed.entry.addr")};
+    typed_entry_address->setVolatile(true);
+    typed_entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     if(state.lazy_defined_targets_are_atomic) { typed_entry_address->setAtomic(::llvm::AtomicOrdering::Acquire); }
 
     // The typed entry pointer may be published after this function is compiled.  Split at runtime: use the typed ABI when
@@ -4953,6 +5157,32 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto const prepared_call{prepare_runtime_local_func_llvm_jit_wasm_call_operands(state, *callee_type_ptr)};
     if(!prepared_call.valid) [[unlikely]] { return false; }
 
+    auto const has_lazy_defined_target_tables{state.lazy_defined_raw_call_target_base_address != 0u &&
+                                              state.lazy_defined_typed_entry_target_base_address != 0u &&
+                                              state.lazy_defined_raw_call_target_count != 0uz &&
+                                              state.lazy_defined_typed_entry_target_count != 0uz};
+    auto const emit_lazy_defined_target_call{
+        [&](::std::size_t local_function_index, char const* param_buffer_name, char const* result_buffer_name) -> llvm_jit_runtime_raw_bridge_emit_result_t
+        {
+            auto const typed_target_result{emit_runtime_local_func_llvm_jit_lazy_typed_target_wasm_call(state,
+                                                                                                        local_function_index,
+                                                                                                        *callee_type_ptr,
+                                                                                                        prepared_call,
+                                                                                                        param_buffer_name,
+                                                                                                        result_buffer_name)};
+            if(typed_target_result.valid)
+            {
+                return {.valid = true, .bridge_call = nullptr, .result_value = typed_target_result.result_value};
+            }
+
+            return emit_runtime_local_func_llvm_jit_raw_target_wasm_call(state,
+                                                                         local_function_index,
+                                                                         *callee_type_ptr,
+                                                                         prepared_call,
+                                                                         param_buffer_name,
+                                                                         result_buffer_name);
+        }};
+
     if(state.route_wasm_calls_through_runtime_bridge)
     {
         // In routed mode, local functions are still allowed to use lazy target tables before falling back to the generic
@@ -4961,21 +5191,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         if(static_cast<::std::size_t>(func_index) >= import_func_count)
         {
             auto const local_function_index{static_cast<::std::size_t>(func_index) - import_func_count};
-            auto const typed_target_result{emit_runtime_local_func_llvm_jit_lazy_typed_target_wasm_call(state,
-                                                                                                        local_function_index,
-                                                                                                        *callee_type_ptr,
-                                                                                                        prepared_call,
-                                                                                                        "call.params",
-                                                                                                        "call.result.buf")};
-            if(typed_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, typed_target_result.result_value); }
-
-            auto const raw_target_result{emit_runtime_local_func_llvm_jit_raw_target_wasm_call(state,
-                                                                                               local_function_index,
-                                                                                               *callee_type_ptr,
-                                                                                               prepared_call,
-                                                                                               "call.params",
-                                                                                               "call.result.buf")};
-            if(raw_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, raw_target_result.result_value); }
+            auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, "call.params", "call.result.buf")};
+            if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
         }
 
         auto const raw_bridge_result{emit_runtime_local_func_llvm_jit_raw_host_wasm_call(state,
@@ -5001,6 +5218,16 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         if(callee_resolution.direct_callable && callee_resolution.function_type_ptr != nullptr &&
            runtime_wasm_function_types_equal(*callee_resolution.function_type_ptr, *callee_type_ptr))
         {
+            if(has_lazy_defined_target_tables && static_cast<::std::size_t>(callee_resolution.func_index) >= import_func_count)
+            {
+                auto const local_function_index{static_cast<::std::size_t>(callee_resolution.func_index) - import_func_count};
+                auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, "call.params", "call.result.buf")};
+                if(lazy_target_result.valid)
+                {
+                    return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value);
+                }
+            }
+
             auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state,
                                                                                     *runtime_module_ptr,
                                                                                     callee_resolution.func_index,
@@ -5022,6 +5249,17 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         if(!raw_bridge_result.valid) [[unlikely]] { return false; }
 
         return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, raw_bridge_result.result_value);
+    }
+
+    if(has_lazy_defined_target_tables)
+    {
+        // Lazy MCJIT modules do not necessarily contain every direct callee.  Emitting an ordinary external declaration
+        // lets COFF/RuntimeDyld resolve the missing Wasm symbol to zero on Windows.  Route through the runtime target
+        // table whenever lazy tables are present; eager/full-module JIT, where all definitions are in the module, keeps
+        // the direct typed call below.
+        auto const local_function_index{static_cast<::std::size_t>(func_index) - import_func_count};
+        auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, "call.params", "call.result.buf")};
+        if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
     }
 
     auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call.arguments)};
@@ -5097,7 +5335,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     }
 
     auto table_view_base_ptr{
-        get_llvm_host_pointer_constant(reinterpret_cast<::std::uintptr_t>(table_view_begin), get_llvm_pointer_type(table_view_struct_type))};
+        get_llvm_host_pointer_value(ir_builder, reinterpret_cast<::std::uintptr_t>(table_view_begin), get_llvm_pointer_type(table_view_struct_type))};
     if(table_view_base_ptr == nullptr) [[unlikely]] { return false; }
 
     auto selector_index{ir_builder.CreateZExt(selector.value, llvm_intptr_type, "call_indirect.selector.index")};
@@ -5109,6 +5347,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto table_size_ptr{ir_builder.CreateStructGEP(table_view_struct_type, table_view_ptr, 1u, "call_indirect.table.size.ptr")};
     auto table_data_address{ir_builder.CreateLoad(llvm_intptr_type, table_data_address_ptr, "call_indirect.table.data.addr")};
     auto table_size{ir_builder.CreateLoad(llvm_intptr_type, table_size_ptr, "call_indirect.table.size")};
+    table_data_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    table_size->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
 
     emit_llvm_conditional_trap(*llvm_module,
                                ir_builder,
@@ -5129,6 +5369,12 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto context_address{ir_builder.CreateLoad(llvm_intptr_type, context_address_ptr, "call_indirect.context.addr")};
     auto encoded_type_id{ir_builder.CreateLoad(llvm_i32_type, encoded_type_id_ptr, "call_indirect.type.id")};
     auto typed_entry_address{ir_builder.CreateLoad(llvm_intptr_type, typed_entry_address_ptr, "call_indirect.typed.entry.addr")};
+    entry_address->setVolatile(true);
+    context_address->setVolatile(true);
+    typed_entry_address->setVolatile(true);
+    entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    context_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    typed_entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     if(state.lazy_defined_targets_are_atomic)
     {
         // Table views may be patched by lazy compilation.  Acquire ordering pairs with the runtime's publication of entry
@@ -5179,13 +5425,13 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) -> ::llvm::CallInst*
         {
             auto raw_entry_function_ptr{ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), "call_indirect.entry.ptr")};
-            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
-                                                                          raw_entry_function_ptr,
-                                                                          {context_address,
-                                                                           raw_call_buffers.result_buffer_address,
-                                                                           ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
-                                                                           raw_call_buffers.param_buffer_address,
-                                                                           ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)}));
+            return apply_llvm_jit_raw_entry_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
+                                                                               raw_entry_function_ptr,
+                                                                               {context_address,
+                                                                                raw_call_buffers.result_buffer_address,
+                                                                                ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
+                                                                                raw_call_buffers.param_buffer_address,
+                                                                                ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)}));
         })};
     if(!raw_bridge_result.valid) [[unlikely]] { return false; }
     auto raw_end_block{ir_builder.GetInsertBlock()};
@@ -5331,7 +5577,7 @@ template <typename CreateValue>
     auto const emit_runtime_bridge_call{
         [&](auto bridge_function, ::llvm::FunctionType* bridge_function_type, ::llvm::ArrayRef<::llvm::Value*> arguments) -> ::llvm::CallInst*
         {
-            auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, bridge_function_type, bridge_function)};
+            auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
             if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
             return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
         }};
@@ -5460,6 +5706,7 @@ template <typename CreateValue>
                 if(memory_length_ptr == nullptr) [[unlikely]] { return nullptr; }
 
                 auto load_inst{ir_builder.CreateLoad(llvm_intptr_type, memory_length_ptr, "memory.length")};
+                load_inst->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
                 load_inst->setAtomic(::llvm::AtomicOrdering::Acquire);
                 return load_inst;
             }
@@ -5469,7 +5716,9 @@ template <typename CreateValue>
                 auto memory_length_ptr{get_llvm_host_pointer_constant(reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_length_value_p),
                                                                       get_llvm_pointer_type(llvm_intptr_type))};
                 if(memory_length_ptr == nullptr) [[unlikely]] { return nullptr; }
-                return ir_builder.CreateLoad(llvm_intptr_type, memory_length_ptr, "memory.length");
+                auto load_inst{ir_builder.CreateLoad(llvm_intptr_type, memory_length_ptr, "memory.length")};
+                load_inst->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+                return load_inst;
             }
         }};
 

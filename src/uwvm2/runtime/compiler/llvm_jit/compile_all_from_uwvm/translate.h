@@ -26,8 +26,11 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
+# include <mutex>
+# include <new>
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -45,13 +48,14 @@
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
 #  include <llvm/IR/InlineAsm.h>
+#  include <llvm/IR/Intrinsics.h>
 #  include <llvm/IR/LLVMContext.h>
+#  include <llvm/IR/Metadata.h>
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/Type.h>
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
-#  include <llvm/Support/raw_ostream.h>
 # endif
 // import
 # include <fast_io.h>
@@ -91,7 +95,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 # if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
         [[clang::disable_tail_calls]]
 # endif
-        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
+        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind
+# if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+                                                 ,
+                                                 ::std::uintptr_t frame_address,
+                                                 ::std::uintptr_t stack_pointer
+# endif
+                                                 ) noexcept;
 
     extern "C++"
 # if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
@@ -102,7 +112,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                               ::std::uint_least64_t memory_offset,
                                                               ::std::uint_least32_t offset_65_bit,
                                                               ::std::uint_least64_t memory_length,
-                                                              ::std::size_t memory_type_size) noexcept;
+                                                              ::std::size_t memory_type_size
+# if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+                                                              ,
+                                                              ::std::uintptr_t frame_address,
+                                                              ::std::uintptr_t stack_pointer
+# endif
+                                                              ) noexcept;
 
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 

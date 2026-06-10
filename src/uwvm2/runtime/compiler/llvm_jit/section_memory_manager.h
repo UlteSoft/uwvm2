@@ -39,6 +39,7 @@ extern "C" void __register_frame(void const*);
 extern "C" void __deregister_frame(void const*);
 # endif
 // import
+# include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 #endif
 
@@ -125,7 +126,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         ::std::uint8_t* allocateCodeSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name) override
         {
             auto* const addr{::llvm::SectionMemoryManager::allocateCodeSection(size, alignment, section_id, section_name)};
-            record_win64_image_base(addr);
+            record_win64_loaded_section(addr, size);
             return addr;
         }
 
@@ -133,15 +134,14 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             allocateDataSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name, bool is_read_only) override
         {
             auto* const addr{::llvm::SectionMemoryManager::allocateDataSection(size, alignment, section_id, section_name, is_read_only)};
-            record_win64_image_base(addr);
+            record_win64_loaded_section(addr, size);
             return addr;
         }
 
         void registerEHFrames(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
-            static_cast<void>(load_addr);
-            register_win64_seh_function_table(addr, size);
+            static_cast<void>(register_win64_seh_function_table(addr, load_addr, size));
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             static_cast<void>(load_addr);
             visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) noexcept { __register_frame(fde); });
@@ -154,7 +154,10 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         void deregisterEHFrames() override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
-            for(auto const& frame: win64_seh_records_) { ::fast_io::win32::RtlDeleteFunctionTable(frame.function_table); }
+            for(auto const& record: win64_seh_records_)
+            {
+                static_cast<void>(::fast_io::win32::RtlDeleteFunctionTable(record.function_table));
+            }
             win64_seh_records_.clear();
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             for(auto const& frame: eh_frame_records_)
@@ -169,34 +172,57 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
     private:
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
+        struct runtime_llvm_jit_win64_loaded_section
+        {
+            ::std::uintptr_t address{};
+            ::std::uintptr_t size{};
+        };
+
         struct runtime_llvm_jit_win64_seh_record
         {
-            ::fast_io::win32::win64_runtime_function* function_table{};
+            ::fast_io::win32::win_current_runtime_function* function_table{};
             ::std::uint32_t function_count{};
         };
 
-        ::std::uintptr_t win64_image_base_{(::std::numeric_limits<::std::uintptr_t>::max)()};
+        ::uwvm2::utils::container::vector<runtime_llvm_jit_win64_loaded_section> win64_loaded_sections_{};
         ::uwvm2::utils::container::vector<runtime_llvm_jit_win64_seh_record> win64_seh_records_{};
 
-        inline void record_win64_image_base(::std::uint8_t* addr) noexcept
+        inline void record_win64_loaded_section(::std::uint8_t* addr, ::std::uintptr_t size) noexcept
         {
+            if(addr == nullptr || size == 0uz) [[unlikely]] { return; }
             auto const address{reinterpret_cast<::std::uintptr_t>(addr)};
-            if(address != 0u && address < win64_image_base_) { win64_image_base_ = address; }
+            if(address == 0u) [[unlikely]] { return; }
+            win64_loaded_sections_.push_back(runtime_llvm_jit_win64_loaded_section{address, size});
         }
 
-        inline bool register_win64_seh_function_table(::std::uint8_t* addr, ::std::size_t size) noexcept
+        [[nodiscard]] inline ::std::uintptr_t get_win64_image_base(::std::uintptr_t fallback) const noexcept
+        {
+            auto image_base{(::std::numeric_limits<::std::uintptr_t>::max)()};
+            for(auto const& section: win64_loaded_sections_)
+            {
+                if(section.address != 0u && section.address < image_base) { image_base = section.address; }
+            }
+            if(image_base != (::std::numeric_limits<::std::uintptr_t>::max)()) { return image_base; }
+            return fallback;
+        }
+
+        inline bool register_win64_seh_function_table(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) noexcept
         {
             if(addr == nullptr || size == 0uz) [[unlikely]] { return false; }
-            if(size % sizeof(::fast_io::win32::win64_runtime_function) != 0uz) [[unlikely]] { return false; }
+            if(size % sizeof(::fast_io::win32::win_current_runtime_function) != 0uz) [[unlikely]] { return false; }
 
-            auto const count{size / sizeof(::fast_io::win32::win64_runtime_function)};
+            auto const count{size / sizeof(::fast_io::win32::win_current_runtime_function)};
             if(count == 0uz || count > static_cast<::std::size_t>((::std::numeric_limits<::std::uint32_t>::max)())) [[unlikely]] { return false; }
 
-            auto const image_base{win64_image_base_ == (::std::numeric_limits<::std::uintptr_t>::max)() ? reinterpret_cast<::std::uintptr_t>(addr)
-                                                                                                        : win64_image_base_};
-            auto* const function_table{reinterpret_cast<::fast_io::win32::win64_runtime_function*>(addr)};
+            // COFF x64 encodes .pdata RVAs relative to RuntimeDyld's synthetic __ImageBase.  LLVM computes that base as
+            // the lowest loaded section address; RtlAddFunctionTable must receive the same value or Windows unwinding
+            // cannot find inlined/generated frames reliably.
+            auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr) : static_cast<::std::uintptr_t>(load_addr)};
+            auto const image_base{get_win64_image_base(fallback_base)};
+            auto* const function_table{reinterpret_cast<::fast_io::win32::win_current_runtime_function*>(addr)};
             auto const function_count{static_cast<::std::uint32_t>(count)};
-            if(!::fast_io::win32::RtlAddFunctionTable(function_table, function_count, static_cast<::std::uint64_t>(image_base))) [[unlikely]]
+            if(!::fast_io::win32::RtlAddFunctionTable(
+                   function_table, function_count, static_cast<::fast_io::win32::win_current_unwind_address>(image_base))) [[unlikely]]
             {
                 return false;
             }
@@ -205,7 +231,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             return true;
         }
 # else
-        inline void record_win64_image_base(::std::uint8_t*) noexcept {}
+        inline void record_win64_loaded_section(::std::uint8_t*, ::std::uintptr_t) noexcept {}
 # endif
 
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
