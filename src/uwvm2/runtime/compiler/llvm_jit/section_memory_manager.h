@@ -156,7 +156,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
             for(auto const& record: win64_seh_records_)
             {
-                static_cast<void>(::fast_io::win32::RtlDeleteFunctionTable(record.function_table));
+                static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table));
             }
             win64_seh_records_.clear();
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
@@ -221,7 +221,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             auto const image_base{get_win64_image_base(fallback_base)};
             auto* const function_table{reinterpret_cast<::fast_io::win32::win_current_runtime_function*>(addr)};
             auto const function_count{static_cast<::std::uint32_t>(count)};
-            if(!::fast_io::win32::RtlAddFunctionTable(
+            if(!::fast_io::win32::nt::RtlAddFunctionTable(
                    function_table, function_count, static_cast<::fast_io::win32::win_current_unwind_address>(image_base))) [[unlikely]]
             {
                 return false;

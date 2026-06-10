@@ -195,11 +195,5 @@ FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RaiseException(::std::uint_least32_t, 
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL ExitProcess(::std::uint_least32_t) noexcept FAST_IO_WINSTDCALL_RENAME(ExitProcess, 4);
 FAST_IO_DLLIMPORT void *FAST_IO_WINSTDCALL AddVectoredExceptionHandler(::std::uint_least32_t, pvectored_exception_handler) noexcept FAST_IO_WINSTDCALL_RENAME(AddVectoredExceptionHandler, 8);
 FAST_IO_DLLIMPORT pvectored_exception_handler FAST_IO_WINSTDCALL SetUnhandledExceptionFilter(pvectored_exception_handler) noexcept FAST_IO_WINSTDCALL_RENAME(SetUnhandledExceptionFilter, 4);
-FAST_IO_DLLIMPORT ::std::uint16_t FAST_IO_WINSTDCALL RtlCaptureStackBackTrace(::std::uint32_t, ::std::uint32_t, void **, ::std::uint32_t *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlCaptureStackBackTrace, 16);
-FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RtlCaptureContext(::fast_io::win32::win_current_context *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlCaptureContext, 4);
-FAST_IO_DLLIMPORT ::std::uint8_t FAST_IO_WINCDECL RtlAddFunctionTable(::fast_io::win32::win_current_runtime_function *, ::std::uint32_t, ::fast_io::win32::win_current_unwind_address) noexcept FAST_IO_WINCDECL_RENAME(RtlAddFunctionTable, 12);
-FAST_IO_DLLIMPORT ::std::uint8_t FAST_IO_WINCDECL RtlDeleteFunctionTable(::fast_io::win32::win_current_runtime_function *) noexcept FAST_IO_WINCDECL_RENAME(RtlDeleteFunctionTable, 4);
-FAST_IO_DLLIMPORT ::fast_io::win32::win_current_runtime_function *FAST_IO_WINSTDCALL RtlLookupFunctionEntry(::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_unwind_address *, void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlLookupFunctionEntry, 12);
-FAST_IO_DLLIMPORT void *FAST_IO_WINSTDCALL RtlVirtualUnwind(::std::uint32_t, ::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_runtime_function *, ::fast_io::win32::win_current_context *, void **, ::fast_io::win32::win_current_unwind_address *, ::fast_io::win32::win_current_nonvolatile_context_pointers *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlVirtualUnwind, 32);
 
 } // namespace fast_io::win32

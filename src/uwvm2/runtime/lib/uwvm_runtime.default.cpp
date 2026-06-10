@@ -1468,10 +1468,10 @@ namespace uwvm2::runtime::lib
 
             void* frames[llvm_jit_unwind_backtrace_storage::max_frames]{};
             auto const captured{
-                ::fast_io::win32::RtlCaptureStackBackTrace(static_cast<::std::uint32_t>(omit),
-                                                           static_cast<::std::uint32_t>(llvm_jit_unwind_backtrace_storage::max_frames),
-                                                           frames,
-                                                           nullptr)};
+                ::fast_io::win32::nt::RtlCaptureStackBackTrace(static_cast<::std::uint32_t>(omit),
+                                                               static_cast<::std::uint32_t>(llvm_jit_unwind_backtrace_storage::max_frames),
+                                                               frames,
+                                                               nullptr)};
             storage.size = static_cast<::std::size_t>(captured);
             for(::std::size_t i{}; i != storage.size; ++i)
             {
@@ -2099,7 +2099,7 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
-        inline constexpr void dump_call_stack_for_trap(trap_kind current_trap_kind) noexcept
+        inline constexpr void dump_call_stack_for_trap([[maybe_unused]] trap_kind current_trap_kind) noexcept
         {
             // No copies will be made here.
             auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
@@ -2199,7 +2199,7 @@ namespace uwvm2::runtime::lib
             if(control_pc != 0u) { --control_pc; }
 
             ::std::uint64_t image_base{};
-            auto const function_entry{::fast_io::win32::RtlLookupFunctionEntry(control_pc, ::std::addressof(image_base), nullptr)};
+            auto const function_entry{::fast_io::win32::nt::RtlLookupFunctionEntry(control_pc, ::std::addressof(image_base), nullptr)};
             if(function_entry == nullptr)
             {
                 if(context.Rsp == 0u || !llvm_jit_frame_record_address_aligned(static_cast<::std::uintptr_t>(context.Rsp))) [[unlikely]]
@@ -2216,14 +2216,14 @@ namespace uwvm2::runtime::lib
 
             void* handler_data{};
             ::std::uint64_t establisher_frame{};
-            static_cast<void>(::fast_io::win32::RtlVirtualUnwind(::fast_io::win32::win64_unwind_flag_nhandler,
-                                                                 image_base,
-                                                                 control_pc,
-                                                                 function_entry,
-                                                                 ::std::addressof(context),
-                                                                 ::std::addressof(handler_data),
-                                                                 ::std::addressof(establisher_frame),
-                                                                 nullptr));
+            static_cast<void>(::fast_io::win32::nt::RtlVirtualUnwind(::fast_io::win32::win64_unwind_flag_nhandler,
+                                                                     image_base,
+                                                                     control_pc,
+                                                                     function_entry,
+                                                                     ::std::addressof(context),
+                                                                     ::std::addressof(handler_data),
+                                                                     ::std::addressof(establisher_frame),
+                                                                     nullptr));
             return context.Rip != 0u;
         }
 
@@ -2246,7 +2246,7 @@ namespace uwvm2::runtime::lib
             }
             else if(expected_return_address != 0u)
             {
-                ::fast_io::win32::RtlCaptureContext(::std::addressof(context));
+                ::fast_io::win32::nt::RtlCaptureContext(::std::addressof(context));
                 for(unsigned i{}; i != 4u; ++i)
                 {
                     if(static_cast<::std::uintptr_t>(context.Rip) == expected_return_address)
