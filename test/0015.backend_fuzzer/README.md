@@ -21,9 +21,18 @@ are observable backend behavior.
 In addition to random arithmetic/memory cases, the generator emits fixed
 strategy cases by default:
 
+- `local_defined_call_matrix`: exercises direct local-defined calls with i32
+  and i64 signatures, recursive calls, and call results flowing into
+  `local.set` and `drop`.
+- `call_indirect_matrix`: builds a local table and exercises indirect calls
+  through multiple table elements, including result-to-local and drop sites.
 - `tiered_hot_direct_call`: repeatedly calls a tiny local helper enough times to
   force tiered entry-hot replacement, then keeps executing through the
   interpreter-to-JIT call edge.
+- `tiered_hot_indirect_call`: repeatedly calls local helpers through a table so
+  tiered raw target publication and call-indirect table views are stressed.
+- `tiered_full_switch_call_pressure`: runs a longer hot direct-call loop to
+  pressure the native-switch counters that request the full LLVM tier.
 - `tiered_osr_loop`: emits a large-enough loop body to exercise tiered loop OSR
   polling and reentry generation.
 - `tiered_win32_abi_direct_matrix`: stresses local-defined typed/raw tiered
@@ -38,9 +47,14 @@ interpreter callback function-pointer boundaries.  It also checks the source for
 the pointer-sized atomic-load alignment guard that prevents COFF/MCJIT from
 emitting unresolved `__atomic_load` calls.
 
+Fixed trap cases also include `call_indirect` OOB, null-element, and signature
+mismatch paths.
+
 The low-level `uwvm-int-ring-matrix` runner only exercises single-function
 translator ABI shapes, so cases that require runtime call bridges are marked
-and skipped there while still running in lazy/full JIT and tiered modes.
+and skipped there while still running in lazy/full JIT and tiered modes. For
+skipped trap cases, the runner mirrors the expected trap result so WABT
+differential comparison remains meaningful.
 
 Default compared modes:
 
@@ -136,6 +150,9 @@ Useful environment variables:
 - `UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR=1`: add a long self-checking loop to
   each generated libFuzzer module so tiered OSR polling/reentry paths are hit
   more aggressively.
+- `UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_SWITCH=1`: add a long self-checking
+  direct-call loop to each generated libFuzzer module so tiered native-switch
+  and full-tier request paths are hit more aggressively.
 - `UWVM_BACKEND_LIBFUZZER_SANITIZERS`: default `fuzzer,address,undefined`.
 - `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
   also honored.

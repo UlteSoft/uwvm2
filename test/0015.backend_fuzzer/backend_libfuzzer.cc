@@ -457,6 +457,7 @@ namespace
         ::std::uint32_t global_i32{};
         bool grew_memory{};
         bool enable_tiered_osr_stress{};
+        bool enable_tiered_switch_stress{};
 
         void init_locals()
         {
@@ -825,6 +826,112 @@ namespace
             i32_locals[1] = acc;
         }
 
+        void call_boundary_matrix_segment()
+        {
+            if(!enable_runtime_calls) { return; }
+            out.has_table = true;
+            out.has_runtime_call_bridge = true;
+
+            auto const direct_x{in.next_u32()};
+            auto const direct_x_expected{helper_i32_add(out.helpers, direct_x)};
+            emit_i32_const(expr, direct_x);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_add_index));
+            emit_local_set(expr, 2u);
+            i32_locals[2] = direct_x_expected;
+            emit_local_get(expr, 2u);
+            emit_check_i32(expr, direct_x_expected);
+
+            auto const direct_y{in.next_u32()};
+            emit_i32_const(expr, direct_y);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_mix_index));
+            append_u8(expr, 0x1au);
+
+            auto const direct_z{static_cast<::std::uint32_t>(in.byte() & 7u)};
+            auto const direct_z_expected{direct_z + 1u};
+            emit_i32_const(expr, direct_z);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_recursive_index));
+            emit_local_set(expr, 3u);
+            i32_locals[3] = direct_z_expected;
+            emit_local_get(expr, 3u);
+            emit_check_i32(expr, direct_z_expected);
+
+            auto const imported_x{in.next_u32()};
+            auto const imported_x_expected{helper_i32_add(out.helpers, imported_x)};
+            emit_i32_const(expr, imported_x);
+            emit_call(expr, 0u);
+            emit_local_set(expr, 4u);
+            i32_locals[4] = imported_x_expected;
+            emit_local_get(expr, 4u);
+            emit_check_i32(expr, imported_x_expected);
+
+            auto const direct_w{in.next_u64()};
+            auto const direct_w_expected{helper_i64_mix(out.helpers, direct_w)};
+            emit_i64_const(expr, direct_w);
+            emit_call(expr, local_function_index_to_function_index(k_local_i64_mix_index));
+            emit_local_set(expr, 8u);
+            i64_locals[0] = direct_w_expected;
+            emit_local_get(expr, 8u);
+            emit_check_i64(expr, direct_w_expected);
+
+            auto const indirect_x{in.next_u32()};
+            auto const indirect_x_expected{helper_i32_add(out.helpers, indirect_x)};
+            emit_i32_const(expr, indirect_x);
+            emit_i32_const(expr, 0u);
+            emit_call_indirect(expr, k_type_i32_i32);
+            emit_local_set(expr, 5u);
+            i32_locals[5] = indirect_x_expected;
+            emit_local_get(expr, 5u);
+            emit_check_i32(expr, indirect_x_expected);
+
+            auto const indirect_y{in.next_u32()};
+            emit_i32_const(expr, indirect_y);
+            emit_i32_const(expr, 1u);
+            emit_call_indirect(expr, k_type_i32_i32);
+            append_u8(expr, 0x1au);
+        }
+
+        void tiered_switch_pressure_segment()
+        {
+            if(!enable_tiered_switch_stress) { return; }
+            if(!enable_runtime_calls) { return; }
+
+            auto const bound{70000u};
+            ::std::uint32_t acc{};
+            for(::std::uint32_t i{}; i != bound; ++i) { acc = u32(acc + helper_i32_add(out.helpers, i)); }
+
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 0u);
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 1u);
+            append_u8(expr, 0x02u);
+            append_u8(expr, 0x40u);
+            append_u8(expr, 0x03u);
+            append_u8(expr, 0x40u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, bound);
+            append_u8(expr, 0x4fu);
+            append_u8(expr, 0x0du);
+            append_uleb(expr, 1u);
+            emit_local_get(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_call(expr, local_function_index_to_function_index(k_local_i32_add_index));
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 0u);
+            append_u8(expr, 0x0cu);
+            append_uleb(expr, 0u);
+            append_u8(expr, 0x0bu);
+            append_u8(expr, 0x0bu);
+            emit_local_get(expr, 1u);
+            emit_check_i32(expr, acc);
+
+            i32_locals[0] = bound;
+            i32_locals[1] = acc;
+        }
+
         void tiered_osr_loop_segment()
         {
             if(!enable_tiered_osr_stress) { return; }
@@ -934,6 +1041,8 @@ namespace
             memory_grow_segment();
             direct_call_segment();
             indirect_call_segment();
+            call_boundary_matrix_segment();
+            tiered_switch_pressure_segment();
             hot_direct_call_segment();
             if((in.byte() & 1u) != 0u) { hot_indirect_call_segment(); }
             tiered_osr_loop_segment();
@@ -1032,7 +1141,8 @@ namespace
     [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data,
                                           ::std::size_t size,
                                           bool enable_runtime_calls = true,
-                                          bool enable_tiered_osr_stress = false)
+                                          bool enable_tiered_osr_stress = false,
+                                          bool enable_tiered_switch_stress = false)
     {
         size = ::std::min(size, k_max_input_bytes);
         input_reader in{data, size, 0uz};
@@ -1048,6 +1158,7 @@ namespace
 
         code_projector p{in, out, enable_runtime_calls};
         p.enable_tiered_osr_stress = enable_tiered_osr_stress;
+        p.enable_tiered_switch_stress = enable_tiered_switch_stress;
         p.global_i32 = out.global_initial;
         p.init_locals();
         p.finish();
@@ -1518,6 +1629,7 @@ namespace
     };
     bool g_trace{};
     bool g_stress_tiered_osr{};
+    bool g_stress_tiered_switch{};
 
     void set_modes_from_env()
     {
@@ -1556,6 +1668,7 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
     set_modes_from_env();
     g_trace = env_enabled("UWVM_BACKEND_LIBFUZZER_TRACE");
     g_stress_tiered_osr = env_enabled("UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR");
+    g_stress_tiered_switch = env_enabled("UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_SWITCH");
     return 0;
 }
 
@@ -1563,7 +1676,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 {
     if(size == 0uz) { return 0; }
     if(g_trace) { ::std::cerr << "backend-libfuzzer: input-size=" << size << '\n'; }
-    auto c{project_input(data, size, true, g_stress_tiered_osr)};
+    auto c{project_input(data, size, true, g_stress_tiered_osr, g_stress_tiered_switch)};
     fuzz_case ring_case{};
     bool ring_case_ready{};
     bool have_runtime_observation{};

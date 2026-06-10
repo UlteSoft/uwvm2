@@ -68,8 +68,11 @@ namespace
     using function_type_t = storage::wasm_binfmt1_final_function_type_t;
     using code_t = storage::wasm_binfmt1_final_wasm_code_t;
     using memory_type_t = storage::wasm_binfmt1_final_memory_type_t;
+    using table_type_t = storage::wasm_binfmt1_final_table_type_t;
     using local_entry_t = typename decltype(::std::declval<code_t&>().locals)::value_type;
     using byte_vec = ::std::vector<::std::byte>;
+
+    constexpr ::std::uint32_t k_null_table_elem{0xffffffffu};
 
     constexpr char8_t k_main_module_name_storage[] = u8"backend-fuzzer-main";
     constexpr ::uwvm2::utils::container::u8string_view k_main_module_name{
@@ -128,6 +131,7 @@ namespace
         ::std::vector<code_t> codes{};
         ::std::vector<::std::vector<wasm_byte_t>> code_bytes{};
         ::std::vector<memory_type_t> memories{};
+        ::std::vector<table_type_t> tables{};
 
         void build(::std::size_t case_index, module_t& module)
         {
@@ -211,6 +215,43 @@ namespace
                 rec.func_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(i));
                 module.local_defined_code_vec_storage.push_back_unchecked(rec);
             }
+
+            tables.clear();
+            if(c.has_table)
+            {
+                tables.resize(1uz);
+                auto& ty{tables[0]};
+                ty.limits.min = c.table_min;
+                ty.limits.present_max = c.table_has_max;
+                ty.limits.max = c.table_has_max ? c.table_max : decltype(ty.limits)::default_max;
+
+                storage::local_defined_table_storage_t table{};
+                table.table_type_ptr = ::std::addressof(tables[0]);
+                table.owner_module_rt_ptr = ::std::addressof(module);
+                table.elems.resize(c.table_min);
+
+                for(::std::size_t i{}; i != c.table_elems_count; ++i)
+                {
+                    if(i >= c.table_min) { die("table element outside table min"); }
+                    auto const func_index{fuzzer::k_table_elems[c.table_elems_begin + i]};
+                    if(func_index == k_null_table_elem) { continue; }
+                    auto const import_count{module.imported_function_vec_storage.size()};
+                    if(func_index < import_count) { die("generated imported table elements are not supported by this runner"); }
+                    auto const local_index{static_cast<::std::size_t>(func_index - import_count)};
+                    if(local_index >= module.local_defined_function_vec_storage.size()) { die("table element function index out of range"); }
+
+                    auto& elem{table.elems.index_unchecked(i)};
+                    elem.type = storage::local_defined_table_elem_storage_type_t::func_ref_defined;
+                    elem.storage.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index));
+                }
+
+                module.local_defined_table_vec_storage.reserve(1uz);
+                module.local_defined_table_vec_storage.push_back_unchecked(::std::move(table));
+            }
+
+#if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
+            module.llvm_jit_call_indirect_table_views.resize(module.imported_table_vec_storage.size() + module.local_defined_table_vec_storage.size());
+#endif
 
             memories.clear();
             if(c.has_memory)
@@ -499,7 +540,7 @@ namespace
     int run_ring_matrix(::std::size_t case_index)
     {
         auto const& c{fuzzer::k_cases[case_index]};
-        if(c.requires_runtime_calls) { return 0; }
+        if(c.requires_runtime_calls) { return c.expect_trap ? 1 : 0; }
 
         configure_quiet_runtime();
         install_manual_traps();
