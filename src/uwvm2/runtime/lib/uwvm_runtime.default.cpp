@@ -1051,6 +1051,11 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept;
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
         [[nodiscard]] inline bool llvm_jit_win64_virtual_unwind_once(win64_context_t& context) noexcept;
+        // Keep this helper as a real call boundary.  Win64 SEH backtracing uses it as the first stable host frame
+        // after a generated-code trap; inlining it into a trap entry can make RtlCaptureContext/return-address
+        // matching observe the trap entry's own layout and truncate the recovered Wasm stack.  The C++ `inline`
+        // keyword is still intentional here for ODR-friendly header-style linkage; UWVM_NOINLINE preserves the
+        // required unwind anchor.
         UWVM_NOINLINE inline void store_llvm_jit_win64_trap_caller_context(::std::uintptr_t expected_return_address,
                                                                            ::std::uintptr_t trap_frame_address,
                                                                            ::std::uintptr_t trap_stack_pointer) noexcept;
