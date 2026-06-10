@@ -927,7 +927,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 try
 # endif
                 {
-                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{[handle]() noexcept { handle.resume(); }});
+                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{[handle]() constexpr noexcept { handle.resume(); }});
                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                 catch(...)
@@ -1070,7 +1070,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
             ::std::atomic_size_t next_task_index{};
 
-            auto const run_worker{[&task_batch, &next_task_index]() noexcept
+            auto const run_worker{[&task_batch, &next_task_index]() constexpr noexcept
                                   {
                                       for(;;)
                                       {

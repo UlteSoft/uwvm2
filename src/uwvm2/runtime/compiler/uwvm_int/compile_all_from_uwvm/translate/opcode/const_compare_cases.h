@@ -46,7 +46,7 @@ case wasm1_code::i32_const:
     // translation time to avoid dispatch-bound slowdowns (e.g. deepstack tests).
     if(!is_polymorphic)
     {
-        auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+        auto const try_elide_const_run_with_drops{[&]() constexpr noexcept -> bool
                                                   {
                                                       ::std::byte const* scan{code_curr};
                                                       ::std::size_t const_count{1uz};
@@ -198,7 +198,7 @@ case wasm1_code::i64_const:
     // Fast-elide: `i64.const* + drop*` (dead stack traffic).
     if(!is_polymorphic)
     {
-        auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+        auto const try_elide_const_run_with_drops{[&]() constexpr noexcept -> bool
                                                   {
                                                       ::std::byte const* scan{code_curr};
                                                       ::std::size_t const_count{1uz};
@@ -309,7 +309,7 @@ case wasm1_code::f32_const:
     // Fast-elide: `f32.const* + drop*` (dead stack traffic).
     if(!is_polymorphic)
     {
-        auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+        auto const try_elide_const_run_with_drops{[&]() constexpr noexcept -> bool
                                                   {
                                                       ::std::byte const* scan{code_curr};
                                                       ::std::size_t const_count{1uz};
@@ -413,7 +413,7 @@ case wasm1_code::f64_const:
     // Fast-elide: `f64.const* + drop*` (dead stack traffic).
     if(!is_polymorphic)
     {
-        auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+        auto const try_elide_const_run_with_drops{[&]() constexpr noexcept -> bool
                                                   {
                                                       ::std::byte const* scan{code_curr};
                                                       ::std::size_t const_count{1uz};

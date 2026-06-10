@@ -209,7 +209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // over the global `--wasip1-global-disable` / default enabled state.
         auto const wasip1_import_visible_for_loaded_wasm{
             [](::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
-               ::uwvm2::utils::container::u8string_view module_name) noexcept -> bool
+               ::uwvm2::utils::container::u8string_view module_name) constexpr noexcept -> bool
             {
                 if(auto const state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(target_kind, module_name)};
                    state != nullptr && state->enabled_is_set) [[unlikely]]

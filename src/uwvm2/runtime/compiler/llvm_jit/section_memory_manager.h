@@ -147,7 +147,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             static_cast<void>(register_win64_seh_function_table(addr, load_addr, size));
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             static_cast<void>(load_addr);
-            visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) noexcept { __register_frame(fde); });
+            visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) constexpr noexcept { __register_frame(fde); });
             eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
 # else
             ::llvm::SectionMemoryManager::registerEHFrames(addr, load_addr, size);
@@ -165,7 +165,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             for(auto const& frame: eh_frame_records_)
             {
-                visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) noexcept { __deregister_frame(fde); });
+                visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) constexpr noexcept { __deregister_frame(fde); });
             }
             eh_frame_records_.clear();
 # else

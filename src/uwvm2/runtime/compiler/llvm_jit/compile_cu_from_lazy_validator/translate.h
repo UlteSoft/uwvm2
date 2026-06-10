@@ -542,7 +542,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         [[nodiscard]] inline constexpr llvm_jit_native_target_config const& get_llvm_jit_native_target_config() noexcept
         {
             static llvm_jit_native_target_config config{.cpu_name =
-                                                            []() noexcept
+                                                            []() constexpr noexcept
                                                         {
                                                             auto const host_cpu_name{::llvm::sys::getHostCPUName()};
                                                             return ::uwvm2::utils::container::string{

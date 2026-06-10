@@ -517,7 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // enable/disable, expose/hide, inherit/noinherit, strict/relaxed
             // UTF-8. Store both the value and an "is set" bit so "false" is not
             // confused with "not specified; inherit the global default".
-            auto const set_bool_option{[&](bool& option, bool& option_is_set, bool value, auto const& conflict_message) noexcept -> parameter_return_type
+            auto const set_bool_option{[&](bool& option, bool& option_is_set, bool value, auto const& conflict_message) constexpr noexcept -> parameter_return_type
                                        {
                                            if(option_is_set) [[unlikely]] { return print_usage_error(parameter, conflict_message); }
                                            option = value;
@@ -526,7 +526,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                        }};
 
             auto const apply_module_enable_disable_action{
-                [&](bool enabled) noexcept -> parameter_return_type
+                [&](bool enabled) constexpr noexcept -> parameter_return_type
                 {
                     if(auto const ret{set_bool_option(
                            target.enabled,
@@ -640,7 +640,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
                 auto const trace_target_text{::uwvm2::utils::container::u8string_view{extra1->str}};
                 auto set_trace_target{
-                    [&](trace_output_target_t trace_target, ::uwvm2::utils::cmdline::parameter_parsing_results* last) noexcept -> parameter_return_type
+                    [&](trace_output_target_t trace_target, ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
                     {
                         if(!trace_configuration_matches(target, trace_target, {})) [[unlikely]]
                         {
@@ -669,7 +669,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
                 auto set_trace_file{
                     [&](::uwvm2::utils::container::u8string_view file_path,
-                        ::uwvm2::utils::cmdline::parameter_parsing_results* last) noexcept -> parameter_return_type
+                        ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
                     {
                         if(file_path.empty()) [[unlikely]] { return print_usage_error(parameter, u8"Missing trace output file path."); }
                         if(!trace_configuration_matches(target, trace_output_target_t::file, file_path)) [[unlikely]]
@@ -897,7 +897,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 }
 
                 auto apply_socket_action{
-                    [&](auto const parameter_name, auto const& socket_parameter, auto callback) noexcept -> parameter_return_type
+                    [&](auto const parameter_name, auto const& socket_parameter, auto callback) constexpr noexcept -> parameter_return_type
                     {
                         if(extra2->str == u8"unix")
                         {

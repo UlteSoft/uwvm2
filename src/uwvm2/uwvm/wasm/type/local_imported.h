@@ -1307,7 +1307,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
                     return static_cast<bool>(with_memory_access_snapshot(
                         memory,
-                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) constexpr noexcept
                         {
                             if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }
 
@@ -1373,7 +1373,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 {
                     return static_cast<bool>(with_memory_access_snapshot(
                         memory,
-                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) noexcept
+                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) constexpr noexcept
                         {
                             if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
                             if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }
@@ -1428,7 +1428,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 {
                     return static_cast<bool>(with_memory_access_snapshot(
                         memory,
-                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) noexcept
+                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) constexpr noexcept
                         {
                             if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
                             if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }

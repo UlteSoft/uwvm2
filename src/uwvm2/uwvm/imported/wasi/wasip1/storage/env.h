@@ -322,8 +322,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         current_wasip1_states.try_emplace_and_visit(
             id,
-            [&](auto& kv) noexcept { st = ::std::addressof(kv.second); },
-            [&](auto& kv) noexcept { st = ::std::addressof(kv.second); });
+            [&](auto& kv) constexpr noexcept { st = ::std::addressof(kv.second); },
+            [&](auto& kv) constexpr noexcept { st = ::std::addressof(kv.second); });
 
         if(st == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         return *st;

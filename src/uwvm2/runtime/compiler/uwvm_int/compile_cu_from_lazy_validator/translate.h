@@ -288,7 +288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                    ::std::byte const* function_code_begin,
                                                    ::std::byte const* code_begin,
                                                    ::std::byte const* code_end,
-                                                   lazy_execution_unit_kind kind)
+                                                   lazy_execution_unit_kind kind) noexcept
         {
             auto const eu_index{storage.execution_units.size()};
             auto const size{code_end == nullptr ? 0uz : static_cast<::std::size_t>(code_end - code_begin)};
@@ -316,7 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                ::std::size_t begin_eu_index,
                                                                ::std::size_t end_eu_index,
                                                                lazy_compile_unit_kind kind,
-                                                               lazy_materialization_scope scope)
+                                                               lazy_materialization_scope scope) noexcept
         {
             auto const cu_index{storage.compile_units.size()};
             auto const& first_eu{storage.execution_units.index_unchecked(begin_eu_index)};
@@ -340,7 +340,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             return cu_index;
         }
 
-        inline constexpr void append_function_compile_units(lazy_module_storage_t& storage, lazy_function_storage_t& fn, lazy_split_config cfg)
+        inline constexpr void append_function_compile_units(lazy_module_storage_t& storage, lazy_function_storage_t& fn, lazy_split_config cfg) noexcept
         {
             fn.first_cu_index = storage.compile_units.size();
 
@@ -383,7 +383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 ::std::size_t group_end{SIZE_MAX};
                 ::std::size_t group_size{};
 
-                auto const flush_group{[&]()
+                auto const flush_group{[&]() constexpr noexcept
                                        {
                                            if(group_begin == SIZE_MAX) { return; }
                                            auto const cu{append_compile_unit_from_eu_range(storage,

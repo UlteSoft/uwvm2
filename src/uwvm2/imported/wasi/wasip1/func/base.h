@@ -264,7 +264,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         auto const trace_target{env.trace_wasip1_output_target};
 
         auto const emit{
-            [&](auto&& out) noexcept
+            [&](auto&& out) constexpr noexcept
             {
                 switch(env.trace_wasip1_group_kind)
                 {

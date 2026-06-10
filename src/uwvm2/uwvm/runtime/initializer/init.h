@@ -2517,7 +2517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 constexpr wasm_u32 wasm1_max_pages{static_cast<wasm_u32>(65536u)};
 
                 auto const validate_memory_limits{
-                    [&]<typename LimitsType>(LimitsType const& limits, ::uwvm2::utils::container::u8string_view kind, ::std::size_t index) noexcept
+                    [&]<typename LimitsType>(LimitsType const& limits, ::uwvm2::utils::container::u8string_view kind, ::std::size_t index) constexpr noexcept
                     {
                         if(limits.present_max && limits.max < limits.min) [[unlikely]]
                         {
@@ -4710,7 +4710,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 auto const print_import{
                     [&curr_module_name](::uwvm2::utils::container::u8string_view kind,
-                                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const* import_ptr) noexcept
+                                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const* import_ptr) constexpr noexcept
                     {
                         if(import_ptr == nullptr) [[unlikely]]
                         {

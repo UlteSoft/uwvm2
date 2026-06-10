@@ -121,7 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // Default-entry resolution runs after runtime initialization, which has already rejected import-alias cycles.
         // Use the initialized runtime storage size as the walk bound so deeply re-exported but valid entry functions are
         // still discoverable while corrupted alias chains cannot loop forever.
-        auto const import_link_walk_bound{[]() noexcept -> ::std::size_t
+        auto const import_link_walk_bound{[]() constexpr noexcept -> ::std::size_t
                                           {
                                               ::std::size_t bound{};
                                               for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
@@ -136,7 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                               return bound;
                                           }()};
 
-        auto const resolve_import_leaf{[import_link_walk_bound](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
+        auto const resolve_import_leaf{[import_link_walk_bound](imported_function_storage_t const* imp) constexpr noexcept -> imported_function_storage_t const*
                                        {
                                            for(::std::size_t steps{};; ++steps)
                                            {
@@ -150,7 +150,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         // Validate an import-inclusive function index against runtime type storage.  For imported functions, inspect
         // the resolved wasm-defined leaf because the import entry itself may only be a forwarding slot.
-        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
+        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) constexpr noexcept -> bool
                                                    {
                                                        auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
                                                        if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
@@ -225,7 +225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
         if(mit != ::uwvm2::uwvm::wasm::storage::all_module_export.end())
         {
-            auto const try_export{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+            auto const try_export{[&](::uwvm2::utils::container::u8string_view export_name) constexpr noexcept -> bool
                                   {
                                       auto const eit{mit->second.find(export_name)};
                                       if(eit == mit->second.end()) { return false; }
@@ -275,7 +275,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     auto const& exportsec{get_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
                     if(exportsec.sec_span.sec_begin != nullptr)
                     {
-                        auto const try_export_from_section{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+                        auto const try_export_from_section{[&](::uwvm2::utils::container::u8string_view export_name) constexpr noexcept -> bool
                                                            {
                                                                for(auto const& e: exportsec.exports)
                                                                {

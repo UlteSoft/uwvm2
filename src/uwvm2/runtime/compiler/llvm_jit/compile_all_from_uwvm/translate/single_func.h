@@ -884,17 +884,22 @@ namespace details
 
         curr_runtime_virtual_register_id next_virtual_register_id{};
 
+        auto const local_virtual_registers_push_back{[&](curr_operand_stack_value_type type) constexpr noexcept
+                                                     {
+                                                         local_virtual_registers.push_back(curr_local_virtual_register_t{
+                                                             .type = type, .virtual_register_id = next_virtual_register_id++});
+                                                     }};
+
         // Assign stable virtual registers to parameters first, then declared locals, matching Wasm local-index order.
         for(::std::size_t i{}; i != func_parameter_count_uz; ++i)
         {
-            local_virtual_registers.push_back(
-                curr_local_virtual_register_t{.type = func_parameter_begin[i], .virtual_register_id = next_virtual_register_id++});
+            local_virtual_registers_push_back(func_parameter_begin[i]);
         }
         for(auto const& local_part: curr_code_locals)
         {
             for(validation_module_traits_t::wasm_u32 i{}; i != local_part.count; ++i)
             {
-                local_virtual_registers.push_back(curr_local_virtual_register_t{.type = local_part.type, .virtual_register_id = next_virtual_register_id++});
+                local_virtual_registers_push_back(local_part.type);
             }
         }
 
@@ -1858,7 +1863,7 @@ inline constexpr full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::run
     storage.local_funcs.resize(local_func_count);
 
     auto const compile_local_functions_serially{
-        [&]() UWVM_THROWS
+        [&]() constexpr UWVM_THROWS
         {
             // Serial mode emits all functions into one module and is also the fallback path when parallel preparation,
             // pre-link optimization, linking, or verification fails.

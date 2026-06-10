@@ -152,7 +152,7 @@ namespace details
         auto curr{reinterpret_cast<::std::byte const*>(code_ptr->body.expr_begin)};
         auto const end{reinterpret_cast<::std::byte const*>(code_ptr->body.code_end)};
 
-        auto const read_op{[&](wasm1_code& out) noexcept -> bool
+        auto const read_op{[&](wasm1_code& out) constexpr noexcept -> bool
                            {
                                if(curr == end) { return false; }
                                ::std::memcpy(::std::addressof(out), curr, sizeof(out));
@@ -160,7 +160,7 @@ namespace details
                                return true;
                            }};
 
-        auto const read_u32_leb{[&](::std::uint32_t& out) noexcept -> bool
+        auto const read_u32_leb{[&](::std::uint32_t& out) constexpr noexcept -> bool
                                 {
                                     ::std::uint32_t v{};
                                     ::std::uint32_t shift{};
@@ -180,7 +180,7 @@ namespace details
                                     return false;
                                 }};
 
-        auto const read_i32_leb{[&](wasm_i32& out) noexcept -> bool
+        auto const read_i32_leb{[&](wasm_i32& out) constexpr noexcept -> bool
                                 {
                                     ::std::int32_t v{};
                                     ::std::uint32_t shift{};
@@ -212,29 +212,29 @@ namespace details
         // Notes:
         // - This is a common tiny PRNG step used in microbenchmarks and hash-like code.
         // - We match the exact canonical form (locals only, no extra ops) to avoid false positives.
-        auto const match_xorshift32_i32{[&]() noexcept -> bool
+        auto const match_xorshift32_i32{[&]() constexpr noexcept -> bool
                                         {
                                             auto const begin{curr};
-                                            auto fail{[&]() noexcept
+                                            auto fail{[&]() constexpr noexcept
                                                       {
                                                           curr = begin;
                                                           return false;
                                                       }};
 
-                                            auto expect_op{[&](wasm1_code expected) noexcept -> bool
+                                            auto expect_op{[&](wasm1_code expected) constexpr noexcept -> bool
                                                            {
                                                                wasm1_code op{};  // no init
                                                                if(!read_op(op) || op != expected) { return false; }
                                                                return true;
                                                            }};
-                                            auto expect_local0{[&](wasm1_code op_kind) noexcept -> bool
+                                            auto expect_local0{[&](wasm1_code op_kind) constexpr noexcept -> bool
                                                                {
                                                                    if(!expect_op(op_kind)) { return false; }
                                                                    ::std::uint32_t idx{};
                                                                    if(!read_u32_leb(idx) || idx != 0u) { return false; }
                                                                    return true;
                                                                }};
-                                            auto expect_i32_const{[&](wasm_i32 expected) noexcept -> bool
+                                            auto expect_i32_const{[&](wasm_i32 expected) constexpr noexcept -> bool
                                                                   {
                                                                       if(!expect_op(wasm1_code::i32_const)) { return false; }
                                                                       wasm_i32 imm{};  // no init

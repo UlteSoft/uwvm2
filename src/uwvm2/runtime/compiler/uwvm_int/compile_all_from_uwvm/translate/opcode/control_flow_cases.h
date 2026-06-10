@@ -1003,7 +1003,7 @@ case wasm1_code::end:
         // Matching is hash-based and intentionally strict so it never triggers accidentally.
         if constexpr(CompileOption.is_tail_call)
         {
-            auto const fnv1a64{[](::std::byte const* p, ::std::size_t n) noexcept -> ::std::uint_least64_t
+            auto const fnv1a64{[](::std::byte const* p, ::std::size_t n) constexpr noexcept -> ::std::uint_least64_t
                                {
                                    ::std::uint_least64_t h{0xcbf29ce484222325ull};
                                    for(::std::size_t i{}; i != n; ++i)

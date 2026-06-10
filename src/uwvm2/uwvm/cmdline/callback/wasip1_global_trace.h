@@ -96,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
             auto const target_text{::uwvm2::utils::container::u8string_view{target_arg->str}};
 
-            auto const disable_trace{[&]() noexcept
+            auto const disable_trace{[&]() constexpr noexcept
                                      {
                                          env.trace_wasip1_call = false;
                                          env.trace_wasip1_output_target = trace_output_target_t::none;

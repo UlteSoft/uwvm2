@@ -728,8 +728,8 @@ namespace uwvm2::runtime::lib
 
             g_thread_states.try_emplace_and_visit(
                 id,
-                [&](auto& kv) noexcept { st = ::std::addressof(kv.second); },
-                [&](auto& kv) noexcept { st = ::std::addressof(kv.second); });
+                [&](auto& kv) constexpr noexcept { st = ::std::addressof(kv.second); },
+                [&](auto& kv) constexpr noexcept { st = ::std::addressof(kv.second); });
 
             if(st == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return *st;
@@ -1153,7 +1153,7 @@ namespace uwvm2::runtime::lib
             if(middle_begin == name_end) { return false; }
 
             auto const parse_size{
-                [](char const* begin, char const* end, ::std::size_t& out) noexcept -> bool
+                [](char const* begin, char const* end, ::std::size_t& out) constexpr noexcept -> bool
                 {
                     if(begin == end) { return false; }
                     ::std::size_t value{};
@@ -1198,8 +1198,8 @@ namespace uwvm2::runtime::lib
                                                                  ::llvm::DWARFContext::ProcessDebugRelocations::Process,
                                                                  loaded_info.get(),
                                                                  "",
-                                                                 [](auto) noexcept {},
-                                                                 [](auto) noexcept {},
+                                                                 [](auto) constexpr noexcept {},
+                                                                 [](auto) constexpr noexcept {},
                                                                  true)};
                 if(dwarf_context == nullptr) { return; }
 
@@ -1812,7 +1812,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr runtime_llvm_jit_unwind_probe_result runtime_llvm_jit_checked_unwind_probe_result() noexcept
         {
-            static runtime_llvm_jit_unwind_probe_result const result{[]() noexcept
+            static runtime_llvm_jit_unwind_probe_result const result{[]() constexpr noexcept
                                                                      {
                                                                          auto const start_time{runtime_llvm_jit_unwind_probe_verbose_now()};
 
@@ -1981,7 +1981,7 @@ namespace uwvm2::runtime::lib
             auto const suppressed_frame{get_suppressed_call_stack_frame()};
 
             auto const print_wasm_frame{
-                [&](::std::size_t module_id, ::std::size_t function_index) noexcept
+                [&](::std::size_t module_id, ::std::size_t function_index) constexpr noexcept
                 {
                     if(module_id == suppressed_frame.module_id && function_index == suppressed_frame.function_index) { return; }
 
@@ -1996,7 +1996,7 @@ namespace uwvm2::runtime::lib
                 }};
 
             auto const print_debug_inline_frames{
-                [&](::std::uintptr_t ip) noexcept -> bool
+                [&](::std::uintptr_t ip) constexpr noexcept -> bool
                 {
                     // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
                     // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
@@ -2040,7 +2040,7 @@ namespace uwvm2::runtime::lib
                 }};
 
             auto const print_resolved_unwind_ip{
-                [&](::std::uintptr_t ip) noexcept
+                [&](::std::uintptr_t ip) constexpr noexcept
                 {
                     auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
                     if(current_trap_kind == trap_kind::call_indirect_type_mismatch && printed_frame_count != 0uz && resolved.entry != nullptr &&
@@ -2322,7 +2322,7 @@ namespace uwvm2::runtime::lib
         {
             // Try to print detailed validator diagnostics (same format as `uwvm/runtime/validator/validate.h`).
             auto const fallback_and_terminate{
-                [&]() noexcept
+                [&]() constexpr noexcept
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -2602,7 +2602,7 @@ namespace uwvm2::runtime::lib
 
             ::std::sort(rec.lazy_prefetch_order.begin(),
                         rec.lazy_prefetch_order.end(),
-                        [&](::std::size_t a, ::std::size_t b) noexcept
+                        [&](::std::size_t a, ::std::size_t b) constexpr noexcept
                         {
                             auto const size_a{lazy_compile_unit_code_size(rec, a)};
                             auto const size_b{lazy_compile_unit_code_size(rec, b)};
@@ -3212,7 +3212,7 @@ namespace uwvm2::runtime::lib
 
             ::std::sort(rec.lazy_prefetch_order.begin(),
                         rec.lazy_prefetch_order.end(),
-                        [&](::std::size_t a, ::std::size_t b) noexcept
+                        [&](::std::size_t a, ::std::size_t b) constexpr noexcept
                         {
                             auto const size_a{llvm_jit_lazy_compile_unit_code_size(rec, a)};
                             auto const size_b{llvm_jit_lazy_compile_unit_code_size(rec, b)};
@@ -4492,7 +4492,7 @@ namespace uwvm2::runtime::lib
             if(!tiered_runtime_active()) { return false; }
             auto const log_enabled{::uwvm2::uwvm::io::enable_runtime_log};
             if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_callback_count.fetch_add(1uz, ::std::memory_order_relaxed); }
-            auto const disable_poll{[&]() noexcept
+            auto const disable_poll{[&]() constexpr noexcept
                                     {
                                         if(compile_state_address_ptr != nullptr)
                                         {
@@ -4500,7 +4500,7 @@ namespace uwvm2::runtime::lib
                                                 ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_disabled_state_address;
                                         }
                                     }};
-            auto const record_miss{[&]() noexcept -> bool
+            auto const record_miss{[&]() constexpr noexcept -> bool
                                    {
                                        if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_miss_count.fetch_add(1uz, ::std::memory_order_relaxed); }
                                        return false;
@@ -5142,8 +5142,8 @@ namespace uwvm2::runtime::lib
 
             g_call_scratch_states.try_emplace_and_visit(
                 id,
-                [&](auto& kv) noexcept { scratch = ::std::addressof(kv.second); },
-                [&](auto& kv) noexcept { scratch = ::std::addressof(kv.second); });
+                [&](auto& kv) constexpr noexcept { scratch = ::std::addressof(kv.second); },
+                [&](auto& kv) constexpr noexcept { scratch = ::std::addressof(kv.second); });
 
             if(scratch == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return *scratch;
@@ -5501,7 +5501,7 @@ namespace uwvm2::runtime::lib
             bind_wasip1_memory_for_selected_env(wasip1_env, caller_module_id);
 
             auto const invoke_function{
-                [&]() noexcept
+                [&]() constexpr noexcept
                 {
                     wasip1_module_target_kind_t target_kind{};
                     ::uwvm2::utils::container::u8string_view target_module_name{};
@@ -5645,7 +5645,7 @@ namespace uwvm2::runtime::lib
 
             ::std::size_t snapshot_byte_length{};
             if(!::uwvm2::object::memory::linear::with_memory_access_snapshot(memory,
-                                                                             [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                                                                             [&](::std::byte* memory_begin, ::std::size_t byte_length) constexpr noexcept
                                                                              {
                                                                                  resolved.memory_begin = memory_begin;
                                                                                  snapshot_byte_length = byte_length;
@@ -5884,7 +5884,7 @@ namespace uwvm2::runtime::lib
                     if(memory == nullptr) [[unlikely]] { return false; }
                     return with_native_preload_copy_access(
                         *memory,
-                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) constexpr noexcept
                         {
                             if(memory_begin == nullptr) [[unlikely]] { return false; }
 
@@ -5928,7 +5928,7 @@ namespace uwvm2::runtime::lib
                     if(memory == nullptr) [[unlikely]] { return false; }
                     return with_native_preload_copy_access(
                         *memory,
-                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) constexpr noexcept
                         {
                             if(memory_begin == nullptr) [[unlikely]] { return false; }
 
@@ -6312,13 +6312,13 @@ namespace uwvm2::runtime::lib
             auto const stack_top{*stack_top_ptr};
             auto const args_begin{stack_top - info.param_bytes};
 
-            auto const load_u32{[](::std::byte const* p) noexcept -> ::std::uint_least32_t
+            auto const load_u32{[](::std::byte const* p) constexpr noexcept -> ::std::uint_least32_t
                                 {
                                     ::std::uint_least32_t v{};  // no init
                                     ::std::memcpy(::std::addressof(v), p, sizeof(v));
                                     return v;
                                 }};
-            auto const store_u32{[](::std::byte* p, ::std::uint_least32_t v) noexcept { ::std::memcpy(p, ::std::addressof(v), sizeof(v)); }};
+            auto const store_u32{[](::std::byte* p, ::std::uint_least32_t v) constexpr noexcept { ::std::memcpy(p, ::std::addressof(v), sizeof(v)); }};
 
             ::std::uint_least32_t const imm_u32{::std::bit_cast<::std::uint_least32_t>(info.trivial_imm)};
             ::std::uint_least32_t const imm2_u32{::std::bit_cast<::std::uint_least32_t>(info.trivial_imm2)};
@@ -8676,7 +8676,7 @@ namespace uwvm2::runtime::lib
             {
                 extra_materialize_threads = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved;
             }
-            auto const llvm_jit_materialize_runtime_log_now{[]() noexcept
+            auto const llvm_jit_materialize_runtime_log_now{[]() constexpr noexcept
                                                             {
                                                                 ::fast_io::unix_timestamp ts{};
                                                                 if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
@@ -8697,14 +8697,14 @@ namespace uwvm2::runtime::lib
                                                                 return ts;
                                                             }};
             auto const llvm_jit_materialize_runtime_log_line{
-                []<typename... Args>(Args&&... args) noexcept
+                []<typename... Args>(Args&&... args) constexpr noexcept
                 {
                     if(!::uwvm2::uwvm::io::enable_runtime_log) [[likely]] { return; }
 
                     ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-full] ", ::std::forward<Args>(args)...);
                 }};
             constexpr auto llvm_jit_materialize_error{
-                []<typename... Args>(Args&&... args) noexcept
+                []<typename... Args>(Args&&... args) constexpr noexcept
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -9015,7 +9015,7 @@ namespace uwvm2::runtime::lib
             {
                 auto const function_index{import_func_count + local_index};
                 auto const resolve_function_address{
-                    [&](::uwvm2::utils::container::string const& function_name) noexcept -> ::std::uintptr_t
+                    [&](::uwvm2::utils::container::string const& function_name) constexpr noexcept -> ::std::uintptr_t
                     {
                         namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
                         llvm_jit_function_address_name_t function_address_name{function_name.data(), function_name.data() + function_name.size()};
@@ -9711,7 +9711,7 @@ namespace uwvm2::runtime::lib
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 }};
 
-            auto const runtime_compile_threads_verbose_now{[]() noexcept
+            auto const runtime_compile_threads_verbose_now{[]() constexpr noexcept
                                                            {
                                                                ::fast_io::unix_timestamp ts{};
                                                                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -9733,7 +9733,7 @@ namespace uwvm2::runtime::lib
                                                            }};
 
             auto const runtime_compile_threads_verbose_done{
-                []<typename... Args>(::fast_io::unix_timestamp start_time, Args&&... args) noexcept
+                []<typename... Args>(::fast_io::unix_timestamp start_time, Args&&... args) constexpr noexcept
                 {
                     if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
 

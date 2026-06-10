@@ -20,7 +20,7 @@ case wasm1_code::i32_clz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -50,7 +50,7 @@ case wasm1_code::i32_ctz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -80,7 +80,7 @@ case wasm1_code::i32_popcnt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -110,7 +110,7 @@ case wasm1_code::i32_add:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAdd(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAdd(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -133,7 +133,7 @@ case wasm1_code::i32_sub:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateSub(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateSub(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -156,7 +156,7 @@ case wasm1_code::i32_mul:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateMul(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateMul(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -179,7 +179,7 @@ case wasm1_code::i32_div_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -208,7 +208,7 @@ case wasm1_code::i32_div_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -238,7 +238,7 @@ case wasm1_code::i32_rem_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
                    return emit_llvm_signed_remainder_with_wasm_semantics(*llvm_module, ir_builder, left.value, right.value);
@@ -265,7 +265,7 @@ case wasm1_code::i32_rem_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -294,7 +294,7 @@ case wasm1_code::i32_and:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAnd(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAnd(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -316,7 +316,7 @@ case wasm1_code::i32_or:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateOr(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateOr(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -338,7 +338,7 @@ case wasm1_code::i32_xor:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateXor(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateXor(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -361,7 +361,7 @@ case wasm1_code::i32_shl:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -385,7 +385,7 @@ case wasm1_code::i32_shr_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -409,7 +409,7 @@ case wasm1_code::i32_shr_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -433,7 +433,7 @@ case wasm1_code::i32_rotl:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return emit_llvm_rotl(ir_builder, left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return emit_llvm_rotl(ir_builder, left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -456,7 +456,7 @@ case wasm1_code::i32_rotr:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return emit_llvm_rotr(ir_builder, left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return emit_llvm_rotr(ir_builder, left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -479,7 +479,7 @@ case wasm1_code::i64_clz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -509,7 +509,7 @@ case wasm1_code::i64_ctz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -538,7 +538,7 @@ case wasm1_code::i64_popcnt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -568,7 +568,7 @@ case wasm1_code::i64_add:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAdd(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAdd(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -591,7 +591,7 @@ case wasm1_code::i64_sub:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateSub(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateSub(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -614,7 +614,7 @@ case wasm1_code::i64_mul:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateMul(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateMul(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -637,7 +637,7 @@ case wasm1_code::i64_div_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -666,7 +666,7 @@ case wasm1_code::i64_div_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -695,7 +695,7 @@ case wasm1_code::i64_rem_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
                    return emit_llvm_signed_remainder_with_wasm_semantics(*llvm_module, ir_builder, left.value, right.value);
@@ -722,7 +722,7 @@ case wasm1_code::i64_rem_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept {
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept {
                    auto llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
@@ -750,7 +750,7 @@ case wasm1_code::i64_and:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAnd(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAnd(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -772,7 +772,7 @@ case wasm1_code::i64_or:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateOr(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateOr(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -794,7 +794,7 @@ case wasm1_code::i64_xor:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateXor(left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateXor(left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -817,7 +817,7 @@ case wasm1_code::i64_shl:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -841,7 +841,7 @@ case wasm1_code::i64_shr_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -865,7 +865,7 @@ case wasm1_code::i64_shr_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -889,7 +889,7 @@ case wasm1_code::i64_rotl:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return emit_llvm_rotl(ir_builder, left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return emit_llvm_rotl(ir_builder, left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -912,7 +912,7 @@ case wasm1_code::i64_rotr:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept { return emit_llvm_rotr(ir_builder, left.value, right.value); })) [[unlikely]]
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept { return emit_llvm_rotr(ir_builder, left.value, right.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }

@@ -2237,7 +2237,7 @@ template <typename MemoryT, typename Fn>
 {
     // The common checked path records the length used for diagnostics, validates the effective range, and then executes
     // the caller's load/store lambda on a raw byte pointer.
-    auto const checked_access{[&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept
+    auto const checked_access{[&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
                               {
                                   memory_length_out = memory_length;
                                   if(memory_begin == nullptr || effective_offset.offset_65_bit || access_size > memory_length ||
@@ -2253,7 +2253,7 @@ template <typename MemoryT, typename Fn>
     if constexpr(MemoryT::can_mmap)
     {
         return ::uwvm2::object::memory::linear::with_memory_access_snapshot(memory,
-                                                                            [&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept
+                                                                            [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
                                                                             { return checked_access(memory_begin, memory_length); });
     }
     else if constexpr(MemoryT::support_multi_thread)
@@ -2304,7 +2304,7 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
         static_offset,
         address,
         LoadBytes,
-        [&](::std::byte* memory_begin, ::std::size_t effective_offset) noexcept
+        [&](::std::byte* memory_begin, ::std::size_t effective_offset) constexpr noexcept
         {
             // At this point the runtime memory snapshot/guard is active and the range `[effective_offset, +LoadBytes)` is
             // known in-bounds.  The helper still reads through `std::byte` + memcpy so host alignment never leaks into Wasm
@@ -2509,7 +2509,7 @@ inline constexpr void
                                         static_offset,
                                         address,
                                         StoreBytes,
-                                        [&](::std::byte* memory_begin, ::std::size_t effective_offset) noexcept
+                                        [&](::std::byte* memory_begin, ::std::size_t effective_offset) constexpr noexcept
                                         {
                                             auto store_ptr{memory_begin + effective_offset};
 
@@ -3501,7 +3501,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     auto const emit_runtime_local_func_llvm_jit_tiered_core_dispatch{
-        [&]() noexcept -> bool
+        [&]() constexpr noexcept -> bool
         {
             // The core entry dispatches entry_id 0 to normal initialization and recorded non-zero ids to OSR load blocks.
             // Each OSR load block restores locals from the raw local snapshot before branching to the recorded loop block.
@@ -3563,7 +3563,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         }};
 
     auto const emit_runtime_local_func_llvm_jit_tiered_public_entry_wrapper{
-        [&]() noexcept -> bool
+        [&]() constexpr noexcept -> bool
         {
             // The public typed entry is kept small in tiered mode: it pushes the logical call-stack frame, calls core
             // entry id 0, pops the frame, and returns the core result.
@@ -3614,7 +3614,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         }};
 
     // Compute the serialized-local byte span required by tiered OSR raw-entry wrappers.
-    auto const get_tiered_osr_local_bytes{[&]() noexcept -> ::std::size_t
+    auto const get_tiered_osr_local_bytes{[&]() constexpr noexcept -> ::std::size_t
                                           {
                                               // Compute the byte span that OSR wrappers must receive for serialized
                                               // locals.  Returning zero for a non-empty local set indicates a bad layout.
@@ -3634,7 +3634,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                           }};
 
     auto const emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers{
-        [&]() noexcept -> bool
+        [&]() constexpr noexcept -> bool
         {
             // Each OSR wrapper uses the raw ABI expected by the tiered runtime.  Parameters are not read from a parameter
             // buffer; the wrapper provides zero/default Wasm arguments and restores live locals from the local snapshot.
@@ -3775,7 +3775,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     auto const emit_runtime_local_func_llvm_jit_raw_entry_wrapper{
-        [&]() noexcept -> bool
+        [&]() constexpr noexcept -> bool
         {
             // The raw entry wrapper adapts the generic byte-buffer ABI to the typed public Wasm entry.  This is the stable
             // boundary used by lazy targets, imported host calls, and call_indirect fallback paths.
@@ -4462,7 +4462,7 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
     if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     // Add PHI/control-context incoming state for one br_table destination while preserving duplicate switch edges.
-    auto const add_target_incoming{[&](llvm_jit_branch_target_t const& branch_target) noexcept {
+    auto const add_target_incoming{[&](llvm_jit_branch_target_t const& branch_target) constexpr noexcept {
                                        if(expected_arity == 1uz)
                                        {
                                            if(branch_target.phi == nullptr) [[unlikely]] { return false; }
@@ -4652,7 +4652,7 @@ template <typename EmitBridgeCallFromBuffers>
         {prepared_call.arguments.data(), prepared_call.arguments.size()},
         param_buffer_name,
         result_buffer_name,
-        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) noexcept -> ::llvm::CallInst*
+        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) constexpr noexcept -> ::llvm::CallInst*
         {
             // Pass the module address and original module function index to the runtime.  The runtime owns import
             // resolution for host/dynamic targets that cannot be represented by a typed LLVM declaration.
@@ -4697,7 +4697,7 @@ template <typename EmitBridgeCallFromBuffers>
         {prepared_call.arguments.data(), prepared_call.arguments.size()},
         param_buffer_name,
         result_buffer_name,
-        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) noexcept -> ::llvm::CallInst*
+        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) constexpr noexcept -> ::llvm::CallInst*
         {
             // Lazy target records are read at runtime and may be patched after this LLVM function has been optimized.
             // Keep the loads volatile even in non-atomic modes: otherwise Win64 tiered/lazy code can constant-fold the
@@ -5160,7 +5160,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
                                               state.lazy_defined_typed_entry_target_base_address != 0u && state.lazy_defined_raw_call_target_count != 0uz &&
                                               state.lazy_defined_typed_entry_target_count != 0uz};
     auto const emit_lazy_defined_target_call{
-        [&](::std::size_t local_function_index, char const* param_buffer_name, char const* result_buffer_name) noexcept -> llvm_jit_runtime_raw_bridge_emit_result_t
+        [&](::std::size_t local_function_index, char const* param_buffer_name, char const* result_buffer_name) constexpr noexcept -> llvm_jit_runtime_raw_bridge_emit_result_t
         {
             auto const typed_target_result{emit_runtime_local_func_llvm_jit_lazy_typed_target_wasm_call(state,
                                                                                                         local_function_index,
@@ -5417,7 +5417,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         {prepared_call.arguments.data(), prepared_call.arguments.size()},
         "call_indirect.params",
         "call_indirect.result.buf",
-        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) noexcept -> ::llvm::CallInst*
+        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) constexpr noexcept -> ::llvm::CallInst*
         {
             auto raw_entry_function_ptr{ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), "call_indirect.entry.ptr")};
             return apply_llvm_jit_raw_entry_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
@@ -5543,12 +5543,12 @@ template <typename CreateValue>
     constexpr bool result{};
 
     // Push a typed LLVM value onto the transient operand stack.
-    auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) noexcept { operand_stack.push_back({.type = type, .value = value}); }};
+    auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) constexpr noexcept { operand_stack.push_back({.type = type, .value = value}); }};
 
     // Resolve and cache memory 0 on first use.  WebAssembly 1.0/MVP memory instructions target the default memory, so a
     // single cached record is sufficient here.  Multi-memory must replace this with selected-memory resolution, and
     // memory64 must also widen the effective-address/data-path assumptions used by the memory emit helpers.
-    auto const ensure_memory0_access_info{[&]() noexcept {
+    auto const ensure_memory0_access_info{[&]() constexpr noexcept {
                                               if(memory0_access_info_resolved)
                                               {
                                                   return memory0_access_info.memory_p != nullptr || memory0_access_info.local_imported_module_ptr != nullptr;
@@ -5569,7 +5569,7 @@ template <typename CreateValue>
     // Local bridge-call helper for dispatcher-only fallbacks.  Higher-level helpers above use the same host convention,
     // but the opcode include files need this compact lambda for memory/global cases.
     auto const emit_runtime_bridge_call{
-        [&](auto bridge_function, ::llvm::FunctionType* bridge_function_type, ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept -> ::llvm::CallInst*
+        [&](auto bridge_function, ::llvm::FunctionType* bridge_function_type, ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
         {
             auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
             if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
@@ -5584,7 +5584,7 @@ template <typename CreateValue>
                                                    auto i32_bridge_function,
                                                    auto i64_bridge_function,
                                                    auto f32_bridge_function,
-                                                   auto f64_bridge_function) noexcept -> ::llvm::CallInst*
+                                                   auto f64_bridge_function) constexpr noexcept -> ::llvm::CallInst*
                                                {
                                                    switch(value_type)
                                                    {
@@ -5604,7 +5604,7 @@ template <typename CreateValue>
     // Dispatcher-local local-imported global getter.  Some opcode case files use this directly instead of the standalone
     // helper when all required LLVM locals are already in scope.
     [[maybe_unused]] auto const emit_local_imported_global_get_bridge_call{
-        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_global_type) noexcept -> ::llvm::CallInst*
+        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_global_type) constexpr noexcept -> ::llvm::CallInst*
         {
             if(global_access_info.local_imported_module_ptr == nullptr || llvm_global_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -5627,7 +5627,7 @@ template <typename CreateValue>
 
     // Dispatcher-local local-imported global setter matching the getter above.
     [[maybe_unused]] auto const emit_local_imported_global_set_bridge_call{
-        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_value_type, ::llvm::Value* value) noexcept -> ::llvm::CallInst*
+        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_value_type, ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(global_access_info.local_imported_module_ptr == nullptr || llvm_value_type == nullptr || value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -5652,7 +5652,7 @@ template <typename CreateValue>
 
     // Local pointer-constant builder bound to the dispatcher's LLVM context.  This shadows the file-level helper only to
     // avoid repeatedly passing the same context inside dense memory-emission lambdas.
-    auto const get_llvm_host_pointer_constant{[&](::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept -> ::llvm::Constant*
+    auto const get_llvm_host_pointer_constant{[&](::std::uintptr_t host_address, ::llvm::Type* pointer_type) constexpr noexcept -> ::llvm::Constant*
                                               {
                                                   if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -5664,7 +5664,7 @@ template <typename CreateValue>
 
     // Clamp a Wasm memarg alignment exponent to the natural access size.  Wasm encodes alignment as log2 bytes, while
     // LLVM expects an Align object and treats over-stated alignment as a stronger promise.
-    auto const get_llvm_memory_access_alignment{[](::std::size_t access_size, validation_module_traits_t::wasm_u32 memarg_align) noexcept -> ::llvm::Align
+    auto const get_llvm_memory_access_alignment{[](::std::size_t access_size, validation_module_traits_t::wasm_u32 memarg_align) constexpr noexcept -> ::llvm::Align
                                                 {
                                                     ::std::size_t natural_alignment{access_size == 0uz ? 1uz : access_size};
                                                     ::std::size_t requested_alignment{1uz};
@@ -5686,7 +5686,7 @@ template <typename CreateValue>
     // Emit a load of the current direct-memory byte length.  mmap-backed memory uses an acquire atomic length load because
     // growth may publish a new length concurrently with JIT code execution.
     auto const emit_direct_memory_byte_length_value{
-        [&]() noexcept -> ::llvm::Value*
+        [&]() constexpr noexcept -> ::llvm::Value*
         {
             if(!ensure_memory0_access_info()) [[unlikely]] { return nullptr; }
             if(memory0_access_info.memory_p == nullptr) [[unlikely]] { return nullptr; }
@@ -5719,7 +5719,7 @@ template <typename CreateValue>
     // Convert a byte length to a Wasm i32 page count using either a shift for power-of-two page sizes or division for
     // custom page sizes.
     auto const emit_direct_memory_page_count_from_byte_length{
-        [&](::llvm::Value* memory_length_load, ::std::size_t page_size_bytes) noexcept -> ::llvm::Value*
+        [&](::llvm::Value* memory_length_load, ::std::size_t page_size_bytes) constexpr noexcept -> ::llvm::Value*
         {
             if(memory_length_load == nullptr || page_size_bytes == 0uz) [[unlikely]] { return nullptr; }
 
@@ -5738,7 +5738,7 @@ template <typename CreateValue>
         }};
 
     // Emit memory.size for a directly addressable memory.
-    auto const emit_direct_memory_page_count_value{[&]() noexcept -> ::llvm::Value*
+    auto const emit_direct_memory_page_count_value{[&]() constexpr noexcept -> ::llvm::Value*
                                                    {
                                                        auto memory_length_load{emit_direct_memory_byte_length_value()};
                                                        if(memory_length_load == nullptr) [[unlikely]] { return nullptr; }
@@ -5750,7 +5750,7 @@ template <typename CreateValue>
     // Try to compute a direct byte pointer for a memory access.  This path is available only for little-endian mmap-backed
     // memories, where the generated LLVM load/store can use the host representation directly.
     auto const emit_direct_mmap_memory_byte_pointer{
-        [&](validation_module_traits_t::wasm_u32 static_offset, ::std::size_t access_size, ::llvm::Value* address_value) noexcept -> ::llvm::Value*
+        [&](validation_module_traits_t::wasm_u32 static_offset, ::std::size_t access_size, ::llvm::Value* address_value) constexpr noexcept -> ::llvm::Value*
         {
             if constexpr(!(runtime_native_memory_t::can_mmap && ::std::endian::native == ::std::endian::little))
             {
@@ -5864,7 +5864,7 @@ template <typename CreateValue>
     // Ask a local-imported memory provider for a snapshot and return it as LLVM values.  This is safe for size queries but
     // not used for actual loads/stores because the provider's access lock/snapshot lifetime is not represented in LLVM IR.
     auto const emit_local_imported_memory_snapshot{
-        [&]() noexcept -> llvm_jit_memory_snapshot_values_t
+        [&]() constexpr noexcept -> llvm_jit_memory_snapshot_values_t
         {
             llvm_jit_memory_snapshot_values_t result{};
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return result; }
@@ -5899,7 +5899,7 @@ template <typename CreateValue>
 
     // Emit memory.size for local-imported memories by snapshotting byte length and converting it to pages.
     auto const emit_local_imported_memory_page_count_value{
-        [&]() noexcept -> ::llvm::Value*
+        [&]() constexpr noexcept -> ::llvm::Value*
         {
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return nullptr; }
             if(memory0_access_info.local_imported_page_size_bytes == 0u) [[unlikely]] { return nullptr; }
@@ -5916,7 +5916,7 @@ template <typename CreateValue>
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
                                  ::std::size_t load_bytes,
-                                 bool signed_load) noexcept -> ::llvm::CallInst*
+                                 bool signed_load) constexpr noexcept -> ::llvm::CallInst*
         {
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
@@ -5991,7 +5991,7 @@ template <typename CreateValue>
     auto const emit_local_imported_memory_store_bridge_call_for_scalar{
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
-                                 ::std::size_t store_bytes) noexcept -> ::llvm::CallInst*
+                                 ::std::size_t store_bytes) constexpr noexcept -> ::llvm::CallInst*
         {
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
@@ -6060,7 +6060,7 @@ template <typename CreateValue>
             ::llvm::Type* llvm_result_type,
             ::std::size_t load_bytes,
             bool signed_load,
-            ::llvm::Value* address_value) noexcept -> ::llvm::CallInst*
+            ::llvm::Value* address_value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.local_imported_module_ptr == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]]
             {
@@ -6116,7 +6116,7 @@ template <typename CreateValue>
             ::llvm::Type* llvm_value_type,
             ::std::size_t store_bytes,
             ::llvm::Value* address_value,
-            ::llvm::Value* value) noexcept -> ::llvm::CallInst*
+            ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.local_imported_module_ptr == nullptr || llvm_value_type == nullptr || address_value == nullptr || value == nullptr)
                 [[unlikely]]
@@ -6165,7 +6165,7 @@ template <typename CreateValue>
     // Choose the direct-memory address path when possible.  Local-imported memories deliberately return null here so the
     // caller falls back to provider-owned bridge calls.
     auto const emit_direct_memory_byte_pointer{
-        [&](validation_module_traits_t::wasm_u32 static_offset, ::std::size_t access_size, ::llvm::Value* address_value) noexcept -> ::llvm::Value*
+        [&](validation_module_traits_t::wasm_u32 static_offset, ::std::size_t access_size, ::llvm::Value* address_value) constexpr noexcept -> ::llvm::Value*
         {
             if(memory0_access_info.memory_p != nullptr)
             {
@@ -6185,7 +6185,7 @@ template <typename CreateValue>
 
     // Emit a native-memory load bridge call for fallback paths.
     auto const emit_native_memory_load_bridge_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset, ::llvm::Type* llvm_result_type, ::llvm::Value* address_value, auto bridge_function) noexcept -> ::llvm::CallInst*
+        [&](validation_module_traits_t::wasm_u32 static_offset, ::llvm::Type* llvm_result_type, ::llvm::Value* address_value, auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6207,7 +6207,7 @@ template <typename CreateValue>
             ::llvm::Type* llvm_value_type,
             ::llvm::Value* address_value,
             ::llvm::Value* value,
-            auto bridge_function) noexcept -> ::llvm::CallInst*
+            auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_value_type == nullptr || address_value == nullptr || value == nullptr) [[unlikely]]
             {
@@ -6229,7 +6229,7 @@ template <typename CreateValue>
 
     // Emit a native-memory memory.size bridge call when direct length loads are unavailable.
     auto const emit_native_memory_page_count_bridge_call{
-        [&]() noexcept -> ::llvm::CallInst*
+        [&]() constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6249,7 +6249,7 @@ template <typename CreateValue>
             ::std::size_t load_bytes,
             bool signed_load,
             ::llvm::Value* address_value,
-            auto native_bridge_function) noexcept -> ::llvm::CallInst*
+            auto native_bridge_function) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p != nullptr)
             {
@@ -6267,7 +6267,7 @@ template <typename CreateValue>
             ::std::size_t store_bytes,
             ::llvm::Value* address_value,
             ::llvm::Value* value,
-            auto native_bridge_function) noexcept -> ::llvm::CallInst*
+            auto native_bridge_function) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p != nullptr)
             {
@@ -6283,7 +6283,7 @@ template <typename CreateValue>
             runtime_operand_stack_value_type result_type,
             ::std::size_t load_bytes,
             bool signed_load,
-            ::llvm::Align memory_alignment) noexcept -> ::llvm::Value*
+            ::llvm::Align memory_alignment) constexpr noexcept -> ::llvm::Value*
         {
             if(direct_memory_pointer == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6379,7 +6379,7 @@ template <typename CreateValue>
             runtime_operand_stack_value_type value_type,
             ::llvm::Value* value,
             ::std::size_t store_bytes,
-            ::llvm::Align memory_alignment) noexcept -> ::llvm::StoreInst*
+            ::llvm::Align memory_alignment) constexpr noexcept -> ::llvm::StoreInst*
         {
             if(direct_memory_pointer == nullptr || value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6486,7 +6486,7 @@ template <typename CreateValue>
         }};
 
     // Emit memory.size for whichever default-memory representation was resolved.
-    auto const emit_memory_page_count_value{[&]() noexcept -> ::llvm::Value*
+    auto const emit_memory_page_count_value{[&]() constexpr noexcept -> ::llvm::Value*
                                             {
                                                 if(!ensure_memory0_access_info()) [[unlikely]] { return nullptr; }
                                                 if(memory0_access_info.local_imported_module_ptr != nullptr)
@@ -6503,7 +6503,7 @@ template <typename CreateValue>
     // Build the control flow for memory.grow.  A zero delta returns the current size without a bridge call; requests that
     // statically exceed the limit return -1; all other requests call the runtime/provider grow bridge.
     auto const emit_memory_grow_result_value{
-        [&](::llvm::Value* delta_value, ::llvm::Value* current_page_count, ::llvm::Value* definitely_fail, bool local_imported_path, auto&& emit_bridge_call) noexcept -> ::llvm::Value*
+        [&](::llvm::Value* delta_value, ::llvm::Value* current_page_count, ::llvm::Value* definitely_fail, bool local_imported_path, auto&& emit_bridge_call) constexpr noexcept -> ::llvm::Value*
         {
             if(delta_value == nullptr || current_page_count == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6559,7 +6559,7 @@ template <typename CreateValue>
         }};
 
     // Return the effective page size for the resolved default memory.
-    auto const get_memory_page_size_bytes{[&]() noexcept -> ::std::size_t
+    auto const get_memory_page_size_bytes{[&]() constexpr noexcept -> ::std::size_t
                                           {
                                               if(memory0_access_info.local_imported_module_ptr != nullptr)
                                               {
@@ -6570,7 +6570,7 @@ template <typename CreateValue>
 
     // Emit a conservative pre-check for memory.grow requests that cannot fit under the configured byte limit.
     auto const emit_memory_grow_definitely_fail_value{
-        [&](::llvm::Value* current_page_count, ::llvm::Value* delta_pages_unsigned) noexcept -> ::llvm::Value*
+        [&](::llvm::Value* current_page_count, ::llvm::Value* delta_pages_unsigned) constexpr noexcept -> ::llvm::Value*
         {
             if(current_page_count == nullptr || delta_pages_unsigned == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6593,7 +6593,7 @@ template <typename CreateValue>
 
     // Emit the actual runtime/provider memory.grow bridge call.
     auto const emit_memory_grow_bridge_call{
-        [&](::llvm::Value* delta_value) noexcept -> ::llvm::CallInst*
+        [&](::llvm::Value* delta_value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(delta_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6635,7 +6635,7 @@ template <typename CreateValue>
             ::llvm::Type* llvm_result_type,
             ::std::size_t load_bytes,
             bool signed_load,
-            auto bridge_function) noexcept -> bool
+            auto bridge_function) constexpr noexcept -> bool
         {
             if(!ensure_memory0_access_info() || llvm_result_type == nullptr || operand_stack.empty()) [[unlikely]] { return false; }
 
@@ -6674,7 +6674,7 @@ template <typename CreateValue>
             runtime_operand_stack_value_type value_type,
             ::llvm::Type* llvm_value_type,
             ::std::size_t store_bytes,
-            auto bridge_function) noexcept -> bool
+            auto bridge_function) constexpr noexcept -> bool
         {
             if(!ensure_memory0_access_info() || llvm_value_type == nullptr || operand_stack.size() < 2uz) [[unlikely]] { return false; }
 
@@ -6710,7 +6710,7 @@ template <typename CreateValue>
         }};
 
     // Complete a Wasm memory.size instruction.
-    auto const emit_memory_size_call{[&]() noexcept -> bool
+    auto const emit_memory_size_call{[&]() constexpr noexcept -> bool
                                      {
                                          auto page_count{emit_memory_page_count_value()};
                                          if(page_count == nullptr) [[unlikely]] { return false; }
@@ -6720,7 +6720,7 @@ template <typename CreateValue>
                                      }};
 
     // Complete a Wasm memory.grow instruction.
-    auto const emit_memory_grow_call{[&]() noexcept -> bool
+    auto const emit_memory_grow_call{[&]() constexpr noexcept -> bool
                                      {
                                          if(!ensure_memory0_access_info() || operand_stack.empty()) [[unlikely]] { return false; }
 
@@ -6739,7 +6739,7 @@ template <typename CreateValue>
                                                                                             current_page_count,
                                                                                             definitely_fail,
                                                                                             memory0_access_info.local_imported_module_ptr != nullptr,
-                                                                                            [&]() noexcept -> ::llvm::CallInst*
+                                                                                            [&]() constexpr noexcept -> ::llvm::CallInst*
                                                                                             { return emit_memory_grow_bridge_call(delta.value); })};
                                          if(grow_result_phi == nullptr) [[unlikely]] { return false; }
 
@@ -6748,7 +6748,7 @@ template <typename CreateValue>
                                      }};
 
     // Dispatcher-local unary helper used by included numeric opcode cases.
-    auto const emit_unary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) noexcept -> bool
+    auto const emit_unary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
                           {
                               if(operand_stack.empty()) [[unlikely]] { return false; }
 
@@ -6765,7 +6765,7 @@ template <typename CreateValue>
                           }};
 
     // Dispatcher-local binary helper used by included numeric opcode cases.
-    auto const emit_binary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) noexcept -> bool
+    auto const emit_binary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
                            {
                                if(operand_stack.size() < 2uz) [[unlikely]] { return false; }
 

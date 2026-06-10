@@ -1122,7 +1122,7 @@ case wasm1_code::call_indirect:
     // Translate: `call_indirect` bridge (module_id + type_index + table_index).
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     auto const emit_call_indirect_normal{
-        [&]() noexcept
+        [&]() constexpr noexcept
         {
             emit_opfunc_to(bytecode, translate::get_uwvmint_call_indirect_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
             emit_imm_to(bytecode, options.curr_wasm_id);
