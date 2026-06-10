@@ -45,7 +45,7 @@
 #if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) &&                                                              \
     ((!defined(_WIN32) && (__has_include(<libunwind.h>) || __has_include(<unwind.h>))) ||                                                                  \
      (defined(_WIN64) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&              \
-      !defined(__CYGWIN__) && __has_include(<windows.h>)))
+      !defined(__CYGWIN__)))
 # define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
 #endif
 

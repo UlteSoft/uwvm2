@@ -70,7 +70,7 @@
 #pragma pop_macro("UWVM_DLLIMPORT")
 #pragma pop_macro("UWVM_HAS_CPP_ATTRIBUTE")
 
-/// @brief      std and windows.h macros
+/// @brief      std and platform macros
 #pragma pop_macro("refresh")
 #pragma pop_macro("new")
 #pragma pop_macro("move")

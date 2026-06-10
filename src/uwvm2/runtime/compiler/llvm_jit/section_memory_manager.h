@@ -33,17 +33,6 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 # endif
-# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN64) &&                                                                                                      \
-     ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && !defined(__CYGWIN__) &&              \
-     __has_include(<windows.h>)
-#  ifndef WIN32_LEAN_AND_MEAN
-#   define WIN32_LEAN_AND_MEAN 1
-#  endif
-#  ifndef NOMINMAX
-#   define NOMINMAX 1
-#  endif
-#  include <windows.h>
-# endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
 #  include <unwind.h>
 extern "C" void __register_frame(void const*);
@@ -56,8 +45,7 @@ extern "C" void __deregister_frame(void const*);
 #pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH")
 #undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN64) &&                                                                                                       \
-    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && !defined(__CYGWIN__) &&               \
-    __has_include(<windows.h>)
+    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && !defined(__CYGWIN__)
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH 1
 #else
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH 0
@@ -166,7 +154,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         void deregisterEHFrames() override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
-            for(auto const& frame: win64_seh_records_) { ::RtlDeleteFunctionTable(frame.function_table); }
+            for(auto const& frame: win64_seh_records_) { ::fast_io::win32::RtlDeleteFunctionTable(frame.function_table); }
             win64_seh_records_.clear();
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             for(auto const& frame: eh_frame_records_)
@@ -183,8 +171,8 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
         struct runtime_llvm_jit_win64_seh_record
         {
-            ::RUNTIME_FUNCTION* function_table{};
-            ::DWORD function_count{};
+            ::fast_io::win32::win64_runtime_function* function_table{};
+            ::std::uint32_t function_count{};
         };
 
         ::std::uintptr_t win64_image_base_{(::std::numeric_limits<::std::uintptr_t>::max)()};
@@ -199,16 +187,19 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         inline bool register_win64_seh_function_table(::std::uint8_t* addr, ::std::size_t size) noexcept
         {
             if(addr == nullptr || size == 0uz) [[unlikely]] { return false; }
-            if(size % sizeof(::RUNTIME_FUNCTION) != 0uz) [[unlikely]] { return false; }
+            if(size % sizeof(::fast_io::win32::win64_runtime_function) != 0uz) [[unlikely]] { return false; }
 
-            auto const count{size / sizeof(::RUNTIME_FUNCTION)};
-            if(count == 0uz || count > static_cast<::std::size_t>((::std::numeric_limits<::DWORD>::max)())) [[unlikely]] { return false; }
+            auto const count{size / sizeof(::fast_io::win32::win64_runtime_function)};
+            if(count == 0uz || count > static_cast<::std::size_t>((::std::numeric_limits<::std::uint32_t>::max)())) [[unlikely]] { return false; }
 
             auto const image_base{win64_image_base_ == (::std::numeric_limits<::std::uintptr_t>::max)() ? reinterpret_cast<::std::uintptr_t>(addr)
                                                                                                         : win64_image_base_};
-            auto* const function_table{reinterpret_cast<::RUNTIME_FUNCTION*>(addr)};
-            auto const function_count{static_cast<::DWORD>(count)};
-            if(!::RtlAddFunctionTable(function_table, function_count, static_cast<::DWORD64>(image_base))) [[unlikely]] { return false; }
+            auto* const function_table{reinterpret_cast<::fast_io::win32::win64_runtime_function*>(addr)};
+            auto const function_count{static_cast<::std::uint32_t>(count)};
+            if(!::fast_io::win32::RtlAddFunctionTable(function_table, function_count, static_cast<::std::uint64_t>(image_base))) [[unlikely]]
+            {
+                return false;
+            }
 
             win64_seh_records_.push_back(runtime_llvm_jit_win64_seh_record{function_table, function_count});
             return true;
