@@ -96,7 +96,8 @@ def llvm_lib_flags(tool: str) -> list[str]:
     else:
         components.append("all-targets")
 
-    for candidate in [components, ["all"]]:
+    candidates = [["all"], components] if sys.platform == "win32" else [components, ["all"]]
+    for candidate in candidates:
         proc = subprocess.run([tool, "--libs", *candidate], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if proc.returncode == 0 and proc.stdout.strip():
             return shlex.split(proc.stdout)
@@ -187,6 +188,7 @@ def main() -> int:
 
     include_dirs = [
         generated_dir,
+        generated_dir / "generated",
         root / "src",
         root / "third-parties" / "fast_float" / "include",
         root / "third-parties" / "fast_io" / "include",
@@ -214,6 +216,8 @@ def main() -> int:
 
     llvm_ldflags = shlex.split(run_text([llvm, "--ldflags"]))
     llvm_system_libs = shlex.split(run_text([llvm, "--system-libs"], check=False))
+    if sys.platform == "win32" and "-lws2_32" not in llvm_system_libs:
+        llvm_system_libs.append("-lws2_32")
     llvm_libs = llvm_lib_flags(llvm)
     llvm_libdir = run_text([llvm, "--libdir"], check=False)
 
