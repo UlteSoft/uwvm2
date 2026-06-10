@@ -942,7 +942,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 
         inline constexpr wasi_fd_t& operator= (wasi_fd_t&& other) noexcept = delete;
 
-        inline ~wasi_fd_t() = default;
+        inline constexpr ~wasi_fd_t() = default;
     };
 
     inline constexpr void destroy_wasi_fd(wasi_fd_t * fd_p) noexcept

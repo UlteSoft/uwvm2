@@ -49,8 +49,7 @@ for(;;)
     wasm1_code curr_opbase;  // no initialization necessary
     ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
     bool llvm_jit_instruction_emitted_inline{};
-    auto const disable_inline_llvm_jit_emission{[&]()
-                                                {
+    auto const disable_inline_llvm_jit_emission{[&]() noexcept {
                                                     // Validation continues even if inline LLVM emission is no longer
                                                     // possible.  Clearing the output storage tells the caller to use the
                                                     // interpreter/tiered fallback rather than a partially emitted module.

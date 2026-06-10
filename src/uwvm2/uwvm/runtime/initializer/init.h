@@ -473,7 +473,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             bool from_all{};
         };
 
-        [[nodiscard]] inline auto resolve_configured_local_defined_memory_limit(configured_runtime_memory_limits_t const* override_limits,
+        [[nodiscard]] inline constexpr auto resolve_configured_local_defined_memory_limit(configured_runtime_memory_limits_t const* override_limits,
                                                                                 ::std::size_t local_memory_index) noexcept
             -> resolved_configured_local_defined_memory_limit_t
         {
@@ -518,7 +518,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 u8"\"). ");
         }
 
-        inline void validate_configured_runtime_memory_limit_target_modules() noexcept
+        inline constexpr void validate_configured_runtime_memory_limit_target_modules() noexcept
         {
             for(auto const& [module_name, configured_limits]: ::uwvm2::uwvm::wasm::storage::configured_module_memory_limit)
             {
@@ -589,7 +589,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::fast_io::fast_terminate();
         }
 
-        inline void reset_configured_import_reset_match_counts() noexcept
+        inline constexpr void reset_configured_import_reset_match_counts() noexcept
         {
             for(auto& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -598,7 +598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void validate_configured_import_reset_target_modules() noexcept
+        inline constexpr void validate_configured_import_reset_target_modules() noexcept
         {
             for(auto const& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -613,7 +613,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void validate_configured_import_reset_matches() noexcept
+        inline constexpr void validate_configured_import_reset_matches() noexcept
         {
             for(auto const& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -2339,7 +2339,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
+        inline constexpr void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
                                                                    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
                                                                    ::std::uint_least64_t& out) noexcept
         {

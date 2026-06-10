@@ -87,6 +87,9 @@ If a hosted facade is necessary, build it atop `fast_io`, keep the API narrow, a
 - Style rules:
   - Prefer explicit, descriptive names. Avoid 1–2 character identifiers outside tight local scopes.
   - Minimize macros; prefer `constexpr`, templates, and inline functions.
+  - When a function definition is visible from a header or from an implementation file that may be included by another translation unit, mark it `inline` unless it is an intentional exported/translation-unit interface. This avoids accidental ODR violations when the same definition is seen by multiple consumers.
+  - Every explicitly `inline` function should also be `constexpr` when the C++ language permits it. In the C++26 baseline, `constexpr` is the preferred default for inline functions: the compiler decides whether a particular call is usable during constant evaluation, while ordinary runtime calls keep their normal behavior.
+  - Coroutine functions are the primary exception. A function whose body uses `co_await`, `co_yield`, or `co_return` cannot be `constexpr`, so coroutine task factories should remain `inline` without `constexpr`. Other declarations that the standard forbids from being `constexpr` (for example allocation/deallocation functions) are also exempt.
   - Keep functions short and cohesive; use early returns; handle errors and edge cases first.
   - Comments should explain "why", not restate code.
 
@@ -356,6 +359,12 @@ Do not assume `<pthread.h>` availability on Windows (ABI variants: win32, posix,
 - Keep functions short and cohesive; use guard clauses and early returns.
 - Handle error and edge cases first.
 - Minimize macros; prefer `constexpr`, templates, and inline functions.
+
+### Inline and constexpr functions
+- Header-defined functions, functions in files included by module/default wiring, and other definitions that may be seen by more than one translation unit must be `inline` unless they are intentional ABI/interface definitions.
+- Prefer writing inline functions as `inline constexpr`. This keeps ODR behavior explicit while allowing compile-time use when a call path is valid for constant evaluation. C++26 relaxes many `constexpr` body restrictions, so the declaration should express the strongest useful property and let the compiler enforce constant-evaluation validity at the call site.
+- Do not mark coroutine functions `constexpr`. Any function body containing `co_await`, `co_yield`, or `co_return` is a coroutine, and coroutine functions are not valid `constexpr` functions. Leave coroutine task factories `inline` only.
+- For `.cpp` interface definitions, do not add `inline` just to follow the header rule. Prefer explicit linkage instead: `extern "C++"` for C++ interfaces and `extern "C"` for C ABI surfaces.
 
 ### Comments
 - Explain intent and invariants. Avoid restating obvious code.

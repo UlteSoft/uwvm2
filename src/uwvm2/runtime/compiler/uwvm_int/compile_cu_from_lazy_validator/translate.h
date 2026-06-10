@@ -236,7 +236,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         [[nodiscard]] inline constexpr ::std::size_t byte_offset(::std::byte const* base, ::std::byte const* curr) noexcept
         { return static_cast<::std::size_t>(curr - base); }
 
-        inline void fail_lazy_split(::std::byte const* op_begin,
+        inline constexpr void fail_lazy_split(::std::byte const* op_begin,
                                     code_validation_error_code ec,
                                     ::uwvm2::validation::error::code_validation_error_impl& err,
                                     ::fast_io::parse_code pc = ::fast_io::parse_code::invalid) UWVM_THROWS
@@ -247,7 +247,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
 
         template <typename T>
-        inline T read_leb128_immediate(::std::byte const*& code_curr,
+        inline constexpr T read_leb128_immediate(::std::byte const*& code_curr,
                                        ::std::byte const* code_end,
                                        ::std::byte const* op_begin,
                                        code_validation_error_code ec,
@@ -266,7 +266,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             return value;
         }
 
-        inline void skip_fixed_immediate(::std::byte const*& code_curr,
+        inline constexpr void skip_fixed_immediate(::std::byte const*& code_curr,
                                          ::std::byte const* code_end,
                                          ::std::byte const* op_begin,
                                          ::std::size_t bytes,
@@ -280,7 +280,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             code_curr += bytes;
         }
 
-        inline ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
+        inline constexpr ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
                                                    ::std::size_t function_index,
                                                    ::std::size_t local_function_index,
                                                    ::std::size_t parent_eu_index,
@@ -304,14 +304,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             return eu_index;
         }
 
-        inline void set_execution_unit_end(lazy_module_storage_t& storage, ::std::size_t eu_index, ::std::byte const* code_end) noexcept
+        inline constexpr void set_execution_unit_end(lazy_module_storage_t& storage, ::std::size_t eu_index, ::std::byte const* code_end) noexcept
         {
             auto& eu{storage.execution_units.index_unchecked(eu_index)};
             eu.code_end = code_end;
             eu.code_size = static_cast<::std::size_t>(code_end - eu.code_begin);
         }
 
-        inline ::std::size_t append_compile_unit_from_eu_range(lazy_module_storage_t& storage,
+        inline constexpr ::std::size_t append_compile_unit_from_eu_range(lazy_module_storage_t& storage,
                                                                lazy_function_storage_t const& fn,
                                                                ::std::size_t begin_eu_index,
                                                                ::std::size_t end_eu_index,
@@ -340,7 +340,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             return cu_index;
         }
 
-        inline void append_function_compile_units(lazy_module_storage_t& storage, lazy_function_storage_t& fn, lazy_split_config cfg)
+        inline constexpr void append_function_compile_units(lazy_module_storage_t& storage, lazy_function_storage_t& fn, lazy_split_config cfg)
         {
             fn.first_cu_index = storage.compile_units.size();
 
@@ -446,7 +446,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             fn.cu_count = storage.compile_units.size() - fn.first_cu_index;
         }
 
-        inline void skip_wasm1_non_structural_immediates(::std::byte const*& code_curr,
+        inline constexpr void skip_wasm1_non_structural_immediates(::std::byte const*& code_curr,
                                                          ::std::byte const* code_end,
                                                          ::std::byte const* op_begin,
                                                          wasm1_code curr_opbase,
@@ -583,7 +583,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
-        inline void build_lazy_function_execution_units(runtime_module_storage_t const& curr_module,
+        inline constexpr void build_lazy_function_execution_units(runtime_module_storage_t const& curr_module,
                                                         lazy_module_storage_t& storage,
                                                         ::std::size_t local_function_index,
                                                         lazy_split_config cfg,
@@ -736,10 +736,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
-        [[nodiscard]] inline auto match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
+        [[nodiscard]] inline constexpr auto match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
         { return ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::match_trivial_call_inline_body(code_ptr); }
 
-        inline void fill_lazy_local_defined_call_info(runtime_module_storage_t const& curr_module,
+        inline constexpr void fill_lazy_local_defined_call_info(runtime_module_storage_t const& curr_module,
                                                       ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
                                                       full_function_symbol_t& storage) noexcept
         {
@@ -781,7 +781,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
-        inline void mark_function_compile_units_state(lazy_module_storage_t& storage,
+        inline constexpr void mark_function_compile_units_state(lazy_module_storage_t& storage,
                                                       lazy_function_storage_t& fn,
                                                       ::uwvm2::utils::thread::lazy_compile_state state) noexcept
         {
@@ -792,7 +792,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
-        inline void validate_function_if_needed(runtime_module_storage_t const& curr_module,
+        inline constexpr void validate_function_if_needed(runtime_module_storage_t const& curr_module,
                                                 lazy_compile_options const& options,
                                                 ::std::size_t local_function_index,
                                                 ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
@@ -820,7 +820,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
-        inline void compile_lazy_local_function(runtime_module_storage_t const& curr_module,
+        inline constexpr void compile_lazy_local_function(runtime_module_storage_t const& curr_module,
                                                 lazy_module_storage_t& storage,
                                                 lazy_compile_options& options,
                                                 ::std::size_t local_function_index,
@@ -836,7 +836,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
-        inline void lazy_compile_request_entry(void* user_data) noexcept
+        inline constexpr void lazy_compile_request_entry(void* user_data) noexcept
         {
             auto const ctx{static_cast<lazy_compile_request_context*>(user_data)};
             if(ctx == nullptr || ctx->curr_module == nullptr || ctx->lazy_storage == nullptr) [[unlikely]] { return; }
@@ -962,7 +962,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
     }  // namespace details
 
-    inline lazy_module_storage_t initialize_lazy_module_storage(runtime_module_storage_t const& curr_module,
+    inline constexpr lazy_module_storage_t initialize_lazy_module_storage(runtime_module_storage_t const& curr_module,
                                                                 ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
                                                                 ::uwvm2::validation::error::code_validation_error_impl& err,
                                                                 lazy_split_config split_config = {}) UWVM_THROWS
@@ -987,7 +987,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
-    inline void compile_cu_from_lazy_validator(runtime_module_storage_t const& curr_module,
+    inline constexpr void compile_cu_from_lazy_validator(runtime_module_storage_t const& curr_module,
                                                lazy_module_storage_t& storage,
                                                lazy_compile_options& options,
                                                ::std::size_t compile_unit_index,
@@ -1114,7 +1114,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
-    [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context & ctx,
+    [[nodiscard]] inline constexpr ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context & ctx,
                                                                                                 unsigned priority = 0u) noexcept
     {
         if(ctx.lazy_storage == nullptr || ctx.compile_unit_index >= ctx.lazy_storage->compile_units.size()) [[unlikely]] { return {}; }

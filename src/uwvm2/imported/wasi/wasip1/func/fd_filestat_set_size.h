@@ -84,7 +84,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_filestat_set_size
     /// @details   __wasi_errno_t fd_filestat_set_size(__wasi_fd_t fd, __wasi_filesize_t filesize);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_size_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_size_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::filesize_t size) noexcept
@@ -358,7 +358,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_size(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_size(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::filesize_t size) noexcept

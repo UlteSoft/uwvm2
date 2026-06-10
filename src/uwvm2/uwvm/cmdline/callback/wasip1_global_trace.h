@@ -57,7 +57,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
         using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
 
-        [[nodiscard]] inline parameter_return_type print_usage_error(::uwvm2::utils::container::u8string_view msg) noexcept
+        [[nodiscard]] inline constexpr parameter_return_type print_usage_error(::uwvm2::utils::container::u8string_view msg) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -72,7 +72,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::return_m1_imme;
         }
 
-        [[nodiscard]] inline parameter_return_type print_open_error(::uwvm2::utils::container::u8string_view path) noexcept
+        [[nodiscard]] inline constexpr parameter_return_type print_open_error(::uwvm2::utils::container::u8string_view path) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::return_m1_imme;
         }
 
-        [[nodiscard]] inline parameter_return_type
+        [[nodiscard]] inline constexpr parameter_return_type
             apply_trace_target_to_default_env(::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
                                               [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
         {

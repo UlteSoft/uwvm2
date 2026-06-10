@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
-        [[nodiscard]] inline bool
+        [[nodiscard]] inline constexpr bool
             validate_wasip1_group_binding_for_loaded_module(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
                                                             ::uwvm2::utils::container::u8string_view module_name) noexcept
         {
@@ -98,7 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return false;
         }
 
-        [[nodiscard]] inline bool validate_loaded_wasip1_group_bindings() noexcept
+        [[nodiscard]] inline constexpr bool validate_loaded_wasip1_group_bindings() noexcept
         {
             using target_kind = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
 
@@ -140,7 +140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
 #endif
 
-    inline int load_exec_wasm_module() noexcept
+    inline constexpr int load_exec_wasm_module() noexcept
     {
         // The wasm preload has been fully parsed
         // The dl preload has been fully registered
@@ -188,7 +188,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
     }
 
-    inline int load_local_modules() noexcept
+    inline constexpr int load_local_modules() noexcept
     {
         // preload abi
 
@@ -385,7 +385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
     }
 
-    inline int load_weak_symbol_modules() noexcept
+    inline constexpr int load_weak_symbol_modules() noexcept
     { return ::uwvm2::uwvm::run::load_weak_symbol_modules_details(::uwvm2::uwvm::wasm::storage::wasm_parameter); }
 
 }  // namespace uwvm2::uwvm::run

@@ -143,7 +143,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
     /// @brief      madvise
     /// @details    Instructs the system to mmap Instructs the system to specify memory operations for mmap
     ///             No exception is thrown because this is an instructional message, not a command.
-    inline void my_madvise([[maybe_unused]] void const* addr, [[maybe_unused]] ::std::size_t length, [[maybe_unused]] madvise_flag flag) noexcept
+    inline constexpr void my_madvise([[maybe_unused]] void const* addr, [[maybe_unused]] ::std::size_t length, [[maybe_unused]] madvise_flag flag) noexcept
     {
 #if defined(_WIN32)
 # if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0A00) && !defined(_WIN32_WINDOWS)

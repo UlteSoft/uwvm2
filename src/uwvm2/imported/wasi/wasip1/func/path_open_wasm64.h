@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t path_open(__wasi_fd_t dirfd, __wasi_lookupflags_t dirflags, const char *path, size_t path_len, __wasi_oflags_t oflags,
     /// __wasi_rights_t fs_rights_base, __wasi_rights_t fs_rights_inheriting, __wasi_fdflags_t fdflags, __wasi_fd_t *fd);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t path_open_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t path_open_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t dirfd,
         ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t dirflags,

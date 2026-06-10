@@ -97,7 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
     };
 
     /// @brief nt_code_cvt_argv and return nt_code_cvt_argv_storage
-    inline nt_code_cvt_argv_storage nt_code_cvt_argv() noexcept
+    inline constexpr nt_code_cvt_argv_storage nt_code_cvt_argv() noexcept
     {
         // get utf-16 cmdline from peb
         // There is no need to check the nullptr in this step, it's never nullptr.

@@ -88,7 +88,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.fd_sync
     /// @details   __wasi_errno_t fd_sync(__wasi_fd_t fd);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_sync_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_sync_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd) noexcept
     {
@@ -400,7 +400,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_sync(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_sync(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd) noexcept
     {

@@ -322,7 +322,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return n + total_extra_space;
         }
 
-        inline void* allocator_adjust_ptr_to_aligned_impl(void* p, ::std::size_t alignment) noexcept
+        inline constexpr void* allocator_adjust_ptr_to_aligned_impl(void* p, ::std::size_t alignment) noexcept
         {
             if(p == nullptr) [[unlikely]] { return nullptr; }
             void* aligned_ptr{reinterpret_cast<void*>((reinterpret_cast<::std::uintptr_t>(p) + alignment) & (0 - alignment))};
@@ -399,7 +399,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void* allocate_zero(::std::size_t n) noexcept
+        inline static constexpr void* allocate_zero(::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_allocate_zero_impl<alloc>) { return allocator_type::allocate_zero(n); }
@@ -432,7 +432,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
              details::has_reallocate_zero_at_least_impl<alloc> || details::has_reallocate_aligned_zero_impl<alloc> ||
              details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static void* reallocate(void* p, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate(void* p, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate)
         {
             if constexpr(details::has_reallocate_impl<alloc>) { return allocator_type::reallocate(p, n); }
@@ -455,7 +455,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             (details::has_reallocate_zero_impl<alloc> || details::has_reallocate_zero_at_least_impl<alloc> ||
              details::has_reallocate_aligned_zero_impl<alloc> || details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static void* reallocate_zero(void* p, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_zero(void* p, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate_zero)
         {
             if constexpr(details::has_reallocate_zero_impl<alloc>) { return allocator_type::reallocate_zero(p, n); }
@@ -467,7 +467,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void* reallocate_n(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_n(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_n_impl<alloc>) { return allocator_type::reallocate_n(p, oldn, n); }
@@ -515,7 +515,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void* reallocate_zero_n(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_zero_n(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_zero_n_impl<alloc>) { return allocator_type::reallocate_zero_n(p, oldn, n); }
@@ -741,7 +741,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             (details::has_reallocate_aligned_impl<alloc> || details::has_reallocate_aligned_at_least_impl<alloc> ||
              details::has_reallocate_aligned_zero_impl<alloc> || details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static void* reallocate_aligned(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_aligned(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate_aligned)
         {
             if constexpr(details::has_reallocate_aligned_impl<alloc>) { return allocator_type::reallocate_aligned(p, alignment, n); }
@@ -756,7 +756,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_reallocate_aligned_zero =
             (details::has_reallocate_aligned_zero_impl<alloc> || details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static void* reallocate_aligned_zero(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_aligned_zero(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate_aligned_zero)
         {
             if constexpr(details::has_reallocate_aligned_zero_impl<alloc>) { return allocator_type::reallocate_aligned_zero(p, alignment, n); }
@@ -766,7 +766,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void* reallocate_aligned_n(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_aligned_n(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_aligned_n_impl<alloc>) { return allocator_type::reallocate_aligned_n(p, oldn, alignment, n); }
@@ -805,7 +805,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void* reallocate_aligned_zero_n(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_aligned_zero_n(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_aligned_zero_n_impl<alloc>) { return allocator_type::reallocate_aligned_zero_n(p, oldn, alignment, n); }
@@ -829,7 +829,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_at_least =
             (has_reallocate && (details::has_reallocate_aligned_at_least_impl<alloc> || details::has_reallocate_aligned_zero_at_least_impl<alloc>));
 
-        inline static ::fast_io::allocation_least_result reallocate_at_least(void* p, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_at_least(void* p, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate)
         {
             if constexpr(details::has_reallocate_at_least_impl<alloc>) { return normalize_allocation_least_result(allocator_type::reallocate_at_least(p, n)); }
@@ -870,7 +870,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_zero_at_least =
             (has_reallocate_zero && (details::has_reallocate_zero_at_least_impl<alloc> || details::has_reallocate_aligned_zero_at_least_impl<alloc>));
 
-        inline static ::fast_io::allocation_least_result reallocate_zero_at_least(void* p, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_zero_at_least(void* p, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate)
         {
             if constexpr(details::has_reallocate_zero_at_least_impl<alloc>)
@@ -893,7 +893,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static ::fast_io::allocation_least_result reallocate_n_at_least(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_n_at_least(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_n_at_least_impl<alloc>)
@@ -983,7 +983,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static ::fast_io::allocation_least_result reallocate_zero_n_at_least(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_zero_n_at_least(void* p, ::std::size_t oldn, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if constexpr(details::has_reallocate_zero_n_at_least_impl<alloc>)
@@ -1020,7 +1020,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_aligned_at_least =
             (has_reallocate_aligned && (details::has_reallocate_aligned_zero_at_least_impl<alloc> || details::has_reallocate_aligned_at_least_impl<alloc>));
 
-        inline static ::fast_io::allocation_least_result reallocate_aligned_at_least(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_aligned_at_least(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate_aligned_zero)
         {
             if constexpr(details::has_reallocate_aligned_at_least_impl<alloc>)
@@ -1046,7 +1046,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_aligned_zero_at_least =
             (has_reallocate_aligned_zero && details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static ::fast_io::allocation_least_result reallocate_aligned_zero_at_least(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_aligned_zero_at_least(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status && has_reallocate_aligned_zero)
         {
             if constexpr(details::has_reallocate_aligned_zero_at_least_impl<alloc>)
@@ -1063,7 +1063,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_aligned_n_at_least =
             (has_reallocate_aligned && (details::has_reallocate_aligned_n_at_least_impl<alloc> || details::has_reallocate_aligned_zero_n_at_least_impl<alloc>));
 
-        inline static ::fast_io::allocation_least_result
+        inline static constexpr ::fast_io::allocation_least_result
             reallocate_aligned_n_at_least(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status)
         {
@@ -1126,7 +1126,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         inline static constexpr bool has_native_reallocate_aligned_zero_n_at_least =
             (has_reallocate_aligned_zero && details::has_reallocate_aligned_zero_at_least_impl<alloc>);
 
-        inline static ::fast_io::allocation_least_result
+        inline static constexpr ::fast_io::allocation_least_result
             reallocate_aligned_zero_n_at_least(void* p, ::std::size_t oldn, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status)
         {
@@ -1156,7 +1156,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
         inline static constexpr bool has_deallocate_aligned = (details::has_deallocate_aligned_impl<alloc> || details::has_deallocate_impl<alloc>);
 
-        inline static void deallocate_aligned(void* p, ::std::size_t alignment) noexcept
+        inline static constexpr void deallocate_aligned(void* p, ::std::size_t alignment) noexcept
             requires (!has_status && has_deallocate_aligned)
         {
             if(p == nullptr) [[unlikely]] { return; }
@@ -1168,7 +1168,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-        inline static void deallocate_aligned_n(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void deallocate_aligned_n(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
             requires (!has_status)
         {
             if(p == nullptr) [[unlikely]] { return; }

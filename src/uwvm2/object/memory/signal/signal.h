@@ -196,7 +196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    For registered protected segments this function is terminal: it invokes the custom
         ///             handler when present, otherwise prints the default mmap memory error, and then
         ///             terminates. The boolean return exists for the platform handler's pass-through path.
-        inline bool handle_fault_address(::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
+        inline constexpr bool handle_fault_address(::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
 
@@ -225,7 +225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    Access violations are translated only when the fault address falls inside a
         ///             registered protected segment. All other exceptions continue through the normal
         ///             Windows exception-dispatch chain.
-        inline ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
+        inline constexpr ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             if(exception_pointers == nullptr || exception_pointers->ExceptionRecord == nullptr) [[unlikely]] { return 0 /*EXCEPTION_CONTINUE_SEARCH*/; }
 
@@ -257,7 +257,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief      Compatibility unhandled-exception filter for old Windows targets.
         /// @details    Old targets do not provide vectored exception handling, so the same access-violation
         ///             translation is installed through SetUnhandledExceptionFilter and chained manually.
-        inline ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
+        inline constexpr ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             auto const ret{vectored_exception_handler(exception_pointers)};
             if(ret != 0) { return ret; }
@@ -273,7 +273,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    The handler is process-wide because Windows exception dispatch is process/thread
         ///             global. register_protected_segment calls this lazily before publishing the first
         ///             protected interval.
-        inline void install_signal_handler() noexcept
+        inline constexpr void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
 
@@ -313,7 +313,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief      Extract the faulting instruction address from a POSIX ucontext, when supported.
         /// @details    The exact register field is OS and architecture specific. Unsupported targets return
         ///             zero, which keeps diagnostics valid while omitting the instruction address.
-        [[nodiscard]] inline ::std::uintptr_t get_signal_instruction_address([[maybe_unused]] void* context) noexcept
+        [[nodiscard]] inline constexpr ::std::uintptr_t get_signal_instruction_address([[maybe_unused]] void* context) noexcept
         {
 #  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
             if(context == nullptr) [[unlikely]] { return 0u; }
@@ -486,7 +486,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    Faults inside registered protected segments are converted to wasm memory diagnostics.
         ///             Other faults are delegated to the previous handler, or to the platform default action
         ///             when no previous handler is available.
-        inline void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
+        inline constexpr void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
             auto const instruction_address{get_signal_instruction_address(context)};
@@ -514,7 +514,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief      Install POSIX SIGSEGV and, where available, SIGBUS handlers once for the process.
         /// @details    The handler is installed lazily by register_protected_segment. It uses SA_SIGINFO so
         ///             the fault address and optional machine context are available for diagnostics.
-        inline void install_signal_handler() noexcept
+        inline constexpr void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
 

@@ -106,7 +106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // callback. The modern single/group parameter files pass
         // target_action_t directly, but this helper is kept for the compact
         // multi-action form so both frontends share exactly the same validator.
-        [[nodiscard]] inline bool parse_target_action(::uwvm2::utils::container::u8string_view text, target_action_t& action) noexcept
+        [[nodiscard]] inline constexpr bool parse_target_action(::uwvm2::utils::container::u8string_view text, target_action_t& action) noexcept
         {
             if(text == u8"enable") { action = target_action_t::enable; }
             else if(text == u8"disable") { action = target_action_t::disable; }
@@ -137,7 +137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // stores them in the same UTF-8 text representation used by wasm names.
         // Validate at command-line time so later group lookups can compare raw
         // byte strings without revalidating or diagnosing late.
-        [[nodiscard]] inline bool validate_wasm_utf8_name(::uwvm2::utils::container::u8string_view text) noexcept
+        [[nodiscard]] inline constexpr bool validate_wasm_utf8_name(::uwvm2::utils::container::u8string_view text) noexcept
         {
             auto const [module_name_pos,
                         module_name_err]{::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
@@ -147,7 +147,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return module_name_err == ::uwvm2::utils::utf::utf_error_code::success;
         }
 
-        inline ::uwvm2::utils::cmdline::parameter_return_type print_usage_error(::uwvm2::utils::cmdline::parameter const& parameter,
+        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type print_usage_error(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                                 ::uwvm2::utils::container::u8string_view msg) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -170,7 +170,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                    type == ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         }
 
-        [[nodiscard]] inline bool parse_size_t(::uwvm2::utils::container::u8string_view text, ::std::size_t& value) noexcept
+        [[nodiscard]] inline constexpr bool parse_size_t(::uwvm2::utils::container::u8string_view text, ::std::size_t& value) noexcept
         {
             auto const [next, err]{::fast_io::parse_by_scan(text.cbegin(), text.cend(), value)};
             return err == ::fast_io::parse_code::ok && next == text.cend();
@@ -182,7 +182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // the count and exactly <count> following tokens as occupied arguments.
         // This is also what makes `--wasip1-*-force-args 0` unambiguous: the
         // count is consumed even though no argv payload follows.
-        inline void force_args_pretreatment(char8_t const* const*& argv_curr,
+        inline constexpr void force_args_pretreatment(char8_t const* const*& argv_curr,
                                             char8_t const* const* argv_end,
                                             ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr,
                                             ::std::size_t leading_args_before_count) noexcept
@@ -235,7 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             argv_curr = curr;
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             apply_mount_dir_to_override(override_state_t& target,
                                         ::uwvm2::utils::container::u8cstring_view wasi_dir,
                                         ::uwvm2::utils::container::u8cstring_view system_dir) noexcept
@@ -309,7 +309,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         template <typename Parameter, typename Callback>
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             apply_socket_callback_to_override(override_state_t& target,
                                               ::uwvm2::utils::container::u8cstring_view parameter_name,
                                               Parameter const& parameter,
@@ -371,7 +371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         template <typename Parameter, typename Callback>
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             apply_socket_callback_to_override(override_state_t& target,
                                               ::uwvm2::utils::container::u8cstring_view parameter_name,
                                               Parameter const& parameter,
@@ -431,7 +431,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 #  endif
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type parse_fd_limit(::uwvm2::utils::cmdline::parameter const& parameter,
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type parse_fd_limit(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                                            ::uwvm2::utils::container::u8string_view text,
                                                                                            override_state_t& target) noexcept
         {
@@ -460,7 +460,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
 
-        [[nodiscard]] inline bool trace_configuration_matches(override_state_t const& target,
+        [[nodiscard]] inline constexpr bool trace_configuration_matches(override_state_t const& target,
                                                               trace_output_target_t trace_target,
                                                               ::uwvm2::utils::container::u8string_view file_path) noexcept
         {
@@ -474,13 +474,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return true;
         }
 
-        [[nodiscard]] inline bool has_deleted_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
+        [[nodiscard]] inline constexpr bool has_deleted_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
         {
             return target.delete_system_environment.find(env_name) != target.delete_system_environment.cend();
         }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-        [[nodiscard]] inline bool has_duplicate_preopen_socket_fd(override_state_t const& target) noexcept
+        [[nodiscard]] inline constexpr bool has_duplicate_preopen_socket_fd(override_state_t const& target) noexcept
         {
             for(auto curr{target.preopen_sockets.cbegin()}; curr != target.preopen_sockets.cend(); ++curr)
             {
@@ -493,7 +493,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 #  endif
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             apply_module_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_action_end,
@@ -961,7 +961,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return print_usage_error(parameter, u8"Unknown module action.");
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             apply_module_action_sequence(::uwvm2::utils::cmdline::parameter const& parameter,
                                          ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
                                          ::uwvm2::utils::cmdline::parameter_parsing_results* action_arg,
@@ -1000,7 +1000,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::def;
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type apply_target_action(::uwvm2::utils::cmdline::parameter const& parameter,
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type apply_target_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
                                                                                                 override_state_t& target,

@@ -1,6 +1,6 @@
-// Constants and comparison opcode validation/emission cases for WebAssembly 1.0/MVP scalar values.
-// Future reference, SIMD, or other proposal value spaces must add their opcode decoding and stack tags explicitly instead
-// of assuming these MVP numeric cases cover the expanded type system.
+    // Constants and comparison opcode validation/emission cases for WebAssembly 1.0/MVP scalar values.
+    // Future reference, SIMD, or other proposal value spaces must add their opcode decoding and stack tags explicitly instead
+    // of assuming these MVP numeric cases cover the expanded type system.
 
 case wasm1_code::i32_const:
 {
@@ -54,7 +54,7 @@ case wasm1_code::i32_const:
         if(!try_emit_runtime_local_func_llvm_jit_constant(
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+               [&](::llvm::LLVMContext& llvm_context) noexcept -> ::llvm::Value*
                { return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt32Ty(llvm_context), static_cast<::std::int_least64_t>(imm)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -115,7 +115,7 @@ case wasm1_code::i64_const:
         if(!try_emit_runtime_local_func_llvm_jit_constant(
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
-               [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+               [&](::llvm::LLVMContext& llvm_context) noexcept -> ::llvm::Value*
                { return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt64Ty(llvm_context), static_cast<::std::int_least64_t>(imm)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -173,7 +173,7 @@ case wasm1_code::f32_const:
         llvm_jit_instruction_emitted_inline = true;
         if(!try_emit_runtime_local_func_llvm_jit_constant(llvm_jit_emit_state,
                                                           runtime_operand_stack_value_type::f32,
-                                                          [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+                                                          [&](::llvm::LLVMContext& llvm_context) noexcept -> ::llvm::Value*
                                                           { return get_llvm_f32_constant_from_bits(llvm_context, bits); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -231,7 +231,7 @@ case wasm1_code::f64_const:
         llvm_jit_instruction_emitted_inline = true;
         if(!try_emit_runtime_local_func_llvm_jit_constant(llvm_jit_emit_state,
                                                           runtime_operand_stack_value_type::f64,
-                                                          [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+                                                          [&](::llvm::LLVMContext& llvm_context) noexcept -> ::llvm::Value*
                                                           { return get_llvm_f64_constant_from_bits(llvm_context, bits); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -251,7 +251,7 @@ case wasm1_code::i32_eqz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
             [[unlikely]]
         {
@@ -272,7 +272,7 @@ case wasm1_code::i32_eq:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -292,7 +292,7 @@ case wasm1_code::i32_ne:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpNE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -312,7 +312,7 @@ case wasm1_code::i32_lt_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -332,7 +332,7 @@ case wasm1_code::i32_lt_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -352,7 +352,7 @@ case wasm1_code::i32_gt_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -372,7 +372,7 @@ case wasm1_code::i32_gt_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -392,7 +392,7 @@ case wasm1_code::i32_le_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -412,7 +412,7 @@ case wasm1_code::i32_le_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -432,7 +432,7 @@ case wasm1_code::i32_ge_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -452,7 +452,7 @@ case wasm1_code::i32_ge_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -472,7 +472,7 @@ case wasm1_code::i64_eqz:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
             [[unlikely]]
         {
@@ -493,7 +493,7 @@ case wasm1_code::i64_eq:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -513,7 +513,7 @@ case wasm1_code::i64_ne:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpNE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -533,7 +533,7 @@ case wasm1_code::i64_lt_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -553,7 +553,7 @@ case wasm1_code::i64_lt_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -573,7 +573,7 @@ case wasm1_code::i64_gt_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -593,7 +593,7 @@ case wasm1_code::i64_gt_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -613,7 +613,7 @@ case wasm1_code::i64_le_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -633,7 +633,7 @@ case wasm1_code::i64_le_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -653,7 +653,7 @@ case wasm1_code::i64_ge_s:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -673,7 +673,7 @@ case wasm1_code::i64_ge_u:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -693,7 +693,7 @@ case wasm1_code::f32_eq:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOEQ(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -713,7 +713,7 @@ case wasm1_code::f32_ne:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpUNE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -733,7 +733,7 @@ case wasm1_code::f32_lt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOLT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -753,7 +753,7 @@ case wasm1_code::f32_gt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -773,7 +773,7 @@ case wasm1_code::f32_le:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOLE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -793,7 +793,7 @@ case wasm1_code::f32_ge:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f32,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -813,7 +813,7 @@ case wasm1_code::f64_eq:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOEQ(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -833,7 +833,7 @@ case wasm1_code::f64_ne:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpUNE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -853,7 +853,7 @@ case wasm1_code::f64_lt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOLT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -873,7 +873,7 @@ case wasm1_code::f64_gt:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOGT(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -893,7 +893,7 @@ case wasm1_code::f64_le:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOLE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -913,7 +913,7 @@ case wasm1_code::f64_ge:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::f64,
                runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) noexcept
                { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateFCmpOGE(left.value, right.value)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();

@@ -317,7 +317,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         }
 
-        UWVM_GNU_COLD [[noreturn]] inline void memory_oob_terminate(::std::size_t memory_idx,
+        UWVM_GNU_COLD [[noreturn]] inline constexpr void memory_oob_terminate(::std::size_t memory_idx,
                                                                     ::std::uint_least64_t memory_static_offset,
                                                                     memory_offset_t effective_offset,
                                                                     ::std::size_t memory_length,
@@ -474,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline ::std::size_t load_memory_length_for_oob_unlocked(MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr ::std::size_t load_memory_length_for_oob_unlocked(MemoryT const& memory) noexcept
         {
             if constexpr(requires { memory.memory_length_p; })
             {
@@ -490,7 +490,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline auto lock_memory(MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr auto lock_memory(MemoryT const& memory) noexcept
         {
             // Only allocator-backed memories may relocate `memory_begin` during grow(), so only they need the memory_operation_guard.
             // mmap-backed memories keep a stable base address, so they are always lock-free on the hot path.
@@ -508,7 +508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // For multithread allocator-backed memories we still need to participate in the grow() relocation protocol, so provide explicit enter/exit helpers
         // (no RAII).
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline void enter_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void enter_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {
@@ -543,7 +543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline void exit_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void exit_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {

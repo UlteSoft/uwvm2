@@ -72,7 +72,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @note      On Darwin platforms, `fd_advise` is non-atomic due to platform limitations. In extreme cases, it may only reserve space in the operating
     ///            system without modifying file attributes, rendering the operation invisible. Within the scope of WASM, however, it is atomic.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_advise_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_advise_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,
@@ -710,7 +710,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_advise(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_advise(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,

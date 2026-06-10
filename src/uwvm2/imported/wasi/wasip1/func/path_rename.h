@@ -88,7 +88,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t path_rename(__wasi_fd_t old_fd, const char *old_path, size_t old_path_len, __wasi_fd_t new_fd, const char *new_path, size_t
     /// new_path_len);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t path_rename(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_rename(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t old_fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t old_path_ptrsz,

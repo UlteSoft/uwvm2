@@ -38,7 +38,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 {
-    [[noreturn]] inline void throw_wasm_parse_code([[maybe_unused]] ::fast_io::parse_code code) UWVM_THROWS
+    [[noreturn]] inline constexpr void throw_wasm_parse_code([[maybe_unused]] ::fast_io::parse_code code) UWVM_THROWS
     {
 #ifdef UWVM_TERMINATE_IMME_WHEN_PARSE
         ::fast_io::fast_terminate();

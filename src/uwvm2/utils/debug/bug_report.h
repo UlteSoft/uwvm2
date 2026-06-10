@@ -40,7 +40,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::utils::debug
 {
-    [[noreturn]] inline void trap_and_inform_bug_pos(::std::source_location loc = ::fast_io::mnp::cur_src_loc()) noexcept
+    [[noreturn]] inline constexpr void trap_and_inform_bug_pos(::std::source_location loc = ::fast_io::mnp::cur_src_loc()) noexcept
     {
 #ifdef UWVM
         ::fast_io::io::panic(::fast_io::u8err(),

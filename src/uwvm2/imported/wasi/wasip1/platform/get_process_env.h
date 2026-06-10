@@ -80,7 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::platform
         }
     };
 
-    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> get_process_env() noexcept
+    inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> get_process_env() noexcept
     {
         ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> result{};
 

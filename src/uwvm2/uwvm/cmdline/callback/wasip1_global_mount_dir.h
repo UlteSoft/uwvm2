@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         //
         // The normalized value is used both for storage (unless explicitly
         // disabled) and for component-aware duplicate/overlap checks.
-        [[nodiscard]] inline mount_path_normalization_result normalize_mount_path(::uwvm2::utils::container::u8string_view path) noexcept
+        [[nodiscard]] inline constexpr mount_path_normalization_result normalize_mount_path(::uwvm2::utils::container::u8string_view path) noexcept
         {
             mount_path_normalization_result result{};
             result.normalized.reserve(path.empty() ? 1uz : path.size());
@@ -175,7 +175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return (::uwvm2::utils::container::u8string_view{path.data(), prefix.size()} == prefix) && (path.index_unchecked(prefix.size()) == u8'/');
         }
 
-        UWVM_GNU_COLD inline ::uwvm2::utils::cmdline::parameter_return_type
+        UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             print_mount_path_normalization_error(::uwvm2::utils::container::u8string_view path) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

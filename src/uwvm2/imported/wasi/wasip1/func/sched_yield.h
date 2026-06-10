@@ -85,7 +85,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.sched_yield
     /// @details   __wasi_errno_t sched_yield(void);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield_impl(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield_impl(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env) noexcept
     {
         if(env.wasip1_sched_yield_func_ptr != nullptr) { return env.wasip1_sched_yield_func_ptr(); }
@@ -96,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};

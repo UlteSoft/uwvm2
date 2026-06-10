@@ -61,12 +61,12 @@ struct llvm_jit_module_storage_t
     ::llvm::DIFile* llvm_di_file{};
     ::llvm::DICompileUnit* llvm_di_compile_unit{};
 
-    llvm_jit_module_storage_t() = default;
-    llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) = delete;
-    llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t const&) = delete;
-    llvm_jit_module_storage_t(llvm_jit_module_storage_t&&) noexcept = default;
+    inline constexpr llvm_jit_module_storage_t() noexcept = default;
+    inline constexpr llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) noexcept = delete;
+    inline constexpr llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t const&) noexcept = delete;
+    inline constexpr llvm_jit_module_storage_t(llvm_jit_module_storage_t&&) noexcept = default;
 
-    llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t&& other) noexcept
+    inline constexpr llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t&& other) noexcept
     {
         if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
 
@@ -279,7 +279,7 @@ namespace details
 
     // Runtime module storage should already be finalized by the parser/initializer.  Violations here mean host/runtime
     // corruption, not guest validation failure, so the JIT fails fast instead of reporting a Wasm error.
-    [[noreturn]] inline void runtime_storage_bug() noexcept
+    [[noreturn]] inline constexpr void runtime_storage_bug() noexcept
     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -297,7 +297,7 @@ namespace details
     }
 
     // Count finalized function types from the runtime type-section pointer pair with defensive storage checks.
-    [[nodiscard]] inline ::std::size_t get_runtime_type_section_count(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
+    [[nodiscard]] inline constexpr ::std::size_t get_runtime_type_section_count(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
     {
         auto const type_begin{curr_module.type_section_storage.type_section_begin};
         auto const type_end{curr_module.type_section_storage.type_section_end};
@@ -323,7 +323,7 @@ namespace details
     }
 
     // Convert a finalized function-type pointer back into its type-section index.
-    [[nodiscard]] inline validation_module_traits_t::wasm_u32
+    [[nodiscard]] inline constexpr validation_module_traits_t::wasm_u32
         get_runtime_type_index(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr) noexcept
     {
@@ -445,7 +445,7 @@ namespace details
     }
 
     // Weight one local function for compile-task splitting.
-    [[nodiscard]] inline ::std::size_t
+    [[nodiscard]] inline constexpr ::std::size_t
         calculate_local_function_task_unit(::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t const& local_func,
                                            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_policy_t split_policy) noexcept
     {
@@ -459,9 +459,9 @@ namespace details
         return static_cast<::std::size_t>(code_end - code_begin);
     }
 
-    [[nodiscard]] inline ::uwvm2::utils::container::vector<local_function_task_group>
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<local_function_task_group>
         build_local_function_task_groups(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-                                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config split_config)
+                                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config split_config) noexcept
     {
         ::uwvm2::utils::container::vector<local_function_task_group> task_groups{};
 
@@ -506,7 +506,7 @@ namespace details
         return task_groups;
     }
 
-    [[nodiscard]] inline ::std::size_t calculate_total_local_function_task_weight(
+    [[nodiscard]] inline constexpr ::std::size_t calculate_total_local_function_task_weight(
         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_policy_t split_policy) noexcept
     {
@@ -523,7 +523,7 @@ namespace details
         return total_weight;
     }
 
-    [[nodiscard]] inline ::std::size_t
+    [[nodiscard]] inline constexpr ::std::size_t
         calculate_local_function_task_group_count(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                   ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config split_config) noexcept
     {
@@ -560,7 +560,7 @@ namespace details
         return task_group_count;
     }
 
-    [[nodiscard]] inline bool
+    [[nodiscard]] inline constexpr bool
         should_run_local_functions_serially(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                             ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config split_config,
                                             ::std::size_t extra_compile_threads) noexcept
@@ -581,7 +581,8 @@ namespace details
         return total_task_weight <= split_size;
     }
 
-    [[nodiscard]] inline validation_module_storage_t build_runtime_validation_module(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module)
+    [[nodiscard]] inline constexpr validation_module_storage_t build_runtime_validation_module(
+        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
     {
         validate_runtime_module_storage(curr_module);
 
@@ -899,7 +900,8 @@ namespace details
 
         if(local_virtual_registers.size() != static_cast<::std::size_t>(all_local_count)) [[unlikely]] { runtime_storage_bug(); }
 
-        auto const local_virtual_register_from_index{[&](validation_module_traits_t::wasm_u32 local_index) constexpr -> curr_local_virtual_register_t const&
+        auto const local_virtual_register_from_index{[&](validation_module_traits_t::wasm_u32 local_index) constexpr noexcept
+                                                         -> curr_local_virtual_register_t const&
                                                      {
                                                          auto const idx{static_cast<::std::size_t>(local_index)};
                                                          if(idx >= local_virtual_registers.size()) [[unlikely]] { runtime_storage_bug(); }
@@ -919,10 +921,10 @@ namespace details
                                              }};
 
         auto const operand_stack_push{
-            [&](curr_operand_stack_value_type type) constexpr
+            [&](curr_operand_stack_value_type type) constexpr noexcept
             { operand_stack.push_back(runtime_operand_stack_storage_t{.type = type, .virtual_register_id = allocate_virtual_register()}); }};
 
-        auto const operand_stack_pop_unchecked{[&]() constexpr -> runtime_operand_stack_storage_t
+        auto const operand_stack_pop_unchecked{[&]() constexpr noexcept -> runtime_operand_stack_storage_t
                                                {
                                                    if(operand_stack.empty()) [[unlikely]] { runtime_storage_bug(); }
                                                    auto const value{operand_stack.back()};
@@ -930,12 +932,12 @@ namespace details
                                                    return value;
                                                }};
 
-        auto const operand_stack_pop_n{[&](::std::size_t n) constexpr
+        auto const operand_stack_pop_n{[&](::std::size_t n) constexpr noexcept
                                        {
                                            while(n-- != 0uz && !operand_stack.empty()) { static_cast<void>(operand_stack_pop_unchecked()); }
                                        }};
 
-        auto const operand_stack_truncate_to{[&](::std::size_t new_size) constexpr
+        auto const operand_stack_truncate_to{[&](::std::size_t new_size) constexpr noexcept
                                              {
                                                  while(operand_stack.size() > new_size) { static_cast<void>(operand_stack_pop_unchecked()); }
                                              }};
@@ -972,14 +974,14 @@ namespace details
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }};
 
-        auto const try_pop_concrete_operand{[&]() constexpr -> concrete_operand_t
+        auto const try_pop_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                             {
                                                 if(concrete_operand_count() == 0uz) { return {}; }
                                                 auto const operand{operand_stack_pop_unchecked()};
                                                 return {.from_stack = true, .type = operand.type};
                                             }};
 
-        auto const try_peek_concrete_operand{[&]() constexpr -> concrete_operand_t
+        auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                              {
                                                  if(concrete_operand_count() == 0uz) { return {}; }
                                                  return {.from_stack = true, .type = operand_stack.back().type};
@@ -1370,7 +1372,7 @@ namespace details
     }
 
     // Compile/validate every local function in one half-open task group.
-    inline void compile_all_from_uwvm_local_func_group(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+    inline constexpr void compile_all_from_uwvm_local_func_group(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                        validation_module_storage_t const& validation_module,
                                                        [[maybe_unused]] compile_option const& options,
                                                        full_function_symbol_t& storage,
@@ -1400,7 +1402,7 @@ namespace details
 #ifdef UWVM_CPP_EXCEPTIONS
     // Publish the first parallel compilation failure using acquire/release synchronization so the scheduler thread sees a
     // fully written diagnostic or exception pointer.
-    inline void publish_parallel_compile_failure(parallel_compile_failure_state& failure_state,
+    inline constexpr void publish_parallel_compile_failure(parallel_compile_failure_state& failure_state,
                                                  ::uwvm2::validation::error::code_validation_error_impl const& local_err,
                                                  ::std::exception_ptr exception,
                                                  bool store_err) noexcept
@@ -1426,7 +1428,7 @@ namespace details
                                                          full_function_symbol_t& storage,
                                                          parallel_compile_failure_state& failure_state,
                                                          local_function_task_group task_group,
-                                                         llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr)
+                                                         llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr) noexcept
     {
 #ifdef UWVM_CPP_EXCEPTIONS
         if(failure_state.failed.load(::std::memory_order_acquire)) { co_return; }
@@ -1459,7 +1461,7 @@ namespace details
     inline ::uwvm2::utils::thread::scheduled_task
         make_llvm_jit_task_module_pre_link_callback_task(llvm_jit_module_storage_t& task_module_storage,
                                                          compile_option const& options,
-                                                         ::std::atomic_bool& failed)
+                                                         ::std::atomic_bool& failed) noexcept
     {
         if(failed.load(::std::memory_order_acquire)) { co_return; }
 
@@ -1474,10 +1476,10 @@ namespace details
         co_return;
     }
 
-    [[nodiscard]] inline bool run_llvm_jit_task_module_pre_link_callback(
+    [[nodiscard]] inline constexpr bool run_llvm_jit_task_module_pre_link_callback(
         ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages,
         compile_option const& options,
-        ::std::size_t effective_extra_compile_threads)
+        ::std::size_t effective_extra_compile_threads) noexcept
     {
         // No callback or no fragments means there is nothing to optimize before linking.
         if(options.llvm_jit_task_module_pre_link_callback == nullptr) { return true; }
@@ -1497,8 +1499,8 @@ namespace details
         return !failed.load(::std::memory_order_acquire);
     }
 
-    [[nodiscard]] inline bool link_llvm_jit_module_fragments(llvm_jit_module_storage_t& merged_module_storage,
-                                                             ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages)
+    [[nodiscard]] inline constexpr bool link_llvm_jit_module_fragments(llvm_jit_module_storage_t& merged_module_storage,
+                                                                       ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages) noexcept
     {
         if(merged_module_storage.llvm_context_holder == nullptr || merged_module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
@@ -1537,7 +1539,7 @@ namespace details
         return true;
     }
 
-    inline bool finalize_runtime_llvm_jit_module_storage(llvm_jit_module_storage_t& module_storage, bool verify_llvm_jit_ir) noexcept
+    inline constexpr bool finalize_runtime_llvm_jit_module_storage(llvm_jit_module_storage_t& module_storage, bool verify_llvm_jit_ir) noexcept
     {
         module_storage.emitted = module_storage.llvm_context_holder != nullptr && module_storage.llvm_module != nullptr;
         if(!module_storage.emitted) { return true; }
@@ -1577,7 +1579,7 @@ inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compil
 
 // Validate all code bodies in a parser-owned module and print a formatted diagnostic on the first failure.
 template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-inline bool validate_all_wasm_code_for_module(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+inline constexpr bool validate_all_wasm_code_for_module(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
                                               ::uwvm2::utils::container::u8cstring_view file_name,
                                               ::uwvm2::utils::container::u8string_view module_name) noexcept
 {
@@ -1815,7 +1817,7 @@ inline constexpr void validate_runtime_wasm_code_for_module(::uwvm2::uwvm::runti
 }
 
 // Optionally reduce extra worker count after task splitting so the pool is not larger than the useful task count.
-[[nodiscard]] inline ::std::size_t resolve_effective_adaptive_extra_compile_threads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+[[nodiscard]] inline constexpr ::std::size_t resolve_effective_adaptive_extra_compile_threads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                                                     compile_task_split_config split_config,
                                                                                     ::std::size_t extra_compile_threads_upper_bound,
                                                                                     ::std::size_t target_task_groups_per_adjusted_compile_thread,
@@ -1840,7 +1842,7 @@ inline constexpr void validate_runtime_wasm_code_for_module(::uwvm2::uwvm::runti
 
 // Validate and compile every local function in a runtime module, using serial or parallel LLVM emission depending on the
 // task split configuration and available worker count.
-inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+inline constexpr full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                     [[maybe_unused]] compile_option& options,
                                                     ::uwvm2::validation::error::code_validation_error_impl& err,
                                                     ::std::size_t extra_compile_threads,
@@ -1977,7 +1979,7 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
 }
 
 // Convenience path used when only the first local function should be compiled.
-inline full_function_symbol_t compile_all_from_uwvm_single_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+inline constexpr full_function_symbol_t compile_all_from_uwvm_single_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                                 [[maybe_unused]] compile_option& options,
                                                                 ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
 {

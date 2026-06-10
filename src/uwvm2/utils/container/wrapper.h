@@ -268,7 +268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
     using delete_owned_ptr = ::uwvm2::utils::container::basic_owned_ptr<T, ::uwvm2::utils::container::delete_owned_ptr_deleter<T>>;
 
     template <typename T, typename... Args>
-    [[nodiscard]] inline auto make_owned(Args && ... args) -> ::uwvm2::utils::container::owned_ptr<T>
+    [[nodiscard]] inline constexpr auto make_owned(Args && ... args) -> ::uwvm2::utils::container::owned_ptr<T>
     {
         auto ptr{::fast_io::native_typed_global_allocator<T>::allocate(1)};
         try
@@ -284,7 +284,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
     }
 
     template <typename T, typename... Args>
-    [[nodiscard]] inline auto make_delete_owned(Args && ... args) -> ::uwvm2::utils::container::delete_owned_ptr<T>
+    [[nodiscard]] inline constexpr auto make_delete_owned(Args && ... args) -> ::uwvm2::utils::container::delete_owned_ptr<T>
     { return ::uwvm2::utils::container::delete_owned_ptr<T>{new T(::std::forward<Args>(args)...)}; }
 
     /// @brief ordered

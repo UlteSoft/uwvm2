@@ -215,7 +215,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     ///                                              __wasi_event_t *out,
     ///                                              __wasi_size_t nsubscriptions,
     ///                                              __wasi_size_t *nevents);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t poll_oneoff_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t poll_oneoff_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t in,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t out,
