@@ -1051,9 +1051,9 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_check_requested() noexcept;
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
         [[nodiscard]] inline bool llvm_jit_win64_virtual_unwind_once(win64_context_t& context) noexcept;
-        inline void store_llvm_jit_win64_trap_caller_context(::std::uintptr_t expected_return_address,
-                                                             ::std::uintptr_t trap_frame_address,
-                                                             ::std::uintptr_t trap_stack_pointer) noexcept;
+        UWVM_NOINLINE inline void store_llvm_jit_win64_trap_caller_context(::std::uintptr_t expected_return_address,
+                                                                           ::std::uintptr_t trap_frame_address,
+                                                                           ::std::uintptr_t trap_stack_pointer) noexcept;
         [[nodiscard]] inline bool load_llvm_jit_win64_trap_caller_context(win64_context_t& context) noexcept;
 # endif
 
