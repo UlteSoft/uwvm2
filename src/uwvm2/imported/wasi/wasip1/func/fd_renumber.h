@@ -82,7 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t fd_renumber(__wasi_fd_t fd_from, __wasi_fd_t fd_to);
     /// @note      Renumber a file descriptor.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_renumber_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_renumber_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd_from,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd_to) noexcept
@@ -289,7 +289,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_renumber(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_renumber(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd_from,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd_to) noexcept

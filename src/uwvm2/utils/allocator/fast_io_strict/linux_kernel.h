@@ -9,7 +9,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
     class fast_io_strict_linux_kmalloc_allocator
     {
     public:
-        inline static void* allocate(::std::size_t n) noexcept
+        inline static constexpr void* allocate(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::fast_io::linux_kernel_kmalloc(n, linux_kernel_gfp_kernel);
@@ -17,7 +17,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void* reallocate(void* p, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate(void* p, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             p = ::fast_io::linux_kernel_krealloc(p, n, linux_kernel_gfp_kernel);
@@ -25,7 +25,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void* allocate_zero(::std::size_t n) noexcept
+        inline static constexpr void* allocate_zero(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::fast_io::linux_kernel_kmalloc(n, linux_kernel_gfp_kernel_zero);
@@ -33,7 +33,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void deallocate(void* p) noexcept
+        inline static constexpr void deallocate(void* p) noexcept
         {
             if(p == nullptr) [[unlikely]] { return; }
             ::fast_io::linux_kernel_kfree(p);

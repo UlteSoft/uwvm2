@@ -5521,7 +5521,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_stacktop_spill1_then_local_get_typed<Opt, SpilledT, LocalT, Pos, Type...>; }
             };
 
@@ -5530,7 +5530,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_stacktop_spill1_then_const_typed<Opt, SpilledT, ConstT, Pos, Type...>; }
             };
 
@@ -5540,7 +5540,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_stacktop_spill1_then_i32_add_2localget_typed<Opt, SpilledT, Pos, Type...>; }
             };
 
@@ -5549,7 +5549,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_stacktop_spill1_then_i64_add_2localget_typed<Opt, SpilledT, Pos, Type...>; }
             };
 #  endif
@@ -5558,7 +5558,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_add_then_fill1<Opt, Pos, Type...>; }
             };
 
@@ -5566,7 +5566,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_add_then_fill1<Opt, Pos, Type...>; }
             };
 
@@ -5574,7 +5574,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_add_then_fill1<Opt, Pos, Type...>; }
             };
 
@@ -5582,7 +5582,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_add_then_fill1<Opt, Pos, Type...>; }
             };
         }  // namespace details
@@ -7072,7 +7072,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
@@ -7081,7 +7081,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_stacktop_i32_drop<CompileOption, Curr, ParamCount, Type...>; }
         };
 
@@ -7090,7 +7090,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_stacktop_i32_local_set<CompileOption, Curr, ParamCount, Type...>; }
         };
 
@@ -7211,7 +7211,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_indirect_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
@@ -7220,7 +7220,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_indirect_stacktop_i32_drop<CompileOption, Curr, ParamCount, Type...>; }
         };
 
@@ -7229,7 +7229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_indirect_stacktop_i32_local_set<CompileOption, Curr, ParamCount, Type...>; }
         };
 
@@ -7331,7 +7331,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_stacktop_f32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
@@ -7375,7 +7375,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
             { return uwvmint_call_stacktop_f64<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 

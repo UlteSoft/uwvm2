@@ -49,7 +49,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::platform_page
         bool success;
     };
 
-    UWVM_GNU_PURE inline get_platform_page_size_result_t get_platform_page_size() noexcept
+    UWVM_GNU_PURE inline constexpr get_platform_page_size_result_t get_platform_page_size() noexcept
     {
 #if defined(_WIN32) || defined(__CYGWIN__)                                                          // Windows
 # if !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__) && defined(_WIN32_WINDOWS)  // WIN32

@@ -77,7 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         local_imported_module_init_error
     };
 
-    inline load_and_check_modules_rtl construct_all_module_and_check_duplicate_module() noexcept
+    inline constexpr load_and_check_modules_rtl construct_all_module_and_check_duplicate_module() noexcept
     {
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"construct all module and check duplicate module"};
@@ -908,7 +908,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         return {load_and_check_modules_rtl::ok, ::std::move(adjacency_list)};
     }
 
-    inline load_and_check_modules_rtl check_import_exist_and_detect_cycles() noexcept
+    inline constexpr load_and_check_modules_rtl check_import_exist_and_detect_cycles() noexcept
     {
         // Build dependency graph and detect cyclic dependencies
         // verbose

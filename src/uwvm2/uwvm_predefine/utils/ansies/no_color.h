@@ -74,7 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
     ///          Only the presence of `NO_COLOR` matters; its value is intentionally ignored.
     /// @return `true` when `NO_COLOR` is present, otherwise `false`.
     /// @see put_color
-    inline bool check_has_no_color() noexcept
+    inline constexpr bool check_has_no_color() noexcept
     {
 # if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
 #  ifndef _WIN32_WINDOWS

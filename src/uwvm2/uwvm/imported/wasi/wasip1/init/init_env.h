@@ -86,7 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }  // namespace posix
 #  endif
 
-    inline void uwvm_wasip1_proc_exit_func_ptr_overload(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 code) noexcept
+    inline constexpr void uwvm_wasip1_proc_exit_func_ptr_overload(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 code) noexcept
     {
         using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
         constexpr wasm_u32 wasi_proc_exit_code_upper_bound{126u};
@@ -879,7 +879,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         return true;
     }
 
-    inline bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t & state) noexcept
+    inline constexpr bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t & state) noexcept
     {
         using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
         using u8string = ::uwvm2::utils::container::u8string;

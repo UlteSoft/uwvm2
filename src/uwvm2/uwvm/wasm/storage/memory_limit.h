@@ -53,7 +53,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
     inline configured_module_memory_limit_map_t configured_module_memory_limit{};  // [global]
 
-    [[nodiscard]] inline configured_module_memory_limit_t* find_configured_module_memory_limit(::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline constexpr configured_module_memory_limit_t* find_configured_module_memory_limit(::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto it{configured_module_memory_limit.find(module_name)}; it != configured_module_memory_limit.end()) [[likely]]
         {
@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline configured_module_memory_limit_t const* find_configured_module_memory_limit_const(
+    [[nodiscard]] inline constexpr configured_module_memory_limit_t const* find_configured_module_memory_limit_const(
         ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto const it{configured_module_memory_limit.find(module_name)}; it != configured_module_memory_limit.cend()) [[likely]]
@@ -72,14 +72,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline configured_module_memory_limit_t& upsert_configured_module_memory_limit(::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline constexpr configured_module_memory_limit_t& upsert_configured_module_memory_limit(::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         auto const [it, inserted]{configured_module_memory_limit.try_emplace(::uwvm2::utils::container::u8string{module_name})};
         static_cast<void>(inserted);
         return it->second;
     }
 
-    [[nodiscard]] inline ::uwvm2::uwvm::wasm::type::module_memory_limit_t const* find_configured_local_defined_memory_limit(
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::module_memory_limit_t const* find_configured_local_defined_memory_limit(
         configured_module_memory_limit_t const& config,
         ::std::size_t local_memory_index) noexcept
     {

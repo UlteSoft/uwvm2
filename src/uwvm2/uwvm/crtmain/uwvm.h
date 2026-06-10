@@ -56,7 +56,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
     /// @param      argc Argument Count
     /// @param      argv Argument Vector
     /// @return     exit value
-    inline int uwvm_uz_u8main(::std::size_t argc, char8_t const* const* argv) noexcept
+    inline constexpr int uwvm_uz_u8main(::std::size_t argc, char8_t const* const* argv) noexcept
     {
         switch(::uwvm2::uwvm::cmdline::parsing(argc, argv))
         {
@@ -98,7 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
     /// @param      argv Argument Vector
     /// @return     exit value
     /// @see        main()
-    inline int uwvm_main_non_winnt(int argc, char** argv) noexcept
+    inline constexpr int uwvm_main_non_winnt(int argc, char** argv) noexcept
     {
         // Automatically get the correct timezone data
         ::uwvm2::uwvm::global::tz_set_s tz_set_ele{};
@@ -174,7 +174,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
     /// @param      argv Argument Vector
     /// @return     exit value
     /// @see        main()
-    inline int uwvm_main_winnt() noexcept
+    inline constexpr int uwvm_main_winnt() noexcept
     {
         // program manipulation
         // Generate guard to protect global pod pointer

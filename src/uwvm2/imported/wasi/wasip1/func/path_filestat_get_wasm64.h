@@ -91,7 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t __wasi_path_filestat_get(__wasi_fd_t fd, __wasi_lookupflags_t flags, const char *path, size_t path_len, __wasi_filestat_t
     /// *buf);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t path_filestat_get_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t path_filestat_get_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t flags,

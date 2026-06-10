@@ -531,7 +531,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
 
         static_assert(::std::is_same_v<::std::remove_cvref_t<FeatureType>, FeatureType>,
                       "code_version_reserve_type_t: typename 'FeatureType' cannot have refer and const attributes");
-        explicit constexpr code_version_reserve_type_t() noexcept = default;
+        inline explicit constexpr code_version_reserve_type_t() noexcept = default;
     };
 
     template <typename FeatureType>

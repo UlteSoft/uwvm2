@@ -99,7 +99,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     /// @brief     WasiPreview1.fd_prestat_get
     /// @details   __wasi_errno_t __wasi_fd_prestat_get(__wasi_fd_t fd, __wasi_prestat_t *buf);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_prestat_get(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_prestat_get(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t buf_ptrsz) noexcept

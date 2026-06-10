@@ -74,7 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::intrinsics::universal
         requires ((0 <= static_cast<int>(curr_prefetch_mode) && static_cast<int>(curr_prefetch_mode) < 3) &&
                   (0 <= static_cast<int>(prefetch_level) && static_cast<int>(prefetch_level) < 4) &&
                   (0 <= static_cast<int>(retention_policy) && static_cast<int>(retention_policy) < 2))
-    UWVM_GNU_ALWAYS_INLINE_ARTIFICIAL UWVM_GNU_NODEBUG UWVM_NO_SANITIZE inline void prefetch(void const* address) noexcept
+    UWVM_GNU_ALWAYS_INLINE_ARTIFICIAL UWVM_GNU_NODEBUG UWVM_NO_SANITIZE inline constexpr void prefetch(void const* address) noexcept
     {
         if constexpr(curr_prefetch_mode == pfc_mode::instruction)
         {

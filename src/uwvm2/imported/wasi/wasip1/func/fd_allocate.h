@@ -98,7 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @note      On Darwin and Windows platforms, `fd_allocate` is not fully atomic. If allocation succeeds but subsequent file size adjustments fail, the
     ///            allocated space cannot be automatically rolled back. This is a platform limitation, not a code defect.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_allocate_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_allocate_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,
@@ -804,7 +804,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_allocate(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_allocate(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,

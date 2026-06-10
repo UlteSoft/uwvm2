@@ -77,7 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @note      The WASI specification does not require implementation-side isolation of environ/environ_buf memory order; the caller must ensure they do
     ///            not overlap. Memory write visibility is guaranteed by function call synchronization boundaries.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t environ_get_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t environ_get_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t environ_ptrsz,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t environ_buf_ptrsz) noexcept

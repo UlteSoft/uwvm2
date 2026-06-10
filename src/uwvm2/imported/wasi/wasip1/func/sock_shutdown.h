@@ -94,7 +94,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_shutdown_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_shutdown_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::sdflags_t how) noexcept
@@ -367,7 +367,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_shutdown(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_shutdown(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::sdflags_t how) noexcept

@@ -52,7 +52,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
     {
         inline static constexpr ::std::uint_least32_t utf8_coding{65001u /*Unicode (UTF-8)*/};
 
-        UWVM_GNU_COLD inline set_win32_console_io_cp_to_utf8() noexcept
+        UWVM_GNU_COLD inline constexpr set_win32_console_io_cp_to_utf8() noexcept
         {
             if(!::fast_io::win32::SetConsoleOutputCP(utf8_coding)) [[unlikely]]
             {

@@ -51,13 +51,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
     {
         inline static constexpr ::std::uint_least32_t enable_virtual_terminal_processing{0x0004u /*ENABLE_VIRTUAL_TERMINAL_PROCESSING*/};
 
-        UWVM_GNU_COLD inline enable_win32_ansi() noexcept
+        UWVM_GNU_COLD inline constexpr enable_win32_ansi() noexcept
         {
             set_out();
             set_err();
         }
 
-        inline void set_out() noexcept
+        inline constexpr void set_out() noexcept
         {
             ::std::uint_least32_t out_omode;  // No initialization required
 
@@ -138,7 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
             }
         }
 
-        inline void set_err() noexcept
+        inline constexpr void set_err() noexcept
         {
             ::std::uint_least32_t err_omode;  // No initialization required
 

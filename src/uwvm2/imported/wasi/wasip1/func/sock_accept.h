@@ -170,7 +170,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                is_default_wasi_addr_data_layout();
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_accept(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_accept(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t fd_flags,

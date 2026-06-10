@@ -128,7 +128,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
 
     inline constexpr void output_memory_error_line(memory_error_t const& memerr) noexcept { output_memory_error(memerr, false); }
 
-    UWVM_GNU_COLD [[noreturn]] inline void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
+    UWVM_GNU_COLD [[noreturn]] inline constexpr void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
     {
         output_memory_error(memerr);
         ::fast_io::fast_terminate();
@@ -185,7 +185,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
 
     inline constexpr void output_mmap_memory_error_line(mmap_memory_error_t const& memerr) noexcept { output_mmap_memory_error(memerr, false); }
 
-    [[noreturn]] inline void output_mmap_memory_error_and_terminate(mmap_memory_error_t const& memerr) noexcept
+    [[noreturn]] inline constexpr void output_mmap_memory_error_and_terminate(mmap_memory_error_t const& memerr) noexcept
     {
         output_mmap_memory_error(memerr);
         ::fast_io::fast_terminate();

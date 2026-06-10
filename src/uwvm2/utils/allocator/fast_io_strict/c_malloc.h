@@ -13,14 +13,14 @@ namespace uwvm2::utils::allocator::fast_io_strict
     class fast_io_strict_c_malloc_allocator
     {
     public:
-        inline static void* allocate(::std::size_t n) noexcept
+        inline static constexpr void* allocate(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::std::malloc(n);
             return p;
         }
 
-        inline static void* reallocate(void* p, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate(void* p, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             ::std::size_t const to_allocate{n};
@@ -28,28 +28,28 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void* allocate_zero(::std::size_t n) noexcept
+        inline static constexpr void* allocate_zero(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::std::calloc(1, n);
             return p;
         }
 #if (__has_include(<malloc.h>) || __has_include(<malloc_np.h>)) && !defined(__MSDOS__) && !defined(__LLVM_LIBC__)
-        inline static ::fast_io::allocation_least_result allocate_at_least(::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result allocate_at_least(::std::size_t n) noexcept
         {
             auto p{allocate(n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {p, ::fast_io::details::c_malloc_usable_size_impl(p)};
         }
 
-        inline static ::fast_io::allocation_least_result allocate_zero_at_least(::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result allocate_zero_at_least(::std::size_t n) noexcept
         {
             auto p{allocate_zero(n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {p, ::fast_io::details::c_malloc_usable_size_impl(p)};
         }
 
-        inline static ::fast_io::allocation_least_result reallocate_at_least(void* oldp, ::std::size_t n) noexcept
+        inline static constexpr ::fast_io::allocation_least_result reallocate_at_least(void* oldp, ::std::size_t n) noexcept
         {
             auto p{reallocate(oldp, n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
@@ -59,7 +59,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
 #if defined(_WIN32) && !defined(__WINE__) && !defined(__CYGWIN__)
 
-        inline static void* allocate_aligned(::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* allocate_aligned(::std::size_t alignment, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p;
@@ -71,7 +71,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void* reallocate_aligned(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
+        inline static constexpr void* reallocate_aligned(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             if(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__) { p = ::std::realloc(p, n); }
@@ -82,7 +82,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static void deallocate_aligned(void* p, ::std::size_t alignment) noexcept
+        inline static constexpr void deallocate_aligned(void* p, ::std::size_t alignment) noexcept
         {
             if(p == nullptr) { return; }
             if(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__) { ::std::free(p); }
@@ -92,7 +92,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 #endif
-        inline static void deallocate(void* p) noexcept
+        inline static constexpr void deallocate(void* p) noexcept
         {
             if(p == nullptr) { return; }
 

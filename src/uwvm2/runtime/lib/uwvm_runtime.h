@@ -92,10 +92,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                  ::std::size_t param_bytes) noexcept;
 #endif
 
-    ::std::size_t preload_memory_descriptor_count_host_api() noexcept;
-    bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t* out) noexcept;
-    bool preload_memory_read_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept;
-    bool preload_memory_write_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept;
+    extern "C++" ::std::size_t preload_memory_descriptor_count_host_api() noexcept;
+    extern "C++" bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index,
+                                                            ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t* out) noexcept;
+    extern "C++" bool preload_memory_read_host_api(::std::size_t memory_index,
+                                                   ::std::uint_least64_t offset,
+                                                   void* destination,
+                                                   ::std::size_t size) noexcept;
+    extern "C++" bool preload_memory_write_host_api(::std::size_t memory_index,
+                                                    ::std::uint_least64_t offset,
+                                                    void const* source,
+                                                    ::std::size_t size) noexcept;
 }  // namespace uwvm2::runtime::lib
 
 #ifndef UWVM_MODULE

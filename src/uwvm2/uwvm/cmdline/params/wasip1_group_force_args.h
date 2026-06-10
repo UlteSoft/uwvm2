@@ -51,7 +51,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
-        inline
+        inline constexpr
 #  endif
             void wasip1_group_force_args_pretreatment(char8_t const* const*&,
                                                       char8_t const* const*,

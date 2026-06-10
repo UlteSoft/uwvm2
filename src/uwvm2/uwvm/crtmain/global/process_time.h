@@ -43,7 +43,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
     inline bool wasm_start_time_available{};
     inline bool wasm_end_time_available{};
 
-    [[nodiscard]] UWVM_GNU_COLD inline bool try_get_monotonic_raw_time(::fast_io::unix_timestamp& timestamp) noexcept
+    [[nodiscard]] UWVM_GNU_COLD inline constexpr bool try_get_monotonic_raw_time(::fast_io::unix_timestamp& timestamp) noexcept
     {
 #ifdef UWVM_CPP_EXCEPTIONS
         try
@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
 #endif
     }
 
-    UWVM_GNU_COLD inline void record_total_wasm_time_start() noexcept
+    UWVM_GNU_COLD inline constexpr void record_total_wasm_time_start() noexcept
     {
         if(wasm_start_time_available) [[unlikely]] { return; }
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -84,20 +84,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
         wasm_end_time_available = false;
     }
 
-    UWVM_GNU_COLD inline void record_total_wasm_time_end() noexcept
+    UWVM_GNU_COLD inline constexpr void record_total_wasm_time_end() noexcept
     {
         if(!wasm_start_time_available) [[unlikely]] { return; }
         wasm_end_time_available = try_get_monotonic_raw_time(wasm_end_time);
     }
 
-    UWVM_GNU_COLD inline void discard_total_wasm_time_record() noexcept
+    UWVM_GNU_COLD inline constexpr void discard_total_wasm_time_record() noexcept
     {
         wasm_start_time_available = false;
         wasm_end_time_available = false;
     }
 
     template <typename Label>
-    UWVM_GNU_COLD inline void print_verbose_total_time(Label && label, ::fast_io::unix_timestamp duration) noexcept
+    UWVM_GNU_COLD inline constexpr void print_verbose_total_time(Label && label, ::fast_io::unix_timestamp duration) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -126,7 +126,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
         ::fast_io::unix_timestamp start_time{};
         bool start_time_available{};
 
-        UWVM_GNU_COLD inline process_time() noexcept
+        UWVM_GNU_COLD inline constexpr process_time() noexcept
         {
             start_time_available = try_get_monotonic_raw_time(start_time);
         }
@@ -136,7 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
         inline constexpr process_time& operator= (process_time const&) noexcept = delete;
         inline constexpr process_time& operator= (process_time&&) noexcept = delete;
 
-        UWVM_GNU_COLD inline ~process_time()
+        UWVM_GNU_COLD inline constexpr ~process_time()
         {
             if(!start_time_available) [[unlikely]] { return; }
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]

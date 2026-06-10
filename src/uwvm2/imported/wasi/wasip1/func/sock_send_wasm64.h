@@ -93,7 +93,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t sock_send_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t sock_send_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t si_data_ptrsz,

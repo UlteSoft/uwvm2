@@ -107,7 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @warning This function does not return on failure.  It emits a fatal diagnostic and terminates when no
      *          valid default entry function can be found.
      */
-    inline ::std::size_t resolve_default_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
+    inline constexpr ::std::size_t resolve_default_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
         using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
@@ -121,7 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // Default-entry resolution runs after runtime initialization, which has already rejected import-alias cycles.
         // Use the initialized runtime storage size as the walk bound so deeply re-exported but valid entry functions are
         // still discoverable while corrupted alias chains cannot loop forever.
-        auto const import_link_walk_bound{[]() noexcept -> ::std::size_t
+        auto const import_link_walk_bound{[]() constexpr noexcept -> ::std::size_t
                                           {
                                               ::std::size_t bound{};
                                               for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
@@ -136,7 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                               return bound;
                                           }()};
 
-        auto const resolve_import_leaf{[import_link_walk_bound](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
+        auto const resolve_import_leaf{[import_link_walk_bound](imported_function_storage_t const* imp) constexpr noexcept -> imported_function_storage_t const*
                                        {
                                            for(::std::size_t steps{};; ++steps)
                                            {
@@ -150,7 +150,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         // Validate an import-inclusive function index against runtime type storage.  For imported functions, inspect
         // the resolved wasm-defined leaf because the import entry itself may only be a forwarding slot.
-        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
+        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) constexpr noexcept -> bool
                                                    {
                                                        auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
                                                        if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
@@ -225,7 +225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
         if(mit != ::uwvm2::uwvm::wasm::storage::all_module_export.end())
         {
-            auto const try_export{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+            auto const try_export{[&](::uwvm2::utils::container::u8string_view export_name) constexpr noexcept -> bool
                                   {
                                       auto const eit{mit->second.find(export_name)};
                                       if(eit == mit->second.end()) { return false; }
@@ -275,7 +275,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     auto const& exportsec{get_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
                     if(exportsec.sec_span.sec_begin != nullptr)
                     {
-                        auto const try_export_from_section{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+                        auto const try_export_from_section{[&](::uwvm2::utils::container::u8string_view export_name) constexpr noexcept -> bool
                                                            {
                                                                for(auto const& e: exportsec.exports)
                                                                {
@@ -455,7 +455,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          not continue after an invalid user-specified entry function or entry argument.
      */
     template <typename... Args>
-    [[noreturn]] inline void wasm_set_start_func_fatal(Args && ... args) noexcept
+    [[noreturn]] inline constexpr void wasm_set_start_func_fatal(Args && ... args) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -500,7 +500,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          hexfloat path is always attempted.  In every case, partial consumption is rejected.
      */
     template <typename T>
-    [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
 
@@ -528,7 +528,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          `i32` also fits `i64`, so it is reported as `i32/i64 literal`; similarly, many `f32` literals can be
      *          represented as `f64`.
      */
-    [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(::uwvm2::utils::container::u8string_view str) noexcept
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(::uwvm2::utils::container::u8string_view str) noexcept
     {
         // These are parser sinks used only to classify the token; the parsed values are never read.
 
@@ -552,7 +552,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @details Used in diagnostics where a full function signature is more helpful than only a raw arity count.
      */
     template <typename Output, typename ValueTypePtr>
-    inline void print_wasm_entry_type_span(Output & output, ValueTypePtr begin, ValueTypePtr end) noexcept
+    inline constexpr void print_wasm_entry_type_span(Output & output, ValueTypePtr begin, ValueTypePtr end) noexcept
     {
         ::fast_io::io::perr(output, u8"(");
         bool first{true};
@@ -574,7 +574,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          the caller's stream reference rather than reacquiring the global logger.
      */
     template <typename Output>
-    inline void print_wasm_entry_info_prefix(Output & output) noexcept
+    inline constexpr void print_wasm_entry_info_prefix(Output & output) noexcept
     {
         ::fast_io::io::perr(output,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -591,7 +591,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          other verbose/runtime output.
      */
     template <typename FunctionType, typename Tokens>
-    [[noreturn]] inline void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
+    [[noreturn]] inline constexpr void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
                                                                       FunctionType const& ft,
                                                                       Tokens const& argument_tokens) noexcept
     {
@@ -658,7 +658,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          plus byte length.  Bounds failures indicate an internal size-calculation bug and terminate immediately.
      */
     template <typename T>
-    inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
+    inline constexpr void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> & buffer, ::std::size_t& offset, T const& value) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
         if(offset > buffer.size() || sizeof(T) > buffer.size() - offset) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -672,7 +672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          It uses `memcpy` so the diagnostic path does not impose alignment requirements on the packed ABI buffer.
      */
     template <typename T>
-    [[nodiscard]] inline T read_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> const& buffer, ::std::size_t& offset) noexcept
+    [[nodiscard]] inline constexpr T read_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> const& buffer, ::std::size_t& offset) noexcept
     {
         static_assert(::std::is_trivially_copyable_v<T>);
         if(offset > buffer.size() || sizeof(T) > buffer.size() - offset) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -694,7 +694,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @param   type_code Expected wasm value-type code.
      * @param   arg_index Zero-based argument index used in diagnostics.
      */
-    inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte> & buffer,
+    inline constexpr void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte> & buffer,
                                          ::std::size_t& offset,
                                          ::uwvm2::utils::container::u8string_view arg,
                                          ::std::uint_least8_t type_code,
@@ -759,7 +759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          is not the most useful representation.
      */
     template <typename Output, typename Signed, typename Unsigned>
-    inline void print_wasm_entry_integer_formats(Output & output, Signed value) noexcept
+    inline constexpr void print_wasm_entry_integer_formats(Output & output, Signed value) noexcept
     {
         static_assert(sizeof(Signed) == sizeof(Unsigned));
         auto const bits{::std::bit_cast<Unsigned>(value)};
@@ -793,7 +793,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          numeric and raw-bit forms.
      */
     template <typename Output>
-    inline void print_wasm_entry_argument_verbose(Output & output,
+    inline constexpr void print_wasm_entry_argument_verbose(Output & output,
                                                   ::uwvm2::utils::container::vector<::std::byte> const& buffer,
                                                   ::std::size_t& offset,
                                                   ::uwvm2::utils::container::u8string_view arg,
@@ -891,7 +891,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          The multi-line record is emitted under one logger lock to preserve readability in verbose concurrent runs.
      */
     template <typename FunctionType, typename Tokens>
-    inline void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
+    inline constexpr void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
                                                   ::std::size_t function_index,
                                                   ::std::size_t import_count,
                                                   FunctionType const& ft,
@@ -1001,7 +1001,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @return  Required packed ABI byte length.
      */
     template <typename ValueTypePtr>
-    [[nodiscard]] inline ::std::size_t calculate_wasm_entry_abi_bytes(ValueTypePtr begin, ValueTypePtr end, bool is_result) noexcept
+    [[nodiscard]] inline constexpr ::std::size_t calculate_wasm_entry_abi_bytes(ValueTypePtr begin, ValueTypePtr end, bool is_result) noexcept
     {
         ::std::size_t total{};
         for(auto curr{begin}; curr != end; ++curr)
@@ -1029,7 +1029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          `entry` alive until the runtime function returns.  Empty parameter/result vectors are represented as null
      *          pointers with zero byte counts to avoid exposing implementation-specific empty-vector data pointers.
      */
-    inline void configure_runtime_entry_buffers(auto& cfg, runtime_entry_invocation& entry) noexcept
+    inline constexpr void configure_runtime_entry_buffers(auto& cfg, runtime_entry_invocation& entry) noexcept
     {
         cfg.entry_function_index = entry.function_index;
         cfg.entry_abi_buffers.param_buffer = entry.param_buffer.empty() ? nullptr : entry.param_buffer.data();
@@ -1051,7 +1051,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @warning Invalid user input is diagnosed and terminates the process; internal storage inconsistencies terminate
      *          directly because they indicate earlier loader/runtime initialization bugs.
      */
-    inline runtime_entry_invocation resolve_runtime_entry_invocation(::uwvm2::utils::container::u8string_view main_module_name) noexcept
+    inline constexpr runtime_entry_invocation resolve_runtime_entry_invocation(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         runtime_entry_invocation entry{};
         auto const& requested{::uwvm2::uwvm::wasm::storage::start_func_call};
@@ -1175,7 +1175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @warning Some invalid numeric settings are fatal.  Warnings can also be promoted to fatal errors by the global
      *          runtime warning policy.
      */
-    inline ::std::size_t resolve_runtime_compile_threads() noexcept
+    inline constexpr ::std::size_t resolve_runtime_compile_threads() noexcept
     {
         using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
         using runtime_compile_threads_unsigned_type = ::std::make_unsigned_t<runtime_compile_threads_type>;
@@ -1498,7 +1498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return lhs + rhs;
     }
 
-    [[nodiscard]] inline ::std::size_t loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf) noexcept
+    [[nodiscard]] inline constexpr ::std::size_t loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf) noexcept
     {
         // Use the parser's module span instead of re-statting paths.  At this point all executable/preload Wasm files have
         // already been loaded, and the span describes the exact byte range that participated in parsing.
@@ -1519,7 +1519,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
     }
 
-    inline void resolve_runtime_int_auto_mode() noexcept
+    inline constexpr void resolve_runtime_int_auto_mode() noexcept
     {
         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile)
         {
@@ -1627,7 +1627,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @return  Process-style integer return code from `uwvm2::uwvm::run::retval`.
      * @warning Fatal configuration/runtime invariants can terminate the process through `fast_io::fast_terminate`.
      */
-    inline int run() noexcept
+    inline constexpr int run() noexcept
     {
         // Preloaded wasm modules and dynamic-link bindings are prepared before this function is entered.  This driver
         // consumes the resulting global command-line/storage state and performs the final ordered load/execute sequence.

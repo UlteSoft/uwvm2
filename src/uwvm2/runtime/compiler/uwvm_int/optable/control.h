@@ -99,7 +99,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             poll_runtime
         };
 
-        UWVM_ALWAYS_INLINE [[nodiscard]] inline tiered_loop_osr_fast_poll_state tiered_loop_osr_check_fast_state(::std::uintptr_t state_address,
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr tiered_loop_osr_fast_poll_state tiered_loop_osr_check_fast_state(::std::uintptr_t state_address,
                                                                                                                  ::std::byte const* state_address_ip) noexcept
         {
             if(state_address == 0u) { return tiered_loop_osr_fast_poll_state::countdown; }

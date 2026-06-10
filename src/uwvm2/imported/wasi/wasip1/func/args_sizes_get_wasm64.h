@@ -64,7 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     ///            In multithreaded environments, synchronization must be handled by the application (typically not called in multithreaded scenarios).
     ///            If buffer conflicts occur → results are undefined, constituting a caller bug.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t args_sizes_get_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t args_sizes_get_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t argc_ptrsz,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t argv_buf_size_ptrsz) noexcept

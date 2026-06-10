@@ -1655,7 +1655,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte* const mem_base{mem.memory_begin};
         if(mem_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto const store_word{[&](::std::uint_least64_t off, ::std::uint32_t v) noexcept
+        auto const store_word{[&](::std::uint_least64_t off, ::std::uint32_t v) constexpr noexcept
                               { details::store_u32_le(details::ptr_add_u64(mem_base, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
 
         // Store the same 16-word output slice as the Wasm: offsets 0..60.
