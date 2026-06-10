@@ -273,16 +273,16 @@ Enables a libFuzzer-oriented test mode (currently intended for LLVM environments
 
 ### `--enable-test-backend-fuzzer=[y|n]`
 
-Registers the shell-driven backend differential fuzzer target in `test/0016.backend_fuzzer`.
+Registers the shell-driven backend differential fuzzer target in `test/0015.backend_fuzzer`.
 
 - **Default:** `n`
 - **Prerequisite:** `--execution-int=uwvm-int/default` and `--execution-jit=llvm/default`.
-- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full runtime outcomes. It does not run tiered mode. The compile-time combine/delay-local matrix is available as `test/0016.backend_fuzzer/run_backend_fuzzer_matrix.sh` because it intentionally reconfigures Xmake with nested `xmake f`/`xmake b`.
+- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases plus fixed tiered strategy cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full and tiered runtime outcomes. The compile-time combine/delay-local matrix is available as `test/0015.backend_fuzzer/run_backend_fuzzer_matrix.sh`.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y`
   - `xmake f -m debug --use-llvm-compiler=y --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined`
   - `xmake test -g backend_fuzzer`
-  - `test/0016.backend_fuzzer/run_backend_fuzzer_matrix.sh`
+  - `test/0015.backend_fuzzer/run_backend_fuzzer_matrix.sh`
 
 ### `--debug-timer=[y|n]`
 

@@ -486,6 +486,9 @@ namespace
 
     int run_ring_matrix(::std::size_t case_index)
     {
+        auto const& c{fuzzer::k_cases[case_index]};
+        if(c.requires_runtime_calls) { return 0; }
+
         configure_quiet_runtime();
         install_manual_traps();
 

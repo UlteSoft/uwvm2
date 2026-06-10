@@ -18,6 +18,19 @@ they compute expected values and execute `unreachable` on mismatch. Trap cases
 are also useful, because `unreachable`, divide-by-zero, and OOB memory accesses
 are observable backend behavior.
 
+In addition to random arithmetic/memory cases, the generator emits fixed
+strategy cases by default:
+
+- `tiered_hot_direct_call`: repeatedly calls a tiny local helper enough times to
+  force tiered entry-hot replacement, then keeps executing through the
+  interpreter-to-JIT call edge.
+- `tiered_osr_loop`: emits a large-enough loop body to exercise tiered loop OSR
+  polling and reentry generation.
+
+The low-level `uwvm-int-ring-matrix` runner only exercises single-function
+translator ABI shapes, so cases that require runtime call bridges are marked
+and skipped there while still running in lazy/full JIT and tiered modes.
+
 Default compared modes:
 
 - `uwvm-int-ring-matrix`
@@ -85,6 +98,7 @@ Useful environment variables:
 - `UWVM_BACKEND_FUZZ_SEED`: deterministic seed. If unset, a random seed is
   generated and printed; generated corpora also write it to `cases/seed.txt`.
 - `UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0`: skip fixed trap cases.
+- `UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY=0`: skip fixed tiered strategy cases.
 - `UWVM_BACKEND_FUZZER_MODES`: space- or comma-separated mode list.
 - `UWVM_BACKEND_FUZZER_WABT_ROOT`: WABT checkout/build root.
 - `UWVM_BACKEND_FUZZER_WORK_DIR`: corpus, runner, and log output root.
@@ -102,6 +116,9 @@ Useful environment variables:
   libFuzzer target. Defaults to all backend modes.
 - `UWVM_BACKEND_LIBFUZZER_TRACE=1`: print input size and backend mode before
   each execution. This is useful when reducing a crash.
+- `UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR=1`: add a long self-checking loop to
+  each generated libFuzzer module so tiered OSR polling/reentry paths are hit
+  more aggressively.
 - `UWVM_BACKEND_LIBFUZZER_SANITIZERS`: default `fuzzer,address,undefined`.
 - `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
   also honored.

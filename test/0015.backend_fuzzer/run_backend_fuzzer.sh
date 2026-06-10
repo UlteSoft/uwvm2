@@ -13,6 +13,7 @@ DELAY="${UWVM_BACKEND_FUZZER_DELAY:-none}"
 MEMORY_MODEL="${UWVM_BACKEND_FUZZER_MEMORY_MODEL:-default}"
 USE_THREAD_LOCAL="${UWVM_BACKEND_FUZZER_USE_THREAD_LOCAL:-0}"
 INCLUDE_TRAPS="${UWVM_BACKEND_FUZZER_INCLUDE_TRAPS:-1}"
+INCLUDE_STRATEGY="${UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY:-1}"
 KEEP_WORK=0
 BUILD_DEFINES=()
 BUILD_CXXFLAGS=()
@@ -63,6 +64,7 @@ Options:
 Environment:
   UWVM_BACKEND_FUZZER_MODES="mode1 mode2"
   UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0|1
+  UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY=0|1
   UWVM_BACKEND_FUZZER_MEMORY_MODEL=default|mmap|single-thread-alloc|multi-thread-alloc
   UWVM_BACKEND_FUZZER_USE_THREAD_LOCAL=0|1
   UWVM_BACKEND_FUZZER_EXTRA_DEFINES="UWVM_FOO -DUWVM_BAR=1"
@@ -287,12 +289,17 @@ GEN_TRAP_FLAG="--include-traps"
 if [[ "${INCLUDE_TRAPS}" == "0" || "${INCLUDE_TRAPS}" == "false" || "${INCLUDE_TRAPS}" == "no" ]]; then
   GEN_TRAP_FLAG="--no-include-traps"
 fi
+GEN_STRATEGY_FLAG="--include-strategy"
+if [[ "${INCLUDE_STRATEGY}" == "0" || "${INCLUDE_STRATEGY}" == "false" || "${INCLUDE_STRATEGY}" == "no" ]]; then
+  GEN_STRATEGY_FLAG="--no-include-strategy"
+fi
 
 python3 "${SCRIPT_DIR}/generate_cases.py" \
   --out-dir "${CASES_DIR}" \
   --cases "${FUZZ_CASES}" \
   --seed "${FUZZ_SEED}" \
-  "${GEN_TRAP_FLAG}"
+  "${GEN_TRAP_FLAG}" \
+  "${GEN_STRATEGY_FLAG}"
 
 BUILD_ARGS=(
   --generated-dir "${CASES_DIR}/generated" \

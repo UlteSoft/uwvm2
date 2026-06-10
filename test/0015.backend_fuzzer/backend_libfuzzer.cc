@@ -456,6 +456,7 @@ namespace
         ::std::vector<::std::uint32_t> i32_stack{};
         ::std::uint32_t global_i32{};
         bool grew_memory{};
+        bool enable_tiered_osr_stress{};
 
         void init_locals()
         {
@@ -728,6 +729,147 @@ namespace
             emit_check_i32(expr, selector == 0u ? helper_i32_add(out.helpers, y) : helper_i32_mix(out.helpers, y));
         }
 
+        void hot_direct_call_segment()
+        {
+            if(!enable_runtime_calls) { return; }
+            out.has_runtime_call_bridge = true;
+
+            auto const use_mix{(in.byte() & 1u) != 0u};
+            auto const bound{static_cast<::std::uint32_t>(2304u + static_cast<::std::uint32_t>(in.byte() & 7u) * 128u)};
+            ::std::uint32_t acc{};
+            for(::std::uint32_t i{}; i != bound; ++i)
+            {
+                acc = u32(acc + (use_mix ? helper_i32_mix(out.helpers, i) : helper_i32_add(out.helpers, i)));
+            }
+
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 0u);
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 1u);
+            append_u8(expr, 0x02u);
+            append_u8(expr, 0x40u);
+            append_u8(expr, 0x03u);
+            append_u8(expr, 0x40u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, bound);
+            append_u8(expr, 0x4fu);
+            append_u8(expr, 0x0du);
+            append_uleb(expr, 1u);
+            emit_local_get(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_call(expr,
+                      local_function_index_to_function_index(use_mix ? k_local_i32_mix_index : k_local_i32_add_index));
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 0u);
+            append_u8(expr, 0x0cu);
+            append_uleb(expr, 0u);
+            append_u8(expr, 0x0bu);
+            append_u8(expr, 0x0bu);
+            emit_local_get(expr, 1u);
+            emit_check_i32(expr, acc);
+
+            i32_locals[0] = bound;
+            i32_locals[1] = acc;
+        }
+
+        void hot_indirect_call_segment()
+        {
+            if(!enable_runtime_calls) { return; }
+            out.has_table = true;
+            out.has_runtime_call_bridge = true;
+
+            auto const bound{static_cast<::std::uint32_t>(2304u + static_cast<::std::uint32_t>(in.byte() & 3u) * 128u)};
+            ::std::uint32_t acc{};
+            for(::std::uint32_t i{}; i != bound; ++i)
+            {
+                acc = u32(acc + ((i & 1u) == 0u ? helper_i32_add(out.helpers, i) : helper_i32_mix(out.helpers, i)));
+            }
+
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 0u);
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 1u);
+            append_u8(expr, 0x02u);
+            append_u8(expr, 0x40u);
+            append_u8(expr, 0x03u);
+            append_u8(expr, 0x40u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, bound);
+            append_u8(expr, 0x4fu);
+            append_u8(expr, 0x0du);
+            append_uleb(expr, 1u);
+            emit_local_get(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x71u);
+            emit_call_indirect(expr, k_type_i32_i32);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 0u);
+            append_u8(expr, 0x0cu);
+            append_uleb(expr, 0u);
+            append_u8(expr, 0x0bu);
+            append_u8(expr, 0x0bu);
+            emit_local_get(expr, 1u);
+            emit_check_i32(expr, acc);
+
+            i32_locals[0] = bound;
+            i32_locals[1] = acc;
+        }
+
+        void tiered_osr_loop_segment()
+        {
+            if(!enable_tiered_osr_stress) { return; }
+
+            for(::std::size_t i{}; i != 1600uz; ++i) { append_u8(expr, 0x01u); }
+
+            constexpr ::std::uint32_t bound{36000u};
+            auto const salt{in.next_u32() & 0xffffu};
+            ::std::uint32_t acc{};
+            for(::std::uint32_t i{}; i != bound; ++i) { acc = u32(acc + (i ^ salt)); }
+
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 0u);
+            emit_i32_const(expr, 0u);
+            emit_local_set(expr, 1u);
+            append_u8(expr, 0x02u);
+            append_u8(expr, 0x40u);
+            append_u8(expr, 0x03u);
+            append_u8(expr, 0x40u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, bound);
+            append_u8(expr, 0x4fu);
+            append_u8(expr, 0x0du);
+            append_uleb(expr, 1u);
+            emit_local_get(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, salt);
+            append_u8(expr, 0x73u);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 1u);
+            emit_local_get(expr, 0u);
+            emit_i32_const(expr, 1u);
+            append_u8(expr, 0x6au);
+            emit_local_set(expr, 0u);
+            append_u8(expr, 0x0cu);
+            append_uleb(expr, 0u);
+            append_u8(expr, 0x0bu);
+            append_u8(expr, 0x0bu);
+            emit_local_get(expr, 1u);
+            emit_check_i32(expr, acc);
+
+            i32_locals[0] = bound;
+            i32_locals[1] = acc;
+        }
+
         void i64_segment()
         {
             auto const a{in.next_u64()};
@@ -792,6 +934,9 @@ namespace
             memory_grow_segment();
             direct_call_segment();
             indirect_call_segment();
+            hot_direct_call_segment();
+            if((in.byte() & 1u) != 0u) { hot_indirect_call_segment(); }
+            tiered_osr_loop_segment();
 
             auto const step_count{static_cast<::std::size_t>(16u + (in.byte() & 0x7fu))};
             for(::std::size_t i{}; i != step_count; ++i)
@@ -884,7 +1029,10 @@ namespace
         }
     };
 
-    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data, ::std::size_t size, bool enable_runtime_calls = true)
+    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data,
+                                          ::std::size_t size,
+                                          bool enable_runtime_calls = true,
+                                          bool enable_tiered_osr_stress = false)
     {
         size = ::std::min(size, k_max_input_bytes);
         input_reader in{data, size, 0uz};
@@ -899,6 +1047,7 @@ namespace
         build_helper_functions(out);
 
         code_projector p{in, out, enable_runtime_calls};
+        p.enable_tiered_osr_stress = enable_tiered_osr_stress;
         p.global_i32 = out.global_initial;
         p.init_locals();
         p.finish();
@@ -1368,6 +1517,7 @@ namespace
         "tiered-no-t2",
     };
     bool g_trace{};
+    bool g_stress_tiered_osr{};
 
     void set_modes_from_env()
     {
@@ -1405,6 +1555,7 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
     set_modes_from_env();
     g_trace = env_enabled("UWVM_BACKEND_LIBFUZZER_TRACE");
+    g_stress_tiered_osr = env_enabled("UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR");
     return 0;
 }
 
@@ -1412,7 +1563,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 {
     if(size == 0uz) { return 0; }
     if(g_trace) { ::std::cerr << "backend-libfuzzer: input-size=" << size << '\n'; }
-    auto c{project_input(data, size)};
+    auto c{project_input(data, size, true, g_stress_tiered_osr)};
     fuzz_case ring_case{};
     bool ring_case_ready{};
     bool have_runtime_observation{};

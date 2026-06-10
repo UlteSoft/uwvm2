@@ -41,6 +41,7 @@ Environment:
   UWVM_BACKEND_FUZZ_CASES=32
   UWVM_BACKEND_FUZZ_SEED=0xC0DEF00D   # unset to generate a random seed
   UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0|1
+  UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY=0|1
   UWVM_BACKEND_FUZZER_MODES="uwvm-int-ring-matrix uwvm-int-lazy ..."
   UWVM_BACKEND_FUZZER_WABT_ROOT=build/test/third-parties/wabt
   UWVM_BACKEND_FUZZER_WORK_DIR=build/test/0015.backend_fuzzer/matrix

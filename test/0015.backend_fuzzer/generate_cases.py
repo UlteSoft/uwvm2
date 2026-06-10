@@ -108,6 +108,10 @@ def local_tee(i: int) -> bytes:
     return b"\x22" + uleb(i)
 
 
+def call(i: int) -> bytes:
+    return b"\x10" + uleb(i)
+
+
 def check_i32(expected: int) -> bytes:
     return i32_const(expected) + b"\x47\x04\x40\x00\x0b"
 
@@ -146,6 +150,7 @@ class Case:
     memory_max: int = 0
     memory_has_max: bool = False
     expect_trap: bool = False
+    requires_runtime_calls: bool = False
 
     def wasm(self) -> bytes:
         out = bytearray(b"\x00asm\x01\x00\x00\x00")
@@ -383,6 +388,71 @@ def i64_case(rng: random.Random, index: int) -> Case:
     )
 
 
+def hot_direct_call_case(index: int) -> Case:
+    bound = 2304
+    add_const = 0x1357
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + u32(i + add_const))
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)  # i
+    main += i32_const(0) + local_set(1)  # acc
+    main += b"\x02\x40"  # block
+    main += b"\x03\x40"  # loop
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + call(1) + b"\x6A" + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    helper = local_get(0) + i32_const(add_const) + b"\x6A\x0b"
+    return Case(
+        name=f"{index:04d}.tiered_hot_direct_call",
+        types=[([], []), ([I32], [I32])],
+        funcs=[Func(0, [(2, I32)], bytes(main)), Func(1, [], helper)],
+        requires_runtime_calls=True,
+    )
+
+
+def tiered_osr_loop_case(index: int) -> Case:
+    # Keep this case deterministic and self-checking while making the function
+    # large enough for the tiered interpreter to emit loop OSR polling.
+    bound = 36000
+    salt = 0x5A5A
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + u32(i ^ salt))
+
+    c = bytearray()
+    c += b"\x01" * 1600
+    c += i32_const(0) + local_set(0)
+    c += i32_const(0) + local_set(1)
+    c += b"\x02\x40"
+    c += b"\x03\x40"
+    c += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    c += local_get(1) + local_get(0) + i32_const(salt) + b"\x73\x6A" + local_set(1)
+    c += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    c += b"\x0C" + uleb(0)
+    c += b"\x0b\x0b"
+    c += local_get(1) + check_i32(expected)
+    c += b"\x0b"
+    return Case(
+        name=f"{index:04d}.tiered_osr_loop",
+        types=[([], [])],
+        funcs=[Func(0, [(2, I32)], bytes(c))],
+    )
+
+
+def strategy_cases(start: int) -> list[Case]:
+    return [
+        hot_direct_call_case(start),
+        tiered_osr_loop_case(start + 1),
+    ]
+
+
 def trap_cases(start: int) -> list[Case]:
     return [
         Case(
@@ -410,7 +480,7 @@ def trap_cases(start: int) -> list[Case]:
     ]
 
 
-def make_cases(count: int, seed: int, include_traps: bool) -> list[Case]:
+def make_cases(count: int, seed: int, include_traps: bool, include_strategy: bool) -> list[Case]:
     rng = random.Random(seed)
     cases: list[Case] = []
     for i in range(count):
@@ -423,6 +493,8 @@ def make_cases(count: int, seed: int, include_traps: bool) -> list[Case]:
             cases.append(memory_case(rng, len(cases)))
         else:
             cases.append(i64_case(rng, len(cases)))
+    if include_strategy:
+        cases.extend(strategy_cases(len(cases)))
     if include_traps:
         cases.extend(trap_cases(len(cases)))
     return cases
@@ -484,6 +556,7 @@ def flatten_cases(cases: list[Case]) -> dict[str, list[int] | list[dict[str, obj
                 "memory_max": case.memory_max,
                 "memory_has_max": case.memory_has_max,
                 "expect_trap": case.expect_trap,
+                "requires_runtime_calls": case.requires_runtime_calls,
             }
         )
 
@@ -514,7 +587,7 @@ def write_header(path: Path, flat: dict[str, object]) -> None:
     lines.append("namespace uwvm2_backend_fuzzer_generated {\n")
     lines.append("struct type_desc { std::uint32_t params_begin; std::uint32_t params_count; std::uint32_t results_begin; std::uint32_t results_count; };\n")
     lines.append("struct func_desc { std::uint32_t type_index; std::uint32_t locals_begin; std::uint32_t locals_count; std::uint32_t code_begin; std::uint32_t code_size; std::uint32_t expr_offset; };\n")
-    lines.append("struct case_desc { char const* name; std::uint32_t type_begin; std::uint32_t type_count; std::uint32_t func_begin; std::uint32_t func_count; std::uint32_t entry_func_index; bool has_memory; std::uint32_t memory_min; std::uint32_t memory_max; bool memory_has_max; bool expect_trap; };\n\n")
+    lines.append("struct case_desc { char const* name; std::uint32_t type_begin; std::uint32_t type_count; std::uint32_t func_begin; std::uint32_t func_count; std::uint32_t entry_func_index; bool has_memory; std::uint32_t memory_min; std::uint32_t memory_max; bool memory_has_max; bool expect_trap; bool requires_runtime_calls; };\n\n")
     lines.append(cxx_array("k_value_types", "std::uint8_t", flat["value_types"]))  # type: ignore[arg-type]
     lines.append(cxx_array("k_local_decls", "std::uint32_t", flat["local_decls"]))  # type: ignore[arg-type]
     lines.append(cxx_array("k_code_bytes", "std::uint8_t", flat["code_bytes"]))  # type: ignore[arg-type]
@@ -542,7 +615,8 @@ def write_header(path: Path, flat: dict[str, object]) -> None:
         lines.append(
             "    case_desc{"
             f"\"{name}\", {c['type_begin']}u, {c['type_count']}u, {c['func_begin']}u, {c['func_count']}u, {c['entry_func_index']}u, "
-            f"{str(c['has_memory']).lower()}, {c['memory_min']}u, {c['memory_max']}u, {str(c['memory_has_max']).lower()}, {str(c['expect_trap']).lower()}"
+            f"{str(c['has_memory']).lower()}, {c['memory_min']}u, {c['memory_max']}u, {str(c['memory_has_max']).lower()}, {str(c['expect_trap']).lower()}, "
+            f"{str(c['requires_runtime_calls']).lower()}"
             "},\n"
         )
     lines.append("}};\n")
@@ -556,6 +630,7 @@ def main() -> int:
     ap.add_argument("--cases", type=int, default=64)
     ap.add_argument("--seed", type=lambda s: int(s, 0), default=None)
     ap.add_argument("--include-traps", action=argparse.BooleanOptionalAction, default=True)
+    ap.add_argument("--include-strategy", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()
 
@@ -571,7 +646,7 @@ def main() -> int:
     generated_dir.mkdir(parents=True, exist_ok=True)
 
     seed = args.seed if args.seed is not None else secrets.randbits(64)
-    cases = make_cases(args.cases, seed, args.include_traps)
+    cases = make_cases(args.cases, seed, args.include_traps, args.include_strategy)
     manifest = []
     for idx, case in enumerate(cases):
         wasm_path = corpus_dir / f"{idx:04d}.{case.name.split('.', 1)[1]}.wasm"
