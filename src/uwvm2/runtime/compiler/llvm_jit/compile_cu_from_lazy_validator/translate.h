@@ -244,7 +244,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
         ::uwvm2::utils::container::vector<::std::uintptr_t> tiered_loop_reentry_raw_entry_addresses{};
 
-        // True only after all required entry addresses are resolved and the engine/context owners are installed.
+        // Publication flag for the non-atomic payload above.  Writers fill `entry_address`, `raw_entry_address`,
+        // reentry vectors, and the LLVM owner fields first, then publish `ready == true` with release semantics.  Readers
+        // must use an acquire load through `std::atomic_ref<bool>` before touching those payload fields.
+        //
+        // Keep the storage type as `bool` rather than `std::atomic_bool`: the project vector type moves these records, and
+        // `std::atomic_ref` gives the required synchronization without making the record itself non-movable.
         bool ready{};
 
         lazy_materialized_function_storage_t() = default;
@@ -322,8 +327,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     namespace details
     {
-        // Serializes LLVM MCJIT materialization and publication.  LLVM global initialization and this runtime's target
-        // table publication are intentionally kept behind a narrow process-local lock.
+        // Serializes LLVM MCJIT materialization and publication.  LLVM global initialization, MCJIT object finalization,
+        // and this runtime's target-table publication are intentionally kept behind a narrow process-local lock because
+        // those phases touch process-wide LLVM state and runtime dispatch tables.
         inline ::std::atomic_flag lazy_materialize_lock = ATOMIC_FLAG_INIT;
 
         // Spin-based guard used by scheduler worker callbacks, where blocking primitives may not be available in all
@@ -332,13 +338,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         {
             inline lazy_materialize_lock_guard() noexcept
             {
+                // Acquire pairs with the guard destructor's release clear.  This is a real lock boundary, not just a
+                // contention flag: after the loop exits, this worker sees all materialization and target-table side
+                // effects sequenced before the previous holder released the flag.
                 while(lazy_materialize_lock.test_and_set(::std::memory_order_acquire)) { ::uwvm2::utils::thread::lazy_compile_thread_yield(); }
             }
 
             inline lazy_materialize_lock_guard(lazy_materialize_lock_guard const&) noexcept = delete;
             inline lazy_materialize_lock_guard& operator= (lazy_materialize_lock_guard const&) noexcept = delete;
 
-            inline ~lazy_materialize_lock_guard() noexcept { lazy_materialize_lock.clear(::std::memory_order_release); }
+            inline ~lazy_materialize_lock_guard() noexcept
+            {
+                // Release publishes every protected side effect before another worker's acquire succeeds.  Wait-free
+                // readers still synchronize through their own `ready` or state acquire loads; this lock only orders
+                // workers with respect to each other.
+                lazy_materialize_lock.clear(::std::memory_order_release);
+            }
         };
 
         // Extracts the first argument type from selected LLVM member functions.  LLVM has changed ownership parameter
@@ -353,8 +368,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         };
 
         using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
-        using llvm_jit_memory_manager_owner_t =
-            typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
+        using llvm_jit_memory_manager_owner_t = typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
         using llvm_jit_function_address_name_t =
             ::std::remove_cvref_t<typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::getFunctionAddress)>::type>;
 
@@ -413,11 +427,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                       lazy_function_storage_t& fn,
                                                       ::uwvm2::utils::thread::lazy_compile_state state) noexcept
         {
+            // This release store is the function-level publication barrier.  By the time a waiter observes `compiled`
+            // with an acquire load/wait, the materialized record, its `ready` publication, and any runtime target-table
+            // stores sequenced before this call are visible.  `failed` is also published with release so waiters never
+            // miss diagnostics or cleanup state written before failure.
             fn.materialization_state.state.store(state, ::std::memory_order_release);
             ::uwvm2::utils::thread::lazy_compile_notify_unit(fn.materialization_state);
             if(fn.primary_cu_index < storage.compile_units.size())
             {
                 auto& cu_state{storage.compile_units.index_unchecked(fn.primary_cu_index).state};
+                // The compile-unit state is a mirror for observers that do not hold the function record directly.  Use the
+                // same release order so either state object can be used as the synchronization point for terminal states.
                 cu_state.state.store(state, ::std::memory_order_release);
                 ::uwvm2::utils::thread::lazy_compile_notify_unit(cu_state);
             }
@@ -456,6 +476,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static ::std::atomic_bool success{};
             static ::std::atomic_flag init_lock = ATOMIC_FLAG_INIT;
 
+            // `initialized` is the once flag.  An acquire load that observes `true` also observes LLVM's process-wide
+            // target registration side effects and the preceding `success` publication.  The separate `success` atomic is
+            // intentionally read after the acquire so callers never consume a stale result from before initialization.
             if(initialized.load(::std::memory_order_acquire)) { return success.load(::std::memory_order_acquire); }
 
             while(init_lock.test_and_set(::std::memory_order_acquire))
@@ -474,12 +497,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
                 auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter()};
+                // Publish the result before publishing completion.  Readers synchronize through the `initialized` flag,
+                // whose release store is sequenced after this store.
                 success.store(ok, ::std::memory_order_release);
                 initialized.store(true, ::std::memory_order_release);
             }
 
             init_lock.clear(::std::memory_order_release);
             return success.load(::std::memory_order_acquire);
+        }
+
+        // Publishes or reads the materialized-function ready flag.
+        //
+        // `ready == true` is a release publication of the ordinary payload fields in `lazy_materialized_function_storage_t`.
+        // The matching acquire load is intentionally inside the accessor functions below, because some tiered paths probe
+        // materialized records before they have observed the outer function state as `compiled`.
+        inline void store_lazy_materialized_ready(lazy_materialized_function_storage_t& materialized, bool ready, ::std::memory_order order) noexcept
+        { ::std::atomic_ref<bool>{materialized.ready}.store(ready, order); }
+
+        [[nodiscard]] inline bool load_lazy_materialized_ready(lazy_materialized_function_storage_t const& materialized, ::std::memory_order order) noexcept
+        {
+            auto& ready{const_cast<bool&>(materialized.ready)};
+            return ::std::atomic_ref<bool>{ready}.load(order);
         }
 
         // Copies LLVM's host feature map into owning strings so later EngineBuilder StringRefs remain valid.
@@ -503,14 +542,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         [[nodiscard]] inline llvm_jit_native_target_config const& get_llvm_jit_native_target_config()
         {
             static llvm_jit_native_target_config config{.cpu_name =
-                                                            []()
+                                                            []() noexcept
                                                         {
                                                             auto const host_cpu_name{::llvm::sys::getHostCPUName()};
                                                             return ::uwvm2::utils::container::string{
                                                                 ::uwvm2::utils::container::string_view{host_cpu_name.data(), host_cpu_name.size()}
                                                             };
                                                         }(),
-                                                        .feature_storage = get_llvm_jit_host_target_attribute_storage()};
+                                                        .feature_storage = get_llvm_jit_host_target_attribute_storage()};  // [global]
             return config;
         }
 
@@ -529,7 +568,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         {
             if(code_curr == code_end) [[unlikely]] { return false; }
 
-            all_details::wasm1_code op{};
+            all_details::wasm1_code op;  // no init necessary
             ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
             switch(op)
             {
@@ -652,7 +691,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         {
             if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
             auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-            materialized.ready = false;
+            // Closing the ready flag does not publish data, so relaxed is sufficient.  The owning compile claim prevents
+            // another writer from rebuilding this record concurrently; readers that see `false` return before touching
+            // the ordinary payload fields.
+            store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
             materialized.tiered_loop_reentries.clear();
@@ -705,8 +747,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
                     .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<
-                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
                             .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
@@ -746,7 +787,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             materialized.raw_entry_address = raw_entry_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
             materialized.llvm_jit_engine = ::std::move(engine);
-            materialized.ready = true;
+            // Publish the fully resolved single-function record.  Acquire readers can now safely consume the addresses
+            // and rely on the owner fields to keep MCJIT code alive.
+            store_lazy_materialized_ready(materialized, true, ::std::memory_order_release);
             return true;
         }
 
@@ -765,7 +808,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             {
                 if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-                materialized.ready = false;
+                // Reset each candidate before resolving the shared object.  This is only a fast-path gate for readers, so
+                // relaxed is enough for the false transition.
+                store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
                 materialized.tiered_loop_reentries.clear();
@@ -818,8 +863,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
                     .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<
-                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
                             .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
@@ -857,15 +901,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
-                materialized.ready = true;
             }
 
-            // Store the shared LLVM owners on one record.  Other records contain only addresses into the same engine, so
-            // the owner record must remain alive for as long as any grouped address can be called.
+            // Store the shared LLVM owners on one record before publishing any member as ready.  Other records contain
+            // only addresses into the same engine, so the owner record must remain alive for as long as any grouped
+            // address can be called.
             auto const owner_local_function_index{local_function_indices.front_unchecked()};
             auto& owner{storage.materialized_functions.index_unchecked(owner_local_function_index)};
             owner.llvm_context_holder = ::std::move(llvm_context_holder);
             owner.llvm_jit_engine = ::std::move(engine);
+            for(auto const local_function_index: local_function_indices)
+            {
+                auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+                // Release-publish after the shared owner has been installed.  This prevents a racing tiered probe from
+                // observing a callable address before the object lifetime anchor is stored in the lazy table.
+                store_lazy_materialized_ready(materialized, true, ::std::memory_order_release);
+            }
             return true;
         }
 
@@ -887,6 +938,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         [[nodiscard]] inline bool should_consider_lazy_group_function(lazy_module_storage_t const& storage, ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return false; }
+            // Acquire keeps this heuristic consistent with terminal-state publication.  A stale non-terminal read may
+            // only skip an optimization candidate; a terminal read must observe the completed record if later reused.
             auto const st{storage.functions.index_unchecked(local_function_index).materialization_state.state.load(::std::memory_order_acquire)};
             return st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled || st == ::uwvm2::utils::thread::lazy_compile_state::queued;
         }
@@ -1037,6 +1090,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled || st == ::uwvm2::utils::thread::lazy_compile_state::queued)
                     {
                         auto expected{st};
+                        // Successful acq_rel CAS owns materialization for this function.  The acquire half observes any
+                        // prior queued-state publication; the release half makes the `compiling` claim visible to waiters.
+                        // The failure order is acquire because a failed CAS may report a terminal state published by
+                        // another compiler, and the caller may act on that state in the same loop.
                         if(fn.materialization_state.state.compare_exchange_strong(expected,
                                                                                   ::uwvm2::utils::thread::lazy_compile_state::compiling,
                                                                                   ::std::memory_order_acq_rel,
@@ -1055,6 +1112,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
                 if(st != ::uwvm2::utils::thread::lazy_compile_state::uncompiled && st != ::uwvm2::utils::thread::lazy_compile_state::queued) { continue; }
                 auto expected{st};
+                // Opportunistic group members are claimed with the same ownership barrier as the demanded function.  A
+                // failed acquire CAS is still useful: it observes another thread's state publication before this function
+                // decides whether to skip the candidate.
                 if(fn.materialization_state.state.compare_exchange_strong(expected,
                                                                           ::uwvm2::utils::thread::lazy_compile_state::compiling,
                                                                           ::std::memory_order_acq_rel,
@@ -1138,7 +1198,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         {
             if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-            if(materialized.ready) { return; }
+            if(load_lazy_materialized_ready(materialized, ::std::memory_order_acquire)) { return; }
 
             validate_function_if_needed(curr_module, options, local_function_index, err);
 
@@ -1372,6 +1432,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         bool counted_wait{};
         for(;;)
         {
+            // The function-level state is the canonical scheduler state.  Acquire is required when observing terminal
+            // states because the compiled path immediately returns and callers may read the materialized payload next.
             auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled)
             {
@@ -1388,7 +1450,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
             {
                 auto expected{::uwvm2::utils::thread::lazy_compile_state::uncompiled};
-                // Claim function-level materialization; all whole-function compile units alias this same state.
+                // Claim function-level materialization; all whole-function compile units alias this same state.  The
+                // acq_rel success order publishes this inline owner and keeps direct claims equivalent to scheduler
+                // claims.  Acquire failure preserves synchronization with a concurrent terminal publisher before retry.
                 if(fn.materialization_state.state.compare_exchange_strong(expected,
                                                                           ::uwvm2::utils::thread::lazy_compile_state::compiling,
                                                                           ::std::memory_order_acq_rel,
@@ -1465,6 +1529,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     }
 
     // Retrieves the raw ABI entry address for a materialized local function.
+    //
+    // This accessor may be called either by the compiler thread after materialization or by a racing tiered probe before
+    // it has observed the outer function state as `compiled`.  Therefore the `ready` flag is the synchronization point
+    // here: if the acquire load observes `true`, the ordinary address fields are safe to read.
     [[nodiscard]] inline bool try_get_lazy_raw_entry_address(lazy_module_storage_t const& storage,
                                                              ::std::size_t local_function_index,
                                                              ::std::uintptr_t& function_address) noexcept
@@ -1473,13 +1541,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
 
         auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-        if(!materialized.ready || materialized.raw_entry_address == 0u) { return false; }
+        if(!details::load_lazy_materialized_ready(materialized, ::std::memory_order_acquire) || materialized.raw_entry_address == 0u) { return false; }
 
         function_address = materialized.raw_entry_address;
         return true;
     }
 
     // Retrieves the typed Wasm entry address for a materialized local function.
+    //
+    // The acquire `ready` load mirrors the raw-entry accessor.  It prevents a caller from consuming a typed entry address
+    // while the materializer is still resolving symbols or installing the MCJIT owner.
     [[nodiscard]] inline bool try_get_lazy_entry_address(lazy_module_storage_t const& storage,
                                                          ::std::size_t local_function_index,
                                                          ::std::uintptr_t& function_address) noexcept
@@ -1488,13 +1559,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
 
         auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-        if(!materialized.ready || materialized.entry_address == 0u) { return false; }
+        if(!details::load_lazy_materialized_ready(materialized, ::std::memory_order_acquire) || materialized.entry_address == 0u) { return false; }
 
         function_address = materialized.entry_address;
         return true;
     }
 
     // Retrieves the raw ABI address for a tiered loop reentry wrapper selected by function-relative Wasm code offset.
+    //
+    // Reentry descriptors and their raw addresses are ordinary vectors.  The acquire `ready` load must happen before the
+    // vector size comparison and element reads so readers see a consistent descriptor/address pair.
     [[nodiscard]] inline bool try_get_lazy_tiered_loop_reentry_raw_entry_address(lazy_module_storage_t const& storage,
                                                                                  ::std::size_t local_function_index,
                                                                                  ::std::size_t wasm_code_offset,
@@ -1504,7 +1578,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
 
         auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-        if(!materialized.ready || materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size()) { return false; }
+        if(!details::load_lazy_materialized_ready(materialized, ::std::memory_order_acquire) ||
+           materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size())
+        {
+            return false;
+        }
 
         for(::std::size_t i{}; i != materialized.tiered_loop_reentries.size(); ++i)
         {
