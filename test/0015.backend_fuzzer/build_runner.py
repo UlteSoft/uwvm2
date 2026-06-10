@@ -111,7 +111,7 @@ def filtered_llvm_cxxflags(tool: str) -> list[str]:
         if skip_next:
             skip_next = False
             continue
-        if flag.startswith("-std=") or flag == "-fno-exceptions":
+        if flag.startswith("-std=") or flag.startswith("-stdlib=") or flag == "-fno-exceptions":
             continue
         if flag in {"-I", "-isystem"}:
             out.append(flag)
@@ -222,7 +222,6 @@ def main() -> int:
         std_flag,
         "-O2",
         "-g",
-        "-pthread",
         *defines,
         *(f"-I{p}" for p in include_dirs),
         *filtered_llvm_cxxflags(llvm),
@@ -238,6 +237,9 @@ def main() -> int:
         *split_env_words("UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS"),
         *args.extra_ldflag,
     ]
+
+    if sys.platform != "win32":
+        cmd.insert(4, "-pthread")
 
     if llvm_libdir:
         cmd.append(f"-Wl,-rpath,{llvm_libdir}")

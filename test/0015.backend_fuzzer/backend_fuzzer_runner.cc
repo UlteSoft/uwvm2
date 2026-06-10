@@ -53,6 +53,15 @@ namespace
 # define UWVM_BACKEND_FUZZER_HAS_TIERED 0
 #endif
 
+#if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
+    (defined(__GNUC__) || defined(__clang__))
+# define UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI __attribute__((__sysv_abi__))
+#elif defined(__i386__) || defined(_M_IX86)
+# define UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI __attribute__((__fastcall__))
+#else
+# define UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI
+#endif
+
     using value_type_t = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
     using wasm_byte_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
     using module_t = storage::wasm_module_storage_t;
@@ -448,15 +457,18 @@ namespace
         }
     };
 
-    void manual_memory_oob_trap(::uwvm2::object::memory::error::memory_error_t const&) noexcept
+    void UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI manual_unreachable_trap() noexcept
+    { ::fast_io::fast_terminate(); }
+
+    void UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI manual_memory_oob_trap(::uwvm2::object::memory::error::memory_error_t const&) noexcept
     { ::fast_io::fast_terminate(); }
 
     void install_manual_traps() noexcept
     {
-        int_optable::unreachable_func = ::fast_io::fast_terminate;
-        int_optable::trap_invalid_conversion_to_integer_func = ::fast_io::fast_terminate;
-        int_optable::trap_integer_divide_by_zero_func = ::fast_io::fast_terminate;
-        int_optable::trap_integer_overflow_func = ::fast_io::fast_terminate;
+        int_optable::unreachable_func = manual_unreachable_trap;
+        int_optable::trap_invalid_conversion_to_integer_func = manual_unreachable_trap;
+        int_optable::trap_integer_divide_by_zero_func = manual_unreachable_trap;
+        int_optable::trap_integer_overflow_func = manual_unreachable_trap;
         int_optable::trap_memory_out_of_bounds_func = manual_memory_oob_trap;
     }
 
@@ -529,6 +541,8 @@ namespace
         }
     }
 }  // namespace
+
+#undef UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI
 
 int main(int argc, char** argv)
 {

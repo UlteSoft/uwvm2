@@ -446,10 +446,119 @@ def tiered_osr_loop_case(index: int) -> Case:
     )
 
 
+def tiered_win32_abi_direct_matrix_case(index: int) -> Case:
+    # Windows tiered JIT crosses several ABI boundaries when a lazily compiled
+    # function calls another local-defined function.  Use enough i32 arguments
+    # to spill past the first four Win64 registers; a wrong SysV/Win64 boundary
+    # shows up as a deterministic self-check failure.
+    bound = 1536
+    salt = 0x2468ACE1
+
+    def helper2(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+        return u32((u32((a + b) ^ c) + u32(d * 3) - e) ^ f)
+
+    def helper1(i: int, acc: int) -> int:
+        return u32(helper2(i, acc, u32(i * 17), u32(acc ^ salt), u32(i + 7), u32(acc + 11)) ^ salt)
+
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + helper1(i, expected))
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1)
+    main += local_get(0) + local_get(1) + call(1)
+    main += b"\x6A" + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    h1 = bytearray()
+    h1 += local_get(0)
+    h1 += local_get(1)
+    h1 += local_get(0) + i32_const(17) + b"\x6C"
+    h1 += local_get(1) + i32_const(salt) + b"\x73"
+    h1 += local_get(0) + i32_const(7) + b"\x6A"
+    h1 += local_get(1) + i32_const(11) + b"\x6A"
+    h1 += call(2)
+    h1 += i32_const(salt) + b"\x73"
+    h1 += b"\x0b"
+
+    h2 = bytearray()
+    h2 += local_get(0) + local_get(1) + b"\x6A"
+    h2 += local_get(2) + b"\x73"
+    h2 += local_get(3) + i32_const(3) + b"\x6C" + b"\x6A"
+    h2 += local_get(4) + b"\x6B"
+    h2 += local_get(5) + b"\x73"
+    h2 += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_win32_abi_direct_matrix",
+        types=[([], []), ([I32, I32], [I32]), ([I32, I32, I32, I32, I32, I32], [I32])],
+        funcs=[Func(0, [(2, I32)], bytes(main)), Func(1, [], bytes(h1)), Func(2, [], bytes(h2))],
+        requires_runtime_calls=True,
+    )
+
+
+def tiered_win32_abi_osr_call_matrix_case(index: int) -> Case:
+    # OSR reentry wrappers are raw-entry calls.  Keep a local-defined call in
+    # the loop body so tiered mode must exercise reentry plus a JIT-to-local
+    # call after crossing back from the interpreter.
+    bound = 22000
+
+    def helper(a: int, b: int, c: int, d: int) -> int:
+        return u32(u32(a ^ u32(b + 17)) + u32(c * 5) - d)
+
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + helper(i, expected, u32(i ^ 0x55AA), u32(expected >> 3)))
+
+    main = bytearray()
+    main += b"\x01" * 1800
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1)
+    main += local_get(0)
+    main += local_get(1)
+    main += local_get(0) + i32_const(0x55AA) + b"\x73"
+    main += local_get(1) + i32_const(3) + b"\x76"
+    main += call(1)
+    main += b"\x6A" + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    h = bytearray()
+    h += local_get(0) + local_get(1) + i32_const(17) + b"\x6A" + b"\x73"
+    h += local_get(2) + i32_const(5) + b"\x6C" + b"\x6A"
+    h += local_get(3) + b"\x6B"
+    h += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_win32_abi_osr_call_matrix",
+        types=[([], []), ([I32, I32, I32, I32], [I32])],
+        funcs=[Func(0, [(2, I32)], bytes(main)), Func(1, [], bytes(h))],
+        requires_runtime_calls=True,
+    )
+
+
 def strategy_cases(start: int) -> list[Case]:
     return [
         hot_direct_call_case(start),
         tiered_osr_loop_case(start + 1),
+        tiered_win32_abi_direct_matrix_case(start + 2),
+        tiered_win32_abi_osr_call_matrix_case(start + 3),
     ]
 
 

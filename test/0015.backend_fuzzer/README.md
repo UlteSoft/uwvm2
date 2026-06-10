@@ -26,6 +26,17 @@ strategy cases by default:
   interpreter-to-JIT call edge.
 - `tiered_osr_loop`: emits a large-enough loop body to exercise tiered loop OSR
   polling and reentry generation.
+- `tiered_win32_abi_direct_matrix`: stresses local-defined typed/raw tiered
+  calls with enough arguments to expose Win64 SysV vs host-ABI mixups.
+- `tiered_win32_abi_osr_call_matrix`: combines tiered OSR reentry with a
+  local-defined JIT call inside the loop body.
+
+On Windows, `run_win32_abi_probe.py` also builds a small standalone C++ probe
+that directly exercises host-to-raw-entry, host-to-typed-entry, generated
+Wasm-ABI-to-host-bridge, table typed/raw dispatch, OSR-style reentry, and
+interpreter callback function-pointer boundaries.  It also checks the source for
+the pointer-sized atomic-load alignment guard that prevents COFF/MCJIT from
+emitting unresolved `__atomic_load` calls.
 
 The low-level `uwvm-int-ring-matrix` runner only exercises single-function
 translator ABI shapes, so cases that require runtime call bridges are marked
@@ -50,6 +61,12 @@ test/0015.backend_fuzzer/run_backend_fuzzer.sh \
   --combine none \
   --delay none \
   --memory-model default
+```
+
+Run the Windows ABI probe:
+
+```bash
+python test/0015.backend_fuzzer/run_win32_abi_probe.py
 ```
 
 Run the compile-time macro matrix:
