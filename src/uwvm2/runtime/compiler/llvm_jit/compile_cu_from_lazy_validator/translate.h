@@ -53,7 +53,7 @@
 #  include <llvm/Transforms/Scalar.h>
 #  include <llvm/Transforms/Scalar/GVN.h>
 #  include <llvm/Transforms/Utils.h>
-#  include <uwvm2/runtime/compiler/llvm_jit/section_memory_manager.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
 # endif
 // import
 # include <fast_io.h>
@@ -533,8 +533,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
-                    mattrs.push_back(::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-",
-                                                                            all_details::get_uwvm_u8string_view(feature_name)));
+                    mattrs.push_back(
+                        ::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-", all_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
             return mattrs;
@@ -547,9 +547,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                             []() constexpr noexcept
                                                         {
                                                             auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                                                            return ::uwvm2::utils::container::u8string{
-                                                                all_details::get_uwvm_u8string_view(host_cpu_name)
-                                                            };
+                                                            return ::uwvm2::utils::container::u8string{all_details::get_uwvm_u8string_view(host_cpu_name)};
                                                         }(),
                                                         .feature_storage = get_llvm_jit_host_target_attribute_storage()};  // [global]
             return config;
