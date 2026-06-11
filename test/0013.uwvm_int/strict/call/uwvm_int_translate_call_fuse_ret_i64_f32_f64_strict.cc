@@ -9,7 +9,7 @@ namespace
     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 
     template <optable::uwvm_interpreter_translate_option_t CompileOption>
-    static void call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         using info_t = optable::compiled_defined_call_info;
 
@@ -211,7 +211,7 @@ namespace
     [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
     {
         optable::call_func = +call_bridge<Opt>;
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::call_indirect_func = strict_terminate_call_indirect;
 
         ::uwvm2::validation::error::code_validation_error_impl err{};
         optable::compile_option cop{};
@@ -296,11 +296,7 @@ namespace
 
     [[nodiscard]] int test_translate_call_fuse_ret_types() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
+        install_unexpected_traps();
 
         auto const wasm = build_call_fuse_ret_types_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_call_fuse_ret_types");
