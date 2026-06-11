@@ -48,9 +48,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline bool wasip1_global_force_args_is_exist{};  // [global]
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_force_args_alias{
-            u8"--wasip1-force-args",
-            u8"-I1fargs"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_force_args_alias{u8"--wasip1-force-args",
+                                                                                                                                        u8"-I1fargs"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else

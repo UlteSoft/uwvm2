@@ -298,7 +298,7 @@ namespace uwvm2::runtime::lib
             try_materialize_runtime_module_llvm_jit(compiled_module_record& rec,
                                                     bool publish_full_ready = true,
                                                     ::llvm::CodeGenOptLevel default_codegen_opt_level = ::llvm::CodeGenOptLevel::Aggressive,
-                                                    ::std::size_t extra_materialize_threads = (::std::numeric_limits<::std::size_t>::max)()) noexcept;
+                                                    ::std::size_t extra_materialize_threads = ::std::numeric_limits<::std::size_t>::max()) noexcept;
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         [[nodiscard]] inline constexpr bool tiered_runtime_active() noexcept;
         [[nodiscard]] inline constexpr bool tiered_t0_enabled() noexcept;
@@ -3493,7 +3493,7 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n >= 1024uz) { return (::std::numeric_limits<::std::size_t>::max)(); }
+            if(local_n >= 1024uz) { return ::std::numeric_limits<::std::size_t>::max(); }
             if(local_n >= 512uz) { return 1048576uz; }
             return tiered_full_compile_switch_threshold;
         }
@@ -7715,7 +7715,7 @@ namespace uwvm2::runtime::lib
                     if(provider_runtime_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                     auto const provider_module_id{find_runtime_module_id_from_storage_ptr(provider_runtime_module)};
-                    if(provider_module_id == (::std::numeric_limits<::std::size_t>::max)()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(provider_module_id == ::std::numeric_limits<::std::size_t>::max()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                     auto& target_vec{caller_rec.llvm_jit_call_indirect_targets.index_unchecked(table_index)};
                     target_vec.clear();
@@ -8672,7 +8672,7 @@ namespace uwvm2::runtime::lib
 # if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             static_cast<void>(publish_full_ready);
 # endif
-            if(extra_materialize_threads == (::std::numeric_limits<::std::size_t>::max)())
+            if(extra_materialize_threads == ::std::numeric_limits<::std::size_t>::max())
             {
                 extra_materialize_threads = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved;
             }
@@ -9065,7 +9065,7 @@ namespace uwvm2::runtime::lib
                 if(raw_function_address == 0u) [[unlikely]] { return false; }
                 rec.llvm_jit_local_raw_entry_addresses.index_unchecked(local_index) = raw_function_address;
 
-                if(materialized_module_id != (::std::numeric_limits<::std::size_t>::max)())
+                if(materialized_module_id != ::std::numeric_limits<::std::size_t>::max())
                 {
                     record_llvm_jit_unwind_entry(materialized_module_id, function_index, function_address, false);
                     record_llvm_jit_unwind_entry(materialized_module_id, function_index, raw_function_address, true);
@@ -9084,7 +9084,7 @@ namespace uwvm2::runtime::lib
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             publish_materialized_indirect_targets = publish_full_ready;
 # endif
-            if(publish_materialized_indirect_targets && materialized_module_id != (::std::numeric_limits<::std::size_t>::max)() &&
+            if(publish_materialized_indirect_targets && materialized_module_id != ::std::numeric_limits<::std::size_t>::max() &&
                materialized_module_id < g_runtime.defined_func_cache.size())
             {
                 auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(materialized_module_id)};

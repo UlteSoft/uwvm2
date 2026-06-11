@@ -57,7 +57,9 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
 {
     struct section_details_t
-    { ::uwvm2::uwvm::wasm::type::all_module_t const* all_module_ptr{}; };
+    {
+        ::uwvm2::uwvm::wasm::type::all_module_t const* all_module_ptr{};
+    };
 
     inline constexpr section_details_t section_details(::uwvm2::uwvm::wasm::type::all_module_t const& module_storage) noexcept
     { return {::std::addressof(module_storage)}; }

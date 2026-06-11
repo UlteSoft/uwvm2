@@ -92,7 +92,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
                 ::std::uint_least64_t length64{};
                 ::std::memcpy(::std::addressof(length64), curr, sizeof(length64));
                 curr += sizeof(length64);
-                if(length64 > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return; }
+                if(length64 > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return; }
                 length = static_cast<::std::size_t>(length64);
             }
             else

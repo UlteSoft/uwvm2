@@ -43,7 +43,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
     inline bool wasm_start_time_available{};
     inline bool wasm_end_time_available{};
 
-    [[nodiscard]] UWVM_GNU_COLD inline constexpr bool try_get_monotonic_raw_time(::fast_io::unix_timestamp& timestamp) noexcept
+    [[nodiscard]] UWVM_GNU_COLD inline constexpr bool try_get_monotonic_raw_time(::fast_io::unix_timestamp & timestamp) noexcept
     {
 #ifdef UWVM_CPP_EXCEPTIONS
         try
@@ -126,10 +126,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
         ::fast_io::unix_timestamp start_time{};
         bool start_time_available{};
 
-        UWVM_GNU_COLD inline constexpr process_time() noexcept
-        {
-            start_time_available = try_get_monotonic_raw_time(start_time);
-        }
+        UWVM_GNU_COLD inline constexpr process_time() noexcept { start_time_available = try_get_monotonic_raw_time(start_time); }
 
         inline constexpr process_time(process_time const&) noexcept = delete;
         inline constexpr process_time(process_time&&) noexcept = delete;

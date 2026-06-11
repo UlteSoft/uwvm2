@@ -221,7 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                               ::std::size_t& old_pages_out) noexcept
         {
             old_pages_out = static_cast<::std::size_t>(memory.get_page_size());
-            if(max_limit_memory_length == (::std::numeric_limits<::std::size_t>::max)()) { return false; }
+            if(max_limit_memory_length == ::std::numeric_limits<::std::size_t>::max()) { return false; }
 
             auto const limit_pages{max_limit_memory_length >> memory.custom_page_size_log2};
             return old_pages_out > limit_pages || delta_pages > (limit_pages - old_pages_out);

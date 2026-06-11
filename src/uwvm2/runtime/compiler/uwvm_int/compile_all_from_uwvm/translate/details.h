@@ -54,9 +54,9 @@ namespace details
             if(::std::addressof(other_module) == ::std::addressof(runtime_module)) { continue; }
 
             auto const imported_function_count{other_module.imported_function_vec_storage.size()};
-            if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound)
+            if(imported_function_count > ::std::numeric_limits<::std::size_t>::max() - bound)
             {
-                return (::std::numeric_limits<::std::size_t>::max)();
+                return ::std::numeric_limits<::std::size_t>::max();
             }
             bound += imported_function_count;
         }

@@ -243,6 +243,8 @@ template <typename FunctionPtr>
 {
     if(host_address == 0u) [[unlikely]] { return nullptr; }
 
+    // The helper must attach the address carrier to the same LLVM module that owns the insertion point; otherwise MCJIT
+    // may materialize a relocation against a different object image than the one containing the generated code.
     auto current_block{ir_builder.GetInsertBlock()};
     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
     auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
@@ -250,15 +252,23 @@ template <typename FunctionPtr>
 
     auto& llvm_context{ir_builder.getContext()};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+
+    // Store the absolute host address as data owned by the JIT object.  A non-constant private global prevents LLVM from
+    // folding the load back into an immediate `inttoptr`, while PrivateLinkage keeps the carrier local to this module.
     auto address_global = new ::llvm::GlobalVariable(*llvm_module,
                                                      llvm_intptr_type,
                                                      false,
                                                      ::llvm::GlobalValue::PrivateLinkage,
                                                      ::llvm::ConstantInt::get(llvm_intptr_type, host_address),
                                                      name_prefix);
+
+    // The value itself has no externally observable identity, but its storage must be naturally aligned because the
+    // generated code performs a real pointer-sized load from the JIT data section.
     address_global->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);
     address_global->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
 
+    // Keep the load visible to codegen.  On Win64 this encourages a RIP-relative load from nearby JIT data instead of a
+    // direct relocation against the far-away host image, avoiding zero/truncated address materialization.
     auto loaded_address{ir_builder.CreateLoad(llvm_intptr_type, address_global, "uwvm.host.addr")};
     loaded_address->setVolatile(true);
     loaded_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
@@ -363,6 +373,9 @@ template <typename FunctionPtr>
 inline constexpr void apply_llvm_jit_platform_function_attrs([[maybe_unused]] ::llvm::Function& function) noexcept
 {
 #if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    // Disable red-zone stack slots for generated Win64 code.  The Windows x64 ABI does not reserve a SysV-style area
+    // below RSP across asynchronous events, and JIT traps may enter SEH/runtime helpers while the native frame is being
+    // unwound; keeping all spills above the adjusted stack pointer prevents hidden temporaries from being clobbered.
     function.addFnAttr(::llvm::Attribute::NoRedZone);
 #endif
 }
@@ -386,7 +399,13 @@ inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& fun
 // Preserve unwind metadata for trap reporting and logical Wasm stack reconstruction.
 inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Function& function) noexcept
 {
+    // Emit asynchronous unwind tables, not only call-site unwind info.  Wasm traps can be reported from arbitrary
+    // instruction PCs after bounds checks, helper calls, or target signals/SEH faults, so the runtime unwinder needs CFI
+    // that remains valid between calls when reconstructing optimized JIT frames.
     function.setUWTableKind(::llvm::UWTableKind::Async);
+
+    // Keep a physical frame pointer in generated functions.  Trap bridges capture the current frame address explicitly,
+    // and a stable frame chain makes mixed JIT/runtime unwinding resilient after LLVM has inlined or optimized Wasm calls.
     function.addFnAttr("frame-pointer", "all");
 }
 
@@ -855,6 +874,7 @@ inline constexpr void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_mo
         auto quiet_mask{::llvm::ConstantInt::get(int_value->getType(), 0x00400000u)};
         return ir_builder.CreateBitCast(ir_builder.CreateOr(int_value, quiet_mask), nan->getType());
     }
+
     if(nan->getType()->isDoubleTy())
     {
         // IEEE-754 quiet bit for binary64 significands.
@@ -1003,7 +1023,7 @@ struct runtime_direct_callee_resolution_t
         if(::std::addressof(other_module) == ::std::addressof(runtime_module)) { continue; }
 
         auto const imported_function_count{other_module.imported_function_vec_storage.size()};
-        if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound) { return (::std::numeric_limits<::std::size_t>::max)(); }
+        if(imported_function_count > ::std::numeric_limits<::std::size_t>::max() - bound) { return ::std::numeric_limits<::std::size_t>::max(); }
         bound += imported_function_count;
     }
     return bound;
@@ -1940,6 +1960,8 @@ inline constexpr void populate_runtime_memory_access_info_mmap_fields(runtime_me
 {
     if(!limits.present_max) { return ::std::numeric_limits<::std::size_t>::max(); }
 
+    // Wasm MVP memory limits are expressed in fixed 64 KiB pages.  If/when the custom-page-size proposal is enabled in
+    // this lowering path, this conversion must use the memory's declared page size instead of the MVP constant.
     constexpr ::std::size_t wasm_page_bytes{65536uz};
     auto const max_pages{static_cast<::std::size_t>(limits.max)};
     if(max_pages > (::std::numeric_limits<::std::size_t>::max() / wasm_page_bytes)) { return ::std::numeric_limits<::std::size_t>::max(); }
@@ -2642,7 +2664,7 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
 
     auto const page_size_shift{static_cast<unsigned>(::std::countr_zero(page_size_bytes))};
     if(page_size_shift >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { return false; }
-    if(snapshot.page_count > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)() >> page_size_shift)) [[unlikely]]
+    if(snapshot.page_count > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max() >> page_size_shift)) [[unlikely]]
     {
         return false;
     }
@@ -3219,7 +3241,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const defined_local_count_uz{static_cast<::std::size_t>(wasm_code_ptr->all_local_count)};
     // This total drives vector reservations, alloca creation, and OSR local snapshot offsets; reject wraparound before
     // any of those layouts can diverge from the validated Wasm local count.
-    if(func_parameter_count_uz > (::std::numeric_limits<::std::size_t>::max)() - defined_local_count_uz) [[unlikely]] { return false; }
+    if(func_parameter_count_uz > ::std::numeric_limits<::std::size_t>::max() - defined_local_count_uz) [[unlikely]] { return false; }
     auto const all_local_count_uz{func_parameter_count_uz + defined_local_count_uz};
     using wasm_u32 = validation_module_traits_t::wasm_u32;
     if(local_func_storage.function_index > static_cast<::std::size_t>((::std::numeric_limits<wasm_u32>::max)())) [[unlikely]] { return false; }

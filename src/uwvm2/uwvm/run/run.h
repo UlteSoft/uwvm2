@@ -127,9 +127,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                               for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
                                               {
                                                   auto const imported_function_count{module_entry.second.imported_function_vec_storage.size()};
-                                                  if(imported_function_count > (::std::numeric_limits<::std::size_t>::max)() - bound)
+                                                  if(imported_function_count > ::std::numeric_limits<::std::size_t>::max() - bound)
                                                   {
-                                                      return (::std::numeric_limits<::std::size_t>::max)();
+                                                      return ::std::numeric_limits<::std::size_t>::max();
                                                   }
                                                   bound += imported_function_count;
                                               }

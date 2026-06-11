@@ -125,7 +125,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         using wasm_binfmt_ver1_export_storage_t = decltype(get_binfmt_ver1_final_export_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
         union wasm_file_export_storage_u
-        { wasm_binfmt_ver1_export_storage_t const* wasm_binfmt_ver1_export_storage_ptr; };
+        {
+            wasm_binfmt_ver1_export_storage_t const* wasm_binfmt_ver1_export_storage_ptr;
+        };
 
         wasm_file_export_storage_u storage{};
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_ver{1u};

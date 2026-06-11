@@ -221,7 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         [[nodiscard]] inline constexpr bool linear_memory_byte_count_overflows(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
-        { return page_size_bytes != 0uz && page_count > (::std::numeric_limits<::std::size_t>::max)() / page_size_bytes; }
+        { return page_size_bytes != 0uz && page_count > ::std::numeric_limits<::std::size_t>::max() / page_size_bytes; }
 
         [[nodiscard]] inline constexpr ::std::size_t linear_memory_byte_count_unchecked(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
         { return page_count * page_size_bytes; }
@@ -474,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         };
 
         [[nodiscard]] inline constexpr auto resolve_configured_local_defined_memory_limit(configured_runtime_memory_limits_t const* override_limits,
-                                                                                ::std::size_t local_memory_index) noexcept
+                                                                                          ::std::size_t local_memory_index) noexcept
             -> resolved_configured_local_defined_memory_limit_t
         {
             if(override_limits == nullptr) [[likely]] { return {}; }
@@ -2339,9 +2339,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline constexpr void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
-                                                                   ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
-                                                                   ::std::uint_least64_t& out) noexcept
+        inline constexpr void
+            try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
+                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
+                                                           ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz)
             {
