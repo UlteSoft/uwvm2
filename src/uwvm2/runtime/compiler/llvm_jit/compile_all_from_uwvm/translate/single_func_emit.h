@@ -478,7 +478,11 @@ inline constexpr void apply_llvm_jit_raw_entry_calling_conv(::llvm::Function& fu
 
 // Mark a generated raw-entry call site.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_raw_entry_calling_conv(::llvm::CallInst* call_inst) noexcept
-{ return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_raw_entry_calling_conv()); }
+{
+    auto ret{apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_raw_entry_calling_conv())};
+    if(ret != nullptr) { ret->setTailCallKind(::llvm::CallInst::TCK_NoTail); }
+    return ret;
+}
 
 // Mark a generated function as callable through the private Wasm-to-Wasm ABI.
 inline constexpr void apply_llvm_jit_wasm_calling_conv(::llvm::Function& function) noexcept
@@ -486,7 +490,11 @@ inline constexpr void apply_llvm_jit_wasm_calling_conv(::llvm::Function& functio
 
 // Mark a generated call site as using the private Wasm-to-Wasm ABI.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call_inst) noexcept
-{ return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_wasm_calling_conv()); }
+{
+    auto ret{apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_wasm_calling_conv())};
+    if(ret != nullptr) { ret->setTailCallKind(::llvm::CallInst::TCK_NoTail); }
+    return ret;
+}
 
 // Return the byte size used by the raw bridge ABI for one Wasm scalar value.  These sizes intentionally match the
 // parser's Wasm scalar storage types, not any native C++ promotion rules.
