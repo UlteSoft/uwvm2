@@ -2567,7 +2567,11 @@ namespace uwvm2::runtime::lib
             printed_call_stack_frame_tracker printed_frames{};
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(runtime_llvm_jit_unwind_call_stack_requested())
+            auto const use_llvm_jit_unwind_call_stack{runtime_llvm_jit_unwind_call_stack_requested()};
+            auto const prefer_logical_jit_frames{
+                use_llvm_jit_unwind_call_stack && n != 0uz &&
+                (current_trap_kind == trap_kind::memory_out_of_bounds || current_trap_kind == trap_kind::call_indirect_type_mismatch)};
+            if(use_llvm_jit_unwind_call_stack && !prefer_logical_jit_frames)
             {
                 // In tiered OSR traps the current faulting frame may be generated code while its callers are still
                 // interpreter frames. Print the native/DWARF-derived JIT frames first so the report starts at the leaf,
@@ -2612,7 +2616,7 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(printed_frame_count == 0uz && runtime_llvm_jit_unwind_call_stack_requested())
+            if(printed_frame_count == 0uz && use_llvm_jit_unwind_call_stack && !prefer_logical_jit_frames)
             {
                 dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul,
                                                                 printed_frame_count,
@@ -3558,6 +3562,11 @@ namespace uwvm2::runtime::lib
             // Convert the runtime call-stack policy into codegen switches before IR is emitted.
             validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
             opt.emit_call_stack_frames = runtime_llvm_jit_uses_instruction_call_stack_frames();
+# if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+            // Some Win64 trap sites are synthetic pre-dispatch checks or detailed runtime bridges where SEH can only
+            // recover the JIT leaf. Keep logical frames available so diagnostics can avoid reporting a partial stack.
+            opt.emit_call_stack_frames = opt.emit_call_stack_frames || runtime_llvm_jit_unwind_call_stack_requested();
+# endif
             opt.emit_unwind_call_stack_frames = runtime_llvm_jit_unwind_call_stack_requested();
         }
 
