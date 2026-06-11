@@ -756,7 +756,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
-            if(options.jit_event_listener != nullptr) { engine->RegisterJITEventListener(options.jit_event_listener); }
+            if(options.jit_event_listener != nullptr)
+            {
+                // Lazy unwind call-stack mode needs DWARF sections as well as executable sections so optimized inline
+                // Wasm frames can be reconstructed from the generated object.
+                engine->setProcessAllSections(true);
+                engine->RegisterJITEventListener(options.jit_event_listener);
+            }
             engine->finalizeObject();
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -873,7 +879,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
-            if(options.jit_event_listener != nullptr) { engine->RegisterJITEventListener(options.jit_event_listener); }
+            if(options.jit_event_listener != nullptr)
+            {
+                // Lazy group materialization can inline or split functions across one MCJIT object; keep DWARF metadata
+                // available to the listener so traps can recover the logical Wasm stack.
+                engine->setProcessAllSections(true);
+                engine->RegisterJITEventListener(options.jit_event_listener);
+            }
             engine->finalizeObject();
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};

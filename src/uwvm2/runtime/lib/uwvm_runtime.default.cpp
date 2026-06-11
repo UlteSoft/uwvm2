@@ -451,12 +451,43 @@ namespace uwvm2::runtime::lib
             ::std::uintptr_t end{};
         };
 
+        // Minimal section relocation record retained beside the copied JIT object.  DWARF lookup sometimes needs both the
+        // loaded native address and the original object-section address to recover inline call chains reliably.
+        struct llvm_jit_debug_loaded_section
+        {
+            ::std::uint64_t section_index{};
+            ::std::uint64_t object_address{};
+            ::std::uint64_t load_address{};
+            ::std::uint64_t size{};
+            bool text{};
+        };
+
+        // Fallback LoadedObjectInfo for MCJIT platforms whose getObjectForDebug returns no object.  Section indices are stable
+        // across a byte-for-byte object-buffer copy, so they are sufficient to answer DWARF relocation address queries.
+        class llvm_jit_copied_loaded_object_info final : public ::llvm::LoadedObjectInfoHelper<llvm_jit_copied_loaded_object_info>
+        {
+        public:
+            ::uwvm2::utils::container::vector<llvm_jit_debug_loaded_section> sections{};
+
+            [[nodiscard]] inline constexpr ::std::uint64_t getSectionLoadAddress(::llvm::object::SectionRef const& section) const override
+            {
+                auto const section_index{section.getIndex()};
+                for(auto const& record: sections)
+                {
+                    if(record.section_index == section_index) { return record.load_address; }
+                }
+
+                return 0u;
+            }
+        };
+
         // Retain debug objects because DWARF inline-frame queries need the object and relocation view to remain alive after MCJIT finalization.
         struct llvm_jit_debug_object
         {
             ::llvm::object::OwningBinary<::llvm::object::ObjectFile> object{};
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::LoadedObjectInfo> loaded_info{};
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::DWARFContext> dwarf_context{};
+            ::uwvm2::utils::container::vector<llvm_jit_debug_loaded_section> loaded_sections{};
         };
 #endif
 
@@ -1255,6 +1286,44 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
+        [[nodiscard]] inline constexpr ::llvm::object::OwningBinary<::llvm::object::ObjectFile>
+            copy_llvm_jit_object_for_debug(::llvm::object::ObjectFile const& obj,
+                                           ::llvm::RuntimeDyld::LoadedObjectInfo const& loaded,
+                                           ::std::unique_ptr<::llvm::LoadedObjectInfo>& loaded_info) noexcept
+        {
+            // Some MCJIT/RuntimeDyld object formats, notably Mach-O in current LLVM builds, do not synthesize a separate
+            // debug object for listeners.  Copy the original object buffer and pair it with a cloneable section-load map so
+            // DWARFContext can still process relocations after the listener callback returns.
+            auto copied_loaded_info{::std::make_unique<llvm_jit_copied_loaded_object_info>()};
+            if(copied_loaded_info == nullptr) [[unlikely]] { return {}; }
+
+            for(auto const& section: obj.sections())
+            {
+                auto const load_address{loaded.getSectionLoadAddress(section)};
+                if(load_address == 0u) { continue; }
+
+                copied_loaded_info->sections.push_back(llvm_jit_debug_loaded_section{.section_index = section.getIndex(),
+                                                                                     .object_address = section.getAddress(),
+                                                                                     .load_address = load_address,
+                                                                                     .size = section.getSize(),
+                                                                                     .text = section.isText()});
+            }
+
+            auto const object_buffer_ref{obj.getMemoryBufferRef()};
+            auto copied_buffer{::llvm::MemoryBuffer::getMemBufferCopy(object_buffer_ref.getBuffer(), object_buffer_ref.getBufferIdentifier())};
+            if(copied_buffer == nullptr) [[unlikely]] { return {}; }
+
+            auto copied_object_expected{::llvm::object::ObjectFile::createObjectFile(copied_buffer->getMemBufferRef())};
+            if(!copied_object_expected)
+            {
+                ::llvm::consumeError(copied_object_expected.takeError());
+                return {};
+            }
+
+            loaded_info = ::std::move(copied_loaded_info);
+            return ::llvm::object::OwningBinary<::llvm::object::ObjectFile>{::std::move(*copied_object_expected), ::std::move(copied_buffer)};
+        }
+
         class uwvm_llvm_jit_debug_listener final : public ::llvm::JITEventListener
         {
         public:
@@ -1273,9 +1342,15 @@ namespace uwvm2::runtime::lib
                 }
 
                 auto debug_object{loaded.getObjectForDebug(obj)};
-                if(debug_object.getBinary() == nullptr) { return; }
                 auto loaded_info{loaded.clone()};
-                if(loaded_info == nullptr) { return; }
+                if(debug_object.getBinary() == nullptr || loaded_info == nullptr)
+                {
+                    // Keep optimized inline recovery available on platforms where LLVM reports code ranges but not a
+                    // ready-made debug object.  Without this fallback the unwind path can see only native entry frames.
+                    loaded_info.reset();
+                    debug_object = copy_llvm_jit_object_for_debug(obj, loaded, loaded_info);
+                }
+                if(debug_object.getBinary() == nullptr || loaded_info == nullptr) { return; }
 
                 auto dwarf_context{::llvm::DWARFContext::create(
                     *debug_object.getBinary(),
@@ -1289,6 +1364,18 @@ namespace uwvm2::runtime::lib
 
                 auto record{::uwvm2::utils::container::make_delete_owned<llvm_jit_debug_object>()};
                 if(record == nullptr) { return; }
+
+                for(auto const& section: obj.sections())
+                {
+                    auto const load_address{loaded.getSectionLoadAddress(section)};
+                    if(load_address == 0u) { continue; }
+
+                    record->loaded_sections.push_back(llvm_jit_debug_loaded_section{.section_index = section.getIndex(),
+                                                                                    .object_address = section.getAddress(),
+                                                                                    .load_address = load_address,
+                                                                                    .size = section.getSize(),
+                                                                                    .text = section.isText()});
+                }
 
                 record->object = ::std::move(debug_object);
                 record->loaded_info.reset(loaded_info.release());
@@ -1402,14 +1489,17 @@ namespace uwvm2::runtime::lib
                                                .frame_pointer = trap_frame_address,
                                                .stack_pointer = stack_pointer};
 #   else
-            auto const frame_pointer{llvm_jit_load_frame_record_word(trap_frame_address)};
-            if(!llvm_jit_frame_pointer_link_plausible(trap_frame_address, frame_pointer)) [[unlikely]] { return {}; }
+            // The trap bridge now prefers the generated frame pointer when available.  Treat the supplied address as
+            // the current frame record and let the frame walk/unwinder step from there; starting at the caller frame
+            // would skip the first Wasm caller for detailed memory traps.
+            auto const next_frame_pointer{llvm_jit_load_frame_record_word(trap_frame_address)};
+            if(next_frame_pointer != 0u && !llvm_jit_frame_pointer_link_plausible(trap_frame_address, next_frame_pointer)) [[unlikely]] { return {}; }
 
             auto const stack_pointer{trap_frame_address + 2u * sizeof(::std::uintptr_t)};
             if(stack_pointer <= trap_frame_address) [[unlikely]] { return {}; }
             return llvm_jit_trap_frame_context{.return_address = return_address,
                                                .trap_frame_address = trap_frame_address,
-                                               .frame_pointer = frame_pointer,
+                                               .frame_pointer = trap_frame_address,
                                                .stack_pointer = stack_pointer};
 #   endif
 #  else
@@ -2100,42 +2190,95 @@ namespace uwvm2::runtime::lib
                                                      // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
                                                      // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
                                                      // they are available and print only the parseable Wasm frame records.
+                                                     //
+                                                     // The IP available from a trap is a native return address normalized by the unwinder.  On targets such
+                                                     // as AArch64 that address can still land at the end of the trap call instruction, while DWARF inline
+                                                     // ranges are often keyed at the instruction start.  Probe a small bounded window around the IP before
+                                                     // falling back to the coarse native unwind entry.
                                                      bool printed{};
                                                      ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
                                                                                            ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
-                                                     ::llvm::object::SectionedAddress addresses[]{
-                                                         {ip,      ::llvm::object::SectionedAddress::UndefSection},
-                                                         {ip + 1u, ::llvm::object::SectionedAddress::UndefSection},
-                                                     };
 
-                                                     for(auto const& debug_object: g_runtime.llvm_jit_debug_objects)
-                                                     {
-                                                         if(debug_object == nullptr || debug_object->dwarf_context == nullptr) { continue; }
-
-                                                         for(auto const address: addresses)
+                                                     auto const try_print_address{
+                                                         [&](::llvm::object::SectionedAddress address) constexpr noexcept -> bool
                                                          {
-                                                             auto const inline_info{debug_object->dwarf_context->getInliningInfoForAddress(address, specifier)};
-                                                             auto const frame_count{inline_info.getNumberOfFrames()};
-                                                             if(frame_count == 0u) { continue; }
+                                                             auto const try_print_debug_object_address{
+                                                                 [&](llvm_jit_debug_object const& debug_object,
+                                                                     ::llvm::object::SectionedAddress candidate_address) constexpr noexcept -> bool
+                                                                 {
+                                                                     auto const inline_info{
+                                                                         debug_object.dwarf_context->getInliningInfoForAddress(candidate_address, specifier)};
+                                                                     auto const frame_count{inline_info.getNumberOfFrames()};
+                                                                     if(frame_count == 0u) { return false; }
 
-                                                             bool matched{};
-                                                             for(unsigned i{}; i != frame_count; ++i)
+                                                                     bool matched{};
+                                                                     for(unsigned i{}; i != frame_count; ++i)
+                                                                     {
+                                                                         ::std::size_t module_id{};
+                                                                         ::std::size_t function_index{};
+                                                                         auto const& frame_name{inline_info.getFrame(i).FunctionName};
+                                                                         auto const frame_name_view{
+                                                                             ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(
+                                                                                 ::llvm::StringRef{frame_name.data(), frame_name.size()})
+                                                                         };
+                                                                         if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
+                                                                         print_wasm_frame(module_id, function_index);
+                                                                         printed = true;
+                                                                         matched = true;
+                                                                     }
+
+                                                                     return matched;
+                                                                 }};
+
+                                                             for(auto const& debug_object: g_runtime.llvm_jit_debug_objects)
                                                              {
-                                                                 ::std::size_t module_id{};
-                                                                 ::std::size_t function_index{};
-                                                                 auto const& frame_name{inline_info.getFrame(i).FunctionName};
-                                                                 auto const frame_name_view{
-                                                                     ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(
-                                                                         ::llvm::StringRef{frame_name.data(), frame_name.size()})
-                                                                 };
-                                                                 if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
-                                                                 print_wasm_frame(module_id, function_index);
-                                                                 printed = true;
-                                                                 matched = true;
+                                                                 if(debug_object == nullptr || debug_object->dwarf_context == nullptr) { continue; }
+                                                                 if(try_print_debug_object_address(*debug_object, address)) { return true; }
+
+                                                                 for(auto const& section: debug_object->loaded_sections)
+                                                                 {
+                                                                     if(!section.text || section.load_address == 0u || section.size == 0u) { continue; }
+                                                                     if(address.Address < section.load_address) { continue; }
+
+                                                                     auto const section_offset{address.Address - section.load_address};
+                                                                     if(section_offset >= section.size ||
+                                                                        section_offset >
+                                                                            ::std::numeric_limits<::std::uint64_t>::max() - section.object_address)
+                                                                     {
+                                                                         continue;
+                                                                     }
+
+                                                                     // Some object formats keep line-table rows section-relative even when a LoadedObjectInfo is
+                                                                     // available.  Convert the native PC back to the original object section address and carry
+                                                                     // the section index so DWARF inline lookup can find inlined Wasm callees after LLVM inlining.
+                                                                     auto const object_address{section.object_address + section_offset};
+                                                                     if(try_print_debug_object_address(
+                                                                            *debug_object,
+                                                                            {object_address, section.section_index}))
+                                                                     {
+                                                                         return true;
+                                                                     }
+                                                                 }
                                                              }
 
-                                                             if(matched) { return true; }
+                                                             return false;
+                                                         }};
+
+                                                     constexpr ::std::uintptr_t probe_stride{4u};
+                                                     constexpr ::std::uintptr_t backward_probe_limit{64u};
+                                                     for(::std::uintptr_t delta{}; delta <= backward_probe_limit; delta += probe_stride)
+                                                     {
+                                                         if(ip >= delta &&
+                                                            try_print_address({ip - delta, ::llvm::object::SectionedAddress::UndefSection}))
+                                                         {
+                                                             return true;
                                                          }
+                                                     }
+
+                                                     if(ip != ::std::numeric_limits<::std::uintptr_t>::max() &&
+                                                        try_print_address({ip + 1u, ::llvm::object::SectionedAddress::UndefSection}))
+                                                     {
+                                                         return true;
                                                      }
 
                                                      return printed;
@@ -7224,6 +7367,52 @@ namespace uwvm2::runtime::lib
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             return true;
         }
+
+        [[nodiscard]] inline constexpr bool prepare_lazy_llvm_jit_unwind_native_call_graph(::std::size_t entry_module_id,
+                                                                                           ::std::size_t entry_function_index) noexcept
+        {
+            // Lazy materialization normally lets the first Wasm call to a cold function cross a C++ raw-entry bridge.
+            // That bridge is not a Wasm frame, and native unwinders may stop or coalesce frames across it before the
+            // caller's generated frame is visible.  In unwind call-stack mode, materialize the entry's direct-call graph
+            // before execution so ordinary Wasm calls use typed native-entry fast paths while unrelated cold functions stay lazy.
+            if(!runtime_llvm_jit_unwind_call_stack_requested() || !g_runtime.lazy_compile_active) { return true; }
+            if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
+               ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+            {
+                return true;
+            }
+
+            if(entry_module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
+
+            auto const& rec{g_runtime.modules.index_unchecked(entry_module_id)};
+            auto const runtime_module{rec.runtime_module};
+            if(runtime_module == nullptr) [[unlikely]] { return false; }
+
+            auto const import_n{runtime_module->imported_function_vec_storage.size()};
+            auto const local_n{runtime_module->local_defined_function_vec_storage.size()};
+            if(entry_function_index < import_n) [[unlikely]] { return false; }
+
+            auto const entry_local_index{entry_function_index - import_n};
+            if(entry_local_index >= local_n) [[unlikely]] { return false; }
+
+            ::uwvm2::utils::container::vector<::std::size_t> graph_order{};
+            if(!collect_llvm_jit_lazy_entry_direct_graph_order(*runtime_module, entry_local_index, local_n, graph_order) || graph_order.empty()) [[unlikely]]
+            {
+                return false;
+            }
+            if(local_n > (::std::numeric_limits<::std::size_t>::max() - import_n)) [[unlikely]] { return false; }
+
+            for(auto const local_index: graph_order)
+            {
+                if(local_index >= local_n) [[unlikely]] { return false; }
+                if(!ensure_lazy_llvm_jit_defined_function_compiled(entry_module_id, import_n + local_index, false)) [[unlikely]]
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
@@ -9159,6 +9348,9 @@ namespace uwvm2::runtime::lib
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
             if(runtime_llvm_jit_unwind_call_stack_requested())
             {
+                // Preserve non-executable metadata sections for the debug listener/fallback object copy.  Optimized inline
+                // frames live in DWARF, not in the native unwind table itself.
+                llvm_jit_engine->setProcessAllSections(true);
                 llvm_jit_engine->RegisterJITEventListener(::std::addressof(get_uwvm_llvm_jit_debug_listener()));
             }
             if(use_parallel_objects)
@@ -11741,9 +11933,13 @@ namespace uwvm2::runtime::lib
 # endif
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
 #  if UWVM_HAS_BUILTIN(__builtin_frame_address)
-        auto const frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
+        // Prefer the generated caller's frame pointer when the IR trap bridge supplied it.  Starting the seeded
+        // unwind from the C++ helper frame can lose Wasm callers across host-call ABI boundaries, especially for
+        // detailed memory traps.
+        auto const helper_frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
+        auto const frame_address{explicit_frame_address == 0u ? helper_frame_address : explicit_frame_address};
 #  else
-        constexpr ::std::uintptr_t frame_address{};
+        auto const frame_address{explicit_frame_address};
 #  endif
 # else
         auto const frame_address{explicit_frame_address};
@@ -11830,9 +12026,12 @@ namespace uwvm2::runtime::lib
 # endif
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
 #  if UWVM_HAS_BUILTIN(__builtin_frame_address)
-        auto const frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
+        // Detailed memory traps already receive the generated frame pointer from IR.  Use it on DWARF/libunwind
+        // targets too so the seeded unwind walks the Wasm caller chain instead of the helper's host frame.
+        auto const helper_frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
+        auto const frame_address{explicit_frame_address == 0u ? helper_frame_address : explicit_frame_address};
 #  else
-        constexpr ::std::uintptr_t frame_address{};
+        auto const frame_address{explicit_frame_address};
 #  endif
 # else
         auto const frame_address{explicit_frame_address};
@@ -12002,6 +12201,11 @@ namespace uwvm2::runtime::lib
 # if defined(UWVM_RUNTIME_LLVM_JIT)
         if(llvm_jit_lazy_backend)
         {
+            if(!prepare_lazy_llvm_jit_unwind_native_call_graph(llvm_jit_entry_module_id, llvm_jit_entry_function_index)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
             // LLVM lazy-only mode can enter the raw generated wrapper directly; tiered mode may still choose an interpreter T0 bridge.
             if(!try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
                                                               llvm_jit_entry_function_index,
