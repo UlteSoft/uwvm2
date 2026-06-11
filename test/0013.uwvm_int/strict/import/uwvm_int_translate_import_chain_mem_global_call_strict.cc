@@ -31,7 +31,7 @@ namespace
     // Minimal imported-call bridge:
     // - compiler encodes imported calls as (module_id=compile_option.curr_wasm_id, call_function=funcidx)
     // - in this test, the only imported function is funcidx=0 with signature (i32,i32)->i32, implemented as `a+b`.
-    static void imported_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI imported_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != g_expected_wasm_id) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -334,13 +334,9 @@ namespace
 
     [[nodiscard]] int test_translate_import_chain_mem_global_call() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +imported_call_bridge;
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        install_unexpected_traps();
+        optable::call_func = imported_call_bridge;
+        optable::call_indirect_func = strict_terminate_call_indirect;
 
         // C defines, B imports from C, A imports from B, main imports from A.
         auto const modC = build_modC();

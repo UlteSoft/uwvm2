@@ -34,7 +34,7 @@ namespace
     }
 
     // Minimal trivial-call bridge (same encoding contract as translate.h local-defined call fast path).
-    static void call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -87,10 +87,10 @@ namespace
     }
 
     // Minimal call_indirect bridge for tests: resolves local-defined table element and dispatches via `call_bridge`.
-    static void call_indirect_bridge(::std::size_t /*wasm_module_id*/,
-                                     ::std::size_t type_index,
-                                     ::std::size_t table_index,
-                                     ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_indirect_bridge(::std::size_t /*wasm_module_id*/,
+                                                        ::std::size_t type_index,
+                                                        ::std::size_t table_index,
+                                                        ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         auto die = [&](char const* msg) noexcept
         {
@@ -573,13 +573,9 @@ namespace
     {
         g_trace_ci = (::std::getenv("UWVM2TEST_TRACE_CI") != nullptr);
 
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +call_indirect_bridge;
+        install_unexpected_traps();
+        optable::call_func = strict_terminate_call;
+        optable::call_indirect_func = call_indirect_bridge;
 
         auto wasm = build_call_indirect_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_call_indirect");

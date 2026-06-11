@@ -112,7 +112,7 @@ def filtered_llvm_cxxflags(tool: str) -> list[str]:
         if skip_next:
             skip_next = False
             continue
-        if flag.startswith("-std=") or flag.startswith("-stdlib=") or flag == "-fno-exceptions":
+        if flag.startswith("-std=") or flag == "-fno-exceptions":
             continue
         if flag in {"-I", "-isystem"}:
             out.append(flag)
@@ -120,6 +120,84 @@ def filtered_llvm_cxxflags(tool: str) -> list[str]:
             continue
         out.append(flag)
     return out
+
+
+def has_library(directory: Path, name: str) -> bool:
+    for filename in (f"lib{name}.dll.a", f"lib{name}.a", f"{name}.lib", f"lib{name}.lib"):
+        if (directory / filename).is_file():
+            return True
+    return False
+
+
+def libcxx_runtime_flags(tool: str, cxxflags: list[str]) -> tuple[list[str], list[str], list[str]]:
+    if "-stdlib=libc++" not in cxxflags:
+        return [], [], []
+
+    prefix = Path(run_text([tool, "--prefix"], check=False) or "")
+    libdir = Path(run_text([tool, "--libdir"], check=False) or "")
+    host_target = run_text([tool, "--host-target"], check=False)
+
+    roots: list[Path] = []
+    for root in (prefix, prefix.parent if str(prefix) else Path(), prefix / "runtimes", prefix.parent / "runtimes" if str(prefix) else Path(),
+                 libdir.parent if str(libdir) else Path(), libdir.parent / "runtimes" if str(libdir) else Path()):
+        if str(root) and root not in roots:
+            roots.append(root)
+
+    targets: list[str] = []
+    for target in (
+        host_target,
+        host_target.replace("-unknown-", "-") if host_target else "",
+        host_target.replace("-unknown-", "-w64-") if host_target else "",
+    ):
+        if target and target not in targets:
+            targets.append(target)
+
+    include_dir: Path | None = None
+    link_dirs: list[Path] = []
+    for root in roots:
+        include_candidates = [root / "include" / "c++" / "v1", root / "runtimes" / "include" / "c++" / "v1"]
+        include_candidates += [root / target / "include" / "c++" / "v1" for target in targets]
+        for candidate in include_candidates:
+            if include_dir is None and (candidate / "algorithm").is_file():
+                include_dir = candidate
+
+        link_candidates = [root / "lib", root / "runtimes" / "lib"]
+        for target in targets:
+            link_candidates += [root / "lib" / target, root / "runtimes" / "lib" / target, root / target / "lib"]
+        for candidate in link_candidates:
+            if has_library(candidate, "c++") and candidate not in link_dirs:
+                link_dirs.append(candidate)
+
+    extra_cxxflags = ["-isystem", str(include_dir)] if include_dir is not None else []
+    extra_ldflags: list[str] = []
+    extra_libs: list[str] = []
+    if link_dirs:
+        extra_ldflags.append("-nostdlib++")
+        extra_ldflags += [f"-L{directory}" for directory in link_dirs]
+        extra_libs.append("-lc++")
+        if any(has_library(directory, "c++abi") for directory in link_dirs):
+            extra_libs.append("-lc++abi")
+        if any(has_library(directory, "unwind") for directory in link_dirs):
+            extra_libs.append("-lunwind")
+    return extra_cxxflags, extra_ldflags, extra_libs
+
+
+def llvm_toolchain_flags(tool: str) -> tuple[list[str], list[str]]:
+    if sys.platform != "win32":
+        return [], []
+
+    host_target = run_text([tool, "--host-target"], check=False)
+    if not host_target:
+        return [], []
+
+    target = host_target.replace("-unknown-", "-w64-")
+    prefix_text = run_text([tool, "--prefix"], check=False)
+    linkflags = ["-fuse-ld=lld"]
+    if prefix_text:
+        target_libdir = Path(prefix_text).parent / target.replace("-w64-", "-") / "lib"
+        if target_libdir.is_dir():
+            linkflags.append(f"-L{target_libdir}")
+    return [f"--target={target}"], linkflags
 
 
 def add_matrix_defines(defines: list[str], combine: str, delay: str) -> None:
@@ -179,8 +257,11 @@ def main() -> int:
     args = ap.parse_args()
 
     cxx = os.environ.get("CXX", "c++")
-    std_flag = pick_std_flag(cxx)
     llvm = llvm_config()
+    toolchain_cxxflags, toolchain_ldflags = llvm_toolchain_flags(llvm)
+    std_flag = pick_std_flag(cxx)
+    llvm_cxxflags = filtered_llvm_cxxflags(llvm)
+    libcxx_cxxflags, libcxx_ldflags, libcxx_libs = libcxx_runtime_flags(llvm, llvm_cxxflags)
 
     generated_dir = args.generated_dir.resolve()
     out = args.out.resolve()
@@ -223,20 +304,25 @@ def main() -> int:
 
     cmd = [
         cxx,
+        *toolchain_cxxflags,
         std_flag,
         "-O2",
         "-g",
         *defines,
         *(f"-I{p}" for p in include_dirs),
-        *filtered_llvm_cxxflags(llvm),
+        *llvm_cxxflags,
+        *libcxx_cxxflags,
         *split_env_words("UWVM_BACKEND_FUZZER_EXTRA_CXXFLAGS"),
         *args.extra_cxxflag,
         str(script_dir / "backend_fuzzer_runner.cc"),
         str(root / "src" / "uwvm2" / "runtime" / "lib" / "uwvm_runtime.default.cpp"),
         "-o",
         str(out),
+        *toolchain_ldflags,
+        *libcxx_ldflags,
         *llvm_ldflags,
         *llvm_libs,
+        *libcxx_libs,
         *llvm_system_libs,
         *split_env_words("UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS"),
         *args.extra_ldflag,

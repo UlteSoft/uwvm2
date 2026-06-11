@@ -159,13 +159,9 @@ namespace
 
     [[nodiscard]] int test_translate_imported_memory_brif_fuse() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        install_unexpected_traps();
+        optable::call_func = strict_terminate_call;
+        optable::call_indirect_func = strict_terminate_call_indirect;
 
         auto wasm_provider = build_provider_memory_module();
         auto wasm_consumer = build_imported_memory_brif_fuse_module();

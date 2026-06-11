@@ -31,7 +31,7 @@ namespace
         return out;
     }
 
-    static void mixed_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI mixed_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -216,23 +216,21 @@ namespace
         }
 
         // A cycle-resolved import alias is now lowered to the local direct-defined
-        // call bridge (`module_id == SIZE_MAX`) instead of routing back through the
-        // imported-call bridge. Keep this regression targeted at the resolution kind:
-        // direct bridge must be used, imported bridge must stay unused.
+        // target instead of routing back through the imported-call bridge.  The
+        // uwvm-int runner observes this through the local call bridge; the LLVM
+        // mirror executes the JIT/native direct call and bypasses optable::call_func.
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(g_direct_bridge_calls != 0uz);
+#endif
         UWVM2TEST_REQUIRE(g_import_bridge_calls == 0uz);
         return 0;
     }
 
     [[nodiscard]] int test_translate_import_cycle_direct_call() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +mixed_call_bridge;
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        install_unexpected_traps();
+        optable::call_func = mixed_call_bridge;
+        optable::call_indirect_func = strict_terminate_call_indirect;
 
         auto const relay_wasm = build_cycle_relay_module();
         auto const main_wasm = build_cycle_main_module();
