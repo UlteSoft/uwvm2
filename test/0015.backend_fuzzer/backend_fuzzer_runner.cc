@@ -23,6 +23,7 @@
 #include <uwvm2/uwvm/runtime/storage/impl.h>
 #include <uwvm2/uwvm/wasm/feature/impl.h>
 #include <uwvm2/uwvm/wasm/type/impl.h>
+#include <uwvm2/uwvm/wasm/type/local_imported.h>
 
 #include "backend_fuzzer_cases.inc"
 
@@ -34,6 +35,7 @@ namespace
     namespace rtmode = ::uwvm2::uwvm::runtime::runtime_mode;
     namespace int_compiler = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm;
     namespace int_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
+    namespace wasm_type = ::uwvm2::uwvm::wasm::type;
 
 #if !defined(UWVM_DISABLE_INT) && (defined(UWVM_USE_DEFAULT_INT) || defined(UWVM_USE_UWVM_INT))
 # define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 1
@@ -64,8 +66,12 @@ namespace
 
     using value_type_t = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
     using wasm_byte_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
+    using wasm_i32_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+    using wasm1_t = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    using feature_list_t = wasm_type::feature_list<wasm1_t>;
     using module_t = storage::wasm_module_storage_t;
     using function_type_t = storage::wasm_binfmt1_final_function_type_t;
+    using import_type_t = storage::wasm_binfmt1_final_import_type_t;
     using code_t = storage::wasm_binfmt1_final_wasm_code_t;
     using memory_type_t = storage::wasm_binfmt1_final_memory_type_t;
     using table_type_t = storage::wasm_binfmt1_final_table_type_t;
@@ -78,6 +84,40 @@ namespace
     constexpr ::uwvm2::utils::container::u8string_view k_main_module_name{
         k_main_module_name_storage,
         sizeof(k_main_module_name_storage) / sizeof(char8_t) - 1uz};
+    constexpr char8_t k_local_import_module_name_storage[] = u8"backend-local-import";
+    constexpr ::uwvm2::utils::container::u8string_view k_local_import_module_name{
+        k_local_import_module_name_storage,
+        sizeof(k_local_import_module_name_storage) / sizeof(char8_t) - 1uz};
+    constexpr char8_t k_local_import_add_i32_name_storage[] = u8"add_i32";
+    constexpr ::uwvm2::utils::container::u8string_view k_local_import_add_i32_name{
+        k_local_import_add_i32_name_storage,
+        sizeof(k_local_import_add_i32_name_storage) / sizeof(char8_t) - 1uz};
+
+    struct backend_fuzzer_add_i32
+    {
+        inline static constexpr auto function_name{k_local_import_add_i32_name};
+
+        using res_type = wasm_type::import_function_result_tuple_t<feature_list_t, value_type_t::i32>;
+        using para_type = wasm_type::import_function_parameter_tuple_t<feature_list_t, value_type_t::i32, value_type_t::i32>;
+        using local_imported_function_type = wasm_type::local_imported_function_type_t<res_type, para_type>;
+
+        static void call(local_imported_function_type& func_type) noexcept
+        {
+            auto const lhs{::uwvm2::utils::container::get<0>(func_type.params)};
+            auto const rhs{::uwvm2::utils::container::get<1>(func_type.params)};
+            ::uwvm2::utils::container::get<0>(func_type.res) = static_cast<wasm_i32_t>(lhs + rhs);
+        }
+    };
+
+    struct backend_fuzzer_local_import_module
+    {
+        ::uwvm2::utils::container::u8string_view module_name{k_local_import_module_name};
+        using local_function_tuple = ::uwvm2::utils::container::tuple<backend_fuzzer_add_i32>;
+    };
+
+    static_assert(wasm_type::is_local_imported_function<backend_fuzzer_add_i32>);
+    static_assert(wasm_type::is_local_imported_module<backend_fuzzer_local_import_module>);
+    static_assert(wasm_type::has_local_function_tuple<backend_fuzzer_local_import_module>);
 
     [[nodiscard]] value_type_t to_value_type(::std::uint8_t v) noexcept
     { return static_cast<value_type_t>(v); }
@@ -128,10 +168,12 @@ namespace
     {
         ::std::vector<value_type_t> value_types{};
         ::std::vector<function_type_t> types{};
+        ::std::vector<import_type_t> import_types{};
         ::std::vector<code_t> codes{};
         ::std::vector<::std::vector<wasm_byte_t>> code_bytes{};
         ::std::vector<memory_type_t> memories{};
         ::std::vector<table_type_t> tables{};
+        wasm_type::local_imported_module<wasm1_t> local_import_module{backend_fuzzer_local_import_module{}};
 
         void build(::std::size_t case_index, module_t& module)
         {
@@ -194,6 +236,29 @@ namespace
 
             module.type_section_storage.type_section_begin = types.data();
             module.type_section_storage.type_section_end = types.data() + types.size();
+
+            import_types.clear();
+            if(c.has_local_imported_i32_add)
+            {
+                if(c.type_count == 0u) { die("local-imported case missing import function type"); }
+                if(!local_import_module.init_local_imported_module()) { die("local-imported module init failed"); }
+
+                import_types.resize(1uz);
+                auto& import_type{import_types[0]};
+                import_type.module_name = k_local_import_module_name;
+                import_type.extern_name = k_local_import_add_i32_name;
+                import_type.imports.type = ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func;
+                import_type.imports.storage.function = ::std::addressof(types[0]);
+
+                storage::imported_function_storage_t imp{};
+                imp.import_type_ptr = ::std::addressof(import_types[0]);
+                imp.link_kind = storage::imported_function_link_kind::local_imported;
+                imp.target.local_imported.module_ptr = ::std::addressof(local_import_module);
+                imp.target.local_imported.index = 0uz;
+
+                module.imported_function_vec_storage.reserve(1uz);
+                module.imported_function_vec_storage.push_back_unchecked(imp);
+            }
 
             module.local_defined_function_vec_storage.reserve(c.func_count);
             for(::std::size_t i{}; i != c.func_count; ++i)
