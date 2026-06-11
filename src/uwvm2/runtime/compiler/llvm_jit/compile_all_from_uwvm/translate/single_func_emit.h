@@ -673,21 +673,14 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
     // - size_t/uintptr_t fields use the host pointer-sized integer so 32-bit and 64-bit hosts keep their native ABI.
     // - Wasm address/length diagnostics are fixed 64-bit values and must not be truncated on 32-bit hosts.
     // - The overflow/carry diagnostic is a uint_least32_t-sized flag, so the IR signature keeps it as i32.
+    // - Frame/stack context slots are always present; non-Win64 runtimes may ignore them, but the bridge ABI remains
+    //   architecture-stable for every generated caller.
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
     auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     return ::llvm::FunctionType::get(
         ::llvm::Type::getVoidTy(llvm_context),
-        llvm_jit_win64_seh_explicit_trap_context_enabled()
-            ? ::std::initializer_list<::llvm::Type*>{llvm_intptr_type,
-                                                     llvm_i64_type,
-                                                     llvm_i64_type,
-                                                     llvm_i32_type,
-                                                     llvm_i64_type,
-                                                     llvm_intptr_type,
-                                                     llvm_intptr_type,
-                                                     llvm_intptr_type}
-            : ::std::initializer_list<::llvm::Type*>{llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type},
+        {llvm_intptr_type, llvm_i64_type, llvm_i64_type, llvm_i32_type, llvm_i64_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type},
         false);
 }
 
@@ -727,12 +720,9 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     call_arguments.emplace_back(offset_65_bit_arg);
     call_arguments.emplace_back(memory_length_arg);
     call_arguments.emplace_back(::llvm::ConstantInt::get(llvm_intptr_type, memory_type_size));
-    if constexpr(llvm_jit_win64_seh_explicit_trap_context_enabled())
-    {
-        auto const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(llvm_intptr_type)};
-        call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
-        call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
-    }
+    auto const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(llvm_intptr_type)};
+    call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
+    call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
     auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
@@ -2255,13 +2245,9 @@ inline constexpr void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
                                                               effective_offset.offset,
                                                               effective_offset.offset_65_bit ? 1u : 0u,
                                                               static_cast<::std::uint_least64_t>(memory_length),
-                                                              access_size
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-                                                              ,
+                                                              access_size,
                                                               0u,
-                                                              0u
-#endif
-    );
+                                                              0u);
     ::fast_io::fast_terminate();
 }
 

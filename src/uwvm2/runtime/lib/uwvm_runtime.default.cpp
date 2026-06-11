@@ -11484,12 +11484,9 @@ namespace uwvm2::runtime::lib
                                                               ::std::uint_least64_t memory_offset,
                                                               ::std::uint_least32_t offset_65_bit,
                                                               ::std::uint_least64_t memory_length,
-                                                              ::std::size_t memory_type_size
-# if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-                                                              ,
-                                                              ::std::uintptr_t frame_address,
-                                                              ::std::uintptr_t stack_pointer
-# endif
+                                                              ::std::size_t memory_type_size,
+                                                              [[maybe_unused]] ::std::uintptr_t explicit_frame_address,
+                                                              [[maybe_unused]] ::std::uintptr_t explicit_stack_pointer
                                                               ) noexcept
     {
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
@@ -11503,10 +11500,12 @@ namespace uwvm2::runtime::lib
 #  else
         constexpr ::std::uintptr_t frame_address{};
 #  endif
+# else
+        auto const frame_address{explicit_frame_address};
 # endif
         store_llvm_jit_trap_context(llvm_jit_trap_kind::memory_out_of_bounds, return_address, frame_address);
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-        store_llvm_jit_win64_trap_caller_context(return_address, frame_address, stack_pointer);
+        store_llvm_jit_win64_trap_caller_context(return_address, frame_address, explicit_stack_pointer);
 # endif
 
         ::uwvm2::object::memory::error::memory_error_t const memerr{

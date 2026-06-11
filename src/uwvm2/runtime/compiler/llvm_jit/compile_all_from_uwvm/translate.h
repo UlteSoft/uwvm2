@@ -112,12 +112,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                               ::std::uint_least64_t memory_offset,
                                                               ::std::uint_least32_t offset_65_bit,
                                                               ::std::uint_least64_t memory_length,
-                                                              ::std::size_t memory_type_size
-# if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-                                                              ,
-                                                              ::std::uintptr_t frame_address,
-                                                              ::std::uintptr_t stack_pointer
-# endif
+                                                              ::std::size_t memory_type_size,
+                                                              [[maybe_unused]] ::std::uintptr_t frame_address,
+                                                              [[maybe_unused]] ::std::uintptr_t stack_pointer
                                                               ) noexcept;
 
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
