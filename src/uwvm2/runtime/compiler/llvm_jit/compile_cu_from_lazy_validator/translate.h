@@ -380,10 +380,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         struct llvm_jit_native_target_config
         {
             // Host CPU name as returned by LLVM, stored to keep StringRef inputs alive.
-            ::uwvm2::utils::container::string cpu_name{};
+            ::uwvm2::utils::container::u8string cpu_name{};
 
             // Host feature attributes such as "+sse2" or "-avx512f", also stored for stable StringRef lifetimes.
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> feature_storage{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> feature_storage{};
         };
 
         // Returns the byte distance between two pointers inside the same Wasm function body.
@@ -523,18 +523,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         // Copies LLVM's host feature map into owning strings so later EngineBuilder StringRefs remain valid.
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>
             get_llvm_jit_host_target_attribute_storage() noexcept
         {
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> mattrs{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> mattrs{};
             auto host_features{::llvm::sys::getHostCPUFeatures()};
             if(!host_features.empty())
             {
                 mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
-                    mattrs.push_back(::uwvm2::utils::container::concat_uwvm(feature_enabled ? "+" : "-",
-                                                                            ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
+                    mattrs.push_back(::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-",
+                                                                            all_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
             return mattrs;
@@ -547,8 +547,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                             []() constexpr noexcept
                                                         {
                                                             auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                                                            return ::uwvm2::utils::container::string{
-                                                                ::uwvm2::utils::container::string_view{host_cpu_name.data(), host_cpu_name.size()}
+                                                            return ::uwvm2::utils::container::u8string{
+                                                                all_details::get_uwvm_u8string_view(host_cpu_name)
                                                             };
                                                         }(),
                                                         .feature_storage = get_llvm_jit_host_target_attribute_storage()};  // [global]
@@ -557,7 +557,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Converts owning host feature strings into the StringRef array shape expected by LLVM EngineBuilder.
         inline constexpr void
-            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& attr_storage,
                                                        ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
         {
             attr_refs.clear();
@@ -672,7 +672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Resolves an emitted LLVM function symbol to a native address, with a fallback for older MCJIT paths that need
         // an IR Function pointer before materializing the address.
         [[nodiscard]] inline constexpr ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
-                                                                                      ::uwvm2::utils::container::string const& function_name) noexcept
+                                                                                      ::uwvm2::utils::container::u8string const& function_name) noexcept
         {
             llvm_jit_function_address_name_t function_address_name{function_name.data(), function_name.data() + function_name.size()};
             auto const direct_function_address{engine.getFunctionAddress(function_address_name)};

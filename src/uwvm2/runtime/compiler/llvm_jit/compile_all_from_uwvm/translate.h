@@ -95,12 +95,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 # if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
         [[clang::disable_tail_calls]]
 # endif
-        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind
-# if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-                                                 ,
-                                                 ::std::uintptr_t frame_address,
-                                                 ::std::uintptr_t stack_pointer
-# endif
+        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind,
+                                                 [[maybe_unused]] ::std::uintptr_t frame_address,
+                                                 [[maybe_unused]] ::std::uintptr_t stack_pointer
                                                  ) noexcept;
 
     extern "C++"

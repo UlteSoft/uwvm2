@@ -1510,7 +1510,7 @@ namespace details
         {
             if(task_module_storage.llvm_context_holder == nullptr || task_module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
-            ::uwvm2::utils::container::string serialized_bitcode{};
+            ::uwvm2::utils::container::u8string serialized_bitcode{};
             {
                 // Reparse each fragment into the merged context before linking. Direct
                 // cross-context linking hit unstable intrinsic remangling on this toolchain.

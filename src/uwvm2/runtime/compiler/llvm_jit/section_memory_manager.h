@@ -73,6 +73,9 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     template <typename Visit>
     inline constexpr void visit_runtime_llvm_jit_eh_frame_fdes(::std::uint8_t* addr, ::std::size_t size, Visit visit) noexcept
     {
+        // Darwin's unwinder registration entry points operate on individual FDE records rather than on the whole
+        // __eh_frame payload.  Walk the compact DWARF record stream defensively and skip CIE records, whose ID field is
+        // zero in the emitted section format used here.
         auto const end{addr + size};
         auto curr{addr};
         while(curr < end)
@@ -148,9 +151,14 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         inline constexpr void registerEHFrames(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) noexcept override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
+            // On Win64 the "EH frame" callback receives the COFF .pdata section, not DWARF CFI.  Windows unwinding is
+            // table driven through RUNTIME_FUNCTION entries and the UNWIND_INFO records they reference in .xdata, so
+            // registration must go through RtlAddFunctionTable instead of __register_frame/libgcc-style APIs.
             static_cast<void>(register_win64_seh_function_table(addr, load_addr, size));
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             static_cast<void>(load_addr);
+            // Apple libunwind accepts FDE pointers one at a time for JIT code.  Keep the original section range so the
+            // exact same FDE set can be deregistered before MCJIT releases the underlying memory.
             visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) constexpr noexcept { __register_frame(fde); });
             eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
 # else
@@ -161,6 +169,8 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         inline constexpr void deregisterEHFrames() noexcept override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
+            // The Windows runtime does not own the JIT memory.  Remove every dynamic function table before the code and
+            // .pdata storage can disappear, otherwise a later stack walk may dereference stale unwind metadata.
             for(auto const& record: win64_seh_records_) { static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table)); }
             win64_seh_records_.clear();
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
@@ -193,6 +203,8 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
         inline constexpr void record_win64_loaded_section(::std::uint8_t* addr, ::std::uintptr_t size) noexcept
         {
+            // RuntimeDyld resolves COFF RVAs against a synthetic image base derived from the loaded sections.  Track all
+            // code/data allocations so the Win64 function table can be registered with the same base later.
             if(addr == nullptr || size == 0uz) [[unlikely]] { return; }
             auto const address{reinterpret_cast<::std::uintptr_t>(addr)};
             if(address == 0u) [[unlikely]] { return; }
@@ -220,8 +232,9 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
             // COFF x64 encodes .pdata RVAs relative to RuntimeDyld's synthetic __ImageBase.  LLVM computes that base as
             // the lowest loaded section address; RtlAddFunctionTable must receive the same value or Windows unwinding
-            auto constind inlined / generated frames reliably.auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr)
-                                                                                                       : static_cast<::std::uintptr_t>(load_addr)};
+            // will not be able to resolve JIT PCs back to their UNWIND_INFO, especially after inlining or code layout
+            // changes move the active PC away from the public entry symbol.
+            auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr) : static_cast<::std::uintptr_t>(load_addr)};
             auto const image_base{get_win64_image_base(fallback_base)};
             auto const function_table{reinterpret_cast<::fast_io::win32::win_current_runtime_function*>(addr)};
             auto const function_count{static_cast<::std::uint32_t>(count)};

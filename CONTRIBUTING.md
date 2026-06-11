@@ -276,6 +276,11 @@ namespace A {
 
 ### Containers and strings
 - Prefer `::uwvm2::utils::container::string` instead of `::std::string` in core layers for deterministic behavior and portability.
+- For fixed byte spellings that must remain UTF-8/ASCII-stable, prefer `u8""`, `char8_t`, `::uwvm2::utils::container::u8string`, and
+  `::uwvm2::utils::container::u8string_view`. Ordinary narrow `""` literals are encoded in the execution character set and must not be used for
+  protocol names, Wasm opcode names, IR/symbol names, command names, diagnostics that are parsed, or other byte-sensitive text.
+- Keep ordinary narrow `""` only where the language, preprocessor, ABI, or third-party API requires it, such as `extern "C"`, `#include`,
+  pragma macro names, `static_assert` messages, raw `char` callback overrides, or APIs that explicitly take `std::string`/`char const*`.
 
 ### Integers and character types
 - Default to `::std::size_t` for sizes and indices.
@@ -465,6 +470,9 @@ inline void bad(::std::string const& s) {
 ### Character types are integers
 - Treat `char`, `wchar_t`, `char8_t`, `char16_t`, and `char32_t` as integers. Do not rely on stream behaviors or locale conversions.
 - Beware `int8_t*` printing via iostream, which may be treated as a C-string.
+- Do not assume ordinary narrow string or character literals have ASCII bytes. User-selected execution encodings can make `"abc"` and `'a'`
+  non-ASCII (for example on EBCDIC-like configurations). Use `u8""`/`char8_t` for UWVM-owned fixed byte text, and convert at API boundaries with
+  explicit helpers such as a may-alias `char8_t const*`/`char const*` bridge when a library such as LLVM exposes only `char`-based views.
 
 ### Avoid extended and maximal integer types
 - Avoid `__uint128_t` for general portability. Prefer two-limb implementations with `::std::uint_least64_t`.

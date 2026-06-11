@@ -981,7 +981,7 @@ namespace uwvm2::runtime::lib
 
             ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -1141,10 +1141,10 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool
-            parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::string_view name, ::std::size_t& module_id, ::std::size_t& function_index) noexcept
+            parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::u8string_view name, ::std::size_t& module_id, ::std::size_t& function_index) noexcept
         {
-            constexpr char prefix[]{"uwvm-inline:m="};
-            constexpr char middle[]{":f="};
+            constexpr char8_t prefix[]{u8"uwvm-inline:m="};
+            constexpr char8_t middle[]{u8":f="};
             constexpr ::std::size_t prefix_size{sizeof(prefix) - 1uz};
             constexpr ::std::size_t middle_size{sizeof(middle) - 1uz};
             if(name.size() <= prefix_size || ::std::memcmp(name.data(), prefix, prefix_size) != 0) { return false; }
@@ -1154,7 +1154,7 @@ namespace uwvm2::runtime::lib
             auto const middle_begin{::std::search(name_begin + prefix_size, name_end, middle, middle + middle_size)};
             if(middle_begin == name_end) { return false; }
 
-            auto const parse_size{[](char const* begin, char const* end, ::std::size_t& out) constexpr noexcept -> bool
+            auto const parse_size{[](char8_t const* begin, char8_t const* end, ::std::size_t& out) constexpr noexcept -> bool
                                   {
                                       if(begin == end) { return false; }
                                       ::std::size_t value{};
@@ -1198,7 +1198,7 @@ namespace uwvm2::runtime::lib
                     *debug_object.getBinary(),
                     ::llvm::DWARFContext::ProcessDebugRelocations::Process,
                     loaded_info.get(),
-                    "",
+                    {},
                     [](auto) constexpr noexcept {},
                     [](auto) constexpr noexcept {},
                     true)};
@@ -1614,7 +1614,9 @@ namespace uwvm2::runtime::lib
             if(!ensure_llvm_jit_native_target_initialized()) [[unlikely]] { return false; }
 
             ::llvm::LLVMContext context{};
-            auto module{::uwvm2::utils::container::make_delete_owned<::llvm::Module>("uwvm2_runtime_llvm_jit_unwind_probe", context)};
+            auto module{::uwvm2::utils::container::make_delete_owned<::llvm::Module>(
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(u8"uwvm2_runtime_llvm_jit_unwind_probe"),
+                context)};
 
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(::llvm::CodeGenOptLevel::None);
@@ -1629,27 +1631,39 @@ namespace uwvm2::runtime::lib
             auto const i32_type{::llvm::Type::getInt32Ty(context)};
             auto const void_type{::llvm::Type::getVoidTy(context)};
             auto const ptr_type{::llvm::PointerType::getUnqual(context)};
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             auto const backtrace_type{::llvm::FunctionType::get(i32_type, {ptr_type, i32_type}, false)};
-            auto const backtrace_function{::llvm::Function::Create(backtrace_type, ::llvm::GlobalValue::ExternalLinkage, "backtrace", *module)};
+            auto const backtrace_function{::llvm::Function::Create(backtrace_type,
+                                                                    ::llvm::GlobalValue::ExternalLinkage,
+                                                                    llvm_jit_translate_details::get_llvm_string_ref(u8"backtrace"),
+                                                                    *module)};
 
             auto const probe_type{::llvm::FunctionType::get(void_type, {ptr_type, ptr_type}, false)};
 #  else
             static_cast<void>(i32_type);
             auto const intptr_type{::llvm::Type::getIntNTy(context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             auto const capture_type{::llvm::FunctionType::get(void_type, {ptr_type, intptr_type, intptr_type}, false)};
-            auto const capture_function{
-                ::llvm::Function::Create(capture_type, ::llvm::GlobalValue::ExternalLinkage, "uwvm2_runtime_llvm_jit_live_unwind_probe_capture", *module)};
+            auto const capture_function{::llvm::Function::Create(
+                capture_type,
+                ::llvm::GlobalValue::ExternalLinkage,
+                llvm_jit_translate_details::get_llvm_string_ref(u8"uwvm2_runtime_llvm_jit_live_unwind_probe_capture"),
+                *module)};
 
             auto const probe_type{::llvm::FunctionType::get(void_type, {ptr_type}, false)};
 #  endif
-            auto const probe_function{
-                ::llvm::Function::Create(probe_type, ::llvm::GlobalValue::ExternalLinkage, "uwvm2_runtime_llvm_jit_live_unwind_probe", *module)};
+            auto const probe_function{::llvm::Function::Create(
+                probe_type,
+                ::llvm::GlobalValue::ExternalLinkage,
+                llvm_jit_translate_details::get_llvm_string_ref(u8"uwvm2_runtime_llvm_jit_live_unwind_probe"),
+                *module)};
             probe_function->setUWTableKind(::llvm::UWTableKind::Async);
-            probe_function->addFnAttr("disable-tail-calls", "true");
-            probe_function->addFnAttr("frame-pointer", "all");
+            probe_function->addFnAttr(llvm_jit_translate_details::get_llvm_string_ref(u8"disable-tail-calls"),
+                                      llvm_jit_translate_details::get_llvm_string_ref(u8"true"));
+            probe_function->addFnAttr(llvm_jit_translate_details::get_llvm_string_ref(u8"frame-pointer"),
+                                      llvm_jit_translate_details::get_llvm_string_ref(u8"all"));
 
-            auto const entry_block{::llvm::BasicBlock::Create(context, "entry", probe_function)};
+            auto const entry_block{::llvm::BasicBlock::Create(context, llvm_jit_translate_details::get_llvm_string_ref(u8"entry"), probe_function)};
             ::llvm::IRBuilder<> builder{entry_block};
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             auto const frames_arg{probe_function->getArg(0)};
@@ -1659,11 +1673,11 @@ namespace uwvm2::runtime::lib
             builder.CreateStore(count_value, count_arg);
 #  else
             auto const state_arg{probe_function->getArg(0)};
-            auto const register_name{::llvm::MDString::get(context, "rbp")};
+            auto const register_name{::llvm::MDString::get(context, llvm_jit_translate_details::get_llvm_string_ref(u8"rbp"))};
             auto const register_metadata{::llvm::MDNode::get(context, {register_name})};
             auto const frame_address{
                 builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {intptr_type}, {::llvm::MetadataAsValue::get(context, register_metadata)})};
-            auto const stack_register_name{::llvm::MDString::get(context, "rsp")};
+            auto const stack_register_name{::llvm::MDString::get(context, llvm_jit_translate_details::get_llvm_string_ref(u8"rsp"))};
             auto const stack_register_metadata{::llvm::MDNode::get(context, {stack_register_name})};
             auto const stack_pointer{
                 builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {intptr_type}, {::llvm::MetadataAsValue::get(context, stack_register_metadata)})};
@@ -1674,10 +1688,14 @@ namespace uwvm2::runtime::lib
             if(::llvm::verifyModule(*module)) [[unlikely]] { return false; }
 
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
-            ::llvm::sys::DynamicLibrary::AddSymbol("backtrace", reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
+            ::llvm::sys::DynamicLibrary::AddSymbol(
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(u8"backtrace"),
+                reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
 #  else
-            ::llvm::sys::DynamicLibrary::AddSymbol("uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
-                                                   reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&runtime_llvm_jit_live_unwind_probe_capture)));
+            ::llvm::sys::DynamicLibrary::AddSymbol(
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(
+                    u8"uwvm2_runtime_llvm_jit_live_unwind_probe_capture"),
+                reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&runtime_llvm_jit_live_unwind_probe_capture)));
 #  endif
 
             auto raw_engine{
@@ -1771,7 +1789,7 @@ namespace uwvm2::runtime::lib
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -1855,7 +1873,7 @@ namespace uwvm2::runtime::lib
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                 u8"[warn]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -1872,7 +1890,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -1925,11 +1943,11 @@ namespace uwvm2::runtime::lib
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                 u8"[fatal] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"LLVM JIT unwind call-stack mode cannot be used: ",
+                                u8"LLVM JIT unwind call-stack mode cannot be used: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                 reason,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -2012,7 +2030,8 @@ namespace uwvm2::runtime::lib
                                                                  ::std::size_t function_index{};
                                                                  auto const& frame_name{inline_info.getFrame(i).FunctionName};
                                                                  auto const frame_name_view{
-                                                                     ::uwvm2::utils::container::string_view{frame_name.data(), frame_name.size()}
+                                                                     ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(
+                                                                         ::llvm::StringRef{frame_name.data(), frame_name.size()})
                                                                  };
                                                                  if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
                                                                  print_wasm_frame(module_id, function_index);
@@ -2099,7 +2118,7 @@ namespace uwvm2::runtime::lib
 
             ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -2135,7 +2154,7 @@ namespace uwvm2::runtime::lib
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                 u8"[fatal] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -2181,6 +2200,8 @@ namespace uwvm2::runtime::lib
         {
             if(context.Rip == 0u) [[unlikely]] { return false; }
 
+            // RtlLookupFunctionEntry expects a control PC inside the call instruction's containing function.  Trap
+            // helpers usually give us a return address, so bias by one byte to make the lookup land in the caller.
             auto control_pc{context.Rip};
             if(control_pc != 0u) { --control_pc; }
 
@@ -2188,6 +2209,8 @@ namespace uwvm2::runtime::lib
             auto const function_entry{::fast_io::win32::nt::RtlLookupFunctionEntry(control_pc, ::std::addressof(image_base), nullptr)};
             if(function_entry == nullptr)
             {
+                // Leaf functions may have no .pdata entry on Win64.  In that case the architectural convention is a
+                // simple return-address pop from RSP, which is the same fallback used by the platform unwinder.
                 if(context.Rsp == 0u || !llvm_jit_frame_record_address_aligned(static_cast<::std::uintptr_t>(context.Rsp))) [[unlikely]] { return false; }
 
                 auto const return_address{llvm_jit_load_frame_record_word(static_cast<::std::uintptr_t>(context.Rsp))};
@@ -2199,6 +2222,8 @@ namespace uwvm2::runtime::lib
 
             void* handler_data{};
             ::std::uint64_t establisher_frame{};
+            // RtlVirtualUnwind applies the registered .pdata/.xdata metadata to mutate CONTEXT in place from the current
+            // frame to its caller.  The image base must match the base used when the JIT registered the function table.
             static_cast<void>(::fast_io::win32::nt::RtlVirtualUnwind(::fast_io::win32::win64_unwind_flag_nhandler,
                                                                      image_base,
                                                                      control_pc,
@@ -2219,7 +2244,8 @@ namespace uwvm2::runtime::lib
 
             // Start from the generated caller's architectural state when the trap helper was entered.  Win64 uses
             // frame-pointer offsets in SEH unwind metadata, so RSP must come from generated code instead of being
-            // reconstructed from RBP as a simple frame-record address.
+            // reconstructed from RBP as a simple frame-record address.  This path is preferred because it avoids using
+            // the helper's mixed-ABI frame as the root of the JIT stack walk.
             if(expected_return_address != 0u && trap_frame_address != 0u && trap_stack_pointer != 0u)
             {
                 context.Rip = static_cast<::std::uint64_t>(expected_return_address);
@@ -2229,6 +2255,8 @@ namespace uwvm2::runtime::lib
             }
             else if(expected_return_address != 0u)
             {
+                // Best-effort fallback for older generated code or partially available trap context: capture the helper
+                // context and unwind a few frames until the expected JIT return address is recovered.
                 ::fast_io::win32::nt::RtlCaptureContext(::std::addressof(context));
                 for(unsigned i{}; i != 4u; ++i)
                 {
@@ -2306,7 +2334,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                         u8"[error] ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -2349,7 +2377,7 @@ namespace uwvm2::runtime::lib
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 // 1
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -2367,11 +2395,11 @@ namespace uwvm2::runtime::lib
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\n"
                                 // 3
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Validator Memory Indication: ",
+                                u8"Validator Memory Indication: u8",
                                 memory_printer,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 u8"\n\n");
@@ -3380,7 +3408,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                     u8"[info]  ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -4637,7 +4665,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                         u8"[info]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -4741,7 +4769,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -4759,7 +4787,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -7931,7 +7959,7 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool runtime_compiler_requires_llvm_jit_execution() noexcept
         { return ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only; }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::string get_runtime_llvm_jit_wasm_function_name(runtime_module_storage_t const& runtime_module,
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_runtime_llvm_jit_wasm_function_name(runtime_module_storage_t const& runtime_module,
                                                                                                                  ::std::size_t func_index) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -7940,7 +7968,7 @@ namespace uwvm2::runtime::lib
                 static_cast<llvm_jit_translate_details::validation_module_traits_t::wasm_u32>(func_index));
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::string
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
             get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -7968,25 +7996,27 @@ namespace uwvm2::runtime::lib
             return success;
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>
             get_llvm_jit_host_target_attribute_storage() noexcept
         {
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> mattrs{};
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> mattrs{};
             auto host_features{::llvm::sys::getHostCPUFeatures()};
             if(!host_features.empty())
             {
                 mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
-                    mattrs.push_back(::uwvm2::utils::container::concat_uwvm(feature_enabled ? "+" : "-",
-                                                                            ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
+                    mattrs.push_back(::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-",
+                                                                            llvm_jit_translate_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
             return mattrs;
         }
 
         inline constexpr void
-            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& attr_storage,
                                                        ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -8182,8 +8212,8 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> make_runtime_llvm_jit_materialize_target_machine(
-            ::uwvm2::utils::container::string const& host_cpu_name,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+            ::uwvm2::utils::container::u8string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
             ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -8202,8 +8232,8 @@ namespace uwvm2::runtime::lib
 
         struct runtime_llvm_jit_legacy_light_task_preopt_context
         {
-            ::uwvm2::utils::container::string host_cpu_name{};
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> host_target_attribute_storage{};
+            ::uwvm2::utils::container::u8string host_cpu_name{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> host_target_attribute_storage{};
             ::llvm::CodeGenOptLevel codegen_opt_level{};
             ::std::atomic_size_t optimized_task_modules{};
         };
@@ -8234,7 +8264,7 @@ namespace uwvm2::runtime::lib
         };
 
         [[nodiscard]] inline constexpr bool serialize_runtime_llvm_jit_module_bitcode(::llvm::Module& module,
-                                                                                      ::uwvm2::utils::container::string& output) noexcept
+                                                                                      ::uwvm2::utils::container::u8string& output) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
@@ -8246,7 +8276,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr bool
             runtime_llvm_jit_function_name_in_range(::llvm::StringRef name,
-                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& function_names,
                                                     ::std::size_t begin,
                                                     ::std::size_t end) noexcept
         {
@@ -8261,7 +8291,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool
-            runtime_llvm_jit_name_in_list(::llvm::StringRef name, ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& names) noexcept
+            runtime_llvm_jit_name_in_list(::llvm::StringRef name, ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& names) noexcept
         {
             for(auto const& curr: names)
             {
@@ -8321,16 +8351,16 @@ namespace uwvm2::runtime::lib
 
         inline constexpr void collect_runtime_llvm_jit_partition_exposed_symbols(
             ::llvm::Module& module,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& function_names,
             ::std::size_t functions_per_task,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& exposed_symbol_names) noexcept
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>& exposed_symbol_names) noexcept
         {
             ::llvm::StringMap<::std::size_t> function_task_indices{};
             for(::std::size_t function_index{}; function_index != function_names.size(); ++function_index)
             {
                 auto const& function_name{function_names.index_unchecked(function_index)};
                 auto task_index{function_index / functions_per_task};
-                function_task_indices[::llvm::StringRef{function_name.data(), function_name.size()}] = task_index;
+                function_task_indices[::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(function_name)] = task_index;
             }
 
             ::llvm::StringMap<char> exposed_symbol_name_map{};
@@ -8371,7 +8401,8 @@ namespace uwvm2::runtime::lib
             for(auto const& exposed_symbol_name: exposed_symbol_name_map)
             {
                 auto const key{exposed_symbol_name.getKey()};
-                exposed_symbol_names.emplace_back(key.data(), key.data() + key.size());
+                exposed_symbol_names.emplace_back(
+                    ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(key));
             }
         }
 
@@ -8381,17 +8412,17 @@ namespace uwvm2::runtime::lib
         };
 
         inline ::uwvm2::utils::thread::scheduled_task make_runtime_llvm_jit_parallel_object_emit_task(
-            ::uwvm2::utils::container::string const& source_bitcode,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& exposed_symbol_names,
+            ::uwvm2::utils::container::u8string const& source_bitcode,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& function_names,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& exposed_symbol_names,
             ::std::size_t begin,
             ::std::size_t end,
             bool owns_global_definitions,
-            ::uwvm2::utils::container::string const& host_cpu_name,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+            ::uwvm2::utils::container::u8string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
             ::llvm::CodeGenOptLevel codegen_opt_level,
             bool verify_llvm_jit_ir,
-            ::uwvm2::utils::container::string& object_output,
+            ::uwvm2::utils::container::u8string& object_output,
             runtime_llvm_jit_parallel_object_emit_failure_state& failure_state) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
@@ -8404,7 +8435,8 @@ namespace uwvm2::runtime::lib
             {
                 ::llvm::LLVMContext context{};
                 auto parsed_module_expected{::llvm::parseBitcodeFile(
-                    ::llvm::MemoryBufferRef(llvm_jit_translate_details::get_llvm_string_ref(source_bitcode), "uwvm2-llvm-jit-object-emit-source"),
+                    ::llvm::MemoryBufferRef(llvm_jit_translate_details::get_llvm_string_ref(source_bitcode),
+                                            llvm_jit_translate_details::get_llvm_string_ref(u8"uwvm2-llvm-jit-object-emit-source")),
                     context)};
                 if(!parsed_module_expected) [[unlikely]]
                 {
@@ -8444,7 +8476,11 @@ namespace uwvm2::runtime::lib
                         drop_runtime_llvm_jit_partition_global_definition(global_variable);
                     }
                 }
-                if(!owns_global_definitions) { module->setModuleInlineAsm(""); }
+                if(!owns_global_definitions)
+                {
+                    module->setModuleInlineAsm(
+                        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(u8""));
+                }
 
                 auto target_machine{make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, codegen_opt_level)};
                 if(target_machine == nullptr) [[unlikely]]
@@ -8472,7 +8508,8 @@ namespace uwvm2::runtime::lib
                 }
 
                 pass_manager.run(*module);
-                object_output = ::uwvm2::utils::container::string{object_buffer.begin(), object_buffer.end()};
+                object_output = ::uwvm2::utils::container::u8string{
+                    llvm_jit_translate_details::get_uwvm_u8string_view(::llvm::StringRef{object_buffer.data(), object_buffer.size()})};
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
@@ -8486,25 +8523,26 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr runtime_llvm_jit_parallel_object_emit_result
             emit_runtime_llvm_jit_objects_parallel(::llvm::Module& module,
-                                                   ::uwvm2::utils::container::string const& host_cpu_name,
-                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+                                                   ::uwvm2::utils::container::u8string const& host_cpu_name,
+                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
                                                    ::llvm::CodeGenOptLevel codegen_opt_level,
                                                    bool verify_llvm_jit_ir,
                                                    ::std::size_t extra_compile_threads,
-                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& object_outputs,
+                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>& object_outputs,
                                                    ::std::size_t& defined_function_count) noexcept
         {
             defined_function_count = 0uz;
             object_outputs.clear();
             if(extra_compile_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
 
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> function_names{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> function_names{};
             for(auto const& function: module)
             {
                 if(function.isDeclaration()) { continue; }
                 auto const name{function.getName()};
                 if(name.empty()) { continue; }
-                function_names.emplace_back(name.data(), name.data() + name.size());
+                function_names.emplace_back(
+                    ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(name));
             }
             defined_function_count = function_names.size();
             if(function_names.size() <= 1uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
@@ -8512,12 +8550,12 @@ namespace uwvm2::runtime::lib
             auto const effective_extra_threads{::uwvm2::utils::thread::clamp_extra_worker_count(function_names.size(), extra_compile_threads)};
             if(effective_extra_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
 
-            ::uwvm2::utils::container::string source_bitcode{};
+            ::uwvm2::utils::container::u8string source_bitcode{};
             if(!serialize_runtime_llvm_jit_module_bitcode(module, source_bitcode)) [[unlikely]] { return runtime_llvm_jit_parallel_object_emit_result::failed; }
 
             auto const task_count{effective_extra_threads + 1uz};
             auto const functions_per_task{function_names.size() / task_count + static_cast<::std::size_t>(function_names.size() % task_count != 0uz)};
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> exposed_symbol_names{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> exposed_symbol_names{};
             collect_runtime_llvm_jit_partition_exposed_symbols(module, function_names, functions_per_task, exposed_symbol_names);
             object_outputs.resize(task_count);
 
@@ -8658,7 +8696,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                         u8"[error] ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -8790,7 +8828,7 @@ namespace uwvm2::runtime::lib
                                                   u8"\" time=",
                                                   llvm_jit_materialize_runtime_log_now() - optimize_start_time);
 
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> parallel_object_outputs{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> parallel_object_outputs{};
             ::std::size_t parallel_object_defined_function_count{};
             bool use_parallel_objects{};
             if(extra_materialize_threads != 0uz)
@@ -8799,7 +8837,9 @@ namespace uwvm2::runtime::lib
                 llvm_jit_materialize_runtime_log_line(u8"object-emit-start module=\"", rec.module_name, u8"\" extra_threads=", extra_materialize_threads);
                 auto const object_emit_result{
                     emit_runtime_llvm_jit_objects_parallel(*merged_module,
-                                                           ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()},
+                                                           ::uwvm2::utils::container::u8string{
+                                                               ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(
+                                                                   host_cpu_name)},
                                                            host_target_attribute_storage,
                                                            codegen_opt_level,
                                                            !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
@@ -8902,7 +8942,7 @@ namespace uwvm2::runtime::lib
                     auto const& object_output{parallel_object_outputs.index_unchecked(object_index)};
                     auto object_buffer{::llvm::MemoryBuffer::getMemBufferCopy(
                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(object_output),
-                        "uwvm2-llvm-jit-object")};
+                        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(u8"uwvm2-llvm-jit-object"))};
                     if(object_buffer == nullptr) [[unlikely]]
                     {
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -8931,7 +8971,7 @@ namespace uwvm2::runtime::lib
                         {
                             llvm_jit_materialize_error(u8"LLVM JIT object load failed for module=\"",
                                                        rec.module_name,
-                                                       u8"\": ",
+                                                       u8"\": u8",
                                                        ::fast_io::mnp::code_cvt(llvm_jit_engine->getErrorMessage()));
                         }
                         return false;
@@ -8958,7 +8998,7 @@ namespace uwvm2::runtime::lib
             {
                 auto const function_index{import_func_count + local_index};
                 auto const resolve_function_address{
-                    [&](::uwvm2::utils::container::string const& function_name) constexpr noexcept -> ::std::uintptr_t
+                    [&](::uwvm2::utils::container::u8string const& function_name) constexpr noexcept -> ::std::uintptr_t
                     {
                         namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
                         llvm_jit_function_address_name_t function_address_name{function_name.data(), function_name.data() + function_name.size()};
@@ -8974,7 +9014,7 @@ namespace uwvm2::runtime::lib
 
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                         {
-                            ::uwvm2::utils::container::string function_type_text{};
+                            ::uwvm2::utils::container::u8string function_type_text{};
                             if(found_function != nullptr)
                             {
                                 llvm_jit_translate_details::raw_uwvm_string_ostream function_type_stream(function_type_text);
@@ -9609,7 +9649,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                         u8"[warn]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -9624,7 +9664,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                         u8"[fatal] ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -9640,7 +9680,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                         u8"[info]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -9696,7 +9736,7 @@ namespace uwvm2::runtime::lib
 
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
+                                        u8"uwvm: u8",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                         u8"[info]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -10174,7 +10214,8 @@ namespace uwvm2::runtime::lib
                             {
                                 auto const host_cpu_name{::llvm::sys::getHostCPUName()};
                                 legacy_light_task_preopt_context.host_cpu_name =
-                                    ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()};
+                                    ::uwvm2::utils::container::u8string{
+                                        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(host_cpu_name)};
                                 legacy_light_task_preopt_context.host_target_attribute_storage = get_llvm_jit_host_target_attribute_storage();
                                 legacy_light_task_preopt_context.codegen_opt_level = full_translation_strategy.codegen_opt_level;
                                 llvm_jit_opt.llvm_jit_task_module_pre_link_callback =
@@ -10266,7 +10307,7 @@ namespace uwvm2::runtime::lib
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                u8"uwvm: ",
+                                                u8"uwvm: u8",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                                 u8"[fatal] ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -10281,7 +10322,7 @@ namespace uwvm2::runtime::lib
 
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                            u8"uwvm: ",
+                                            u8"uwvm: u8",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                             u8"[warn]  ",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -10383,7 +10424,7 @@ namespace uwvm2::runtime::lib
                     {
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                            u8"uwvm: ",
+                                            u8"uwvm: u8",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                             u8"[fatal] ",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -10510,7 +10551,7 @@ namespace uwvm2::runtime::lib
                 ::fast_io::io::perr(
                     ::uwvm2::uwvm::io::u8log_output,
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                    u8"uwvm: ",
+                    u8"uwvm: u8",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                     u8"[info]  ",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -11396,12 +11437,9 @@ namespace uwvm2::runtime::lib
 # if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
         [[clang::disable_tail_calls]]
 # endif
-        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k
-# if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-                                                 ,
-                                                 ::std::uintptr_t frame_address,
-                                                 ::std::uintptr_t stack_pointer
-# endif
+        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k,
+                                                 [[maybe_unused]] ::std::uintptr_t explicit_frame_address,
+                                                 [[maybe_unused]] ::std::uintptr_t explicit_stack_pointer
                                                  ) noexcept
     {
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
@@ -11415,10 +11453,12 @@ namespace uwvm2::runtime::lib
 #  else
         constexpr ::std::uintptr_t frame_address{};
 #  endif
+# else
+        auto const frame_address{explicit_frame_address};
 # endif
         store_llvm_jit_trap_context(k, return_address, frame_address);
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-        store_llvm_jit_win64_trap_caller_context(return_address, frame_address, stack_pointer);
+        store_llvm_jit_win64_trap_caller_context(return_address, frame_address, explicit_stack_pointer);
 # endif
         switch(k)
         {
@@ -11591,7 +11631,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -11826,7 +11866,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -11901,7 +11941,7 @@ namespace uwvm2::runtime::lib
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
+                                    u8"uwvm: u8",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -11920,7 +11960,7 @@ namespace uwvm2::runtime::lib
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
+                                u8"uwvm: u8",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                 u8"[warn]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
