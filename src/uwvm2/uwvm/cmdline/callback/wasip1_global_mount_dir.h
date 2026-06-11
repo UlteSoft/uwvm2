@@ -143,10 +143,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 {
                     if(result.normalized.size() != 1uz) { result.normalized.push_back(u8'/'); }
                 }
-                else if(!result.normalized.empty())
-                {
-                    result.normalized.push_back(u8'/');
-                }
+                else if(!result.normalized.empty()) { result.normalized.push_back(u8'/'); }
 
                 result.normalized.append(segment);
             }
@@ -497,10 +494,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
         }
 
-        auto const disable_mount_path_normalization{
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_disable_mount_path_normalization};
-        auto const allow_overlapping_mount_paths{
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_allow_overlapping_mount_paths};
+        auto const disable_mount_path_normalization{::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_disable_mount_path_normalization};
+        auto const allow_overlapping_mount_paths{::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_allow_overlapping_mount_paths};
 
         // The two command-line switches are intentionally independent. The
         // storage policy controls which guest path spelling reaches the WASIp1

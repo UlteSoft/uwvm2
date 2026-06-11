@@ -1,6 +1,6 @@
-// Control-flow opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
-// This file is included directly inside the validator switch, so proposal/prefixed control opcodes must extend the
-// dispatch layer and LLVM control-flow lowering at the same time.
+    // Control-flow opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // This file is included directly inside the validator switch, so proposal/prefixed control opcodes must extend the
+    // dispatch layer and LLVM control-flow lowering at the same time.
 
 case wasm1_code::unreachable:
 {

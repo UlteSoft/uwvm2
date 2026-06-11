@@ -188,10 +188,10 @@ namespace details
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
     inline constexpr void compile_all_from_uwvm_local_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-                                                 [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
-                                                 full_function_symbol_t& storage,
-                                                 ::std::size_t compile_local_function_idx,
-                                                 ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS{
+                                                           [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
+                                                           full_function_symbol_t& storage,
+                                                           ::std::size_t compile_local_function_idx,
+                                                           ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS{
 #define UWVM_COMPILE_SINGLE_LOCAL_FUNCTION 1
 #include "single_func_context.h"
 #include "single_func_emit_helpers.h"
@@ -201,10 +201,10 @@ namespace details
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
     inline constexpr void compile_all_from_uwvm_local_func_group(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-                                                       [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
-                                                       full_function_symbol_t& storage,
-                                                       local_function_task_group task_group,
-                                                       ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                                 [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
+                                                                 full_function_symbol_t& storage,
+                                                                 local_function_task_group task_group,
+                                                                 ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         for(::std::size_t local_function_idx{task_group.begin_index}; local_function_idx != task_group.end_index; ++local_function_idx)
         {
@@ -225,9 +225,9 @@ namespace details
 
 #ifdef UWVM_CPP_EXCEPTIONS
     inline constexpr void publish_parallel_compile_failure(parallel_compile_failure_state& failure_state,
-                                                 ::uwvm2::validation::error::code_validation_error_impl const& local_err,
-                                                 ::std::exception_ptr exception,
-                                                 bool store_err) noexcept
+                                                           ::uwvm2::validation::error::code_validation_error_impl const& local_err,
+                                                           ::std::exception_ptr exception,
+                                                           bool store_err) noexcept
     {
         if(!failure_state.failure_claim.test_and_set(::std::memory_order_acq_rel))
         {
@@ -305,11 +305,12 @@ inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compil
     return split_config;
 }
 
-[[nodiscard]] inline constexpr ::std::size_t resolve_effective_adaptive_extra_compile_threads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-                                                                                    compile_task_split_config split_config,
-                                                                                    ::std::size_t extra_compile_threads_upper_bound,
-                                                                                    ::std::size_t target_task_groups_per_adjusted_compile_thread,
-                                                                                    bool split_was_adjusted) noexcept
+[[nodiscard]] inline constexpr ::std::size_t
+    resolve_effective_adaptive_extra_compile_threads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+                                                     compile_task_split_config split_config,
+                                                     ::std::size_t extra_compile_threads_upper_bound,
+                                                     ::std::size_t target_task_groups_per_adjusted_compile_thread,
+                                                     bool split_was_adjusted) noexcept
 {
     auto const useful_extra_compile_threads{
         ::uwvm2::utils::thread::clamp_extra_worker_count(details::calculate_local_function_task_group_count(curr_module, split_config),

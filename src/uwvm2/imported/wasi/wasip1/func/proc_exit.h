@@ -83,8 +83,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.proc_exit
     /// @details   void proc_exit(__wasi_exitcode_t code);
 
-    inline constexpr void proc_exit_impl(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-                               ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
+    inline constexpr void proc_exit_impl(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> &
+                                             env,
+                                         ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
     {
         if(env.wasip1_proc_exit_func_ptr != nullptr)
         {
@@ -104,7 +105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     inline constexpr void proc_exit(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-                          ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
+                                    ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 

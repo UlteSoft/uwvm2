@@ -824,7 +824,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 
     /// @brief Used to prevent default construction.
     struct wasi_no_construct_t
-    { inline explicit constexpr wasi_no_construct_t() noexcept = default; };
+    {
+        inline explicit constexpr wasi_no_construct_t() noexcept = default;
+    };
 
     inline constexpr wasi_no_construct_t wasi_no_construct{};
 

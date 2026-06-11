@@ -56,7 +56,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                           para_begin,
                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
-    { return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_disable, para_curr, para_end, wasip1_module_details::target_action_t::disable); }
+    {
+        return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_disable,
+                                                   para_curr,
+                                                   para_end,
+                                                   wasip1_module_details::target_action_t::disable);
+    }
 
 # endif
 #endif

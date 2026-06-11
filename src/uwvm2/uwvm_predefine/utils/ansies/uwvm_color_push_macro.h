@@ -199,7 +199,6 @@
 #  define UWVM_COLOR_RGB(r, g, b) UWVM_AES_RGB(r, g, b)
 # endif
 
-
 // Wide-character color macros.
 # pragma push_macro("UWVM_COLOR_W_RST_ALL")
 # undef UWVM_COLOR_W_RST_ALL
@@ -361,7 +360,6 @@
 # else
 #  define UWVM_COLOR_W_RGB(r, g, b) UWVM_AES_W_RGB(r, g, b)
 # endif
-
 
 // UTF-8 color macros.
 # pragma push_macro("UWVM_COLOR_U8_RST_ALL")
@@ -526,7 +524,6 @@
 # else
 #  define UWVM_COLOR_U8_RGB(r, g, b) UWVM_AES_U8_RGB(r, g, b)
 # endif
-
 
 // UTF-16 color macros.
 # pragma push_macro("UWVM_COLOR_U16_RST_ALL")
@@ -694,7 +691,6 @@
 # else
 #  define UWVM_COLOR_U16_RGB(r, g, b) UWVM_AES_U16_RGB(r, g, b)
 # endif
-
 
 // UTF-32 color macros.
 # pragma push_macro("UWVM_COLOR_U32_RST_ALL")

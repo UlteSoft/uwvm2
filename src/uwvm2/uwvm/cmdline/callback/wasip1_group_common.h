@@ -56,9 +56,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Group action commands are keyed by an existing group name. The name is
         // not a WebAssembly module name, so only emptiness is rejected here.
         [[nodiscard]] inline constexpr parameter_return_type validate_group_arg(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results* group_arg,
-                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                      ::uwvm2::utils::container::u8string_view& group_name) noexcept
+                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* group_arg,
+                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                                ::uwvm2::utils::container::u8string_view& group_name) noexcept
         {
             if(group_arg == para_end || !wasip1_module_details::is_argument_result(group_arg->type)) [[unlikely]]
             {
@@ -74,9 +74,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // same UTF-8 validation as single targets so lookup keys are comparable
         // and diagnostics are emitted before any module is executed.
         [[nodiscard]] inline constexpr parameter_return_type validate_module_arg(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
-                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                       ::uwvm2::utils::container::u8string_view& module_name) noexcept
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                                 ::uwvm2::utils::container::u8string_view& module_name) noexcept
         {
             if(module_arg == para_end || !wasip1_module_details::is_argument_result(module_arg->type)) [[unlikely]]
             {
@@ -98,9 +98,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // shared makes single and group targets obey identical force-args,
         // environment, fd-limit, mount, overlap, normalization, and socket rules.
         [[nodiscard]] inline constexpr parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                wasip1_module_details::target_action_t action) noexcept
+                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
+                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                          wasip1_module_details::target_action_t action) noexcept
         {
             auto group_arg{para_curr + 1u};
             ::uwvm2::utils::container::u8string_view group_name{};

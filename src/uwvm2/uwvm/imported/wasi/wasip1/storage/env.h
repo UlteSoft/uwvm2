@@ -66,15 +66,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     // Add-or-replace entries are represented as a map because the observable
     // semantics are keyed by environment name: inserting the same name again
     // replaces the previous value before the environment is materialized.
-    using wasip1_environment_name_set_t =
-        ::uwvm2::utils::container::unordered_flat_set<::uwvm2::utils::container::u8string_view,
-                                                      ::uwvm2::utils::container::pred::u8string_view_hash,
-                                                      ::uwvm2::utils::container::pred::u8string_view_equal>;
-    using wasip1_environment_map_t =
-        ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view,
-                                                      ::uwvm2::utils::container::u8string_view,
-                                                      ::uwvm2::utils::container::pred::u8string_view_hash,
-                                                      ::uwvm2::utils::container::pred::u8string_view_equal>;
+    using wasip1_environment_name_set_t = ::uwvm2::utils::container::unordered_flat_set<::uwvm2::utils::container::u8string_view,
+                                                                                        ::uwvm2::utils::container::pred::u8string_view_hash,
+                                                                                        ::uwvm2::utils::container::pred::u8string_view_equal>;
+    using wasip1_environment_map_t = ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view,
+                                                                                   ::uwvm2::utils::container::u8string_view,
+                                                                                   ::uwvm2::utils::container::pred::u8string_view_hash,
+                                                                                   ::uwvm2::utils::container::pred::u8string_view_equal>;
 
     enum class wasip1_module_target_kind_t : unsigned
     {
@@ -230,7 +228,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
     // All configured target states live in one deque so pointers/references to a
     // state remain stable while command-line parsing appends more groups.
-    inline wasip1_group_state_storage_t configured_wasip1_groups{};    // [global]
+    inline wasip1_group_state_storage_t configured_wasip1_groups{};  // [global]
 
     // group name -> state index for `--wasip1-group-create <group>`.
     inline wasip1_group_index_map_t configured_named_wasip1_groups{};  // [global]
@@ -239,7 +237,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     inline wasip1_group_index_map_t configured_module_wasip1_anonymous_groups{};  // [global]
 
     // module name -> named group state index for `--wasip1-group-add-module`.
-    inline wasip1_group_index_map_t configured_named_wasip1_module_groups{};      // [global]
+    inline wasip1_group_index_map_t configured_named_wasip1_module_groups{};  // [global]
 
 #  if defined(UWVM_USE_THREAD_LOCAL)
     // Fast path: these are consulted on host API calls, so keep direct
@@ -331,11 +329,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
 
 #  if !defined(UWVM_USE_THREAD_LOCAL)
-    [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasip1_env_type*& current_wasip1_env_ptr_ref() noexcept
-    { return current_wasip1_state().current_env_ptr; }
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasip1_env_type*& current_wasip1_env_ptr_ref() noexcept { return current_wasip1_state().current_env_ptr; }
 
-    [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool& current_wasip1_target_is_set_ref() noexcept
-    { return current_wasip1_state().current_target_is_set; }
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool& current_wasip1_target_is_set_ref() noexcept { return current_wasip1_state().current_target_is_set; }
 
     [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasip1_module_target_kind_t& current_wasip1_target_kind_ref() noexcept
     { return current_wasip1_state().current_target_kind; }
@@ -345,8 +341,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
 
     [[nodiscard]] inline constexpr bool reopen_wasip1_trace_output_file(::fast_io::u8native_file & output_file,
-                                                              ::uwvm2::utils::container::u8string_view path,
-                                                              bool nt_path_warning = true) noexcept
+                                                                        ::uwvm2::utils::container::u8string_view path,
+                                                                        bool nt_path_warning = true) noexcept
     {
         static_cast<void>(nt_path_warning);
 
@@ -485,7 +481,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         // Record the active module identity for diagnostics and target lookup.
         // The string view refers to module-name storage owned by the loader, not
         // transient command-line argument memory.
-        inline constexpr explicit scoped_current_wasip1_target_t(wasip1_module_target_kind_t target_kind, ::uwvm2::utils::container::u8string_view module_name) noexcept :
+        inline constexpr explicit scoped_current_wasip1_target_t(wasip1_module_target_kind_t target_kind,
+                                                                 ::uwvm2::utils::container::u8string_view module_name) noexcept :
 #  if defined(UWVM_USE_THREAD_LOCAL)
             saved_is_set{current_wasip1_target_is_set}, saved_kind{current_wasip1_target_kind}, saved_module_name{current_wasip1_target_module_name}
         {
@@ -494,8 +491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             current_wasip1_target_module_name = module_name;
         }
 #  else
-            saved_is_set{current_wasip1_target_is_set_ref()},
-            saved_kind{current_wasip1_target_kind_ref()},
+            saved_is_set{current_wasip1_target_is_set_ref()}, saved_kind{current_wasip1_target_kind_ref()},
             saved_module_name{current_wasip1_target_module_name_ref()}
         {
             current_wasip1_target_is_set_ref() = true;
@@ -566,7 +562,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }
 
     [[nodiscard]] inline constexpr bool try_add_wasip1_module_to_named_group(::uwvm2::utils::container::u8string_view module_name,
-                                                                   wasip1_group_index_t group_index) noexcept
+                                                                             wasip1_group_index_t group_index) noexcept
     {
         // A module may not be configured as both an anonymous single target and
         // a named group member. Rejecting the overlap during parsing keeps the
@@ -582,18 +578,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     [[nodiscard]] inline constexpr wasip1_group_index_t find_named_wasip1_module_group_index(::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_wasip1_group_index_in_map(configured_named_wasip1_module_groups, module_name); }
 
-    [[nodiscard]] inline constexpr wasip1_group_index_t find_targetless_wasip1_anonymous_module_group_index(::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline constexpr wasip1_group_index_t find_targetless_wasip1_anonymous_module_group_index(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_wasip1_group_index_in_map(configured_module_wasip1_anonymous_groups, module_name); }
 
     [[nodiscard]] inline constexpr wasip1_group_state_t* find_targetless_wasip1_module_override(::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_wasip1_group_state(find_targetless_wasip1_anonymous_module_group_index(module_name)); }
 
     [[nodiscard]] inline constexpr wasip1_group_index_t find_wasip1_anonymous_module_group_index([[maybe_unused]] wasip1_module_target_kind_t target_kind,
-                                                                                       ::uwvm2::utils::container::u8string_view module_name) noexcept
+                                                                                                 ::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_targetless_wasip1_anonymous_module_group_index(module_name); }
 
     [[nodiscard]] inline constexpr wasip1_group_index_t find_wasip1_module_group_index(wasip1_module_target_kind_t target_kind,
-                                                                             ::uwvm2::utils::container::u8string_view module_name) noexcept
+                                                                                       ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         // Normal command-line validation prevents a module from having both an
         // anonymous and named group binding. If corrupted state reaches here,
@@ -610,14 +607,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }
 
     [[nodiscard]] inline constexpr wasip1_group_state_t* find_wasip1_module_override(wasip1_module_target_kind_t target_kind,
-                                                                           ::uwvm2::utils::container::u8string_view module_name) noexcept
+                                                                                     ::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_wasip1_group_state(find_wasip1_module_group_index(target_kind, module_name)); }
 
-    [[nodiscard]] inline constexpr wasip1_module_override_t const* find_wasip1_module_override_const(wasip1_module_target_kind_t target_kind,
-                                                                                           ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline constexpr wasip1_module_override_t const* find_wasip1_module_override_const(
+        wasip1_module_target_kind_t target_kind,
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     { return find_wasip1_module_override(target_kind, module_name); }
 
-    [[nodiscard]] inline constexpr wasip1_group_state_t* try_create_targetless_wasip1_module_override(::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline constexpr wasip1_group_state_t* try_create_targetless_wasip1_module_override(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         // A single target is anonymous storage keyed by module name. It cannot
         // be created after the module has already been bound to a named group.

@@ -1,6 +1,6 @@
-// Parametric and variable opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
-// The value tags used here are MVP scalar numeric tags.  Typed select, reference types, or wider proposal value spaces must
-// extend the stack value model and the matching LLVM lowering before these cases are reused for those opcodes.
+    // Parametric and variable opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // The value tags used here are MVP scalar numeric tags.  Typed select, reference types, or wider proposal value spaces must
+    // extend the stack value model and the matching LLVM lowering before these cases are reused for those opcodes.
 
 case wasm1_code::drop:
 {

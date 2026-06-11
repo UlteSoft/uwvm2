@@ -63,7 +63,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // mounts with the named group's existing mounts. This keeps
         // normalization, duplicate detection, ancestor/child overlap checks, and
         // the two WASIp1 mount-path escape hatches consistent with global mounts.
-        return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_mount_dir, para_curr, para_end, wasip1_module_details::target_action_t::mount_dir);
+        return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_mount_dir,
+                                                  para_curr,
+                                                  para_end,
+                                                  wasip1_module_details::target_action_t::mount_dir);
     }
 
 # endif

@@ -318,10 +318,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         UWVM_GNU_COLD [[noreturn]] inline constexpr void memory_oob_terminate(::std::size_t memory_idx,
-                                                                    ::std::uint_least64_t memory_static_offset,
-                                                                    memory_offset_t effective_offset,
-                                                                    ::std::size_t memory_length,
-                                                                    ::std::size_t wasm_bytes) noexcept
+                                                                              ::std::uint_least64_t memory_static_offset,
+                                                                              memory_offset_t effective_offset,
+                                                                              ::std::size_t memory_length,
+                                                                              ::std::size_t wasm_bytes) noexcept
         {
             ::uwvm2::object::memory::error::memory_error_t const memerr{.memory_idx = memory_idx,
                                                                         .memory_offset = effective_offset,

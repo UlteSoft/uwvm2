@@ -168,11 +168,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
-                              ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-                              ::std::size_t const function_index,
-                              ::std::byte const* code_begin,
-                              ::std::byte const* code_end,
-                              ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+                                        ::std::size_t const function_index,
+                                        ::std::byte const* code_begin,
+                                        ::std::byte const* code_end,
+                                        ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         // check
         auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<

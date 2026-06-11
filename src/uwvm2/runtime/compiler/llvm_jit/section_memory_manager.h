@@ -121,7 +121,8 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     public:
         inline constexpr runtime_llvm_jit_section_memory_manager() noexcept :
             ::llvm::SectionMemoryManager(nullptr, UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH != 0)
-        {}
+        {
+        }
 
         inline constexpr ~runtime_llvm_jit_section_memory_manager() override { deregisterEHFrames(); }
 
@@ -133,8 +134,11 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             return addr;
         }
 
-        inline constexpr ::std::uint8_t*
-            allocateDataSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name, bool is_read_only) noexcept override
+        inline constexpr ::std::uint8_t* allocateDataSection(::std::uintptr_t size,
+                                                             unsigned alignment,
+                                                             unsigned section_id,
+                                                             ::llvm::StringRef section_name,
+                                                             bool is_read_only) noexcept override
         {
             auto const addr{::llvm::SectionMemoryManager::allocateDataSection(size, alignment, section_id, section_name, is_read_only)};
             record_win64_loaded_section(addr, size);
@@ -157,10 +161,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         inline constexpr void deregisterEHFrames() noexcept override
         {
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
-            for(auto const& record: win64_seh_records_)
-            {
-                static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table));
-            }
+            for(auto const& record: win64_seh_records_) { static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table)); }
             win64_seh_records_.clear();
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
             for(auto const& frame: eh_frame_records_)
@@ -219,13 +220,14 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
             // COFF x64 encodes .pdata RVAs relative to RuntimeDyld's synthetic __ImageBase.  LLVM computes that base as
             // the lowest loaded section address; RtlAddFunctionTable must receive the same value or Windows unwinding
-            auto constind inlined/generated frames reliably.
-            auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr) : static_cast<::std::uintptr_t>(load_addr)};
+            auto constind inlined / generated frames reliably.auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr)
+                                                                                                       : static_cast<::std::uintptr_t>(load_addr)};
             auto const image_base{get_win64_image_base(fallback_base)};
             auto const function_table{reinterpret_cast<::fast_io::win32::win_current_runtime_function*>(addr)};
             auto const function_count{static_cast<::std::uint32_t>(count)};
-            if(!::fast_io::win32::nt::RtlAddFunctionTable(
-                   function_table, function_count, static_cast<::fast_io::win32::win_current_unwind_address>(image_base))) [[unlikely]]
+            if(!::fast_io::win32::nt::RtlAddFunctionTable(function_table,
+                                                          function_count,
+                                                          static_cast<::fast_io::win32::win_current_unwind_address>(image_base))) [[unlikely]]
             {
                 return false;
             }

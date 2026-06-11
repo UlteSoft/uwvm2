@@ -129,7 +129,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             else if(text == u8"socket-udp-bind") { action = target_action_t::socket_udp_bind; }
             else if(text == u8"socket-udp-connect") { action = target_action_t::socket_udp_connect; }
 #  endif
-            else { return false; }
+            else
+            {
+                return false;
+            }
             return true;
         }
 
@@ -148,7 +151,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         inline constexpr ::uwvm2::utils::cmdline::parameter_return_type print_usage_error(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                                ::uwvm2::utils::container::u8string_view msg) noexcept
+                                                                                          ::uwvm2::utils::container::u8string_view msg) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -163,8 +166,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        [[nodiscard]] inline constexpr bool
-            is_argument_result(::uwvm2::utils::cmdline::parameter_parsing_results_type type) noexcept
+        [[nodiscard]] inline constexpr bool is_argument_result(::uwvm2::utils::cmdline::parameter_parsing_results_type type) noexcept
         {
             return type == ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg ||
                    type == ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
@@ -183,9 +185,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // This is also what makes `--wasip1-*-force-args 0` unambiguous: the
         // count is consumed even though no argv payload follows.
         inline constexpr void force_args_pretreatment(char8_t const* const*& argv_curr,
-                                            char8_t const* const* argv_end,
-                                            ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr,
-                                            ::std::size_t leading_args_before_count) noexcept
+                                                      char8_t const* const* argv_end,
+                                                      ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr,
+                                                      ::std::size_t leading_args_before_count) noexcept
         {
             auto curr{argv_curr + 1u};
 
@@ -432,8 +434,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  endif
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type parse_fd_limit(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                                           ::uwvm2::utils::container::u8string_view text,
-                                                                                           override_state_t& target) noexcept
+                                                                                                     ::uwvm2::utils::container::u8string_view text,
+                                                                                                     override_state_t& target) noexcept
         {
             ::std::size_t limit{};
             auto const [next, err]{::fast_io::parse_by_scan(text.cbegin(), text.cend(), limit)};
@@ -461,8 +463,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         [[nodiscard]] inline constexpr bool trace_configuration_matches(override_state_t const& target,
-                                                              trace_output_target_t trace_target,
-                                                              ::uwvm2::utils::container::u8string_view file_path) noexcept
+                                                                        trace_output_target_t trace_target,
+                                                                        ::uwvm2::utils::container::u8string_view file_path) noexcept
         {
             // The public parameter is "once", but this predicate lets the
             // sequence parser diagnose identical repeats separately from repeats
@@ -475,9 +477,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         [[nodiscard]] inline constexpr bool has_deleted_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
-        {
-            return target.delete_system_environment.find(env_name) != target.delete_system_environment.cend();
-        }
+        { return target.delete_system_environment.find(env_name) != target.delete_system_environment.cend(); }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         [[nodiscard]] inline constexpr bool has_duplicate_preopen_socket_fd(override_state_t const& target) noexcept
@@ -517,13 +517,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // enable/disable, expose/hide, inherit/noinherit, strict/relaxed
             // UTF-8. Store both the value and an "is set" bit so "false" is not
             // confused with "not specified; inherit the global default".
-            auto const set_bool_option{[&](bool& option, bool& option_is_set, bool value, auto const& conflict_message) constexpr noexcept -> parameter_return_type
-                                       {
-                                           if(option_is_set) [[unlikely]] { return print_usage_error(parameter, conflict_message); }
-                                           option = value;
-                                           option_is_set = true;
-                                           return parameter_return_type::def;
-                                       }};
+            auto const set_bool_option{
+                [&](bool& option, bool& option_is_set, bool value, auto const& conflict_message) constexpr noexcept -> parameter_return_type
+                {
+                    if(option_is_set) [[unlikely]] { return print_usage_error(parameter, conflict_message); }
+                    option = value;
+                    option_is_set = true;
+                    return parameter_return_type::def;
+                }};
 
             auto const apply_module_enable_disable_action{
                 [&](bool enabled) constexpr noexcept -> parameter_return_type
@@ -543,372 +544,389 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
             switch(action)
             {
-            case target_action_t::enable:
-                return apply_module_enable_disable_action(true);
-            case target_action_t::disable:
-                return apply_module_enable_disable_action(false);
-            case target_action_t::expose_host_api:
-            {
-                if(auto const ret{set_bool_option(
-                       target.expose_host_api,
-                       target.expose_host_api_is_set,
-                       true,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
+                case target_action_t::enable: return apply_module_enable_disable_action(true);
+                case target_action_t::disable: return apply_module_enable_disable_action(false);
+                case target_action_t::expose_host_api:
                 {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::hide_host_api:
-            {
-                if(auto const ret{set_bool_option(
-                       target.expose_host_api,
-                       target.expose_host_api_is_set,
-                       false,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
-                {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::noinherit_system_environment:
-            {
-                if(auto const ret{set_bool_option(
-                       target.noinherit_system_environment,
-                       target.noinherit_system_environment_is_set,
-                       true,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat noinherit-system-environment/inherit-system-environment for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
-                {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::inherit_system_environment:
-            {
-                if(auto const ret{set_bool_option(
-                       target.noinherit_system_environment,
-                       target.noinherit_system_environment_is_set,
-                       false,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat noinherit-system-environment/inherit-system-environment for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
-                {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::disable_utf8_check:
-            {
-                if(auto const ret{set_bool_option(
-                       target.disable_utf8_check,
-                       target.disable_utf8_check_is_set,
-                       true,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat disable-utf8-check/enable-utf8-check for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
-                {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::enable_utf8_check:
-            {
-                if(auto const ret{set_bool_option(
-                       target.disable_utf8_check,
-                       target.disable_utf8_check_is_set,
-                       false,
-                       u8"Duplicate or conflicting module action. Cannot combine or repeat disable-utf8-check/enable-utf8-check for the same WASI Preview 1 target.")};
-                   ret != parameter_return_type::def) [[unlikely]]
-                {
-                    return ret;
-                }
-                mark_consumed(mark_action_end);
-                return parameter_return_type::def;
-            }
-            case target_action_t::trace:
-            {
-                if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing trace output target.");
-                }
-
-                auto const trace_target_text{::uwvm2::utils::container::u8string_view{extra1->str}};
-                auto set_trace_target{
-                    [&](trace_output_target_t trace_target, ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
+                    if(auto const ret{set_bool_option(
+                           target.expose_host_api,
+                           target.expose_host_api_is_set,
+                           true,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
                     {
-                        if(!trace_configuration_matches(target, trace_target, {})) [[unlikely]]
-                        {
-                            return print_usage_error(parameter,
-                                                     u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
-                        }
-                        if(target.trace_wasip1_call_is_set) [[unlikely]]
-                        {
-                            return print_usage_error(
-                                parameter,
-                                u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
-                        }
-                        target.trace_wasip1_call = trace_target != trace_output_target_t::none;
-                        target.trace_wasip1_call_is_set = true;
-                        target.trace_wasip1_output_target = trace_target;
-                        if(trace_target != trace_output_target_t::file) { target.trace_wasip1_output_file_path_storage.clear(); }
-                        mark_consumed(last);
-                        return parameter_return_type::def;
-                    }};
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::hide_host_api:
+                {
+                    if(auto const ret{set_bool_option(
+                           target.expose_host_api,
+                           target.expose_host_api_is_set,
+                           false,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
+                    {
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::noinherit_system_environment:
+                {
+                    if(auto const ret{set_bool_option(
+                           target.noinherit_system_environment,
+                           target.noinherit_system_environment_is_set,
+                           true,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat noinherit-system-environment/inherit-system-environment for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
+                    {
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::inherit_system_environment:
+                {
+                    if(auto const ret{set_bool_option(
+                           target.noinherit_system_environment,
+                           target.noinherit_system_environment_is_set,
+                           false,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat noinherit-system-environment/inherit-system-environment for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
+                    {
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::disable_utf8_check:
+                {
+                    if(auto const ret{set_bool_option(
+                           target.disable_utf8_check,
+                           target.disable_utf8_check_is_set,
+                           true,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat disable-utf8-check/enable-utf8-check for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
+                    {
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::enable_utf8_check:
+                {
+                    if(auto const ret{set_bool_option(
+                           target.disable_utf8_check,
+                           target.disable_utf8_check_is_set,
+                           false,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat disable-utf8-check/enable-utf8-check for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
+                    {
+                        return ret;
+                    }
+                    mark_consumed(mark_action_end);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::trace:
+                {
+                    if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing trace output target.");
+                    }
 
-                if(trace_target_text == u8"none") { return set_trace_target(trace_output_target_t::none, extra1); }
-                if(trace_target_text == u8"out") { return set_trace_target(trace_output_target_t::out, extra1); }
-                if(trace_target_text == u8"err") { return set_trace_target(trace_output_target_t::err, extra1); }
+                    auto const trace_target_text{::uwvm2::utils::container::u8string_view{extra1->str}};
+                    auto set_trace_target{
+                        [&](trace_output_target_t trace_target,
+                            ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
+                        {
+                            if(!trace_configuration_matches(target, trace_target, {})) [[unlikely]]
+                            {
+                                return print_usage_error(parameter,
+                                                         u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
+                            }
+                            if(target.trace_wasip1_call_is_set) [[unlikely]]
+                            {
+                                return print_usage_error(
+                                    parameter,
+                                    u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
+                            }
+                            target.trace_wasip1_call = trace_target != trace_output_target_t::none;
+                            target.trace_wasip1_call_is_set = true;
+                            target.trace_wasip1_output_target = trace_target;
+                            if(trace_target != trace_output_target_t::file) { target.trace_wasip1_output_file_path_storage.clear(); }
+                            mark_consumed(last);
+                            return parameter_return_type::def;
+                        }};
+
+                    if(trace_target_text == u8"none") { return set_trace_target(trace_output_target_t::none, extra1); }
+                    if(trace_target_text == u8"out") { return set_trace_target(trace_output_target_t::out, extra1); }
+                    if(trace_target_text == u8"err") { return set_trace_target(trace_output_target_t::err, extra1); }
 
 #  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
-                auto set_trace_file{
-                    [&](::uwvm2::utils::container::u8string_view file_path,
-                        ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
-                    {
-                        if(file_path.empty()) [[unlikely]] { return print_usage_error(parameter, u8"Missing trace output file path."); }
-                        if(!trace_configuration_matches(target, trace_output_target_t::file, file_path)) [[unlikely]]
+                    auto set_trace_file{
+                        [&](::uwvm2::utils::container::u8string_view file_path,
+                            ::uwvm2::utils::cmdline::parameter_parsing_results* last) constexpr noexcept -> parameter_return_type
                         {
-                            return print_usage_error(parameter,
-                                                     u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
-                        }
-                        if(target.trace_wasip1_call_is_set) [[unlikely]]
-                        {
-                            return print_usage_error(
-                                parameter,
-                                u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
-                        }
-
-                        ::fast_io::u8native_file test_output{};
-                        if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(test_output, file_path)) [[unlikely]]
-                        {
-                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                                u8"[error] ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"Unable to open WASI trace output file \"",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                                file_path,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"\".\n\n",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                            return parameter_return_type::return_m1_imme;
-                        }
-
-                        target.trace_wasip1_call = true;
-                        target.trace_wasip1_call_is_set = true;
-                        target.trace_wasip1_output_target = trace_output_target_t::file;
-                        target.trace_wasip1_output_file_path_storage = ::uwvm2::utils::container::u8string{file_path};
-                        mark_consumed(last);
-                        return parameter_return_type::def;
-                    }};
-
-                if(trace_target_text == u8"file")
-                {
-                    auto extra2{extra1 + 1u};
-                    if(extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
-                    {
-                        return print_usage_error(parameter, u8"Missing trace output file path.");
-                    }
-                    return set_trace_file(::uwvm2::utils::container::u8string_view{extra2->str}, extra2);
-                }
-                return set_trace_file(trace_target_text, extra1);
-#  else
-                return print_usage_error(parameter, u8"Invalid trace output target.");
-#  endif
-            }
-            case target_action_t::set_argv0:
-            {
-                if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing argv0."); }
-                if(target.argv0_is_set) [[unlikely]]
-                {
-                    return print_usage_error(parameter,
-                                             u8"Duplicate or conflicting module action. Cannot set argv0 more than once for the same WASI Preview 1 target.");
-                }
-                if(target.force_args_is_set) [[unlikely]]
-                {
-                    return print_usage_error(parameter,
-                                             u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
-                }
-                target.argv0_storage = ::uwvm2::utils::container::u8string{extra1->str};
-                target.argv0_is_set = true;
-                mark_consumed(extra1);
-                return parameter_return_type::def;
-            }
-            case target_action_t::force_args:
-            {
-                // Target force-args is a complete argv replacement for this
-                // target. It deliberately does not inherit the `--run` argv tail
-                // and cannot be combined with set-argv0, because set-argv0 is
-                // defined as a patch over the default argv vector.
-                if(extra1 == para_end || !is_argument_result(extra1->type)) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing force-args count.");
-                }
-
-                ::std::size_t arg_count{};
-                if(!parse_size_t(::uwvm2::utils::container::u8string_view{extra1->str}, arg_count)) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Invalid force-args count (size_t).");
-                }
-
-                if(target.argv0_is_set) [[unlikely]]
-                {
-                    return print_usage_error(parameter,
-                                             u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
-                }
-                if(target.force_args_is_set) [[unlikely]]
-                {
-                    return print_usage_error(parameter,
-                                             u8"Duplicate module action. Cannot set force-args more than once for the same WASI Preview 1 target.");
-                }
-
-                ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> force_args{};
-                force_args.reserve(arg_count);
-
-                auto last{extra1};
-                auto arg_curr{extra1 + 1u};
-                for(::std::size_t i{}; i != arg_count; ++i, ++arg_curr)
-                {
-                    if(arg_curr == para_end || !is_argument_result(arg_curr->type)) [[unlikely]]
-                    {
-                        return print_usage_error(parameter, u8"Missing force-args value.");
-                    }
-                    force_args.emplace_back(::uwvm2::utils::container::u8string{arg_curr->str});
-                    last = arg_curr;
-                }
-
-                target.force_argument_storage = ::std::move(force_args);
-                target.force_args_is_set = true;
-                mark_consumed(last);
-                return parameter_return_type::def;
-            }
-            case target_action_t::set_fd_limit:
-            {
-                if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing fd limit."); }
-                auto const ret{parse_fd_limit(parameter, ::uwvm2::utils::container::u8string_view{extra1->str}, target)};
-                if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
-                mark_consumed(extra1);
-                return parameter_return_type::def;
-            }
-            case target_action_t::delete_system_environment:
-            {
-                // Deleting the same name twice has no runtime side effect, but
-                // it is rejected because it usually means a positional single or
-                // group command was accidentally attached to the wrong target.
-                if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing environment variable name.");
-                }
-
-                auto const env_name{::uwvm2::utils::container::u8string_view{extra1->str}};
-                if(env_name.empty() || env_name.find_character(u8'=') != ::fast_io::containers::npos) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Invalid environment variable name.");
-                }
-                if(has_deleted_environment(target, env_name)) [[unlikely]]
-                {
-                    return print_usage_error(
-                        parameter,
-                        u8"Duplicate module action. Cannot delete the same environment variable more than once in one WASI Preview 1 target.");
-                }
-                if(target.add_or_replace_environment.find(env_name) != target.add_or_replace_environment.cend()) [[unlikely]]
-                {
-                    return print_usage_error(
-                        parameter,
-                        u8"Conflicting module action. Cannot combine delete-system-environment and add-or-replace-environment for the same variable in one WASI Preview 1 target.");
-                }
-
-                target.delete_system_environment.emplace(env_name);
-                mark_consumed(extra1);
-                return parameter_return_type::def;
-            }
-            case target_action_t::add_or_replace_environment:
-            {
-                // Add-or-replace remains repeatable by design: the last value for
-                // a key wins before materialization. A same-target delete for the
-                // same name is still a conflict because command order should not
-                // change whether a target imports or synthesizes that variable.
-                auto extra2{extra1 + 1u};
-                if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing add-or-replace-environment arguments.");
-                }
-
-                auto const env_name{::uwvm2::utils::container::u8string_view{extra1->str}};
-                if(env_name.empty() || env_name.find_character(u8'=') != ::fast_io::containers::npos) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Invalid environment variable name.");
-                }
-                if(has_deleted_environment(target, env_name)) [[unlikely]]
-                {
-                    return print_usage_error(
-                        parameter,
-                        u8"Conflicting module action. Cannot combine add-or-replace-environment and delete-system-environment for the same variable in one WASI Preview 1 target.");
-                }
-
-                auto const env_value{::uwvm2::utils::container::u8string_view{extra2->str}};
-                if(auto env_iter{target.add_or_replace_environment.find(env_name)}; env_iter != target.add_or_replace_environment.end())
-                {
-                    env_iter->second = env_value;
-                }
-                else
-                {
-                    target.add_or_replace_environment.emplace(env_name, env_value);
-                }
-                mark_consumed(extra2);
-                return parameter_return_type::def;
-            }
-            case target_action_t::mount_dir:
-            {
-                auto extra2{extra1 + 1u};
-                if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing mount-dir arguments.");
-                }
-
-                auto const ret{apply_mount_dir_to_override(target, extra1->str, extra2->str)};
-                if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
-                mark_consumed(extra2);
-                return parameter_return_type::def;
-            }
-#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-            case target_action_t::socket_tcp_connect:
-            case target_action_t::socket_tcp_listen:
-            case target_action_t::socket_udp_bind:
-            case target_action_t::socket_udp_connect:
-            {
-                // Socket actions share the global TCP/UDP parsers, then perform
-                // an additional target-local duplicate fd check. Runtime will
-                // merge global and target sockets; duplicate fds inside one
-                // target are rejected here so the failure is tied to the exact
-                // command that introduced it.
-                auto extra2{extra1 + 1u};
-                if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
-                {
-                    return print_usage_error(parameter, u8"Missing socket action arguments.");
-                }
-
-                auto apply_socket_action{
-                    [&](auto const parameter_name, auto const& socket_parameter, auto callback) constexpr noexcept -> parameter_return_type
-                    {
-                        if(extra2->str == u8"unix")
-                        {
-                            auto extra3{extra2 + 1u};
-                            if(extra3 == para_end || extra3->type != parameter_type::arg) [[unlikely]]
+                            if(file_path.empty()) [[unlikely]] { return print_usage_error(parameter, u8"Missing trace output file path."); }
+                            if(!trace_configuration_matches(target, trace_output_target_t::file, file_path)) [[unlikely]]
                             {
-                                return print_usage_error(parameter, u8"Missing unix socket path.");
+                                return print_usage_error(parameter,
+                                                         u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
+                            }
+                            if(target.trace_wasip1_call_is_set) [[unlikely]]
+                            {
+                                return print_usage_error(
+                                    parameter,
+                                    u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
                             }
 
-                            auto const ret{
-                                apply_socket_callback_to_override(target, parameter_name, socket_parameter, callback, extra1->str, extra2->str, extra3->str)};
+                            ::fast_io::u8native_file test_output{};
+                            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(test_output, file_path)) [[unlikely]]
+                            {
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                    u8"[error] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"Unable to open WASI trace output file \"",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                    file_path,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"\".\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                return parameter_return_type::return_m1_imme;
+                            }
+
+                            target.trace_wasip1_call = true;
+                            target.trace_wasip1_call_is_set = true;
+                            target.trace_wasip1_output_target = trace_output_target_t::file;
+                            target.trace_wasip1_output_file_path_storage = ::uwvm2::utils::container::u8string{file_path};
+                            mark_consumed(last);
+                            return parameter_return_type::def;
+                        }};
+
+                    if(trace_target_text == u8"file")
+                    {
+                        auto extra2{extra1 + 1u};
+                        if(extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
+                        {
+                            return print_usage_error(parameter, u8"Missing trace output file path.");
+                        }
+                        return set_trace_file(::uwvm2::utils::container::u8string_view{extra2->str}, extra2);
+                    }
+                    return set_trace_file(trace_target_text, extra1);
+#  else
+                    return print_usage_error(parameter, u8"Invalid trace output target.");
+#  endif
+                }
+                case target_action_t::set_argv0:
+                {
+                    if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing argv0."); }
+                    if(target.argv0_is_set) [[unlikely]]
+                    {
+                        return print_usage_error(
+                            parameter,
+                            u8"Duplicate or conflicting module action. Cannot set argv0 more than once for the same WASI Preview 1 target.");
+                    }
+                    if(target.force_args_is_set) [[unlikely]]
+                    {
+                        return print_usage_error(parameter,
+                                                 u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
+                    }
+                    target.argv0_storage = ::uwvm2::utils::container::u8string{extra1->str};
+                    target.argv0_is_set = true;
+                    mark_consumed(extra1);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::force_args:
+                {
+                    // Target force-args is a complete argv replacement for this
+                    // target. It deliberately does not inherit the `--run` argv tail
+                    // and cannot be combined with set-argv0, because set-argv0 is
+                    // defined as a patch over the default argv vector.
+                    if(extra1 == para_end || !is_argument_result(extra1->type)) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing force-args count.");
+                    }
+
+                    ::std::size_t arg_count{};
+                    if(!parse_size_t(::uwvm2::utils::container::u8string_view{extra1->str}, arg_count)) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Invalid force-args count (size_t).");
+                    }
+
+                    if(target.argv0_is_set) [[unlikely]]
+                    {
+                        return print_usage_error(parameter,
+                                                 u8"Conflicting module action. Cannot combine force-args and set-argv0 for the same WASI Preview 1 target.");
+                    }
+                    if(target.force_args_is_set) [[unlikely]]
+                    {
+                        return print_usage_error(parameter,
+                                                 u8"Duplicate module action. Cannot set force-args more than once for the same WASI Preview 1 target.");
+                    }
+
+                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> force_args{};
+                    force_args.reserve(arg_count);
+
+                    auto last{extra1};
+                    auto arg_curr{extra1 + 1u};
+                    for(::std::size_t i{}; i != arg_count; ++i, ++arg_curr)
+                    {
+                        if(arg_curr == para_end || !is_argument_result(arg_curr->type)) [[unlikely]]
+                        {
+                            return print_usage_error(parameter, u8"Missing force-args value.");
+                        }
+                        force_args.emplace_back(::uwvm2::utils::container::u8string{arg_curr->str});
+                        last = arg_curr;
+                    }
+
+                    target.force_argument_storage = ::std::move(force_args);
+                    target.force_args_is_set = true;
+                    mark_consumed(last);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::set_fd_limit:
+                {
+                    if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing fd limit."); }
+                    auto const ret{parse_fd_limit(parameter, ::uwvm2::utils::container::u8string_view{extra1->str}, target)};
+                    if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
+                    mark_consumed(extra1);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::delete_system_environment:
+                {
+                    // Deleting the same name twice has no runtime side effect, but
+                    // it is rejected because it usually means a positional single or
+                    // group command was accidentally attached to the wrong target.
+                    if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing environment variable name.");
+                    }
+
+                    auto const env_name{::uwvm2::utils::container::u8string_view{extra1->str}};
+                    if(env_name.empty() || env_name.find_character(u8'=') != ::fast_io::containers::npos) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Invalid environment variable name.");
+                    }
+                    if(has_deleted_environment(target, env_name)) [[unlikely]]
+                    {
+                        return print_usage_error(
+                            parameter,
+                            u8"Duplicate module action. Cannot delete the same environment variable more than once in one WASI Preview 1 target.");
+                    }
+                    if(target.add_or_replace_environment.find(env_name) != target.add_or_replace_environment.cend()) [[unlikely]]
+                    {
+                        return print_usage_error(
+                            parameter,
+                            u8"Conflicting module action. Cannot combine delete-system-environment and add-or-replace-environment for the same variable in one WASI Preview 1 target.");
+                    }
+
+                    target.delete_system_environment.emplace(env_name);
+                    mark_consumed(extra1);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::add_or_replace_environment:
+                {
+                    // Add-or-replace remains repeatable by design: the last value for
+                    // a key wins before materialization. A same-target delete for the
+                    // same name is still a conflict because command order should not
+                    // change whether a target imports or synthesizes that variable.
+                    auto extra2{extra1 + 1u};
+                    if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing add-or-replace-environment arguments.");
+                    }
+
+                    auto const env_name{::uwvm2::utils::container::u8string_view{extra1->str}};
+                    if(env_name.empty() || env_name.find_character(u8'=') != ::fast_io::containers::npos) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Invalid environment variable name.");
+                    }
+                    if(has_deleted_environment(target, env_name)) [[unlikely]]
+                    {
+                        return print_usage_error(
+                            parameter,
+                            u8"Conflicting module action. Cannot combine add-or-replace-environment and delete-system-environment for the same variable in one WASI Preview 1 target.");
+                    }
+
+                    auto const env_value{::uwvm2::utils::container::u8string_view{extra2->str}};
+                    if(auto env_iter{target.add_or_replace_environment.find(env_name)}; env_iter != target.add_or_replace_environment.end())
+                    {
+                        env_iter->second = env_value;
+                    }
+                    else
+                    {
+                        target.add_or_replace_environment.emplace(env_name, env_value);
+                    }
+                    mark_consumed(extra2);
+                    return parameter_return_type::def;
+                }
+                case target_action_t::mount_dir:
+                {
+                    auto extra2{extra1 + 1u};
+                    if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing mount-dir arguments.");
+                    }
+
+                    auto const ret{apply_mount_dir_to_override(target, extra1->str, extra2->str)};
+                    if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
+                    mark_consumed(extra2);
+                    return parameter_return_type::def;
+                }
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+                case target_action_t::socket_tcp_connect:
+                case target_action_t::socket_tcp_listen:
+                case target_action_t::socket_udp_bind:
+                case target_action_t::socket_udp_connect:
+                {
+                    // Socket actions share the global TCP/UDP parsers, then perform
+                    // an additional target-local duplicate fd check. Runtime will
+                    // merge global and target sockets; duplicate fds inside one
+                    // target are rejected here so the failure is tied to the exact
+                    // command that introduced it.
+                    auto extra2{extra1 + 1u};
+                    if(extra1 == para_end || extra1->type != parameter_type::arg || extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing socket action arguments.");
+                    }
+
+                    auto apply_socket_action{
+                        [&](auto const parameter_name, auto const& socket_parameter, auto callback) constexpr noexcept -> parameter_return_type
+                        {
+                            if(extra2->str == u8"unix")
+                            {
+                                auto extra3{extra2 + 1u};
+                                if(extra3 == para_end || extra3->type != parameter_type::arg) [[unlikely]]
+                                {
+                                    return print_usage_error(parameter, u8"Missing unix socket path.");
+                                }
+
+                                auto const ret{apply_socket_callback_to_override(target,
+                                                                                 parameter_name,
+                                                                                 socket_parameter,
+                                                                                 callback,
+                                                                                 extra1->str,
+                                                                                 extra2->str,
+                                                                                 extra3->str)};
+                                if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
+                                if(has_duplicate_preopen_socket_fd(target)) [[unlikely]]
+                                {
+                                    return print_usage_error(
+                                        parameter,
+                                        u8"Conflicting module action. Cannot assign the same WASI socket fd more than once in one WASI Preview 1 target.");
+                                }
+                                mark_consumed(extra3);
+                                return parameter_return_type::def;
+                            }
+
+                            auto const ret{apply_socket_callback_to_override(target, parameter_name, socket_parameter, callback, extra1->str, extra2->str)};
                             if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
                             if(has_duplicate_preopen_socket_fd(target)) [[unlikely]]
                             {
@@ -916,45 +934,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     parameter,
                                     u8"Conflicting module action. Cannot assign the same WASI socket fd more than once in one WASI Preview 1 target.");
                             }
-                            mark_consumed(extra3);
+                            mark_consumed(extra2);
                             return parameter_return_type::def;
-                        }
+                        }};
 
-                        auto const ret{apply_socket_callback_to_override(target, parameter_name, socket_parameter, callback, extra1->str, extra2->str)};
-                        if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
-                        if(has_duplicate_preopen_socket_fd(target)) [[unlikely]]
-                        {
-                            return print_usage_error(
-                                parameter,
-                                u8"Conflicting module action. Cannot assign the same WASI socket fd more than once in one WASI Preview 1 target.");
-                        }
-                        mark_consumed(extra2);
-                        return parameter_return_type::def;
-                    }};
-
-                switch(action)
-                {
-                case target_action_t::socket_tcp_connect:
-                    return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-connect"},
-                                               ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_connect,
-                                               ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_connect_callback);
-                case target_action_t::socket_tcp_listen:
-                    return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-listen"},
-                                               ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_listen,
-                                               ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_listen_callback);
-                case target_action_t::socket_udp_bind:
-                    return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-bind"},
-                                               ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_bind,
-                                               ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_bind_callback);
-                case target_action_t::socket_udp_connect:
-                    return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-connect"},
-                                               ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_connect,
-                                               ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_connect_callback);
-                default:
+                    switch(action)
+                    {
+                        case target_action_t::socket_tcp_connect:
+                            return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-connect"},
+                                                       ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_connect,
+                                                       ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_connect_callback);
+                        case target_action_t::socket_tcp_listen:
+                            return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-tcp-listen"},
+                                                       ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_tcp_listen,
+                                                       ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_tcp_listen_callback);
+                        case target_action_t::socket_udp_bind:
+                            return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-bind"},
+                                                       ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_bind,
+                                                       ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_bind_callback);
+                        case target_action_t::socket_udp_connect:
+                            return apply_socket_action(::uwvm2::utils::container::u8cstring_view{u8"--wasip1-global-socket-udp-connect"},
+                                                       ::uwvm2::uwvm::cmdline::params::wasip1_global_socket_udp_connect,
+                                                       ::uwvm2::uwvm::cmdline::params::details::wasip1_global_socket_udp_connect_callback);
+                        default: break;
+                    }
                     break;
                 }
-                break;
-            }
 #  endif
             }
 
@@ -985,13 +990,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     return print_usage_error(parameter, u8"Unknown module action.");
                 }
 
-                auto const ret{apply_module_action(parameter,
-                                                   mark_begin,
-                                                   curr_action,
-                                                   action,
-                                                   curr_action + 1u,
-                                                   para_end,
-                                                   target)};
+                auto const ret{apply_module_action(parameter, mark_begin, curr_action, action, curr_action + 1u, para_end, target)};
                 if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
 
                 for(++curr_action; curr_action != para_end && curr_action->type == parameter_type::occupied_arg; ++curr_action) {}
@@ -1000,11 +999,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::def;
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type apply_target_action(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                                                override_state_t& target,
-                                                                                                target_action_t action) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+            apply_target_action(::uwvm2::utils::cmdline::parameter const& parameter,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                override_state_t& target,
+                                target_action_t action) noexcept
         { return apply_module_action(parameter, target_arg, target_arg, action, target_arg + 1u, para_end, target); }
     }  // namespace wasip1_module_details
 

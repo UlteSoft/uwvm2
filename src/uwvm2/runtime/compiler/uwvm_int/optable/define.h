@@ -55,7 +55,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
     struct uwvm_interpreter_function_operands_t
-    { ::uwvm2::utils::container::vector<::std::byte> operands{}; };
+    {
+        ::uwvm2::utils::container::vector<::std::byte> operands{};
+    };
 
     struct local_func_storage_t
     {
@@ -376,8 +378,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     ///       `uwvm_interpreter_opfunc_t`: Windows x86_64 GNU/Clang uses SysV, and all i686 targets use fastcall.
     using unreachable_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)() noexcept;
 
-    using memory_out_of_bounds_func_t =
-        void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
+    using memory_out_of_bounds_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
 
     /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
     ///          the arguments and writes the return result back onto the operand stack.
@@ -386,10 +387,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
     ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
-    using interpreter_call_indirect_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id,
-                                                                                       ::std::size_t type_index,
-                                                                                       ::std::size_t table_index,
-                                                                                       ::std::byte** stack_top_ptr) UWVM_THROWS;
+    using interpreter_call_indirect_func_t = void(
+        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr)
+        UWVM_THROWS;
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     inline constexpr ::std::uintptr_t interpreter_tiered_loop_osr_disabled_state_address{::std::numeric_limits<::std::uintptr_t>::max()};
@@ -449,8 +449,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     [[nodiscard]] inline constexpr bool interpreter_tiered_loop_osr_poll_should_emit(::std::size_t local_function_count,
-                                        
-        ::std::size_t function_code_size) noexcept
+
+                                                                                     ::std::size_t function_code_size) noexcept
     {
         if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size) { return true; }
         if(!interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count)) { return false; }

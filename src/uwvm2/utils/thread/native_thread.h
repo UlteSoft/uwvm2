@@ -251,7 +251,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         struct worker_task;
 
         struct ring_slot
-        { lazy_compile_request request{}; };
+        {
+            lazy_compile_request request{};
+        };
 
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
         using native_thread_type = ::fast_io::native_thread;

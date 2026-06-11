@@ -256,7 +256,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type, typename... Args>
-    inline constexpr void print_wasip1_trace_message(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env, Args && ... args) noexcept
+    inline constexpr void print_wasip1_trace_message(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env,
+                                                     Args && ... args) noexcept
     {
         using trace_group_kind_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t;
         using trace_output_target_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t;

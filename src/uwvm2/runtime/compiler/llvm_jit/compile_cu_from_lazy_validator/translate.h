@@ -392,10 +392,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Adds one local function to the lazy metadata tables and records its borrowed runtime function storage.
         inline constexpr void append_lazy_function(runtime_module_storage_t const& curr_module,
-                                         lazy_module_storage_t& storage,
-                                         compile_option const& options,
-                                         ::std::size_t local_function_index,
-                                         ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                   lazy_module_storage_t& storage,
+                                                   compile_option const& options,
+                                                   ::std::size_t local_function_index,
+                                                   ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
             auto const function_index{import_func_count + local_function_index};
@@ -424,8 +424,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Publishes a function-level terminal state and mirrors it to the primary compile unit so both scheduler waiters
         // and compile-unit observers are notified.
         inline constexpr void mark_function_compile_units_state(lazy_module_storage_t& storage,
-                                                      lazy_function_storage_t& fn,
-                                                      ::uwvm2::utils::thread::lazy_compile_state state) noexcept
+                                                                lazy_function_storage_t& fn,
+                                                                ::uwvm2::utils::thread::lazy_compile_state state) noexcept
         {
             // This release store is the function-level publication barrier.  By the time a waiter observes `compiled`
             // with an acquire load/wait, the materialized record, its `ready` publication, and any runtime target-table
@@ -445,9 +445,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Runs standard Wasm code validation for one local function when the lazy mode requires it.
         inline constexpr void validate_function_if_needed(runtime_module_storage_t const& curr_module,
-                                                lazy_compile_options const& options,
-                                                ::std::size_t local_function_index,
-                                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                          lazy_compile_options const& options,
+                                                          ::std::size_t local_function_index,
+                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
@@ -515,14 +515,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         inline constexpr void store_lazy_materialized_ready(lazy_materialized_function_storage_t& materialized, bool ready, ::std::memory_order order) noexcept
         { ::std::atomic_ref<bool>{materialized.ready}.store(ready, order); }
 
-        [[nodiscard]] inline constexpr bool load_lazy_materialized_ready(lazy_materialized_function_storage_t const& materialized, ::std::memory_order order) noexcept
+        [[nodiscard]] inline constexpr bool load_lazy_materialized_ready(lazy_materialized_function_storage_t const& materialized,
+                                                                         ::std::memory_order order) noexcept
         {
             auto& ready{const_cast<bool&>(materialized.ready)};
             return ::std::atomic_ref<bool>{ready}.load(order);
         }
 
         // Copies LLVM's host feature map into owning strings so later EngineBuilder StringRefs remain valid.
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> get_llvm_jit_host_target_attribute_storage() noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>
+            get_llvm_jit_host_target_attribute_storage() noexcept
         {
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> mattrs{};
             auto host_features{::llvm::sys::getHostCPUFeatures()};
@@ -554,8 +556,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         // Converts owning host feature strings into the StringRef array shape expected by LLVM EngineBuilder.
-        inline constexpr void append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
-                                                                         ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
+        inline constexpr void
+            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+                                                       ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
         {
             attr_refs.clear();
             attr_refs.reserve(attr_storage.size());
@@ -597,8 +600,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Finds directly-called local-defined functions in one Wasm body.  The scan is intentionally shallow: indirect
         // calls and calls to imports are not grouped because they do not identify a single local materialization target.
         [[nodiscard]] inline constexpr bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
-                                                                 ::std::size_t local_function_index,
-                                                                 ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+                                                                           ::std::size_t local_function_index,
+                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
         {
             callees.clear();
             if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]] { return false; }
@@ -640,9 +643,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Verifies and lightly optimizes a lazy LLVM module before MCJIT takes ownership of it.
         [[nodiscard]] inline constexpr bool optimize_lazy_llvm_jit_module(::llvm::Module& module,
-                                                                ::llvm::TargetMachine& target_machine,
-                                                                ::llvm::CodeGenOptLevel codegen_opt_level,
-                                                                bool verify_llvm_jit_ir) noexcept
+                                                                          ::llvm::TargetMachine& target_machine,
+                                                                          ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                                          bool verify_llvm_jit_ir) noexcept
         {
             if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
@@ -669,7 +672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Resolves an emitted LLVM function symbol to a native address, with a fallback for older MCJIT paths that need
         // an IR Function pointer before materializing the address.
         [[nodiscard]] inline constexpr ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
-                                                                            ::uwvm2::utils::container::string const& function_name) noexcept
+                                                                                      ::uwvm2::utils::container::string const& function_name) noexcept
         {
             llvm_jit_function_address_name_t function_address_name{function_name.data(), function_name.data() + function_name.size()};
             auto const direct_function_address{engine.getFunctionAddress(function_address_name)};
@@ -685,10 +688,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Takes a single-function LLVM IR module, creates an MCJIT engine, resolves all public/raw entry points, and
         // stores the owning LLVM objects in the materialized function record.
         [[nodiscard]] inline constexpr bool materialize_lazy_local_function(runtime_module_storage_t const& curr_module,
-                                                                  lazy_module_storage_t& storage,
-                                                                  lazy_compile_options const& options,
-                                                                  ::std::size_t local_function_index,
-                                                                  llvm_jit_module_storage_t& llvm_ir_storage) noexcept
+                                                                            lazy_module_storage_t& storage,
+                                                                            lazy_compile_options const& options,
+                                                                            ::std::size_t local_function_index,
+                                                                            llvm_jit_module_storage_t& llvm_ir_storage) noexcept
         {
             if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
             auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
@@ -797,11 +800,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Materializes a group of local functions from one LLVM IR module.  All functions share one LLVMContext and one
         // MCJIT engine; the first materialized record owns those objects and therefore owns the native code lifetime for
         // the whole group.
-        [[nodiscard]] inline constexpr bool materialize_lazy_local_function_group(runtime_module_storage_t const& curr_module,
-                                                                        lazy_module_storage_t& storage,
-                                                                        lazy_compile_options const& options,
-                                                                        ::uwvm2::utils::container::vector<::std::size_t> const& local_function_indices,
-                                                                        llvm_jit_module_storage_t& llvm_ir_storage) noexcept
+        [[nodiscard]] inline constexpr bool
+            materialize_lazy_local_function_group(runtime_module_storage_t const& curr_module,
+                                                  lazy_module_storage_t& storage,
+                                                  lazy_compile_options const& options,
+                                                  ::uwvm2::utils::container::vector<::std::size_t> const& local_function_indices,
+                                                  llvm_jit_module_storage_t& llvm_ir_storage) noexcept
         {
             if(local_function_indices.empty()) [[unlikely]] { return false; }
 
@@ -922,7 +926,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         // Returns the Wasm byte size used by the lazy grouping budget.
-        [[nodiscard]] inline constexpr ::std::size_t lazy_group_function_code_size(lazy_module_storage_t const& storage, ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline constexpr ::std::size_t lazy_group_function_code_size(lazy_module_storage_t const& storage,
+                                                                                   ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return 0uz; }
             auto const& fn{storage.functions.index_unchecked(local_function_index)};
@@ -932,11 +937,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Checks whether a grouping candidate has already been selected.
         [[nodiscard]] inline constexpr bool lazy_group_contains_function(::uwvm2::utils::container::vector<::std::size_t> const& out,
-                                                               ::std::size_t local_function_index) noexcept
+                                                                         ::std::size_t local_function_index) noexcept
         { return ::std::find(out.begin(), out.end(), local_function_index) != out.end(); }
 
         // Only uncompiled or queued functions are safe to opportunistically include in a new group.
-        [[nodiscard]] inline constexpr bool should_consider_lazy_group_function(lazy_module_storage_t const& storage, ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline constexpr bool should_consider_lazy_group_function(lazy_module_storage_t const& storage,
+                                                                                ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return false; }
             // Acquire keeps this heuristic consistent with terminal-state publication.  A stale non-terminal read may
@@ -948,12 +954,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Adds one candidate to the group if it fits the configured count and code-size budget.  `force` is used for the
         // demand-triggering function so it is always included even when it alone exceeds the heuristic budget.
         [[nodiscard]] inline constexpr bool try_append_lazy_group_function(::uwvm2::utils::container::vector<::std::size_t>& out,
-                                                                 lazy_module_storage_t const& storage,
-                                                                 ::std::size_t local_function_index,
-                                                                 ::std::size_t function_budget,
-                                                                 ::std::size_t code_size_budget,
-                                                                 ::std::size_t& total_code_size,
-                                                                 bool force) noexcept
+                                                                           lazy_module_storage_t const& storage,
+                                                                           ::std::size_t local_function_index,
+                                                                           ::std::size_t function_budget,
+                                                                           ::std::size_t code_size_budget,
+                                                                           ::std::size_t& total_code_size,
+                                                                           bool force) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return false; }
             if(lazy_group_contains_function(out, local_function_index)) { return false; }
@@ -975,11 +981,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Fills spare group budget with nearby local functions.  This improves locality for modules whose related
         // functions are laid out next to each other but do not form a direct-call chain.
         inline constexpr void append_lazy_group_adjacent_functions(lazy_module_storage_t& storage,
-                                                         ::std::size_t entry_local_function_index,
-                                                         ::std::size_t function_budget,
-                                                         ::std::size_t code_size_budget,
-                                                         ::std::size_t& total_code_size,
-                                                         ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+                                                                   ::std::size_t entry_local_function_index,
+                                                                   ::std::size_t function_budget,
+                                                                   ::std::size_t code_size_budget,
+                                                                   ::std::size_t& total_code_size,
+                                                                   ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
         {
             auto const local_count{storage.functions.size()};
             if(entry_local_function_index >= local_count) [[unlikely]] { return; }
@@ -1010,9 +1016,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Builds a small materialization group rooted at the demanded function.  Direct local callees are preferred, then
         // adjacent functions are added as a locality fallback.
         inline constexpr void collect_lazy_direct_call_group(runtime_module_storage_t const& curr_module,
-                                                   lazy_module_storage_t& storage,
-                                                   ::std::size_t entry_local_function_index,
-                                                   ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+                                                             lazy_module_storage_t& storage,
+                                                             ::std::size_t entry_local_function_index,
+                                                             ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
         {
             constexpr ::std::size_t group_function_budget{16uz};
             constexpr ::std::size_t group_code_size_budget{8uz * 1024uz};
@@ -1052,12 +1058,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Claims, validates, emits, materializes, publishes, and marks ready a group of lazy LLVM JIT functions.
         inline constexpr void compile_lazy_local_function_group(runtime_module_storage_t const& curr_module,
-                                                      lazy_module_storage_t& storage,
-                                                      lazy_compile_options& options,
-                                                      ::std::size_t entry_local_function_index,
-                                                      ::uwvm2::validation::error::code_validation_error_impl& err,
-                                                      void (*publish_materialized_function)(void*, ::std::size_t) noexcept = nullptr,
-                                                      void* publish_user_data = nullptr) UWVM_THROWS
+                                                                lazy_module_storage_t& storage,
+                                                                lazy_compile_options& options,
+                                                                ::std::size_t entry_local_function_index,
+                                                                ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                                void (*publish_materialized_function)(void*, ::std::size_t) noexcept = nullptr,
+                                                                void* publish_user_data = nullptr) UWVM_THROWS
         {
             ::uwvm2::utils::container::vector<::std::size_t> candidate_group{};
             collect_lazy_direct_call_group(curr_module, storage, entry_local_function_index, candidate_group);
@@ -1192,10 +1198,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Single-function materialization path retained for direct internal use.  The public lazy compile entry normally
         // uses the group path so direct callees can be warmed together.
         inline constexpr void compile_lazy_local_function(runtime_module_storage_t const& curr_module,
-                                                lazy_module_storage_t& storage,
-                                                lazy_compile_options& options,
-                                                ::std::size_t local_function_index,
-                                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                          lazy_module_storage_t& storage,
+                                                          lazy_compile_options& options,
+                                                          ::std::size_t local_function_index,
+                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
@@ -1356,9 +1362,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // Builds all lazy metadata for a runtime module without emitting native code.  Each local function receives one
     // whole-function compile unit and one materialization record indexed by local-defined-function index.
     inline constexpr lazy_module_storage_t initialize_lazy_module_storage(runtime_module_storage_t const& curr_module,
-                                                                compile_option const& options,
-                                                                ::uwvm2::validation::error::code_validation_error_impl& err,
-                                                                [[maybe_unused]] lazy_split_config split_config = {}) UWVM_THROWS
+                                                                          compile_option const& options,
+                                                                          ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                                          [[maybe_unused]] lazy_split_config split_config = {}) UWVM_THROWS
     {
         lazy_module_storage_t storage{};
         storage.validation_module = details::all_details::build_runtime_validation_module(curr_module);
@@ -1383,17 +1389,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     // Public wrapper for direct-callee discovery, primarily used by runtime prefetch/tiering heuristics.
     [[nodiscard]] inline constexpr bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
-                                                             ::std::size_t local_function_index,
-                                                             ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+                                                                       ::std::size_t local_function_index,
+                                                                       ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
     { return details::collect_direct_defined_callees(curr_module, local_function_index, callees); }
 
     // Synchronously compiles the compile unit identified by `compile_unit_index`.  Invalid indices and failed
     // materialization are fatal because callers use this path when execution cannot proceed without native code.
     inline constexpr void compile_cu_from_lazy_validator(runtime_module_storage_t const& curr_module,
-                                               lazy_module_storage_t& storage,
-                                               lazy_compile_options& options,
-                                               ::std::size_t compile_unit_index,
-                                               ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                         lazy_module_storage_t& storage,
+                                                         lazy_compile_options& options,
+                                                         ::std::size_t compile_unit_index,
+                                                         ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::fast_io::unix_timestamp compile_start_time{};
@@ -1515,7 +1521,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // Creates a scheduler request for the function-level materialization state associated with `ctx.compile_unit_index`.
     // The returned request borrows `ctx`; callers must keep the context storage stable while the request may run.
     [[nodiscard]] inline constexpr ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context & ctx,
-                                                                                                unsigned priority = 0u) noexcept
+                                                                                                          unsigned priority = 0u) noexcept
     {
         if(ctx.lazy_storage == nullptr || ctx.compile_unit_index >= ctx.lazy_storage->compile_units.size()) [[unlikely]] { return {}; }
 
@@ -1535,8 +1541,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // it has observed the outer function state as `compiled`.  Therefore the `ready` flag is the synchronization point
     // here: if the acquire load observes `true`, the ordinary address fields are safe to read.
     [[nodiscard]] inline constexpr bool try_get_lazy_raw_entry_address(lazy_module_storage_t const& storage,
-                                                             ::std::size_t local_function_index,
-                                                             ::std::uintptr_t& function_address) noexcept
+                                                                       ::std::size_t local_function_index,
+                                                                       ::std::uintptr_t& function_address) noexcept
     {
         function_address = 0u;
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
@@ -1553,8 +1559,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // The acquire `ready` load mirrors the raw-entry accessor.  It prevents a caller from consuming a typed entry address
     // while the materializer is still resolving symbols or installing the MCJIT owner.
     [[nodiscard]] inline constexpr bool try_get_lazy_entry_address(lazy_module_storage_t const& storage,
-                                                         ::std::size_t local_function_index,
-                                                         ::std::uintptr_t& function_address) noexcept
+                                                                   ::std::size_t local_function_index,
+                                                                   ::std::uintptr_t& function_address) noexcept
     {
         function_address = 0u;
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
@@ -1571,9 +1577,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // Reentry descriptors and their raw addresses are ordinary vectors.  The acquire `ready` load must happen before the
     // vector size comparison and element reads so readers see a consistent descriptor/address pair.
     [[nodiscard]] inline constexpr bool try_get_lazy_tiered_loop_reentry_raw_entry_address(lazy_module_storage_t const& storage,
-                                                                                 ::std::size_t local_function_index,
-                                                                                 ::std::size_t wasm_code_offset,
-                                                                                 ::std::uintptr_t& function_address) noexcept
+                                                                                           ::std::size_t local_function_index,
+                                                                                           ::std::size_t wasm_code_offset,
+                                                                                           ::std::uintptr_t& function_address) noexcept
     {
         function_address = 0u;
         if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }

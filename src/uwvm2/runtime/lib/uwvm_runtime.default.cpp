@@ -182,8 +182,8 @@ extern "C" void __deregister_frame(void const*);
 #undef UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI
 #pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR")
 #undef UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN32) &&                                                                                                      \
-    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                      \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN32) &&                                                                                                       \
+    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                       \
     (defined(__GNUC__) || defined(__clang__))
 # define UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI __attribute__((__sysv_abi__))
 # define UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[__gnu__::__sysv_abi__]]
@@ -197,8 +197,8 @@ extern "C" void __deregister_frame(void const*);
 
 #pragma push_macro("UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR")
 #undef UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) && defined(_WIN32) &&                                                                                              \
-    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                      \
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) && defined(_WIN32) &&                                                                                               \
+    ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                       \
     (defined(__GNUC__) || defined(__clang__))
 # define UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[__gnu__::__sysv_abi__]]
 #elif defined(UWVM_RUNTIME_UWVM_INTERPRETER) && (defined(__i386__) || defined(_M_IX86))
@@ -246,9 +246,9 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr ::std::size_t lazy_total_function_count() noexcept;
         [[nodiscard]] inline constexpr ::std::size_t lazy_compiled_function_count() noexcept;
         inline constexpr void print_lazy_runtime_compiler_log(::fast_io::unix_timestamp run_start,
-                                                    ::fast_io::unix_timestamp exec_start,
-                                                    ::fast_io::unix_timestamp exec_end,
-                                                    ::fast_io::unix_timestamp stop_end) noexcept;
+                                                              ::fast_io::unix_timestamp exec_start,
+                                                              ::fast_io::unix_timestamp exec_end,
+                                                              ::fast_io::unix_timestamp stop_end) noexcept;
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
@@ -278,8 +278,7 @@ namespace uwvm2::runtime::lib
         };
 
         using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
-        using llvm_jit_memory_manager_owner_t =
-            typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
+        using llvm_jit_memory_manager_owner_t = typename member_function_first_argument<decltype(&::llvm::EngineBuilder::setMCJITMemoryManager)>::type;
         using llvm_jit_function_address_name_t =
             ::std::remove_cvref_t<typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::getFunctionAddress)>::type>;
 
@@ -293,7 +292,8 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool llvm_jit_lazy_background_refill_callback(void*, ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept;
         [[nodiscard]] inline constexpr bool
             ensure_lazy_llvm_jit_defined_function_compiled(::std::size_t module_id, ::std::size_t function_index, bool allow_tiered = false) noexcept;
-        [[nodiscard]] inline constexpr ::std::size_t llvm_jit_lazy_compile_unit_code_size(compiled_module_record const& rec, ::std::size_t local_function_index) noexcept;
+        [[nodiscard]] inline constexpr ::std::size_t llvm_jit_lazy_compile_unit_code_size(compiled_module_record const& rec,
+                                                                                          ::std::size_t local_function_index) noexcept;
         [[nodiscard]] inline constexpr bool
             try_materialize_runtime_module_llvm_jit(compiled_module_record& rec,
                                                     bool publish_full_ready = true,
@@ -307,13 +307,15 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool tiered_full_ready(compiled_module_record const& rec) noexcept;
         [[nodiscard]] inline constexpr bool tiered_large_module_long_run_active(compiled_module_record const& rec) noexcept;
         [[nodiscard]] inline constexpr ::std::size_t tiered_full_compile_switch_request_threshold(compiled_module_record const& rec) noexcept;
-        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept;
+        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec,
+                                                                                                ::std::size_t local_index) noexcept;
         [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_entry_hot_probe_stride(compiled_module_record const& rec) noexcept;
-        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept;
+        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec,
+                                                                                               ::std::size_t local_index) noexcept;
         [[nodiscard]] inline constexpr bool try_publish_tiered_ready_full_llvm_jit_entry(compiled_module_record& rec,
-                                                                               ::std::size_t module_id,
-                                                                               ::std::size_t local_index,
-                                                                               ::std::uintptr_t& raw_entry_address) noexcept;
+                                                                                         ::std::size_t module_id,
+                                                                                         ::std::size_t local_index,
+                                                                                         ::std::uintptr_t& raw_entry_address) noexcept;
 # endif
 #endif
 
@@ -737,7 +739,8 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
 
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr preload_call_context_t& get_preload_call_context() noexcept { return get_thread_state().preload_call_context; }
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr preload_call_context_t& get_preload_call_context() noexcept
+        { return get_thread_state().preload_call_context; }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr suppressed_call_stack_frame_t& get_suppressed_call_stack_frame() noexcept
         { return get_thread_state().suppressed_call_stack_frame; }
@@ -782,8 +785,8 @@ namespace uwvm2::runtime::lib
             preload_call_context_t saved{};
 
             inline explicit constexpr preload_call_context_guard(preload_module_memory_attribute_t const* attribute,
-                                                       capi_function_t const* function = nullptr,
-                                                       ::std::size_t caller_module_id = preload_call_context_t::invalid_module_id) noexcept :
+                                                                 capi_function_t const* function = nullptr,
+                                                                 ::std::size_t caller_module_id = preload_call_context_t::invalid_module_id) noexcept :
                 ctx{::std::addressof(get_preload_call_context())}, saved{*ctx}
             {
                 if(caller_module_id != preload_call_context_t::invalid_module_id) { ctx->module_id = caller_module_id; }
@@ -925,7 +928,8 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view resolve_module_display_name(::uwvm2::utils::container::u8string_view module_name) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+            resolve_module_display_name(::uwvm2::utils::container::u8string_view module_name) noexcept
         {
             auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
             if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) { return module_name; }
@@ -943,7 +947,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view resolve_func_display_name(::uwvm2::utils::container::u8string_view module_name,
-                                                                                                ::std::size_t function_index) noexcept
+                                                                                                          ::std::size_t function_index) noexcept
         {
             auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
             if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) { return {}; }
@@ -966,10 +970,8 @@ namespace uwvm2::runtime::lib
         }
 
         template <typename Output>
-        [[nodiscard]] inline constexpr bool dump_call_stack_frame_for_trap(Output& u8log_output_ul,
-                                                                  ::std::size_t frame_index,
-                                                                  ::std::size_t module_id,
-                                                                  ::std::size_t function_index) noexcept
+        [[nodiscard]] inline constexpr bool
+            dump_call_stack_frame_for_trap(Output& u8log_output_ul, ::std::size_t frame_index, ::std::size_t module_id, ::std::size_t function_index) noexcept
         {
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
 
@@ -1029,7 +1031,7 @@ namespace uwvm2::runtime::lib
         [[__gnu__::__tls_model__("local-dynamic")]]
 #   endif
 #  endif
-        inline thread_local ::std::uintptr_t llvm_jit_trap_frame_address{};   // [global] [thread-local]
+        inline thread_local ::std::uintptr_t llvm_jit_trap_frame_address{};  // [global] [thread-local]
 # endif
 # if defined(UWVM_USE_THREAD_LOCAL)
 #  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
@@ -1039,14 +1041,15 @@ namespace uwvm2::runtime::lib
         [[__gnu__::__tls_model__("local-dynamic")]]
 #   endif
 #  endif
-        inline thread_local llvm_jit_trap_kind llvm_jit_last_trap_kind{};      // [global] [thread-local]
+        inline thread_local llvm_jit_trap_kind llvm_jit_last_trap_kind{};  // [global] [thread-local]
 # endif
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE && defined(UWVM_USE_THREAD_LOCAL)
-        inline thread_local win64_context_t llvm_jit_win64_trap_caller_context{};      // [global] [thread-local]
-        inline thread_local bool llvm_jit_win64_trap_caller_context_valid{};   // [global] [thread-local]
+        inline thread_local win64_context_t llvm_jit_win64_trap_caller_context{};  // [global] [thread-local]
+        inline thread_local bool llvm_jit_win64_trap_caller_context_valid{};       // [global] [thread-local]
 # endif
 
-        [[nodiscard]] inline constexpr ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
+            get_runtime_llvm_jit_effective_call_stack_mode() noexcept;
         [[nodiscard]] inline constexpr bool runtime_llvm_jit_unwind_call_stack_requested() noexcept;
         [[nodiscard]] inline constexpr bool runtime_llvm_jit_unwind_check_requested() noexcept;
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
@@ -1057,8 +1060,8 @@ namespace uwvm2::runtime::lib
         // keyword is still intentional here for ODR-friendly header-style linkage; UWVM_NOINLINE preserves the
         // required unwind anchor.
         UWVM_NOINLINE inline constexpr void store_llvm_jit_win64_trap_caller_context(::std::uintptr_t expected_return_address,
-                                                                           ::std::uintptr_t trap_frame_address,
-                                                                           ::std::uintptr_t trap_stack_pointer) noexcept;
+                                                                                     ::std::uintptr_t trap_frame_address,
+                                                                                     ::std::uintptr_t trap_stack_pointer) noexcept;
         [[nodiscard]] inline constexpr bool load_llvm_jit_win64_trap_caller_context(win64_context_t& context) noexcept;
 # endif
 
@@ -1076,7 +1079,8 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        inline constexpr void record_llvm_jit_unwind_entry(::std::size_t module_id, ::std::size_t function_index, ::std::uintptr_t address, bool raw_entry) noexcept
+        inline constexpr void
+            record_llvm_jit_unwind_entry(::std::size_t module_id, ::std::size_t function_index, ::std::uintptr_t address, bool raw_entry) noexcept
         {
             if(address == 0u) [[unlikely]] { return; }
 
@@ -1129,17 +1133,15 @@ namespace uwvm2::runtime::lib
             auto const it{::std::upper_bound(ranges.begin(),
                                              ranges.end(),
                                              ip,
-                                             [](auto const address, llvm_jit_code_range const& range) constexpr noexcept
-                                             { return address < range.begin; })};
+                                             [](auto const address, llvm_jit_code_range const& range) constexpr noexcept { return address < range.begin; })};
             if(it == ranges.begin()) [[unlikely]] { return false; }
 
             auto const& range{*(it - 1u)};
             return ip >= range.begin && ip < range.end;
         }
 
-        [[nodiscard]] inline constexpr bool parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::string_view name,
-                                                                    ::std::size_t& module_id,
-                                                                    ::std::size_t& function_index) noexcept
+        [[nodiscard]] inline constexpr bool
+            parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::string_view name, ::std::size_t& module_id, ::std::size_t& function_index) noexcept
         {
             constexpr char prefix[]{"uwvm-inline:m="};
             constexpr char middle[]{":f="};
@@ -1152,16 +1154,15 @@ namespace uwvm2::runtime::lib
             auto const middle_begin{::std::search(name_begin + prefix_size, name_end, middle, middle + middle_size)};
             if(middle_begin == name_end) { return false; }
 
-            auto const parse_size{
-                [](char const* begin, char const* end, ::std::size_t& out) constexpr noexcept -> bool
-                {
-                    if(begin == end) { return false; }
-                    ::std::size_t value{};
-                    auto const [next, err]{::fast_io::parse_by_scan(begin, end, ::fast_io::mnp::dec_get<true, false>(value))};
-                    if(err != ::fast_io::parse_code::ok || next != end) { return false; }
-                    out = value;
-                    return true;
-                }};
+            auto const parse_size{[](char const* begin, char const* end, ::std::size_t& out) constexpr noexcept -> bool
+                                  {
+                                      if(begin == end) { return false; }
+                                      ::std::size_t value{};
+                                      auto const [next, err]{::fast_io::parse_by_scan(begin, end, ::fast_io::mnp::dec_get<true, false>(value))};
+                                      if(err != ::fast_io::parse_code::ok || next != end) { return false; }
+                                      out = value;
+                                      return true;
+                                  }};
 
             ::std::size_t parsed_module_id{};
             ::std::size_t parsed_function_index{};
@@ -1176,9 +1177,8 @@ namespace uwvm2::runtime::lib
         class uwvm_llvm_jit_debug_listener final : public ::llvm::JITEventListener
         {
         public:
-            constexpr void notifyObjectLoaded(ObjectKey,
-                                              ::llvm::object::ObjectFile const& obj,
-                                              ::llvm::RuntimeDyld::LoadedObjectInfo const& loaded) noexcept override
+            constexpr void
+                notifyObjectLoaded(ObjectKey, ::llvm::object::ObjectFile const& obj, ::llvm::RuntimeDyld::LoadedObjectInfo const& loaded) noexcept override
             {
                 for(auto const& section: obj.sections())
                 {
@@ -1194,13 +1194,14 @@ namespace uwvm2::runtime::lib
                 auto loaded_info{loaded.clone()};
                 if(loaded_info == nullptr) { return; }
 
-                auto dwarf_context{::llvm::DWARFContext::create(*debug_object.getBinary(),
-                                                                 ::llvm::DWARFContext::ProcessDebugRelocations::Process,
-                                                                 loaded_info.get(),
-                                                                 "",
-                                                                 [](auto) constexpr noexcept {},
-                                                                 [](auto) constexpr noexcept {},
-                                                                 true)};
+                auto dwarf_context{::llvm::DWARFContext::create(
+                    *debug_object.getBinary(),
+                    ::llvm::DWARFContext::ProcessDebugRelocations::Process,
+                    loaded_info.get(),
+                    "",
+                    [](auto) constexpr noexcept {},
+                    [](auto) constexpr noexcept {},
+                    true)};
                 if(dwarf_context == nullptr) { return; }
 
                 auto record{::uwvm2::utils::container::make_delete_owned<llvm_jit_debug_object>()};
@@ -1295,13 +1296,10 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr llvm_jit_trap_frame_context get_llvm_jit_trap_frame_context(::std::uintptr_t return_address,
-                                                                                        ::std::uintptr_t trap_frame_address) noexcept
+                                                                                                   ::std::uintptr_t trap_frame_address) noexcept
         {
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_TRAP_FRAME_POINTER_CHAIN
-            if(return_address == 0u || trap_frame_address == 0u || !llvm_jit_frame_record_address_aligned(trap_frame_address)) [[unlikely]]
-            {
-                return {};
-            }
+            if(return_address == 0u || trap_frame_address == 0u || !llvm_jit_frame_record_address_aligned(trap_frame_address)) [[unlikely]] { return {}; }
 
 #   if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
             // On Win64 the generated code passes the current JIT frame pointer explicitly.  The helper's own frame is
@@ -1397,10 +1395,7 @@ namespace uwvm2::runtime::lib
         {
             llvm_jit_unwind_backtrace_storage storage{};
 #   if UWVM2_RUNTIME_LLVM_JIT_HAS_SEEDED_LIBUNWIND_BACKTRACE
-            if(trap_context.return_address == 0u || trap_context.stack_pointer == 0u || trap_context.frame_pointer == 0u) [[unlikely]]
-            {
-                return storage;
-            }
+            if(trap_context.return_address == 0u || trap_context.stack_pointer == 0u || trap_context.frame_pointer == 0u) [[unlikely]] { return storage; }
 
             unw_context_t context;
             if(unw_getcontext(::std::addressof(context)) != 0) [[unlikely]] { return storage; }
@@ -1412,13 +1407,9 @@ namespace uwvm2::runtime::lib
             if(ip != 0u) { --ip; }
 
             if(unw_set_reg(::std::addressof(cursor), UNW_REG_IP, static_cast<unw_word_t>(ip)) != 0) [[unlikely]] { return storage; }
-            if(unw_set_reg(::std::addressof(cursor), UNW_REG_SP, static_cast<unw_word_t>(trap_context.stack_pointer)) != 0) [[unlikely]]
-            {
-                return storage;
-            }
-            if(unw_set_reg(::std::addressof(cursor),
-                           UWVM2_RUNTIME_LLVM_JIT_LIBUNWIND_FRAME_POINTER_REG,
-                           static_cast<unw_word_t>(trap_context.frame_pointer)) != 0) [[unlikely]]
+            if(unw_set_reg(::std::addressof(cursor), UNW_REG_SP, static_cast<unw_word_t>(trap_context.stack_pointer)) != 0) [[unlikely]] { return storage; }
+            if(unw_set_reg(::std::addressof(cursor), UWVM2_RUNTIME_LLVM_JIT_LIBUNWIND_FRAME_POINTER_REG, static_cast<unw_word_t>(trap_context.frame_pointer)) !=
+               0) [[unlikely]]
             {
                 return storage;
             }
@@ -1469,11 +1460,10 @@ namespace uwvm2::runtime::lib
             if(omit > static_cast<::std::size_t>((::std::numeric_limits<::std::uint32_t>::max)())) [[unlikely]] { return storage; }
 
             void* frames[llvm_jit_unwind_backtrace_storage::max_frames]{};
-            auto const captured{
-                ::fast_io::win32::nt::RtlCaptureStackBackTrace(static_cast<::std::uint32_t>(omit),
-                                                               static_cast<::std::uint32_t>(llvm_jit_unwind_backtrace_storage::max_frames),
-                                                               frames,
-                                                               nullptr)};
+            auto const captured{::fast_io::win32::nt::RtlCaptureStackBackTrace(static_cast<::std::uint32_t>(omit),
+                                                                               static_cast<::std::uint32_t>(llvm_jit_unwind_backtrace_storage::max_frames),
+                                                                               frames,
+                                                                               nullptr)};
             storage.size = static_cast<::std::size_t>(captured);
             for(::std::size_t i{}; i != storage.size; ++i)
             {
@@ -1589,8 +1579,8 @@ namespace uwvm2::runtime::lib
 
 #  if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
         UWVM_NOINLINE inline constexpr void runtime_llvm_jit_live_unwind_probe_capture(runtime_llvm_jit_live_unwind_probe_state* state,
-                                                                             ::std::uintptr_t frame_address,
-                                                                             ::std::uintptr_t stack_pointer) noexcept
+                                                                                       ::std::uintptr_t frame_address,
+                                                                                       ::std::uintptr_t stack_pointer) noexcept
         {
             if(state == nullptr) [[unlikely]] { return; }
 
@@ -1671,14 +1661,12 @@ namespace uwvm2::runtime::lib
             auto const state_arg{probe_function->getArg(0)};
             auto const register_name{::llvm::MDString::get(context, "rbp")};
             auto const register_metadata{::llvm::MDNode::get(context, {register_name})};
-            auto const frame_address{builder.CreateIntrinsic(::llvm::Intrinsic::read_register,
-                                                              {intptr_type},
-                                                              {::llvm::MetadataAsValue::get(context, register_metadata)})};
+            auto const frame_address{
+                builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {intptr_type}, {::llvm::MetadataAsValue::get(context, register_metadata)})};
             auto const stack_register_name{::llvm::MDString::get(context, "rsp")};
             auto const stack_register_metadata{::llvm::MDNode::get(context, {stack_register_name})};
-            auto const stack_pointer{builder.CreateIntrinsic(::llvm::Intrinsic::read_register,
-                                                              {intptr_type},
-                                                              {::llvm::MetadataAsValue::get(context, stack_register_metadata)})};
+            auto const stack_pointer{
+                builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {intptr_type}, {::llvm::MetadataAsValue::get(context, stack_register_metadata)})};
             builder.CreateCall(capture_function, {state_arg, frame_address, stack_pointer});
 #  endif
             builder.CreateRetVoid();
@@ -1697,8 +1685,7 @@ namespace uwvm2::runtime::lib
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(::llvm::CodeGenOptLevel::None)
                     .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<
-                            ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
                             .release()})
                     .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
@@ -1897,7 +1884,8 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t get_runtime_llvm_jit_effective_call_stack_mode() noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t
+            get_runtime_llvm_jit_effective_call_stack_mode() noexcept
         {
             namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
             using runtime_llvm_jit_call_stack_t = runtime_mode::runtime_llvm_jit_call_stack_t;
@@ -1971,9 +1959,8 @@ namespace uwvm2::runtime::lib
         }
 
         template <typename Output>
-        inline constexpr void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul,
-                                                                    ::std::size_t& printed_frame_count,
-                                                                    trap_kind current_trap_kind) noexcept
+        inline constexpr void
+            dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul, ::std::size_t& printed_frame_count, trap_kind current_trap_kind) noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
@@ -1995,70 +1982,70 @@ namespace uwvm2::runtime::lib
                     }
                 }};
 
-            auto const print_debug_inline_frames{
-                [&](::std::uintptr_t ip) constexpr noexcept -> bool
-                {
-                    // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
-                    // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
-                    // they are available and print only the parseable Wasm frame records.
-                    bool printed{};
-                    ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
-                                                          ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
-                    ::llvm::object::SectionedAddress addresses[]{
-                        {ip, ::llvm::object::SectionedAddress::UndefSection},
-                        {ip + 1u, ::llvm::object::SectionedAddress::UndefSection},
-                    };
+            auto const print_debug_inline_frames{[&](::std::uintptr_t ip) constexpr noexcept -> bool
+                                                 {
+                                                     // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
+                                                     // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
+                                                     // they are available and print only the parseable Wasm frame records.
+                                                     bool printed{};
+                                                     ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
+                                                                                           ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
+                                                     ::llvm::object::SectionedAddress addresses[]{
+                                                         {ip,      ::llvm::object::SectionedAddress::UndefSection},
+                                                         {ip + 1u, ::llvm::object::SectionedAddress::UndefSection},
+                                                     };
 
-                    for(auto const& debug_object: g_runtime.llvm_jit_debug_objects)
-                    {
-                        if(debug_object == nullptr || debug_object->dwarf_context == nullptr) { continue; }
+                                                     for(auto const& debug_object: g_runtime.llvm_jit_debug_objects)
+                                                     {
+                                                         if(debug_object == nullptr || debug_object->dwarf_context == nullptr) { continue; }
 
-                        for(auto const address: addresses)
-                        {
-                            auto const inline_info{debug_object->dwarf_context->getInliningInfoForAddress(address, specifier)};
-                            auto const frame_count{inline_info.getNumberOfFrames()};
-                            if(frame_count == 0u) { continue; }
+                                                         for(auto const address: addresses)
+                                                         {
+                                                             auto const inline_info{debug_object->dwarf_context->getInliningInfoForAddress(address, specifier)};
+                                                             auto const frame_count{inline_info.getNumberOfFrames()};
+                                                             if(frame_count == 0u) { continue; }
 
-                            bool matched{};
-                            for(unsigned i{}; i != frame_count; ++i)
-                            {
-                                ::std::size_t module_id{};
-                                ::std::size_t function_index{};
-                                auto const& frame_name{inline_info.getFrame(i).FunctionName};
-                                auto const frame_name_view{::uwvm2::utils::container::string_view{frame_name.data(), frame_name.size()}};
-                                if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
-                                print_wasm_frame(module_id, function_index);
-                                printed = true;
-                                matched = true;
-                            }
+                                                             bool matched{};
+                                                             for(unsigned i{}; i != frame_count; ++i)
+                                                             {
+                                                                 ::std::size_t module_id{};
+                                                                 ::std::size_t function_index{};
+                                                                 auto const& frame_name{inline_info.getFrame(i).FunctionName};
+                                                                 auto const frame_name_view{
+                                                                     ::uwvm2::utils::container::string_view{frame_name.data(), frame_name.size()}
+                                                                 };
+                                                                 if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
+                                                                 print_wasm_frame(module_id, function_index);
+                                                                 printed = true;
+                                                                 matched = true;
+                                                             }
 
-                            if(matched) { return true; }
-                        }
-                    }
+                                                             if(matched) { return true; }
+                                                         }
+                                                     }
 
-                    return printed;
-                }};
+                                                     return printed;
+                                                 }};
 
-            auto const print_resolved_unwind_ip{
-                [&](::std::uintptr_t ip) constexpr noexcept
-                {
-                    auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
-                    if(current_trap_kind == trap_kind::call_indirect_type_mismatch && printed_frame_count != 0uz && resolved.entry != nullptr &&
-                       resolved.entry->raw_entry)
-                    {
-                        return;
-                    }
-                    if(print_debug_inline_frames(ip)) { return; }
+            auto const print_resolved_unwind_ip{[&](::std::uintptr_t ip) constexpr noexcept
+                                                {
+                                                    auto const resolved{resolve_llvm_jit_unwind_entry(ip)};
+                                                    if(current_trap_kind == trap_kind::call_indirect_type_mismatch && printed_frame_count != 0uz &&
+                                                       resolved.entry != nullptr && resolved.entry->raw_entry)
+                                                    {
+                                                        return;
+                                                    }
+                                                    if(print_debug_inline_frames(ip)) { return; }
 
-                    if(resolved.entry == nullptr) { return; }
-                    print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);
-                }};
+                                                    if(resolved.entry == nullptr) { return; }
+                                                    print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);
+                                                }};
 
-# if !defined(UWVM_USE_THREAD_LOCAL)
+#  if !defined(UWVM_USE_THREAD_LOCAL)
             auto const llvm_jit_trap_return_address{get_llvm_jit_trap_return_address()};
             auto const llvm_jit_trap_frame_address{get_llvm_jit_trap_frame_address()};
             auto const llvm_jit_last_trap_kind{get_llvm_jit_last_trap_kind()};
-# endif
+#  endif
 
             if(llvm_jit_trap_return_address != 0u)
             {
@@ -2068,21 +2055,20 @@ namespace uwvm2::runtime::lib
             }
 
             auto const trap_frame_context{get_llvm_jit_trap_frame_context(llvm_jit_trap_return_address, llvm_jit_trap_frame_address)};
-# if UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE
             auto backtrace{capture_llvm_jit_seeded_unwind_backtrace(trap_frame_context, 0uz)};
             if(backtrace.size == 0uz) { backtrace = capture_llvm_jit_frame_pointer_backtrace(trap_frame_context, 0uz); }
             if(backtrace.size == 0uz) { backtrace = capture_llvm_jit_unwind_backtrace(0uz); }
-# elif UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+#  elif UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
             auto backtrace{capture_llvm_jit_win64_seeded_unwind_backtrace(0uz)};
             if(backtrace.size == 0uz) { backtrace = capture_llvm_jit_frame_pointer_backtrace(trap_frame_context, 0uz); }
             if(backtrace.size == 0uz) { backtrace = capture_llvm_jit_unwind_backtrace(0uz); }
-# else
+#  else
             auto backtrace{capture_llvm_jit_frame_pointer_backtrace(trap_frame_context, 0uz)};
             if(backtrace.size == 0uz) { backtrace = capture_llvm_jit_unwind_backtrace(0uz); }
-# endif
+#  endif
             if(printed_frame_count > 1uz &&
-               (llvm_jit_last_trap_kind == llvm_jit_trap_kind::call_indirect_type_mismatch ||
-                current_trap_kind == trap_kind::call_indirect_type_mismatch))
+               (llvm_jit_last_trap_kind == llvm_jit_trap_kind::call_indirect_type_mismatch || current_trap_kind == trap_kind::call_indirect_type_mismatch))
             {
                 return;
             }
@@ -2177,9 +2163,7 @@ namespace uwvm2::runtime::lib
         }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        inline constexpr void store_llvm_jit_trap_context(llvm_jit_trap_kind k,
-                                                ::std::uintptr_t return_address,
-                                                ::std::uintptr_t frame_address = 0u) noexcept
+        inline constexpr void store_llvm_jit_trap_context(llvm_jit_trap_kind k, ::std::uintptr_t return_address, ::std::uintptr_t frame_address = 0u) noexcept
         {
 # if defined(UWVM_USE_THREAD_LOCAL)
             llvm_jit_last_trap_kind = k;
@@ -2204,10 +2188,7 @@ namespace uwvm2::runtime::lib
             auto const function_entry{::fast_io::win32::nt::RtlLookupFunctionEntry(control_pc, ::std::addressof(image_base), nullptr)};
             if(function_entry == nullptr)
             {
-                if(context.Rsp == 0u || !llvm_jit_frame_record_address_aligned(static_cast<::std::uintptr_t>(context.Rsp))) [[unlikely]]
-                {
-                    return false;
-                }
+                if(context.Rsp == 0u || !llvm_jit_frame_record_address_aligned(static_cast<::std::uintptr_t>(context.Rsp))) [[unlikely]] { return false; }
 
                 auto const return_address{llvm_jit_load_frame_record_word(static_cast<::std::uintptr_t>(context.Rsp))};
                 if(return_address == 0u) [[unlikely]] { return false; }
@@ -2230,8 +2211,8 @@ namespace uwvm2::runtime::lib
         }
 
         UWVM_NOINLINE inline constexpr void store_llvm_jit_win64_trap_caller_context(::std::uintptr_t expected_return_address,
-                                                                           ::std::uintptr_t trap_frame_address,
-                                                                           ::std::uintptr_t trap_stack_pointer) noexcept
+                                                                                     ::std::uintptr_t trap_frame_address,
+                                                                                     ::std::uintptr_t trap_stack_pointer) noexcept
         {
             win64_context_t context{};
             bool valid{};
@@ -2309,16 +2290,15 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void ensure_memory_signal_trap_bridge_initialized() noexcept
-        {
-            ::uwvm2::object::memory::signal::set_mmap_memory_out_of_bounds_handler(print_mmap_memory_out_of_bounds_trap);
-        }
+        { ::uwvm2::object::memory::signal::set_mmap_memory_out_of_bounds_handler(print_mmap_memory_out_of_bounds_trap); }
 #else
         inline constexpr void ensure_memory_signal_trap_bridge_initialized() noexcept {}
 #endif
 
 #ifdef UWVM_CPP_EXCEPTIONS
-        [[noreturn]] inline constexpr void print_and_terminate_compile_validation_error(::uwvm2::utils::container::u8string_view module_name,
-                                                                              ::uwvm2::validation::error::code_validation_error_impl const& v_err) noexcept
+        [[noreturn]] inline constexpr void
+            print_and_terminate_compile_validation_error(::uwvm2::utils::container::u8string_view module_name,
+                                                         ::uwvm2::validation::error::code_validation_error_impl const& v_err) noexcept
         {
             // Try to print detailed validator diagnostics (same format as `uwvm/runtime/validator/validate.h`).
             auto const fallback_and_terminate{
@@ -2624,7 +2604,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool enqueue_lazy_background_requests_for_module(compiled_module_record& rec,
-                                                                              ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
+                                                                                        ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
         {
             auto const local_n{rec.lazy_prefetch_order.size()};
             if(local_n == 0uz || rec.runtime_module == nullptr) [[unlikely]] { return false; }
@@ -2753,9 +2733,9 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void print_lazy_runtime_compiler_log(::fast_io::unix_timestamp run_start,
-                                                    ::fast_io::unix_timestamp exec_start,
-                                                    ::fast_io::unix_timestamp exec_end,
-                                                    ::fast_io::unix_timestamp stop_end) noexcept
+                                                              ::fast_io::unix_timestamp exec_start,
+                                                              ::fast_io::unix_timestamp exec_end,
+                                                              ::fast_io::unix_timestamp stop_end) noexcept
         {
             if(!::uwvm2::uwvm::io::enable_runtime_log) { return; }
 
@@ -3024,7 +3004,8 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        inline constexpr void configure_runtime_llvm_jit_call_stack_policy(::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option& opt) noexcept
+        inline constexpr void
+            configure_runtime_llvm_jit_call_stack_policy(::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option& opt) noexcept
         {
             validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
             opt.emit_call_stack_frames = runtime_llvm_jit_uses_instruction_call_stack_frames();
@@ -3032,8 +3013,8 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void publish_llvm_jit_call_indirect_defined_entry_targets(compiled_defined_func_info const* info,
-                                                                         ::std::uintptr_t raw_entry_address,
-                                                                         ::std::uintptr_t typed_entry_address) noexcept
+                                                                                   ::std::uintptr_t raw_entry_address,
+                                                                                   ::std::uintptr_t typed_entry_address) noexcept
         {
             if(info == nullptr) { return; }
 
@@ -3062,7 +3043,8 @@ namespace uwvm2::runtime::lib
         }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        [[nodiscard]] inline constexpr bool tiered_local_function_direct_supported(compiled_module_record const& rec, ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline constexpr bool tiered_local_function_direct_supported(compiled_module_record const& rec,
+                                                                                   ::std::size_t local_function_index) noexcept
         {
             static_cast<void>(rec);
             static_cast<void>(local_function_index);
@@ -3070,10 +3052,10 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool publish_tiered_llvm_jit_entry_targets(compiled_module_record& rec,
-                                                                        ::std::size_t module_id,
-                                                                        ::std::size_t local_function_index,
-                                                                        ::std::uintptr_t raw_entry_address,
-                                                                        ::std::uintptr_t typed_entry_address) noexcept
+                                                                                  ::std::size_t module_id,
+                                                                                  ::std::size_t local_function_index,
+                                                                                  ::std::uintptr_t raw_entry_address,
+                                                                                  ::std::uintptr_t typed_entry_address) noexcept
         {
             if(raw_entry_address == 0u) [[unlikely]] { return false; }
             if(!tiered_local_function_direct_supported(rec, local_function_index)) { return false; }
@@ -3171,7 +3153,8 @@ namespace uwvm2::runtime::lib
             publish_llvm_jit_call_indirect_defined_entry_targets(info_for_targets, raw_entry_address, typed_entry_address);
         }
 
-        [[nodiscard]] inline constexpr ::std::size_t llvm_jit_lazy_compile_unit_code_size(compiled_module_record const& rec, ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline constexpr ::std::size_t llvm_jit_lazy_compile_unit_code_size(compiled_module_record const& rec,
+                                                                                          ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return 0uz; }
             auto const& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_function_index)};
@@ -3234,9 +3217,9 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool collect_llvm_jit_lazy_entry_direct_graph_order(runtime_module_storage_t const& runtime_module,
-                                                                                 ::std::size_t entry_local_function_index,
-                                                                                 ::std::size_t graph_budget,
-                                                                                 ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+                                                                                           ::std::size_t entry_local_function_index,
+                                                                                           ::std::size_t graph_budget,
+                                                                                           ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
         {
             out.clear();
             auto const local_n{runtime_module.local_defined_function_vec_storage.size()};
@@ -3283,7 +3266,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool seed_llvm_jit_lazy_background_entry_direct_graph(compiled_module_record& rec,
-                                                                                   ::std::size_t entry_local_function_index) noexcept
+                                                                                             ::std::size_t entry_local_function_index) noexcept
         {
             if(rec.runtime_module == nullptr) [[unlikely]] { return false; }
 
@@ -3311,8 +3294,9 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] inline constexpr bool enqueue_llvm_jit_lazy_background_requests_for_module(compiled_module_record& rec,
-                                                                                       ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
+        [[nodiscard]] inline constexpr bool
+            enqueue_llvm_jit_lazy_background_requests_for_module(compiled_module_record& rec,
+                                                                 ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
         {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -3421,19 +3405,14 @@ namespace uwvm2::runtime::lib
             if(g_runtime.lazy_scheduler.running()) { return; }
             if(!g_runtime.tiered_schedulers_deferred.load(::std::memory_order_acquire)) { return; }
 
-            while(g_runtime.tiered_scheduler_start_lock.test_and_set(::std::memory_order_acquire))
-            {
-                ::uwvm2::utils::thread::lazy_compile_thread_yield();
-            }
+            while(g_runtime.tiered_scheduler_start_lock.test_and_set(::std::memory_order_acquire)) { ::uwvm2::utils::thread::lazy_compile_thread_yield(); }
 
             if(!g_runtime.lazy_scheduler.running() && g_runtime.tiered_schedulers_deferred.load(::std::memory_order_relaxed))
             {
                 auto const worker_count{g_runtime.tiered_deferred_worker_count};
                 auto const jit_worker_count{worker_count == 0uz ? 0uz : 1uz};
-                g_runtime.lazy_scheduler.start({.worker_count = jit_worker_count,
-                                                .queue_capacity = 0uz,
-                                                .refill_callback = nullptr,
-                                                .refill_user_data = nullptr});
+                g_runtime.lazy_scheduler.start(
+                    {.worker_count = jit_worker_count, .queue_capacity = 0uz, .refill_callback = nullptr, .refill_user_data = nullptr});
                 g_runtime.tiered_urgent_scheduler.start({.worker_count = jit_worker_count,
                                                          .queue_capacity = jit_worker_count == 0uz ? 0uz : tiered_urgent_scheduler_queue_capacity,
                                                          .refill_callback = nullptr,
@@ -3501,8 +3480,7 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool tiered_t1_schedulers_stable_for_full_compile() noexcept
         {
             if(g_runtime.lazy_scheduler.queued_count.load(::std::memory_order_acquire) != 0uz) { return false; }
-            if(g_runtime.tiered_urgent_scheduler.running() &&
-               g_runtime.tiered_urgent_scheduler.queued_count.load(::std::memory_order_acquire) != 0uz)
+            if(g_runtime.tiered_urgent_scheduler.running() && g_runtime.tiered_urgent_scheduler.queued_count.load(::std::memory_order_acquire) != 0uz)
             {
                 return false;
             }
@@ -3533,11 +3511,11 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool tiered_large_long_run_counter_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
         {
             if(stride <= 1u) { return true; }
-# if defined(UWVM_USE_THREAD_LOCAL)
+#  if defined(UWVM_USE_THREAD_LOCAL)
             auto const tick{++tiered_counter_sample_tick};
-# else
+#  else
             auto const tick{++get_tiered_counter_sample_tick()};
-# endif
+#  endif
             auto const phase{static_cast<::std::uint_least32_t>((local_index + 1uz) * 0x85ebca6buz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
         }
@@ -3678,9 +3656,9 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_publish_tiered_ready_full_llvm_jit_entry(compiled_module_record& rec,
-                                                                               ::std::size_t module_id,
-                                                                               ::std::size_t local_index,
-                                                                               ::std::uintptr_t& raw_entry_address) noexcept
+                                                                                         ::std::size_t module_id,
+                                                                                         ::std::size_t local_index,
+                                                                                         ::std::uintptr_t& raw_entry_address) noexcept
         {
             raw_entry_address = 0u;
             if(!tiered_t2_enabled()) { return false; }
@@ -3775,7 +3753,8 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        inline constexpr void maybe_request_tiered_full_compile(compiled_module_record& rec, ::uwvm2::utils::container::u8string_view reason = u8"switch") noexcept
+        inline constexpr void maybe_request_tiered_full_compile(compiled_module_record& rec,
+                                                                ::uwvm2::utils::container::u8string_view reason = u8"switch") noexcept
         {
             if(!tiered_t2_enabled()) { return; }
             if(tiered_full_ready(rec)) { return; }
@@ -3822,7 +3801,8 @@ namespace uwvm2::runtime::lib
                    ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_large_loop_sentinel_function_size;
         }
 
-        inline constexpr void record_tiered_large_loop_sample(compiled_module_record& rec, ::std::size_t local_index, ::std::size_t loop_wasm_code_offset) noexcept
+        inline constexpr void
+            record_tiered_large_loop_sample(compiled_module_record& rec, ::std::size_t local_index, ::std::size_t loop_wasm_code_offset) noexcept
         {
             static_cast<void>(local_index);
             auto const sample_count{::std::atomic_ref<::std::size_t>{rec.tiered_large_loop_sample_count}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
@@ -3923,7 +3903,8 @@ namespace uwvm2::runtime::lib
             g_runtime.tiered_full_publish_count.store(0uz, ::std::memory_order_relaxed);
         }
 
-        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_entry_hot_request_threshold(compiled_module_record const& rec,
+                                                                                                ::std::size_t local_index) noexcept
         {
             ::std::uint_least32_t threshold{262144u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
@@ -3982,11 +3963,11 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr bool tiered_entry_hot_probe_sampled(::std::size_t local_index, ::std::uint_least32_t stride) noexcept
         {
             if(stride <= 1u) { return true; }
-# if defined(UWVM_USE_THREAD_LOCAL)
+#  if defined(UWVM_USE_THREAD_LOCAL)
             auto const tick{++tiered_entry_hot_probe_tick};
-# else
+#  else
             auto const tick{++get_tiered_entry_hot_probe_tick()};
-# endif
+#  endif
             auto const phase{static_cast<::std::uint_least32_t>(local_index * 0x9e3779b1uz)};
             return ((tick ^ phase) & (stride - 1u)) == 0u;
         }
@@ -4045,7 +4026,8 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        [[nodiscard]] inline constexpr bool tiered_loop_osr_should_suppress_medium_fp_kernel(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] inline constexpr bool tiered_loop_osr_should_suppress_medium_fp_kernel(compiled_module_record const& rec,
+                                                                                             ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n < 16uz || local_n >= 128uz) { return false; }
@@ -4054,7 +4036,8 @@ namespace uwvm2::runtime::lib
             return code_size >= 1024uz && tiered_function_code_has_fp_kernel_shape(rec, local_index);
         }
 
-        [[nodiscard]] inline constexpr bool tiered_entry_should_compile_inline_for_small_hot_loop(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] inline constexpr bool tiered_entry_should_compile_inline_for_small_hot_loop(compiled_module_record const& rec,
+                                                                                                  ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n == 0uz || local_n > 8uz) { return false; }
@@ -4096,7 +4079,8 @@ namespace uwvm2::runtime::lib
             return observed >= request_threshold || observed + probe_stride >= request_threshold;
         }
 
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool tiered_entry_miss_should_enter_prepare(compiled_module_record& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool tiered_entry_miss_should_enter_prepare(compiled_module_record& rec,
+                                                                                                      ::std::size_t local_index) noexcept
         {
             if(tiered_full_ready(rec)) { return true; }
             if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { return true; }
@@ -4123,7 +4107,8 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] inline constexpr ::std::uint_least32_t tiered_loop_osr_request_threshold(compiled_module_record const& rec,
+                                                                                               ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(tiered_large_loop_sentinel_candidate(rec, local_index)) { return tiered_large_loop_osr_request_threshold; }
@@ -4145,8 +4130,7 @@ namespace uwvm2::runtime::lib
                 if(code_size >= 1536uz) { return 2u; }
 
                 constexpr ::std::size_t cold_small_module_osr_work_threshold{8uz * 1024uz * 1024uz};
-                auto threshold{code_size == 0uz ? cold_small_module_osr_work_threshold
-                                                 : (cold_small_module_osr_work_threshold + code_size - 1uz) / code_size};
+                auto threshold{code_size == 0uz ? cold_small_module_osr_work_threshold : (cold_small_module_osr_work_threshold + code_size - 1uz) / code_size};
                 auto const min_threshold{code_size >= 4096uz ? 256uz : 512uz};
                 auto const max_threshold{65535uz};
                 if(threshold < min_threshold) { threshold = min_threshold; }
@@ -4170,9 +4154,9 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_publish_tiered_ready_llvm_jit_entry(compiled_module_record& rec,
-                                                                          ::std::size_t module_id,
-                                                                          ::std::size_t local_index,
-                                                                          ::std::uintptr_t& raw_entry_address) noexcept
+                                                                                    ::std::size_t module_id,
+                                                                                    ::std::size_t local_index,
+                                                                                    ::std::uintptr_t& raw_entry_address) noexcept
         {
             raw_entry_address = 0u;
             if(try_publish_tiered_ready_full_llvm_jit_entry(rec, module_id, local_index, raw_entry_address)) { return true; }
@@ -4318,10 +4302,10 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_get_tiered_ready_loop_reentry(compiled_module_record& rec,
-                                                                    ::std::size_t module_id,
-                                                                    ::std::size_t local_index,
-                                                                    ::std::size_t loop_wasm_code_offset,
-                                                                    ::std::uintptr_t& reentry_address) noexcept
+                                                                              ::std::size_t module_id,
+                                                                              ::std::size_t local_index,
+                                                                              ::std::size_t loop_wasm_code_offset,
+                                                                              ::std::uintptr_t& reentry_address) noexcept
         {
             reentry_address = 0u;
             auto const full_ready{tiered_full_ready(rec)};
@@ -4376,7 +4360,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool tiered_loop_osr_should_compile_inline_after_deferred_sample(compiled_module_record const& rec,
-                                                                                              ::std::size_t local_index) noexcept
+                                                                                                        ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 512uz) { return false; }
@@ -4387,7 +4371,8 @@ namespace uwvm2::runtime::lib
             return code_size >= 1024uz && code_size < 4096uz;
         }
 
-        [[nodiscard]] inline constexpr bool tiered_loop_osr_should_wait_for_urgent_compile(compiled_module_record const& rec, ::std::size_t local_index) noexcept
+        [[nodiscard]] inline constexpr bool tiered_loop_osr_should_wait_for_urgent_compile(compiled_module_record const& rec,
+                                                                                           ::std::size_t local_index) noexcept
         {
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
             if(local_n >= 512uz) { return false; }
@@ -4582,11 +4567,8 @@ namespace uwvm2::runtime::lib
             // Tiered OSR reentry wrappers are generated as raw Wasm-entry targets.  Keep this pointer ABI in lockstep
             // with the LLVM raw-entry calling convention and uwvm-int's opfunc ABI policy: Windows x86_64 is SysV,
             // every i686 target is fastcall, and the rest use the platform default.
-            using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t);
+            using entry_fn_t =
+                void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(reentry_address)};
             entry_fn(0u, reinterpret_cast<::std::uintptr_t>(result_buffer), result_bytes, reinterpret_cast<::std::uintptr_t>(local_base), local_bytes);
             if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_ready_count.fetch_add(1uz, ::std::memory_order_relaxed); }
@@ -4594,15 +4576,15 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr bool tiered_try_enter_loop_osr(
-            ::std::size_t module_id,
-            ::std::size_t function_index,
-            ::std::size_t loop_wasm_code_offset,
-            ::std::byte* result_buffer,
-            ::std::size_t result_bytes,
-            ::std::byte const* local_base,
-            ::std::size_t local_bytes,
-            ::std::uintptr_t* compile_state_address_ptr) noexcept
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr bool
+            tiered_try_enter_loop_osr(::std::size_t module_id,
+                                      ::std::size_t function_index,
+                                      ::std::size_t loop_wasm_code_offset,
+                                      ::std::byte* result_buffer,
+                                      ::std::size_t result_bytes,
+                                      ::std::byte const* local_base,
+                                      ::std::size_t local_bytes,
+                                      ::std::uintptr_t* compile_state_address_ptr) noexcept
         {
             return tiered_try_enter_loop_osr_impl(module_id,
                                                   function_index,
@@ -4677,8 +4659,8 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool llvm_jit_lazy_demand_should_use_urgent_scheduler(compiled_module_record const& rec,
-                                                                                   ::std::size_t local_index,
-                                                                                   ::uwvm2::utils::thread::lazy_compile_state current_state) noexcept
+                                                                                             ::std::size_t local_index,
+                                                                                             ::uwvm2::utils::thread::lazy_compile_state current_state) noexcept
         {
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
             if(current_state != ::uwvm2::utils::thread::lazy_compile_state::queued && current_state != ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
@@ -4746,14 +4728,14 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void validate_entry_run_buffers(::uwvm2::utils::container::u8string_view main_module_name,
-                                               ::std::size_t param_count,
-                                               ::std::size_t param_bytes,
-                                               ::std::size_t result_count,
-                                               ::std::size_t result_bytes,
-                                               ::std::byte const* param_buffer,
-                                               ::std::size_t configured_param_bytes,
-                                               ::std::byte* result_buffer,
-                                               ::std::size_t configured_result_bytes) noexcept
+                                                         ::std::size_t param_count,
+                                                         ::std::size_t param_bytes,
+                                                         ::std::size_t result_count,
+                                                         ::std::size_t result_bytes,
+                                                         ::std::byte const* param_buffer,
+                                                         ::std::size_t configured_param_bytes,
+                                                         ::std::byte* result_buffer,
+                                                         ::std::size_t configured_result_bytes) noexcept
         {
             if((param_count != 0uz && param_bytes == 0uz) || (result_count != 0uz && result_bytes == 0uz)) [[unlikely]]
             {
@@ -4861,7 +4843,8 @@ namespace uwvm2::runtime::lib
 
         // Import resolution is performed by uwvm runtime initializer.
         // This runtime only consumes the initialized link_kind/target fields and never performs on-demand linking.
-        [[nodiscard]] inline constexpr runtime_imported_func_storage_t const* resolve_import_leaf_assuming_initialized(runtime_imported_func_storage_t const* f) noexcept
+        [[nodiscard]] inline constexpr runtime_imported_func_storage_t const*
+            resolve_import_leaf_assuming_initialized(runtime_imported_func_storage_t const* f) noexcept
         {
             using link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
             auto curr{f};
@@ -5202,7 +5185,7 @@ namespace uwvm2::runtime::lib
         { return !::uwvm2::uwvm::imported::wasi::wasip1::storage::configured_wasip1_groups.empty(); }
 
         inline constexpr void bind_default_wasip1_memory(runtime_module_storage_t const& rt,
-                                               ::std::size_t module_id = invalid_default_wasip1_memory_runtime_module_id) noexcept
+                                                         ::std::size_t module_id = invalid_default_wasip1_memory_runtime_module_id) noexcept
         {
             // Best-effort binding: WASI functions will trap/return errors if a caller without memory[0] invokes them.
             // Always overwrite the pointer to avoid using a stale memory from a previous run.
@@ -5424,8 +5407,8 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_get_wasip1_target_for_preload_capi_function(capi_function_t const* function,
-                                                                                  wasip1_module_target_kind_t& target_kind,
-                                                                                  ::uwvm2::utils::container::u8string_view& module_name) noexcept
+                                                                                            wasip1_module_target_kind_t& target_kind,
+                                                                                            ::uwvm2::utils::container::u8string_view& module_name) noexcept
         {
             if(!has_configured_wasip1_module_override_fast_path()) [[likely]] { return false; }
             auto const owner{::uwvm2::uwvm::wasm::storage::find_preload_capi_function_owner(function)};
@@ -5459,10 +5442,10 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void call_local_imported_with_wasip1_env(local_imported_t const& module,
-                                                        ::std::size_t function_index,
-                                                        ::std::byte* result_buffer,
-                                                        ::std::byte* param_buffer,
-                                                        ::std::size_t caller_module_id) noexcept
+                                                                  ::std::size_t function_index,
+                                                                  ::std::byte* result_buffer,
+                                                                  ::std::byte* param_buffer,
+                                                                  ::std::size_t caller_module_id) noexcept
         {
             if(try_prepare_default_global_wasip1_env_fast_path(caller_module_id)) [[likely]]
             {
@@ -5484,10 +5467,10 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void call_capi_with_wasip1_env(capi_function_t const& function,
-                                              preload_module_memory_attribute_t const* preload_module_memory_attribute,
-                                              ::std::byte* result_buffer,
-                                              ::std::byte* param_buffer,
-                                              ::std::size_t caller_module_id) noexcept
+                                                        preload_module_memory_attribute_t const* preload_module_memory_attribute,
+                                                        ::std::byte* result_buffer,
+                                                        ::std::byte* param_buffer,
+                                                        ::std::size_t caller_module_id) noexcept
         {
             preload_call_context_guard preload_guard{preload_module_memory_attribute, ::std::addressof(function), caller_module_id};
 
@@ -5539,7 +5522,8 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr preload_module_memory_attribute_t const* get_active_preload_memory_attribute() noexcept
         { return get_preload_call_context().preload_module_memory_attribute; }
 
-        [[nodiscard]] inline constexpr bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute, ::std::size_t memory_index) noexcept
+        [[nodiscard]] inline constexpr bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute,
+                                                                             ::std::size_t memory_index) noexcept
         {
             if(attribute == nullptr) [[unlikely]] { return false; }
             if(attribute->apply_to_all_memories) [[likely]] { return true; }
@@ -5601,7 +5585,9 @@ namespace uwvm2::runtime::lib
         };
 
         struct preload_memory_delivery_t
-        { unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none}; };
+        {
+            unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
+        };
 
         [[nodiscard]] inline constexpr bool
             compute_preload_byte_length(::std::uint_least64_t page_count, ::std::uint_least64_t page_size_bytes, ::std::uint_least64_t& byte_length) noexcept
@@ -5683,8 +5669,8 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool resolve_local_imported_preload_memory(local_imported_t* local_imported,
-                                                                        ::std::size_t local_imported_index,
-                                                                        resolved_preload_memory_t& resolved) noexcept
+                                                                                  ::std::size_t local_imported_index,
+                                                                                  resolved_preload_memory_t& resolved) noexcept
         {
             if(local_imported == nullptr) [[unlikely]] { return false; }
 
@@ -5794,9 +5780,9 @@ namespace uwvm2::runtime::lib
         { return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size(); }
 
         [[nodiscard]] inline constexpr bool try_build_preload_memory_descriptor(::std::size_t memory_index,
-                                                                      preload_memory_descriptor_t* out,
-                                                                      resolved_preload_memory_t* resolved_out,
-                                                                      preload_memory_delivery_t* delivery_out) noexcept
+                                                                                preload_memory_descriptor_t* out,
+                                                                                resolved_preload_memory_t* resolved_out,
+                                                                                preload_memory_delivery_t* delivery_out) noexcept
         {
             auto const rt{get_active_preload_runtime_module()};
             if(rt == nullptr) [[unlikely]] { return false; }
@@ -6023,9 +6009,9 @@ namespace uwvm2::runtime::lib
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption, ::std::size_t... Is>
         UWVM_ALWAYS_INLINE inline constexpr void execute_compiled_defined_tailcall_impl(::std::index_sequence<Is...>,
-                                                                              ::std::byte const* ip,
-                                                                              ::std::byte* stack_top,
-                                                                              ::std::byte* local_base) noexcept
+                                                                                        ::std::byte const* ip,
+                                                                                        ::std::byte* stack_top,
+                                                                                        ::std::byte* local_base) noexcept
         {
             using opfunc_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<uwvmint_interp_arg_t<Is, CompileOption>...>;
             opfunc_t fn;  // no init
@@ -6265,7 +6251,7 @@ namespace uwvm2::runtime::lib
         { return (::std::numeric_limits<::std::uint_least32_t>::max)(); }
 
         [[maybe_unused]] [[nodiscard]] inline constexpr ::std::uint_least32_t find_canonical_type_id_for_sig(compiled_module_record const& rec,
-                                                                                                   func_sig_view sig) noexcept
+                                                                                                             func_sig_view sig) noexcept
         {
             auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return invalid_llvm_jit_encoded_type_id(); }
@@ -6432,7 +6418,7 @@ namespace uwvm2::runtime::lib
         }
 
         [[maybe_unused]] [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool try_execute_trivial_defined_call(compiled_defined_func_info const& info,
-                                                                                                       ::std::byte** stack_top_ptr) noexcept
+                                                                                                                 ::std::byte** stack_top_ptr) noexcept
         {
             auto const compiled_call_info{info.compiled_call_info};
             if(compiled_call_info == nullptr) [[unlikely]] { return false; }
@@ -6440,11 +6426,11 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void execute_compiled_defined(call_stack_tls_state& call_stack,
-                                             [[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
-                                             compiled_local_func_t const* compiled_func,
-                                             ::std::size_t param_bytes,
-                                             ::std::size_t result_bytes,
-                                             ::std::byte** caller_stack_top_ptr) noexcept
+                                                       [[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
+                                                       compiled_local_func_t const* compiled_func,
+                                                       ::std::size_t param_bytes,
+                                                       ::std::size_t result_bytes,
+                                                       ::std::byte** caller_stack_top_ptr) noexcept
         {
             auto const local_bytes_raw{compiled_func->local_bytes_max};
             auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
@@ -6717,9 +6703,9 @@ namespace uwvm2::runtime::lib
 #endif
 
         [[maybe_unused]] inline constexpr void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,
-                                                           ::std::size_t para_bytes,
-                                                           ::std::size_t res_bytes,
-                                                           ::std::byte** caller_stack_top_ptr) noexcept
+                                                                     ::std::size_t para_bytes,
+                                                                     ::std::size_t res_bytes,
+                                                                     ::std::byte** caller_stack_top_ptr) noexcept
         {
             local_imported_t const* m{tgt.module_ptr};
             if(m == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -6745,10 +6731,10 @@ namespace uwvm2::runtime::lib
         }
 
         [[maybe_unused]] inline constexpr void invoke_capi(capi_function_t const* f,
-                                                 preload_module_memory_attribute_t const* preload_module_memory_attribute,
-                                                 ::std::size_t para_bytes,
-                                                 ::std::size_t res_bytes,
-                                                 ::std::byte** caller_stack_top_ptr) noexcept
+                                                           preload_module_memory_attribute_t const* preload_module_memory_attribute,
+                                                           ::std::size_t para_bytes,
+                                                           ::std::size_t res_bytes,
+                                                           ::std::byte** caller_stack_top_ptr) noexcept
         {
             if(f == nullptr || f->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -6892,8 +6878,8 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_get_runtime_llvm_jit_raw_defined_entry_address(::std::size_t module_id,
-                                                                                     ::std::size_t function_index,
-                                                                                     ::std::uintptr_t& function_address) noexcept
+                                                                                               ::std::size_t function_index,
+                                                                                               ::std::uintptr_t& function_address) noexcept
         {
             function_address = 0u;
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
@@ -6981,23 +6967,20 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_invoke_runtime_llvm_jit_raw_defined_entry(::std::size_t module_id,
-                                                                                ::std::size_t function_index,
-                                                                                void* result_buffer,
-                                                                                ::std::size_t result_bytes,
-                                                                                void const* param_buffer,
-                                                                                ::std::size_t param_bytes,
-                                                                                bool allow_tiered = false) noexcept
+                                                                                          ::std::size_t function_index,
+                                                                                          void* result_buffer,
+                                                                                          ::std::size_t result_bytes,
+                                                                                          void const* param_buffer,
+                                                                                          ::std::size_t param_bytes,
+                                                                                          bool allow_tiered = false) noexcept
         {
             if(!ensure_lazy_llvm_jit_defined_function_compiled(module_id, function_index, allow_tiered)) [[unlikely]] { return false; }
 
             ::std::uintptr_t function_address{};
             if(!try_get_runtime_llvm_jit_raw_defined_entry_address(module_id, function_index, function_address)) { return false; }
 
-            using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t);
+            using entry_fn_t =
+                void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             return true;
@@ -7006,18 +6989,17 @@ namespace uwvm2::runtime::lib
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void
-            tiered_raw_call_defined_entry(::std::uintptr_t context_address,
-                                          ::std::uintptr_t result_buffer_address,
-                                          ::std::size_t result_bytes,
-                                          ::std::uintptr_t param_buffer_address,
-                                          ::std::size_t param_bytes) noexcept;
+        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
+                                                                                                                        ::std::uintptr_t result_buffer_address,
+                                                                                                                        ::std::size_t result_bytes,
+                                                                                                                        ::std::uintptr_t param_buffer_address,
+                                                                                                                        ::std::size_t param_bytes) noexcept;
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool try_execute_tiered_llvm_jit_defined_from_stack_active(::std::size_t module_id,
-                                                                                                           ::std::size_t function_index,
-                                                                                                           ::std::size_t param_bytes,
-                                                                                                           ::std::size_t result_bytes,
-                                                                                                           ::std::byte** stack_top_ptr) noexcept
+                                                                                                                     ::std::size_t function_index,
+                                                                                                                     ::std::size_t param_bytes,
+                                                                                                                     ::std::size_t result_bytes,
+                                                                                                                     ::std::byte** stack_top_ptr) noexcept
         {
             if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
@@ -7052,11 +7034,8 @@ namespace uwvm2::runtime::lib
             auto const stack_top{*stack_top_ptr};
             auto const args_begin{stack_top - param_bytes};
 
-            using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t);
+            using entry_fn_t =
+                void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn(0u, pointer_to_uintptr(args_begin), result_bytes, pointer_to_uintptr(args_begin), param_bytes);
             *stack_top_ptr = args_begin + result_bytes;
@@ -7065,11 +7044,11 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr bool try_execute_tiered_llvm_jit_defined_raw_buffers_active(::std::size_t module_id,
-                                                                                                            ::std::size_t function_index,
-                                                                                                            ::std::size_t param_bytes,
-                                                                                                            ::std::size_t result_bytes,
-                                                                                                            ::std::byte* result_buffer,
-                                                                                                            ::std::byte const* param_buffer) noexcept
+                                                                                                                      ::std::size_t function_index,
+                                                                                                                      ::std::size_t param_bytes,
+                                                                                                                      ::std::size_t result_bytes,
+                                                                                                                      ::std::byte* result_buffer,
+                                                                                                                      ::std::byte const* param_buffer) noexcept
         {
             if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]]
             {
@@ -7103,11 +7082,8 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t);
+            using entry_fn_t =
+                void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             record_tiered_llvm_jit_switch(rec);
@@ -7116,13 +7092,13 @@ namespace uwvm2::runtime::lib
 # endif
 
         inline constexpr void execute_defined_with_optional_tiered_jit(call_stack_tls_state& call_stack,
-                                                             ::std::size_t module_id,
-                                                             ::std::size_t function_index,
-                                                             runtime_local_func_storage_t const* runtime_func,
-                                                             compiled_local_func_t const* compiled_func,
-                                                             ::std::size_t param_bytes,
-                                                             ::std::size_t result_bytes,
-                                                             ::std::byte** stack_top_ptr) noexcept
+                                                                       ::std::size_t module_id,
+                                                                       ::std::size_t function_index,
+                                                                       runtime_local_func_storage_t const* runtime_func,
+                                                                       compiled_local_func_t const* compiled_func,
+                                                                       ::std::size_t param_bytes,
+                                                                       ::std::size_t result_bytes,
+                                                                       ::std::byte** stack_top_ptr) noexcept
         {
             if(runtime_func == nullptr || compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             ensure_lazy_defined_function_compiled(module_id, function_index);
@@ -7131,10 +7107,10 @@ namespace uwvm2::runtime::lib
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         [[nodiscard]] inline constexpr bool invoke_tiered_llvm_jit_defined_from_stack_sync(::std::size_t module_id,
-                                                                                 ::std::size_t function_index,
-                                                                                 ::std::size_t param_bytes,
-                                                                                 ::std::size_t result_bytes,
-                                                                                 ::std::byte** stack_top_ptr) noexcept
+                                                                                           ::std::size_t function_index,
+                                                                                           ::std::size_t param_bytes,
+                                                                                           ::std::size_t result_bytes,
+                                                                                           ::std::byte** stack_top_ptr) noexcept
         {
             if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -7151,13 +7127,13 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void execute_defined_with_tiered_jit(call_stack_tls_state& call_stack,
-                                                    ::std::size_t module_id,
-                                                    ::std::size_t function_index,
-                                                    runtime_local_func_storage_t const* runtime_func,
-                                                    compiled_local_func_t const* compiled_func,
-                                                    ::std::size_t param_bytes,
-                                                    ::std::size_t result_bytes,
-                                                    ::std::byte** stack_top_ptr) noexcept
+                                                              ::std::size_t module_id,
+                                                              ::std::size_t function_index,
+                                                              runtime_local_func_storage_t const* runtime_func,
+                                                              compiled_local_func_t const* compiled_func,
+                                                              ::std::size_t param_bytes,
+                                                              ::std::size_t result_bytes,
+                                                              ::std::byte** stack_top_ptr) noexcept
         {
             if(runtime_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(!tiered_t0_enabled())
@@ -7177,8 +7153,8 @@ namespace uwvm2::runtime::lib
 # endif
 
         inline constexpr void execute_defined_with_optional_tiered_jit(call_stack_tls_state& call_stack,
-                                                             compiled_defined_func_info const& info,
-                                                             ::std::byte** stack_top_ptr) noexcept
+                                                                       compiled_defined_func_info const& info,
+                                                                       ::std::byte** stack_top_ptr) noexcept
         {
             execute_defined_with_optional_tiered_jit(call_stack,
                                                      info.module_id,
@@ -7205,8 +7181,8 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void execute_defined_with_tiered_jit(call_stack_tls_state& call_stack,
-                                                    ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
-                                                    ::std::byte** stack_top_ptr) noexcept
+                                                              ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
+                                                              ::std::byte** stack_top_ptr) noexcept
         {
             execute_defined_with_tiered_jit(call_stack,
                                             info.module_id,
@@ -7220,8 +7196,8 @@ namespace uwvm2::runtime::lib
 # endif
 
         inline constexpr void execute_defined_with_optional_tiered_jit(call_stack_tls_state& call_stack,
-                                                             ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
-                                                             ::std::byte** stack_top_ptr) noexcept
+                                                                       ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
+                                                                       ::std::byte** stack_top_ptr) noexcept
         {
             execute_defined_with_optional_tiered_jit(call_stack,
                                                      info.module_id,
@@ -7235,13 +7211,13 @@ namespace uwvm2::runtime::lib
 
         template <bool UseTieredEnsure>
         inline constexpr void invoke_compiled_defined_raw_buffers_impl(call_stack_tls_state& call_stack,
-                                                             call_stack_frame frame,
-                                                             runtime_local_func_storage_t const* runtime_func,
-                                                             compiled_local_func_t const* compiled_func,
-                                                             ::std::size_t param_bytes,
-                                                             ::std::size_t result_bytes,
-                                                             ::std::byte* result_buffer,
-                                                             ::std::byte const* param_buffer) noexcept
+                                                                       call_stack_frame frame,
+                                                                       runtime_local_func_storage_t const* runtime_func,
+                                                                       compiled_local_func_t const* compiled_func,
+                                                                       ::std::size_t param_bytes,
+                                                                       ::std::size_t result_bytes,
+                                                                       ::std::byte* result_buffer,
+                                                                       ::std::byte const* param_buffer) noexcept
         {
             if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr) || runtime_func == nullptr ||
                compiled_func == nullptr) [[unlikely]]
@@ -7259,10 +7235,7 @@ namespace uwvm2::runtime::lib
             ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
             call_stack_guard g{call_stack, frame.module_id, frame.function_index};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            if constexpr(UseTieredEnsure)
-            {
-                ensure_tiered_lazy_defined_function_compiled(frame.module_id, frame.function_index);
-            }
+            if constexpr(UseTieredEnsure) { ensure_tiered_lazy_defined_function_compiled(frame.module_id, frame.function_index); }
             else
 # endif
             {
@@ -7274,13 +7247,13 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr void invoke_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
-                                                        call_stack_frame frame,
-                                                        runtime_local_func_storage_t const* runtime_func,
-                                                        compiled_local_func_t const* compiled_func,
-                                                        ::std::size_t param_bytes,
-                                                        ::std::size_t result_bytes,
-                                                        ::std::byte* result_buffer,
-                                                        ::std::byte const* param_buffer) noexcept
+                                                                  call_stack_frame frame,
+                                                                  runtime_local_func_storage_t const* runtime_func,
+                                                                  compiled_local_func_t const* compiled_func,
+                                                                  ::std::size_t param_bytes,
+                                                                  ::std::size_t result_bytes,
+                                                                  ::std::byte* result_buffer,
+                                                                  ::std::byte const* param_buffer) noexcept
         {
             invoke_compiled_defined_raw_buffers_impl<false>(call_stack,
                                                             frame,
@@ -7294,13 +7267,13 @@ namespace uwvm2::runtime::lib
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         inline constexpr void invoke_tiered_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
-                                                               call_stack_frame frame,
-                                                               runtime_local_func_storage_t const* runtime_func,
-                                                               compiled_local_func_t const* compiled_func,
-                                                               ::std::size_t param_bytes,
-                                                               ::std::size_t result_bytes,
-                                                               ::std::byte* result_buffer,
-                                                               ::std::byte const* param_buffer) noexcept
+                                                                         call_stack_frame frame,
+                                                                         runtime_local_func_storage_t const* runtime_func,
+                                                                         compiled_local_func_t const* compiled_func,
+                                                                         ::std::size_t param_bytes,
+                                                                         ::std::size_t result_bytes,
+                                                                         ::std::byte* result_buffer,
+                                                                         ::std::byte const* param_buffer) noexcept
         {
             invoke_compiled_defined_raw_buffers_impl<true>(call_stack,
                                                            frame,
@@ -7314,12 +7287,11 @@ namespace uwvm2::runtime::lib
 # endif
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void
-            tiered_raw_call_defined_entry(::std::uintptr_t context_address,
-                                          ::std::uintptr_t result_buffer_address,
-                                          ::std::size_t result_bytes,
-                                          ::std::uintptr_t param_buffer_address,
-                                          ::std::size_t param_bytes) noexcept
+        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
+                                                                                                                        ::std::uintptr_t result_buffer_address,
+                                                                                                                        ::std::size_t result_bytes,
+                                                                                                                        ::std::uintptr_t param_buffer_address,
+                                                                                                                        ::std::size_t param_bytes) noexcept
         {
             auto const info{reinterpret_cast<compiled_defined_func_info const*>(context_address)};
             if(info == nullptr || info->runtime_func == nullptr || param_bytes != info->param_bytes || result_bytes != info->result_bytes) [[unlikely]]
@@ -7370,12 +7342,12 @@ namespace uwvm2::runtime::lib
         }
 # endif
 
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void
-            llvm_jit_raw_call_defined_entry(::std::uintptr_t context_address,
-                                            ::std::uintptr_t result_buffer_address,
-                                            ::std::size_t result_bytes,
-                                            ::std::uintptr_t param_buffer_address,
-                                            ::std::size_t param_bytes) noexcept
+        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
+            [[maybe_unused]] inline constexpr void llvm_jit_raw_call_defined_entry(::std::uintptr_t context_address,
+                                                                                   ::std::uintptr_t result_buffer_address,
+                                                                                   ::std::size_t result_bytes,
+                                                                                   ::std::uintptr_t param_buffer_address,
+                                                                                   ::std::size_t param_bytes) noexcept
         {
 # ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -7407,12 +7379,12 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void
-            llvm_jit_lazy_raw_call_defined_entry(::std::uintptr_t context_address,
-                                                 ::std::uintptr_t result_buffer_address,
-                                                 ::std::size_t result_bytes,
-                                                 ::std::uintptr_t param_buffer_address,
-                                                 ::std::size_t param_bytes) noexcept
+        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
+            [[maybe_unused]] inline constexpr void llvm_jit_lazy_raw_call_defined_entry(::std::uintptr_t context_address,
+                                                                                        ::std::uintptr_t result_buffer_address,
+                                                                                        ::std::size_t result_bytes,
+                                                                                        ::std::uintptr_t param_buffer_address,
+                                                                                        ::std::size_t param_bytes) noexcept
         {
             auto const info{reinterpret_cast<compiled_defined_func_info const*>(context_address)};
             if(info == nullptr || param_bytes != info->param_bytes || result_bytes != info->result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -7463,22 +7435,19 @@ namespace uwvm2::runtime::lib
             }
             publish_llvm_jit_call_indirect_defined_entry_targets(info, function_address, typed_function_address);
 
-            using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t,
-                                                                                 ::std::uintptr_t,
-                                                                                 ::std::size_t);
+            using entry_fn_t =
+                void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn(0u, result_buffer_address, result_bytes, param_buffer_address, param_bytes);
         }
 #endif
 
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void
-            llvm_jit_raw_call_cached_import_entry(::std::uintptr_t context_address,
-                                                  ::std::uintptr_t result_buffer_address,
-                                                  ::std::size_t result_bytes,
-                                                  ::std::uintptr_t param_buffer_address,
-                                                  ::std::size_t param_bytes) noexcept
+        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
+            [[maybe_unused]] inline constexpr void llvm_jit_raw_call_cached_import_entry(::std::uintptr_t context_address,
+                                                                                         ::std::uintptr_t result_buffer_address,
+                                                                                         ::std::size_t result_bytes,
+                                                                                         ::std::uintptr_t param_buffer_address,
+                                                                                         ::std::size_t param_bytes) noexcept
         {
 #ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -7673,7 +7642,8 @@ namespace uwvm2::runtime::lib
             };
         }
 
-        [[maybe_unused]] [[nodiscard]] inline constexpr ::std::size_t find_runtime_module_id_from_storage_ptr(runtime_module_storage_t const* runtime_module_ptr) noexcept
+        [[maybe_unused]] [[nodiscard]] inline constexpr ::std::size_t
+            find_runtime_module_id_from_storage_ptr(runtime_module_storage_t const* runtime_module_ptr) noexcept
         {
             if(runtime_module_ptr == nullptr) [[unlikely]] { return ::std::numeric_limits<::std::size_t>::max(); }
 
@@ -7970,9 +7940,8 @@ namespace uwvm2::runtime::lib
                 static_cast<llvm_jit_translate_details::validation_module_traits_t::wasm_u32>(func_index));
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::string get_runtime_llvm_jit_wasm_raw_function_name(
-            runtime_module_storage_t const& runtime_module,
-            ::std::size_t func_index) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::string
+            get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             return llvm_jit_translate_details::get_llvm_wasm_raw_function_name(
@@ -7999,7 +7968,8 @@ namespace uwvm2::runtime::lib
             return success;
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> get_llvm_jit_host_target_attribute_storage() noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>
+            get_llvm_jit_host_target_attribute_storage() noexcept
         {
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> mattrs{};
             auto host_features{::llvm::sys::getHostCPUFeatures()};
@@ -8015,8 +7985,9 @@ namespace uwvm2::runtime::lib
             return mattrs;
         }
 
-        inline constexpr void append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
-                                                                         ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
+        inline constexpr void
+            append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+                                                       ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             attr_refs.clear();
@@ -8210,11 +8181,10 @@ namespace uwvm2::runtime::lib
             function_pass_manager.doFinalization();
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>
-            make_runtime_llvm_jit_materialize_target_machine(::uwvm2::utils::container::string const& host_cpu_name,
-                                                             ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const&
-                                                                 host_target_attribute_storage,
-                                                             ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> make_runtime_llvm_jit_materialize_target_machine(
+            ::uwvm2::utils::container::string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+            ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
@@ -8245,9 +8215,8 @@ namespace uwvm2::runtime::lib
             auto const context{static_cast<runtime_llvm_jit_legacy_light_task_preopt_context*>(opaque)};
             if(context == nullptr || module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
-            auto target_machine{make_runtime_llvm_jit_materialize_target_machine(context->host_cpu_name,
-                                                                                 context->host_target_attribute_storage,
-                                                                                 context->codegen_opt_level)};
+            auto target_machine{
+                make_runtime_llvm_jit_materialize_target_machine(context->host_cpu_name, context->host_target_attribute_storage, context->codegen_opt_level)};
             if(target_machine == nullptr) [[unlikely]] { return false; }
 
             module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple());
@@ -8265,7 +8234,7 @@ namespace uwvm2::runtime::lib
         };
 
         [[nodiscard]] inline constexpr bool serialize_runtime_llvm_jit_module_bitcode(::llvm::Module& module,
-                                                                            ::uwvm2::utils::container::string& output) noexcept
+                                                                                      ::uwvm2::utils::container::string& output) noexcept
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
@@ -8275,11 +8244,11 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] inline constexpr bool runtime_llvm_jit_function_name_in_range(
-            ::llvm::StringRef name,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
-            ::std::size_t begin,
-            ::std::size_t end) noexcept
+        [[nodiscard]] inline constexpr bool
+            runtime_llvm_jit_function_name_in_range(::llvm::StringRef name,
+                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& function_names,
+                                                    ::std::size_t begin,
+                                                    ::std::size_t end) noexcept
         {
             for(::std::size_t i{begin}; i != end; ++i)
             {
@@ -8291,9 +8260,8 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        [[nodiscard]] inline constexpr bool runtime_llvm_jit_name_in_list(
-            ::llvm::StringRef name,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& names) noexcept
+        [[nodiscard]] inline constexpr bool
+            runtime_llvm_jit_name_in_list(::llvm::StringRef name, ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& names) noexcept
         {
             for(auto const& curr: names)
             {
@@ -8318,11 +8286,10 @@ namespace uwvm2::runtime::lib
             global_variable.setInitializer(nullptr);
         }
 
-        inline constexpr void collect_runtime_llvm_jit_partition_exposed_symbol_from_value(
-            ::llvm::Value const* value,
-            ::std::size_t source_task_index,
-            ::llvm::StringMap<::std::size_t> const& function_task_indices,
-            ::llvm::StringMap<char>& exposed_symbol_names) noexcept
+        inline constexpr void collect_runtime_llvm_jit_partition_exposed_symbol_from_value(::llvm::Value const* value,
+                                                                                           ::std::size_t source_task_index,
+                                                                                           ::llvm::StringMap<::std::size_t> const& function_task_indices,
+                                                                                           ::llvm::StringMap<char>& exposed_symbol_names) noexcept
         {
             if(value == nullptr) { return; }
 
@@ -8337,15 +8304,9 @@ namespace uwvm2::runtime::lib
                 if(::llvm::isa<::llvm::Function>(global_value))
                 {
                     auto const target_task_it{function_task_indices.find(name)};
-                    if(target_task_it != function_task_indices.end() && target_task_it->getValue() != source_task_index)
-                    {
-                        exposed_symbol_names[name] = 0;
-                    }
+                    if(target_task_it != function_task_indices.end() && target_task_it->getValue() != source_task_index) { exposed_symbol_names[name] = 0; }
                 }
-                else if(source_task_index != 0uz)
-                {
-                    exposed_symbol_names[name] = 0;
-                }
+                else if(source_task_index != 0uz) { exposed_symbol_names[name] = 0; }
                 return;
             }
 
@@ -8354,10 +8315,7 @@ namespace uwvm2::runtime::lib
 
             for(auto const& operand: constant_value->operands())
             {
-                collect_runtime_llvm_jit_partition_exposed_symbol_from_value(operand.get(),
-                                                                             source_task_index,
-                                                                             function_task_indices,
-                                                                             exposed_symbol_names);
+                collect_runtime_llvm_jit_partition_exposed_symbol_from_value(operand.get(), source_task_index, function_task_indices, exposed_symbol_names);
             }
         }
 
@@ -8445,10 +8403,9 @@ namespace uwvm2::runtime::lib
 # endif
             {
                 ::llvm::LLVMContext context{};
-                auto parsed_module_expected{
-                    ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(llvm_jit_translate_details::get_llvm_string_ref(source_bitcode),
-                                                                     "uwvm2-llvm-jit-object-emit-source"),
-                                             context)};
+                auto parsed_module_expected{::llvm::parseBitcodeFile(
+                    ::llvm::MemoryBufferRef(llvm_jit_translate_details::get_llvm_string_ref(source_bitcode), "uwvm2-llvm-jit-object-emit-source"),
+                    context)};
                 if(!parsed_module_expected) [[unlikely]]
                 {
                     ::llvm::consumeError(parsed_module_expected.takeError());
@@ -8464,10 +8421,7 @@ namespace uwvm2::runtime::lib
                     auto const function_name{function.getName()};
                     if(runtime_llvm_jit_function_name_in_range(function_name, function_names, begin, end))
                     {
-                        if(runtime_llvm_jit_name_in_list(function_name, exposed_symbol_names))
-                        {
-                            expose_runtime_llvm_jit_partition_symbol(function);
-                        }
+                        if(runtime_llvm_jit_name_in_list(function_name, exposed_symbol_names)) { expose_runtime_llvm_jit_partition_symbol(function); }
                     }
                     else
                     {
@@ -8492,8 +8446,7 @@ namespace uwvm2::runtime::lib
                 }
                 if(!owns_global_definitions) { module->setModuleInlineAsm(""); }
 
-                auto target_machine{
-                    make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, codegen_opt_level)};
+                auto target_machine{make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, codegen_opt_level)};
                 if(target_machine == nullptr) [[unlikely]]
                 {
                     failure_state.failed.store(true, ::std::memory_order_release);
@@ -8531,15 +8484,15 @@ namespace uwvm2::runtime::lib
             co_return;
         }
 
-        [[nodiscard]] inline constexpr runtime_llvm_jit_parallel_object_emit_result emit_runtime_llvm_jit_objects_parallel(
-            ::llvm::Module& module,
-            ::uwvm2::utils::container::string const& host_cpu_name,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
-            ::llvm::CodeGenOptLevel codegen_opt_level,
-            bool verify_llvm_jit_ir,
-            ::std::size_t extra_compile_threads,
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& object_outputs,
-            ::std::size_t& defined_function_count) noexcept
+        [[nodiscard]] inline constexpr runtime_llvm_jit_parallel_object_emit_result
+            emit_runtime_llvm_jit_objects_parallel(::llvm::Module& module,
+                                                   ::uwvm2::utils::container::string const& host_cpu_name,
+                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& host_target_attribute_storage,
+                                                   ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                   bool verify_llvm_jit_ir,
+                                                   ::std::size_t extra_compile_threads,
+                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::container::string>& object_outputs,
+                                                   ::std::size_t& defined_function_count) noexcept
         {
             defined_function_count = 0uz;
             object_outputs.clear();
@@ -8560,10 +8513,7 @@ namespace uwvm2::runtime::lib
             if(effective_extra_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
 
             ::uwvm2::utils::container::string source_bitcode{};
-            if(!serialize_runtime_llvm_jit_module_bitcode(module, source_bitcode)) [[unlikely]]
-            {
-                return runtime_llvm_jit_parallel_object_emit_result::failed;
-            }
+            if(!serialize_runtime_llvm_jit_module_bitcode(module, source_bitcode)) [[unlikely]] { return runtime_llvm_jit_parallel_object_emit_result::failed; }
 
             auto const task_count{effective_extra_threads + 1uz};
             auto const functions_per_task{function_names.size() / task_count + static_cast<::std::size_t>(function_names.size() % task_count != 0uz)};
@@ -8603,11 +8553,11 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool optimize_runtime_llvm_jit_module(::llvm::Module& module,
-                                                                   ::llvm::TargetMachine& target_machine,
-                                                                   runtime_llvm_jit_full_pipeline_kind pipeline,
-                                                                   ::llvm::CodeGenOptLevel codegen_opt_level,
-                                                                   bool verify_llvm_jit_ir,
-                                                                   bool legacy_light_preoptimized) noexcept
+                                                                             ::llvm::TargetMachine& target_machine,
+                                                                             runtime_llvm_jit_full_pipeline_kind pipeline,
+                                                                             ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                                             bool verify_llvm_jit_ir,
+                                                                             bool legacy_light_preoptimized) noexcept
         {
             if(verify_llvm_jit_ir)
             {
@@ -8665,9 +8615,9 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline constexpr bool try_materialize_runtime_module_llvm_jit(compiled_module_record& rec,
-                                                                          bool publish_full_ready,
-                                                                          ::llvm::CodeGenOptLevel default_codegen_opt_level,
-                                                                          ::std::size_t extra_materialize_threads) noexcept
+                                                                                    bool publish_full_ready,
+                                                                                    ::llvm::CodeGenOptLevel default_codegen_opt_level,
+                                                                                    ::std::size_t extra_materialize_threads) noexcept
         {
 # if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             static_cast<void>(publish_full_ready);
@@ -8846,19 +8796,16 @@ namespace uwvm2::runtime::lib
             if(extra_materialize_threads != 0uz)
             {
                 auto const object_emit_start_time{llvm_jit_materialize_runtime_log_now()};
-                llvm_jit_materialize_runtime_log_line(u8"object-emit-start module=\"",
-                                                      rec.module_name,
-                                                      u8"\" extra_threads=",
-                                                      extra_materialize_threads);
-                auto const object_emit_result{emit_runtime_llvm_jit_objects_parallel(
-                    *merged_module,
-                    ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()},
-                    host_target_attribute_storage,
-                    codegen_opt_level,
-                    !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
-                    extra_materialize_threads,
-                    parallel_object_outputs,
-                    parallel_object_defined_function_count)};
+                llvm_jit_materialize_runtime_log_line(u8"object-emit-start module=\"", rec.module_name, u8"\" extra_threads=", extra_materialize_threads);
+                auto const object_emit_result{
+                    emit_runtime_llvm_jit_objects_parallel(*merged_module,
+                                                           ::uwvm2::utils::container::string{host_cpu_name.data(), host_cpu_name.data() + host_cpu_name.size()},
+                                                           host_target_attribute_storage,
+                                                           codegen_opt_level,
+                                                           !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
+                                                           extra_materialize_threads,
+                                                           parallel_object_outputs,
+                                                           parallel_object_defined_function_count)};
                 if(object_emit_result == runtime_llvm_jit_parallel_object_emit_result::success)
                 {
                     use_parallel_objects = true;
@@ -8895,8 +8842,7 @@ namespace uwvm2::runtime::lib
             ::llvm::ExecutionEngine* raw_engine{};
             if(use_parallel_objects)
             {
-                auto engine_module{
-                    ::uwvm2::utils::container::make_delete_owned<::llvm::Module>(merged_module->getName(), *llvm_context_holder)};
+                auto engine_module{::uwvm2::utils::container::make_delete_owned<::llvm::Module>(merged_module->getName(), *llvm_context_holder)};
                 if(engine_module == nullptr) [[unlikely]]
                 {
                     if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -8908,31 +8854,29 @@ namespace uwvm2::runtime::lib
                 engine_module->setTargetTriple(target_machine->getTargetTriple());
                 engine_module->setDataLayout(target_machine->createDataLayout());
                 merged_module.reset();
-                raw_engine =
-                    ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
-                        .setEngineKind(::llvm::EngineKind::JIT)
-                        .setOptLevel(codegen_opt_level)
-                        .setMCPU(host_cpu_name)
-                        .setMAttrs(host_target_attributes)
-                        .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                            ::uwvm2::utils::container::make_delete_owned<
-                                ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                                .release()})
-                        .create(target_machine.get());
+                raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
+                                 .setEngineKind(::llvm::EngineKind::JIT)
+                                 .setOptLevel(codegen_opt_level)
+                                 .setMCPU(host_cpu_name)
+                                 .setMAttrs(host_target_attributes)
+                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                                     ::uwvm2::utils::container::make_delete_owned<
+                                         ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                                         .release()})
+                                 .create(target_machine.get());
             }
             else
             {
-                raw_engine =
-                    ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
-                        .setEngineKind(::llvm::EngineKind::JIT)
-                        .setOptLevel(codegen_opt_level)
-                        .setMCPU(host_cpu_name)
-                        .setMAttrs(host_target_attributes)
-                        .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                            ::uwvm2::utils::container::make_delete_owned<
-                                ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                                .release()})
-                        .create(target_machine.get());
+                raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
+                                 .setEngineKind(::llvm::EngineKind::JIT)
+                                 .setOptLevel(codegen_opt_level)
+                                 .setMCPU(host_cpu_name)
+                                 .setMAttrs(host_target_attributes)
+                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
+                                     ::uwvm2::utils::container::make_delete_owned<
+                                         ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
+                                         .release()})
+                                 .create(target_machine.get());
             }
             if(raw_engine == nullptr) [[unlikely]]
             {
@@ -8945,21 +8889,20 @@ namespace uwvm2::runtime::lib
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
-            if(runtime_llvm_jit_unwind_call_stack_requested()) { llvm_jit_engine->RegisterJITEventListener(::std::addressof(get_uwvm_llvm_jit_debug_listener())); }
+            if(runtime_llvm_jit_unwind_call_stack_requested())
+            {
+                llvm_jit_engine->RegisterJITEventListener(::std::addressof(get_uwvm_llvm_jit_debug_listener()));
+            }
             if(use_parallel_objects)
             {
                 auto const object_load_start_time{llvm_jit_materialize_runtime_log_now()};
-                llvm_jit_materialize_runtime_log_line(u8"object-load-start module=\"",
-                                                      rec.module_name,
-                                                      u8"\" objects=",
-                                                      parallel_object_outputs.size());
+                llvm_jit_materialize_runtime_log_line(u8"object-load-start module=\"", rec.module_name, u8"\" objects=", parallel_object_outputs.size());
                 for(::std::size_t object_index{}; object_index != parallel_object_outputs.size(); ++object_index)
                 {
                     auto const& object_output{parallel_object_outputs.index_unchecked(object_index)};
-                    auto object_buffer{
-                        ::llvm::MemoryBuffer::getMemBufferCopy(
-                            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(object_output),
-                            "uwvm2-llvm-jit-object")};
+                    auto object_buffer{::llvm::MemoryBuffer::getMemBufferCopy(
+                        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(object_output),
+                        "uwvm2-llvm-jit-object")};
                     if(object_buffer == nullptr) [[unlikely]]
                     {
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -8980,8 +8923,8 @@ namespace uwvm2::runtime::lib
                         return false;
                     }
 
-                    llvm_jit_engine->addObjectFile(::llvm::object::OwningBinary<::llvm::object::ObjectFile>{::std::move(*object_file_expected),
-                                                                                                            ::std::move(object_buffer)});
+                    llvm_jit_engine->addObjectFile(
+                        ::llvm::object::OwningBinary<::llvm::object::ObjectFile>{::std::move(*object_file_expected), ::std::move(object_buffer)});
                     if(llvm_jit_engine->hasError()) [[unlikely]]
                     {
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -9100,7 +9043,8 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard, maybe_unused]] inline constexpr bool try_invoke_runtime_llvm_jit_defined_entry(::std::size_t module_id, ::std::size_t function_index) noexcept
+        [[nodiscard, maybe_unused]] inline constexpr bool try_invoke_runtime_llvm_jit_defined_entry(::std::size_t module_id,
+                                                                                                    ::std::size_t function_index) noexcept
         {
             // Enter generated code through the raw wrapper so the C++ boundary keeps the host ABI even when typed Wasm bodies use a private ABI.
             return try_invoke_runtime_llvm_jit_raw_defined_entry(module_id, function_index, nullptr, 0uz, nullptr, 0uz);
@@ -9124,12 +9068,13 @@ namespace uwvm2::runtime::lib
         UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_invalid_conversion_to_integer() noexcept
         { trap_fatal(trap_kind::invalid_conversion_to_integer); }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_integer_divide_by_zero() noexcept { trap_fatal(trap_kind::integer_divide_by_zero); }
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_integer_divide_by_zero() noexcept
+        { trap_fatal(trap_kind::integer_divide_by_zero); }
 
         UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_memory_out_of_bounds(
-            ::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
+            trap_memory_out_of_bounds(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
         { print_memory_out_of_bounds_trap(memerr); }
 
         template <bool TryTieredJit, typename... Args>
@@ -9233,21 +9178,21 @@ namespace uwvm2::runtime::lib
             execute_defined_for_bridge<TryTieredJit>(call_stack, info, stack_top_ptr);
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void call_bridge(::std::size_t wasm_module_id,
-                                                                             ::std::size_t func_index,
-                                                                             ::std::byte** stack_top_ptr) UWVM_THROWS
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
+            call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         { call_bridge_impl<false>(wasm_module_id, func_index, stack_top_ptr); }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void tiered_call_bridge(::std::size_t wasm_module_id,
-                                                                                    ::std::size_t func_index,
-                                                                                    ::std::byte** stack_top_ptr) UWVM_THROWS
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
+            tiered_call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         { call_bridge_impl<true>(wasm_module_id, func_index, stack_top_ptr); }
 # endif
 
         template <bool TryTieredJit>
-        inline constexpr void call_indirect_bridge_impl(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr)
-            UWVM_THROWS
+        inline constexpr void call_indirect_bridge_impl(::std::size_t wasm_module_id,
+                                                        ::std::size_t type_index,
+                                                        ::std::size_t table_index,
+                                                        ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -9397,8 +9342,7 @@ namespace uwvm2::runtime::lib
                                 {
                                     auto& suppressed_frame{get_suppressed_call_stack_frame()};
                                     suppressed_frame.module_id = wasm_module_id;
-                                    suppressed_frame.function_index =
-                                        module.imported_function_vec_storage.size() + static_cast<::std::size_t>(def_ptr - base);
+                                    suppressed_frame.function_index = module.imported_function_vec_storage.size() + static_cast<::std::size_t>(def_ptr - base);
                                 }
                                 trap_fatal(trap_kind::call_indirect_type_mismatch);
                             }
@@ -9550,10 +9494,9 @@ namespace uwvm2::runtime::lib
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void tiered_call_indirect_bridge(::std::size_t wasm_module_id,
-                                                                                             ::std::size_t type_index,
-                                                                                             ::std::size_t table_index,
-                                                                                             ::std::byte** stack_top_ptr)
-            UWVM_THROWS
+                                                                                                       ::std::size_t type_index,
+                                                                                                       ::std::size_t table_index,
+                                                                                                       ::std::byte** stack_top_ptr) UWVM_THROWS
         { call_indirect_bridge_impl<true>(wasm_module_id, type_index, table_index, stack_top_ptr); }
 # endif
 
@@ -10225,8 +10168,7 @@ namespace uwvm2::runtime::lib
                         bool legacy_light_task_preopt_enabled{};
                         if(effective_module_extra_compile_threads != 0uz)
                         {
-                            auto const full_translation_strategy{
-                                resolve_runtime_llvm_jit_full_materialize_strategy(::llvm::CodeGenOptLevel::Aggressive)};
+                            auto const full_translation_strategy{resolve_runtime_llvm_jit_full_materialize_strategy(::llvm::CodeGenOptLevel::Aggressive)};
                             if(full_translation_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light &&
                                ensure_llvm_jit_native_target_initialized())
                             {
@@ -10237,8 +10179,7 @@ namespace uwvm2::runtime::lib
                                 legacy_light_task_preopt_context.codegen_opt_level = full_translation_strategy.codegen_opt_level;
                                 llvm_jit_opt.llvm_jit_task_module_pre_link_callback =
                                     ::std::addressof(optimize_runtime_llvm_jit_legacy_light_task_module_pre_link);
-                                llvm_jit_opt.llvm_jit_task_module_pre_link_callback_context =
-                                    ::std::addressof(legacy_light_task_preopt_context);
+                                llvm_jit_opt.llvm_jit_task_module_pre_link_callback_context = ::std::addressof(legacy_light_task_preopt_context);
                                 legacy_light_task_preopt_enabled = true;
 
                                 if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
@@ -10276,8 +10217,7 @@ namespace uwvm2::runtime::lib
                                                   u8"\" tasks=",
                                                   legacy_light_task_preopt_context.optimized_task_modules.load(::std::memory_order_relaxed),
                                                   u8" applied=",
-                                                  ::fast_io::mnp::cond(rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized
-                                                      ,u8"yes",u8"no"));
+                                                  ::fast_io::mnp::cond(rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized, u8"yes", u8"no"));
                         }
                         runtime_compile_threads_verbose_done(llvm_jit_translation_start_time,
                                                              u8"LLVM JIT IR translation for module \"",
@@ -10319,8 +10259,8 @@ namespace uwvm2::runtime::lib
                                                              u8"\". ");
                     }
                     auto const llvm_jit_materialize_start_time{runtime_compile_threads_verbose_now()};
-                    if(!try_materialize_runtime_module_llvm_jit(
-                           rec, true, ::llvm::CodeGenOptLevel::Aggressive, effective_module_extra_compile_threads)) [[unlikely]]
+                    if(!try_materialize_runtime_module_llvm_jit(rec, true, ::llvm::CodeGenOptLevel::Aggressive, effective_module_extra_compile_threads))
+                        [[unlikely]]
                     {
                         if(runtime_compiler_requires_llvm_jit_execution())
                         {
@@ -10925,7 +10865,8 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        inline constexpr void initialize_llvm_jit_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
+        inline constexpr void initialize_llvm_jit_lazy_modules_if_needed(::uwvm2::utils::container::u8string_view main_module_name,
+                                                                         lazy_compile_run_config cfg) noexcept
         {
             ensure_memory_signal_trap_bridge_initialized();
 
@@ -11457,11 +11398,11 @@ namespace uwvm2::runtime::lib
 # endif
         UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind k
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-                                             ,
-                                             ::std::uintptr_t frame_address,
-                                             ::std::uintptr_t stack_pointer
+                                                 ,
+                                                 ::std::uintptr_t frame_address,
+                                                 ::std::uintptr_t stack_pointer
 # endif
-                                             ) noexcept
+                                                 ) noexcept
     {
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
         auto const return_address{reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0))};
@@ -11469,11 +11410,11 @@ namespace uwvm2::runtime::lib
         constexpr ::std::uintptr_t return_address{};
 # endif
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-# if UWVM_HAS_BUILTIN(__builtin_frame_address)
+#  if UWVM_HAS_BUILTIN(__builtin_frame_address)
         auto const frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
-# else
+#  else
         constexpr ::std::uintptr_t frame_address{};
-# endif
+#  endif
 # endif
         store_llvm_jit_trap_context(k, return_address, frame_address);
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
@@ -11539,17 +11480,17 @@ namespace uwvm2::runtime::lib
         [[clang::disable_tail_calls]]
 # endif
         UWVM_NOINLINE void llvm_jit_memory_out_of_bounds_trap(::std::size_t memory_idx,
-                                                          ::std::uint_least64_t memory_static_offset,
-                                                          ::std::uint_least64_t memory_offset,
-                                                          ::std::uint_least32_t offset_65_bit,
-                                                          ::std::uint_least64_t memory_length,
-                                                          ::std::size_t memory_type_size
+                                                              ::std::uint_least64_t memory_static_offset,
+                                                              ::std::uint_least64_t memory_offset,
+                                                              ::std::uint_least32_t offset_65_bit,
+                                                              ::std::uint_least64_t memory_length,
+                                                              ::std::size_t memory_type_size
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-                                                          ,
-                                                          ::std::uintptr_t frame_address,
-                                                          ::std::uintptr_t stack_pointer
+                                                              ,
+                                                              ::std::uintptr_t frame_address,
+                                                              ::std::uintptr_t stack_pointer
 # endif
-                                                          ) noexcept
+                                                              ) noexcept
     {
 # if UWVM_HAS_BUILTIN(__builtin_return_address)
         auto const return_address{reinterpret_cast<::std::uintptr_t>(__builtin_return_address(0))};
@@ -11557,11 +11498,11 @@ namespace uwvm2::runtime::lib
         constexpr ::std::uintptr_t return_address{};
 # endif
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
-# if UWVM_HAS_BUILTIN(__builtin_frame_address)
+#  if UWVM_HAS_BUILTIN(__builtin_frame_address)
         auto const frame_address{reinterpret_cast<::std::uintptr_t>(__builtin_frame_address(0))};
-# else
+#  else
         constexpr ::std::uintptr_t frame_address{};
-# endif
+#  endif
 # endif
         store_llvm_jit_trap_context(llvm_jit_trap_kind::memory_out_of_bounds, return_address, frame_address);
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
@@ -11573,7 +11514,8 @@ namespace uwvm2::runtime::lib
             .memory_offset = {.offset = memory_offset, .offset_65_bit = offset_65_bit != 0u},
             .memory_static_offset = memory_static_offset,
             .memory_length = memory_length,
-            .memory_type_size = memory_type_size};
+            .memory_type_size = memory_type_size
+        };
         print_memory_out_of_bounds_trap(memerr);
 
         using terminate_func_t = void (*)() noexcept;
@@ -11760,11 +11702,11 @@ namespace uwvm2::runtime::lib
                                 auto const context_address{::std::atomic_ref<::std::uintptr_t>{context_address_ref}.load(::std::memory_order_acquire)};
                                 if(entry_address != 0u)
                                 {
-                                    using entry_fn_t = void (UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI *)(::std::uintptr_t,
-                                                                                                         ::std::uintptr_t,
-                                                                                                         ::std::size_t,
-                                                                                                         ::std::uintptr_t,
-                                                                                                         ::std::size_t);
+                                    using entry_fn_t = void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t,
+                                                                                                       ::std::uintptr_t,
+                                                                                                       ::std::size_t,
+                                                                                                       ::std::uintptr_t,
+                                                                                                       ::std::size_t);
                                     auto const entry_fn{reinterpret_cast<entry_fn_t>(entry_address)};
                                     entry_fn(context_address,
                                              pointer_to_uintptr(cfg.entry_abi_buffers.result_buffer),
@@ -12031,13 +11973,13 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
     template <typename TrailerWriter, typename InvokeBridge>
     inline constexpr void llvm_jit_invoke_raw_host_bridge_common(void const* runtime_module_ptr,
-                                                       void* result_buffer,
-                                                       ::std::size_t result_bytes,
-                                                       void const* param_buffer,
-                                                       ::std::size_t param_bytes,
-                                                       ::std::size_t trailer_bytes,
-                                                       TrailerWriter&& trailer_writer,
-                                                       InvokeBridge&& invoke_bridge) noexcept
+                                                                 void* result_buffer,
+                                                                 ::std::size_t result_bytes,
+                                                                 void const* param_buffer,
+                                                                 ::std::size_t param_bytes,
+                                                                 ::std::size_t trailer_bytes,
+                                                                 TrailerWriter&& trailer_writer,
+                                                                 InvokeBridge&& invoke_bridge) noexcept
     {
         compile_all_modules_if_needed();
         ensure_bridges_initialized();
@@ -12128,11 +12070,11 @@ namespace uwvm2::runtime::lib
     }
 
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
-                                    ::std::uint_least32_t func_index,
-                                    void* result_buffer,
-                                    ::std::size_t result_bytes,
-                                    void const* param_buffer,
-                                    ::std::size_t param_bytes) noexcept
+                                                 ::std::uint_least32_t func_index,
+                                                 void* result_buffer,
+                                                 ::std::size_t result_bytes,
+                                                 void const* param_buffer,
+                                                 ::std::size_t param_bytes) noexcept
     {
         compile_all_modules_if_needed(false);
 
@@ -12230,16 +12172,12 @@ namespace uwvm2::runtime::lib
     extern "C++" [[nodiscard]] bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
     { return preload_memory_descriptor_at_impl(descriptor_index, out); }
 
-    extern "C++" [[nodiscard]] bool preload_memory_read_host_api(::std::size_t memory_index,
-                                                                 ::std::uint_least64_t offset,
-                                                                 void* destination,
-                                                                 ::std::size_t size) noexcept
+    extern "C++" [[nodiscard]] bool
+        preload_memory_read_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
     { return preload_memory_read_impl(memory_index, offset, destination, size); }
 
-    extern "C++" [[nodiscard]] bool preload_memory_write_host_api(::std::size_t memory_index,
-                                                                  ::std::uint_least64_t offset,
-                                                                  void const* source,
-                                                                  ::std::size_t size) noexcept
+    extern "C++" [[nodiscard]] bool
+        preload_memory_write_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
     { return preload_memory_write_impl(memory_index, offset, source, size); }
 
 }  // namespace uwvm2::runtime::lib

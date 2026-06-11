@@ -91,10 +91,11 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_io_observer const& dirfile,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(
+        ::fast_io::dir_io_observer const& dirfile,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
     {
         [[maybe_unused]] auto const& file_fd{dirfile};
 

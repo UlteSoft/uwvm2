@@ -172,8 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // parser; an explicit `-Rcm` after this point will overwrite the default below.
             if(!::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_mode_existed)
             {
-                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode =
-                    ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile;
+                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile;
             }
         }
         else

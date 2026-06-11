@@ -592,8 +592,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      */
     template <typename FunctionType, typename Tokens>
     [[noreturn]] inline constexpr void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
-                                                                      FunctionType const& ft,
-                                                                      Tokens const& argument_tokens) noexcept
+                                                                                FunctionType const& ft,
+                                                                                Tokens const& argument_tokens) noexcept
     {
         auto const param_count{static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)};
         auto const argument_token_count{argument_tokens.size()};
@@ -695,10 +695,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @param   arg_index Zero-based argument index used in diagnostics.
      */
     inline constexpr void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte> & buffer,
-                                         ::std::size_t& offset,
-                                         ::uwvm2::utils::container::u8string_view arg,
-                                         ::std::uint_least8_t type_code,
-                                         ::std::size_t arg_index) noexcept
+                                                   ::std::size_t& offset,
+                                                   ::uwvm2::utils::container::u8string_view arg,
+                                                   ::std::uint_least8_t type_code,
+                                                   ::std::size_t arg_index) noexcept
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
         switch(static_cast<wasm_value_type>(type_code))
@@ -794,11 +794,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      */
     template <typename Output>
     inline constexpr void print_wasm_entry_argument_verbose(Output & output,
-                                                  ::uwvm2::utils::container::vector<::std::byte> const& buffer,
-                                                  ::std::size_t& offset,
-                                                  ::uwvm2::utils::container::u8string_view arg,
-                                                  ::std::uint_least8_t type_code,
-                                                  ::std::size_t arg_index) noexcept
+                                                            ::uwvm2::utils::container::vector<::std::byte> const& buffer,
+                                                            ::std::size_t& offset,
+                                                            ::uwvm2::utils::container::u8string_view arg,
+                                                            ::std::uint_least8_t type_code,
+                                                            ::std::size_t arg_index) noexcept
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -892,11 +892,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      */
     template <typename FunctionType, typename Tokens>
     inline constexpr void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
-                                                  ::std::size_t function_index,
-                                                  ::std::size_t import_count,
-                                                  FunctionType const& ft,
-                                                  Tokens const& argument_tokens,
-                                                  ::uwvm2::utils::container::vector<::std::byte> const& param_buffer) noexcept
+                                                            ::std::size_t function_index,
+                                                            ::std::size_t import_count,
+                                                            FunctionType const& ft,
+                                                            Tokens const& argument_tokens,
+                                                            ::uwvm2::utils::container::vector<::std::byte> const& param_buffer) noexcept
     {
         // Emit the multi-line verbose record as one locked output unit.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
@@ -1521,27 +1521,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     inline constexpr void resolve_runtime_int_auto_mode() noexcept
     {
-        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile)
-        {
-            return;
-        }
+        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile) { return; }
 
         // `auto_compile` is deliberately not a general runtime mode knob.  It is the uwvm-int auto policy used by `-Rint`
         // and by `-Rcc int` when `-Rcm` is omitted; JIT/tiered invocations must choose their mode explicitly.
-        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
-           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only) [[unlikely]]
+        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler != ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
+            [[unlikely]]
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                u8"[fatal] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint, or -Rcc int without -Rcm). "
-                                u8"Use -Rcm lazy|full with -Rcc jit|tiered to select LLVM-JIT or tiered runtime modes explicitly. ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                u8"(runtime)\n\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::io::perr(
+                ::uwvm2::uwvm::io::u8log_output,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                u8"uwvm: ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                u8"[fatal] ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint, or -Rcc int without -Rcm). " u8"Use -Rcm lazy|full with -Rcc jit|tiered to select LLVM-JIT or tiered runtime modes explicitly. ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                u8"(runtime)\n\n",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             ::fast_io::fast_terminate();
         }
 
@@ -1560,50 +1557,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const threshold{has_preload_wasm ? runtime_int_auto_preload_total_full_threshold : runtime_int_auto_main_full_threshold};
         auto const selected_full{has_preload_wasm ? total_wasm_bytes <= threshold : main_wasm_bytes <= threshold};
 
-        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode =
-            selected_full ? ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
-                          : ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = selected_full ? ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
+                                                                                  : ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             // Keep the auto decision visible under verbose logging so benchmark runs can explain why the uwvm-int auto
             // policy behaved like `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
-            ::fast_io::io::perr(
-                ::uwvm2::uwvm::io::u8log_output,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                u8"uwvm: ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                u8"[info]  ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"uwvm-int auto selected ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8" compile for uwvm-int (main-wasm-bytes=",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                main_wasm_bytes,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8", preload-wasm-bytes=",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                preload_wasm_bytes,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8", total-wasm-bytes=",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                total_wasm_bytes,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8", threshold=",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                threshold,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                ::fast_io::mnp::cond(has_preload_wasm, u8", policy=preload-total", u8", policy=main-only"),
-                u8"). ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                u8"[",
-                ::uwvm2::uwvm::io::get_local_realtime(),
-                u8"] ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                u8"(verbose)\n",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"uwvm-int auto selected ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" compile for uwvm-int (main-wasm-bytes=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                main_wasm_bytes,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", preload-wasm-bytes=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                preload_wasm_bytes,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", total-wasm-bytes=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                total_wasm_bytes,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", threshold=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                threshold,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::fast_io::mnp::cond(has_preload_wasm, u8", policy=preload-total", u8", policy=main-only"),
+                                u8"). ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                u8"[",
+                                ::uwvm2::uwvm::io::get_local_realtime(),
+                                u8"] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         }
     }
 #endif

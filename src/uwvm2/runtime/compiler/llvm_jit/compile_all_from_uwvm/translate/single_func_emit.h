@@ -168,7 +168,8 @@ public:
 
 // Map a supported Wasm MVP scalar type to its LLVM scalar type.  Unsupported or malformed runtime types return null so
 // callers can abort emission without manufacturing an invalid type.
-[[nodiscard]] inline constexpr ::llvm::Type* get_llvm_type_from_wasm_value_type(::llvm::LLVMContext& llvm_context, runtime_operand_stack_value_type value_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Type* get_llvm_type_from_wasm_value_type(::llvm::LLVMContext& llvm_context,
+                                                                                runtime_operand_stack_value_type value_type) noexcept
 {
     switch(get_runtime_wasm_value_type_encoding(value_type))
     {
@@ -418,7 +419,8 @@ inline constexpr void apply_llvm_jit_calling_conv(::llvm::Function& function, ::
 
 // Set the calling convention on a call site.  Call sites must match the declaration or LLVM may emit an ABI-incompatible
 // native call.
-inline constexpr void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept { call_inst.setCallingConv(calling_conv); }
+inline constexpr void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
+{ call_inst.setCallingConv(calling_conv); }
 
 // Null-safe call-site convention helper used by expression-style call builders.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_calling_conv(::llvm::CallInst* call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
@@ -428,7 +430,8 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_calling_conv(::llvm::CallInst*
 }
 
 // Mark a generated function as callable from the host/runtime bridge ABI.
-inline constexpr void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcept { apply_llvm_jit_calling_conv(function, get_llvm_jit_host_calling_conv()); }
+inline constexpr void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcept
+{ apply_llvm_jit_calling_conv(function, get_llvm_jit_host_calling_conv()); }
 
 // Mark a generated call site as crossing the host/runtime bridge ABI.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_host_calling_conv(::llvm::CallInst* call_inst) noexcept
@@ -447,7 +450,8 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_raw_entry_calling_conv(::llvm:
 { return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_raw_entry_calling_conv()); }
 
 // Mark a generated function as callable through the private Wasm-to-Wasm ABI.
-inline constexpr void apply_llvm_jit_wasm_calling_conv(::llvm::Function& function) noexcept { apply_llvm_jit_calling_conv(function, get_llvm_jit_wasm_calling_conv()); }
+inline constexpr void apply_llvm_jit_wasm_calling_conv(::llvm::Function& function) noexcept
+{ apply_llvm_jit_calling_conv(function, get_llvm_jit_wasm_calling_conv()); }
 
 // Mark a generated call site as using the private Wasm-to-Wasm ABI.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call_inst) noexcept
@@ -484,7 +488,7 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 
 // Create the zero/null constant for a Wasm scalar type, used for local initialization and default reentry arguments.
 [[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_zero_constant_from_wasm_value_type(::llvm::LLVMContext& llvm_context,
-                                                                                   runtime_operand_stack_value_type value_type) noexcept
+                                                                                             runtime_operand_stack_value_type value_type) noexcept
 {
     auto llvm_type{get_llvm_type_from_wasm_value_type(llvm_context, value_type)};
     if(llvm_type == nullptr) [[unlikely]] { return nullptr; }
@@ -500,10 +504,10 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 
 // Lookup and call an LLVM intrinsic, including overloaded intrinsics whose concrete types are supplied by the caller.
 [[nodiscard]] inline constexpr ::llvm::Value* call_llvm_intrinsic(::llvm::Module& llvm_module,
-                                                        ::llvm::IRBuilder<>& ir_builder,
-                                                        ::llvm::Intrinsic::ID intrinsic_id,
-                                                        ::llvm::ArrayRef<::llvm::Type*> overloaded_types,
-                                                        ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
+                                                                  ::llvm::IRBuilder<>& ir_builder,
+                                                                  ::llvm::Intrinsic::ID intrinsic_id,
+                                                                  ::llvm::ArrayRef<::llvm::Type*> overloaded_types,
+                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
 {
     auto llvm_intrinsic{::llvm::Intrinsic::getOrInsertDeclaration(::std::addressof(llvm_module), intrinsic_id, overloaded_types)};
     return ir_builder.CreateCall(llvm_intrinsic, arguments);
@@ -518,7 +522,8 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 
 // Mask Wasm shift/rotate counts to the lane width.  WebAssembly defines shifts modulo the integer bit width, while LLVM
 // shifts are undefined when the count is greater than or equal to that width.
-[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_shift_count_mask(::llvm::IRBuilder<>& ir_builder, ::llvm::Value* shift_count, unsigned num_bits) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value*
+    emit_llvm_shift_count_mask(::llvm::IRBuilder<>& ir_builder, ::llvm::Value* shift_count, unsigned num_bits) noexcept
 {
     if(shift_count == nullptr || num_bits == 0u) [[unlikely]] { return nullptr; }
     auto bits_minus_one{::llvm::ConstantInt::get(shift_count->getType(), num_bits - 1u)};
@@ -582,7 +587,8 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 }
 
 // Emit the generated function's current frame address as an integer value for trap/unwind bridge calls.
-[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_jit_current_frame_address(::llvm::IRBuilder<>& ir_builder, ::llvm::IntegerType* llvm_intptr_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_jit_current_frame_address(::llvm::IRBuilder<>& ir_builder,
+                                                                                  ::llvm::IntegerType* llvm_intptr_type) noexcept
 {
 #if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
     auto& llvm_context{ir_builder.getContext()};
@@ -591,14 +597,15 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else
     auto const frame_address_ptr{ir_builder.CreateIntrinsic(::llvm::Intrinsic::frameaddress,
-                                                             ir_builder.getPtrTy(),
-                                                             {::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder.getContext()), 0u)})};
+                                                            ir_builder.getPtrTy(),
+                                                            {::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder.getContext()), 0u)})};
     return ir_builder.CreatePtrToInt(frame_address_ptr, llvm_intptr_type);
 #endif
 }
 
 // Emit the generated function's current stack pointer when the platform trap bridge consumes it; otherwise return zero.
-[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_jit_current_stack_pointer(::llvm::IRBuilder<>& ir_builder, ::llvm::IntegerType* llvm_intptr_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_jit_current_stack_pointer(::llvm::IRBuilder<>& ir_builder,
+                                                                                  ::llvm::IntegerType* llvm_intptr_type) noexcept
 {
 #if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
     auto& llvm_context{ir_builder.getContext()};
@@ -687,12 +694,12 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
 // Emit a detailed out-of-bounds memory trap.  Null dynamic values are replaced with zero to keep trap emission robust in
 // late fallback paths while preserving all known details.
 inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& ir_builder,
-                                                ::std::size_t memory_idx,
-                                                ::std::uint_least64_t memory_static_offset,
-                                                ::llvm::Value* memory_offset,
-                                                ::llvm::Value* offset_65_bit,
-                                                ::llvm::Value* memory_length,
-                                                ::std::size_t memory_type_size) noexcept
+                                                          ::std::size_t memory_idx,
+                                                          ::std::uint_least64_t memory_static_offset,
+                                                          ::llvm::Value* memory_offset,
+                                                          ::llvm::Value* offset_65_bit,
+                                                          ::llvm::Value* memory_length,
+                                                          ::std::size_t memory_type_size) noexcept
 {
     auto& llvm_context{ir_builder.getContext()};
     auto function_type{get_llvm_memory_out_of_bounds_trap_bridge_function_type(llvm_context)};
@@ -738,8 +745,10 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
 }
 
 // Split the current block on a boolean condition and emit a generic runtime trap on the true edge.
-inline constexpr void
-    emit_llvm_conditional_trap(::llvm::Module&, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind) noexcept
+inline constexpr void emit_llvm_conditional_trap(::llvm::Module&,
+                                                 ::llvm::IRBuilder<>& ir_builder,
+                                                 ::llvm::Value* condition,
+                                                 ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind) noexcept
 {
     if(condition == nullptr) [[unlikely]] { return; }
 
@@ -768,14 +777,14 @@ inline constexpr void emit_llvm_conditional_trap(::llvm::Module& llvm_module, ::
 
 // Split the current block on a boolean condition and emit the detailed memory out-of-bounds trap on the true edge.
 inline constexpr void emit_llvm_conditional_memory_out_of_bounds_trap(::llvm::Module&,
-                                                            ::llvm::IRBuilder<>& ir_builder,
-                                                            ::llvm::Value* condition,
-                                                            ::std::size_t memory_idx,
-                                                            ::std::uint_least64_t memory_static_offset,
-                                                            ::llvm::Value* memory_offset,
-                                                            ::llvm::Value* offset_65_bit,
-                                                            ::llvm::Value* memory_length,
-                                                            ::std::size_t memory_type_size) noexcept
+                                                                      ::llvm::IRBuilder<>& ir_builder,
+                                                                      ::llvm::Value* condition,
+                                                                      ::std::size_t memory_idx,
+                                                                      ::std::uint_least64_t memory_static_offset,
+                                                                      ::llvm::Value* memory_offset,
+                                                                      ::llvm::Value* offset_65_bit,
+                                                                      ::llvm::Value* memory_length,
+                                                                      ::std::size_t memory_type_size) noexcept
 {
     if(condition == nullptr) [[unlikely]] { return; }
 
@@ -809,7 +818,8 @@ inline constexpr void emit_llvm_divide_by_zero_trap(::llvm::Module& llvm_module,
 }
 
 // Emit both signed division traps required by Wasm: divide-by-zero and signed-min divided by -1 overflow.
-inline constexpr void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* dividend, ::llvm::Value* divisor) noexcept
+inline constexpr void
+    emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* dividend, ::llvm::Value* divisor) noexcept
 {
     if(dividend == nullptr || divisor == nullptr) [[unlikely]] { return; }
 
@@ -826,9 +836,9 @@ inline constexpr void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_mo
 // Emit signed remainder with Wasm semantics.  LLVM `srem signed_min, -1` is poison/undefined, while Wasm defines the
 // remainder result as zero after the divide-by-zero check, so this builds an explicit control-flow diamond.
 [[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_signed_remainder_with_wasm_semantics(::llvm::Module& llvm_module,
-                                                                                   ::llvm::IRBuilder<>& ir_builder,
-                                                                                   ::llvm::Value* dividend,
-                                                                                   ::llvm::Value* divisor) noexcept
+                                                                                             ::llvm::IRBuilder<>& ir_builder,
+                                                                                             ::llvm::Value* dividend,
+                                                                                             ::llvm::Value* divisor) noexcept
 {
     if(dividend == nullptr || divisor == nullptr) [[unlikely]] { return nullptr; }
 
@@ -947,12 +957,12 @@ inline constexpr void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_mo
 // the Wasm traps are emitted before the final FPToSI/FPToUI instruction.
 template <typename Float>
 [[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_trunc_float_to_int(::llvm::Module& llvm_module,
-                                                                 ::llvm::IRBuilder<>& ir_builder,
-                                                                 ::llvm::Type* dest_type,
-                                                                 bool is_signed,
-                                                                 Float min_bounds,
-                                                                 Float max_bounds,
-                                                                 ::llvm::Value* operand) noexcept
+                                                                           ::llvm::IRBuilder<>& ir_builder,
+                                                                           ::llvm::Type* dest_type,
+                                                                           bool is_signed,
+                                                                           Float min_bounds,
+                                                                           Float max_bounds,
+                                                                           ::llvm::Value* operand) noexcept
 {
     if(dest_type == nullptr || operand == nullptr) [[unlikely]] { return nullptr; }
 
@@ -1134,8 +1144,9 @@ struct runtime_direct_callee_resolution_t
 { return ::uwvm2::utils::container::concat_uwvm("uwvm_m_", reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))); }
 
 // Public typed Wasm entry name.  This is the symbol used for direct JIT-to-JIT calls inside the same runtime module.
-[[nodiscard]] inline constexpr ::uwvm2::utils::container::string get_llvm_wasm_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                                   validation_module_traits_t::wasm_u32 func_index) noexcept
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::string
+    get_llvm_wasm_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                validation_module_traits_t::wasm_u32 func_index) noexcept
 {
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
     return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_func_", func_index_uz);
@@ -1431,7 +1442,7 @@ struct runtime_direct_callee_resolution_t
 // Compare two Wasm function types structurally.  This is used for direct-call eligibility and canonical type-id
 // computation, so the comparison is based on exact parameter/result byte values.
 [[nodiscard]] inline constexpr bool runtime_wasm_function_types_equal(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& left,
-                                                            ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& right) noexcept
+                                                                      ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& right) noexcept
 {
     auto const left_param_begin{left.parameter.begin};
     auto const left_param_end{left.parameter.end};
@@ -1476,8 +1487,9 @@ struct runtime_direct_callee_resolution_t
 
 // Assign a canonical type id by finding the first structurally equal type in the module type section.  This makes
 // `call_indirect` type checks stable even when the Wasm module has duplicate type declarations.
-[[nodiscard]] inline constexpr ::std::uint_least32_t resolve_runtime_canonical_type_id(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                             validation_module_traits_t::wasm_u32 type_index) noexcept
+[[nodiscard]] inline constexpr ::std::uint_least32_t
+    resolve_runtime_canonical_type_id(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                      validation_module_traits_t::wasm_u32 type_index) noexcept
 {
     auto type_begin{runtime_module.type_section_storage.type_section_begin};
     auto type_end{runtime_module.type_section_storage.type_section_end};
@@ -1600,8 +1612,8 @@ struct runtime_global_access_info_t
 
 // Build an LLVM constant pointer to the concrete scalar field inside a directly addressable global storage record.
 [[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
-                                                                       ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
-                                                                       runtime_operand_stack_value_type value_type) noexcept
+                                                                                 ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
+                                                                                 runtime_operand_stack_value_type value_type) noexcept
 {
     if(global_storage_ptr == nullptr) [[unlikely]] { return nullptr; }
 
@@ -1647,7 +1659,8 @@ struct runtime_global_access_info_t
 // Host bridge used by generated code to read a local-imported global.  The template keeps the LLVM function signature
 // strongly typed for each Wasm scalar kind.
 template <typename ValueType>
-[[nodiscard]] inline constexpr ValueType llvm_jit_local_imported_global_get_bridge(::std::uintptr_t local_imported_module_address, ::std::size_t global_index) noexcept
+[[nodiscard]] inline constexpr ValueType llvm_jit_local_imported_global_get_bridge(::std::uintptr_t local_imported_module_address,
+                                                                                   ::std::size_t global_index) noexcept
 {
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1660,7 +1673,8 @@ template <typename ValueType>
 // Host bridge used by generated code to write a local-imported global.  Failure is fatal because validated JIT code should
 // only request globals that the runtime resolved successfully at emission time.
 template <typename ValueType>
-inline constexpr void llvm_jit_local_imported_global_set_bridge(::std::uintptr_t local_imported_module_address, ::std::size_t global_index, ValueType value) noexcept
+inline constexpr void
+    llvm_jit_local_imported_global_set_bridge(::std::uintptr_t local_imported_module_address, ::std::size_t global_index, ValueType value) noexcept
 {
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1708,8 +1722,9 @@ struct runtime_call_indirect_callee_resolution_t
 };
 
 // Resolve an imported or local table index to the concrete table storage backing call_indirect.
-[[nodiscard]] inline constexpr runtime_table_storage_t const* resolve_runtime_table_storage(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                                  validation_module_traits_t::wasm_u32 table_index) noexcept
+[[nodiscard]] inline constexpr runtime_table_storage_t const*
+    resolve_runtime_table_storage(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                  validation_module_traits_t::wasm_u32 table_index) noexcept
 {
     using imported_table_storage_t = ::uwvm2::uwvm::runtime::storage::imported_table_storage_t;
     using table_link_kind = imported_table_storage_t::imported_table_link_kind;
@@ -1990,7 +2005,8 @@ inline constexpr void populate_runtime_memory_access_info_mmap_fields(runtime_me
 }
 
 // Combine the Wasm/user limit with backend limits so memory.grow and direct-access checks agree.
-[[nodiscard]] inline constexpr ::std::size_t refine_runtime_memory_max_limit_length(runtime_native_memory_t const& memory, ::std::size_t max_limit_memory_length) noexcept
+[[nodiscard]] inline constexpr ::std::size_t refine_runtime_memory_max_limit_length(runtime_native_memory_t const& memory,
+                                                                                    ::std::size_t max_limit_memory_length) noexcept
 {
     auto const backend_max_limit_length{get_runtime_memory_backend_max_limit_length(memory)};
     return backend_max_limit_length < max_limit_memory_length ? backend_max_limit_length : max_limit_memory_length;
@@ -2166,8 +2182,8 @@ UWVM_ALWAYS_INLINE inline constexpr bool llvm_jit_add_overflow(I a, I b, I& resu
 
 // Compute the effective offset for a Wasm32 memory access.  Keeping the overflow bit separate lets bridge traps report
 // both the wrapped low bits and the fact that the access was outside the representable Wasm32 range.
-[[nodiscard]] inline constexpr llvm_jit_wasm32_effective_offset_t llvm_jit_compute_wasm32_effective_offset(runtime_wasm_i32 address,
-                                                                                                 validation_module_traits_t::wasm_u32 static_offset) noexcept
+[[nodiscard]] inline constexpr llvm_jit_wasm32_effective_offset_t
+    llvm_jit_compute_wasm32_effective_offset(runtime_wasm_i32 address, validation_module_traits_t::wasm_u32 static_offset) noexcept
 {
     if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
     {
@@ -2229,10 +2245,10 @@ inline constexpr void llvm_jit_memory_bridge_trap() noexcept
 
 // Detailed memory trap bridge for native checked-memory access fallback paths.
 inline constexpr void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
-                                        validation_module_traits_t::wasm_u32 static_offset,
-                                        llvm_jit_wasm32_effective_offset_t effective_offset,
-                                        ::std::size_t memory_length,
-                                        ::std::size_t access_size) noexcept
+                                                  validation_module_traits_t::wasm_u32 static_offset,
+                                                  llvm_jit_wasm32_effective_offset_t effective_offset,
+                                                  ::std::size_t memory_length,
+                                                  ::std::size_t access_size) noexcept
 {
     ::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap(memory_idx,
                                                               static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset)),
@@ -2252,10 +2268,10 @@ inline constexpr void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
 // Run a memory access under the backend's required snapshot/guard discipline and call `fn` only after bounds checks pass.
 template <typename MemoryT, typename Fn>
 [[nodiscard]] inline constexpr bool llvm_jit_try_checked_memory_access(MemoryT const& memory,
-                                                             llvm_jit_wasm32_effective_offset_t effective_offset,
-                                                             ::std::size_t access_size,
-                                                             ::std::size_t& memory_length_out,
-                                                             Fn&& fn) noexcept
+                                                                       llvm_jit_wasm32_effective_offset_t effective_offset,
+                                                                       ::std::size_t access_size,
+                                                                       ::std::size_t& memory_length_out,
+                                                                       Fn&& fn) noexcept
 {
     // The common checked path records the length used for diagnostics, validates the effective range, and then executes
     // the caller's load/store lambda on a raw byte pointer.
@@ -2293,10 +2309,10 @@ template <typename MemoryT, typename Fn>
 // trap on failure.
 template <typename Fn>
 inline constexpr void llvm_jit_with_checked_memory_access(::std::uintptr_t memory_address,
-                                                validation_module_traits_t::wasm_u32 static_offset,
-                                                runtime_wasm_i32 address,
-                                                ::std::size_t access_size,
-                                                Fn&& fn) noexcept
+                                                          validation_module_traits_t::wasm_u32 static_offset,
+                                                          runtime_wasm_i32 address,
+                                                          ::std::size_t access_size,
+                                                          Fn&& fn) noexcept
 {
     auto const effective_offset{llvm_jit_compute_wasm32_effective_offset(address, static_offset)};
     auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
@@ -2429,9 +2445,9 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
 // remain active for the duration of the access.
 template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
 [[nodiscard]] inline constexpr ResultType llvm_jit_local_imported_memory_load_bridge(::std::uintptr_t local_imported_module_address,
-                                                                           ::std::size_t memory_index,
-                                                                           validation_module_traits_t::wasm_u32 static_offset,
-                                                                           runtime_wasm_i32 address) noexcept
+                                                                                     ::std::size_t memory_index,
+                                                                                     validation_module_traits_t::wasm_u32 static_offset,
+                                                                                     runtime_wasm_i32 address) noexcept
 {
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
@@ -2524,8 +2540,10 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
 // Native memory store bridge used when direct LLVM stores are unavailable.  Integer stores truncate according to the Wasm
 // opcode width, and float stores preserve the IEEE bit pattern.
 template <typename ValueType, ::std::size_t StoreBytes>
-inline constexpr void
-    llvm_jit_memory_store_bridge(::std::uintptr_t memory_address, validation_module_traits_t::wasm_u32 static_offset, runtime_wasm_i32 address, ValueType value) noexcept
+inline constexpr void llvm_jit_memory_store_bridge(::std::uintptr_t memory_address,
+                                                   validation_module_traits_t::wasm_u32 static_offset,
+                                                   runtime_wasm_i32 address,
+                                                   ValueType value) noexcept
 {
     llvm_jit_with_checked_memory_access(memory_address,
                                         static_offset,
@@ -2583,10 +2601,10 @@ inline constexpr void
 // Local-imported memory store bridge.  The value is serialized into a fixed byte buffer before calling the provider.
 template <typename ValueType, ::std::size_t StoreBytes>
 inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_imported_module_address,
-                                                        ::std::size_t memory_index,
-                                                        validation_module_traits_t::wasm_u32 static_offset,
-                                                        runtime_wasm_i32 address,
-                                                        ValueType value) noexcept
+                                                                  ::std::size_t memory_index,
+                                                                  validation_module_traits_t::wasm_u32 static_offset,
+                                                                  runtime_wasm_i32 address,
+                                                                  ValueType value) noexcept
 {
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
@@ -2640,9 +2658,9 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
 // Acquire a best-effort address/length snapshot for a local-imported memory.  This is used only for memory.size-style
 // queries; actual loads/stores stay on bridge functions so provider locks do not outlive the snapshot.
 [[nodiscard]] inline constexpr bool llvm_jit_local_imported_memory_snapshot_bridge(::std::uintptr_t local_imported_module_address,
-                                                                         ::std::size_t memory_index,
-                                                                         ::std::uintptr_t* memory_begin_address_out,
-                                                                         ::std::size_t* byte_length_out) noexcept
+                                                                                   ::std::size_t memory_index,
+                                                                                   ::std::uintptr_t* memory_begin_address_out,
+                                                                                   ::std::size_t* byte_length_out) noexcept
 {
     if(memory_begin_address_out == nullptr || byte_length_out == nullptr) [[unlikely]] { return false; }
 
@@ -2664,10 +2682,7 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
 
     auto const page_size_shift{static_cast<unsigned>(::std::countr_zero(page_size_bytes))};
     if(page_size_shift >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { return false; }
-    if(snapshot.page_count > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max() >> page_size_shift)) [[unlikely]]
-    {
-        return false;
-    }
+    if(snapshot.page_count > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max() >> page_size_shift)) [[unlikely]] { return false; }
 
     *memory_begin_address_out = reinterpret_cast<::std::uintptr_t>(snapshot.memory_begin);
     *byte_length_out = static_cast<::std::size_t>(snapshot.page_count) << page_size_shift;
@@ -2732,9 +2747,9 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
 
 // Local-imported memory.grow bridge.  The provider owns the memory growth policy and returns the old page count or -1.
 [[nodiscard]] inline constexpr runtime_wasm_i32 llvm_jit_local_imported_memory_grow_bridge(::std::uintptr_t local_imported_module_address,
-                                                                                 ::std::size_t memory_index,
-                                                                                 ::std::size_t max_limit_memory_length,
-                                                                                 runtime_wasm_i32 delta_i32) noexcept
+                                                                                           ::std::size_t memory_index,
+                                                                                           ::std::size_t max_limit_memory_length,
+                                                                                           runtime_wasm_i32 delta_i32) noexcept
 {
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { return static_cast<runtime_wasm_i32>(-1); }
@@ -3165,8 +3180,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
 // Allocate LLVM context/module storage for a runtime module and optionally initialize compact DWARF metadata.
 [[nodiscard]] inline constexpr bool try_prepare_runtime_llvm_jit_module_storage(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                      llvm_jit_module_storage_t& module_storage,
-                                                                      bool emit_unwind_call_stack_frames = false) noexcept
+                                                                                llvm_jit_module_storage_t& module_storage,
+                                                                                bool emit_unwind_call_stack_frames = false) noexcept
 {
     module_storage = {};
     module_storage.llvm_context_holder = ::uwvm2::utils::container::make_delete_owned<::llvm::LLVMContext>();
@@ -3199,18 +3214,18 @@ struct runtime_local_func_llvm_jit_emit_state_t
 // Initialize the full per-function emit state, create typed entry/core functions, allocate locals, and seed the control
 // stack with the implicit function return label.
 [[nodiscard]] inline constexpr bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
-                                                                             llvm_jit_module_storage_t& module_storage,
-                                                                             runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                             bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
-                                                                             bool route_wasm_calls_through_runtime_bridge = false,
-                                                                             ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
-                                                                             ::std::size_t lazy_defined_raw_call_target_count = 0uz,
-                                                                             ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
-                                                                             ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
-                                                                             bool lazy_defined_targets_are_atomic = false,
-                                                                             bool emit_tiered_loop_reentry_entries = false,
-                                                                             bool emit_call_stack_frames = true,
-                                                                             bool emit_unwind_call_stack_frames = false) noexcept
+                                                                                       llvm_jit_module_storage_t& module_storage,
+                                                                                       runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                                       bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
+                                                                                       bool route_wasm_calls_through_runtime_bridge = false,
+                                                                                       ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
+                                                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
+                                                                                       ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
+                                                                                       ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
+                                                                                       bool lazy_defined_targets_are_atomic = false,
+                                                                                       bool emit_tiered_loop_reentry_entries = false,
+                                                                                       bool emit_call_stack_frames = true,
+                                                                                       bool emit_unwind_call_stack_frames = false) noexcept
 {
     state = {};
     state.verify_llvm_jit_ir = verify_llvm_jit_ir;
@@ -3445,21 +3460,21 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     // Local PHI builder used during preparation before the shared helper below is available in this function's flow.
-    auto const create_optional_result_phi{[&](::llvm::BasicBlock* block, runtime_block_result_type block_result, char const* name) constexpr noexcept -> ::llvm::PHINode*
-                                          {
-                                              // The current emitter supports at most one result per block/function, so a
-                                              // single PHI is enough for structured merge values.
-                                              auto const result_count{get_runtime_block_result_count(block_result)};
-                                              if(result_count == 0uz) { return nullptr; }
-                                              if(result_count != 1uz || block == nullptr) [[unlikely]] { return nullptr; }
+    auto const create_optional_result_phi{
+        [&](::llvm::BasicBlock* block, runtime_block_result_type block_result, char const* name) constexpr noexcept -> ::llvm::PHINode*
+        {
+            // The current emitter supports at most one result per block/function, so a
+            // single PHI is enough for structured merge values.
+            auto const result_count{get_runtime_block_result_count(block_result)};
+            if(result_count == 0uz) { return nullptr; }
+            if(result_count != 1uz || block == nullptr) [[unlikely]] { return nullptr; }
 
-                                              auto phi_type{
-                                                  get_llvm_type_from_wasm_value_type(llvm_context, get_runtime_block_single_result_type(block_result))};
-                                              if(phi_type == nullptr) [[unlikely]] { return nullptr; }
+            auto phi_type{get_llvm_type_from_wasm_value_type(llvm_context, get_runtime_block_single_result_type(block_result))};
+            if(phi_type == nullptr) [[unlikely]] { return nullptr; }
 
-                                              ::llvm::IRBuilder<> phi_builder(block);
-                                              return phi_builder.CreatePHI(phi_type, 0u, name);
-                                          }};
+            ::llvm::IRBuilder<> phi_builder(block);
+            return phi_builder.CreatePHI(phi_type, 0u, name);
+        }};
 
     state.return_block = ::llvm::BasicBlock::Create(llvm_context, "return", state.llvm_function);
     state.return_phi = create_optional_result_phi(state.return_block, state.function_result, "return.phi");
@@ -3483,7 +3498,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
 // Complete the current function after all instructions have been emitted.  This seals the return block, generates any
 // tiered/raw wrappers, verifies generated functions when requested, and leaves the module ready for optimization/JIT use.
-[[nodiscard]] inline constexpr bool finalize_runtime_local_func_llvm_jit_emit_state(runtime_local_func_llvm_jit_emit_state_t& state, llvm_jit_module_storage_t&) noexcept
+[[nodiscard]] inline constexpr bool finalize_runtime_local_func_llvm_jit_emit_state(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                                    llvm_jit_module_storage_t&) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_module == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr)
         [[unlikely]]
@@ -3975,7 +3991,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
 // Mark the owning control context as having at least one incoming edge to its end block.
 inline constexpr void mark_runtime_local_func_llvm_jit_branch_target_has_incoming(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                        llvm_jit_branch_target_t const& target) noexcept
+                                                                                  llvm_jit_branch_target_t const& target) noexcept
 {
     if(target.control_stack_index >= state.control_stack.size()) [[unlikely]] { return; }
 
@@ -3986,8 +4002,8 @@ inline constexpr void mark_runtime_local_func_llvm_jit_branch_target_has_incomin
 // Read the branch value required by a target without mutating the operand stack.  The caller decides whether the source
 // instruction consumes the value or keeps it available on fallthrough.
 [[nodiscard]] inline constexpr bool try_get_runtime_local_func_llvm_jit_branch_value(runtime_local_func_llvm_jit_emit_state_t const& state,
-                                                                           runtime_block_result_type params,
-                                                                           llvm_jit_stack_value_t& branch_value) noexcept
+                                                                                     runtime_block_result_type params,
+                                                                                     llvm_jit_stack_value_t& branch_value) noexcept
 {
     auto const arity{get_runtime_block_result_count(params)};
     if(arity == 0uz)
@@ -4003,7 +4019,7 @@ inline constexpr void mark_runtime_local_func_llvm_jit_branch_target_has_incomin
 
 // Emit an unconditional branch to a normalized target and wire the optional single-result PHI.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_branch_to_target(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                llvm_jit_branch_target_t const& target) noexcept
+                                                                                          llvm_jit_branch_target_t const& target) noexcept
 {
     if(!state.valid || state.ir_builder == nullptr) [[unlikely]] { return false; }
 
@@ -4043,9 +4059,9 @@ inline constexpr void enter_runtime_local_func_llvm_jit_unreachable_control_cont
 
 // Create the optional PHI for a structured merge block.  Only zero or one result is supported by this emitter.
 [[nodiscard]] inline constexpr ::llvm::PHINode* create_runtime_local_func_llvm_jit_optional_result_phi(::llvm::LLVMContext& llvm_context,
-                                                                                             ::llvm::BasicBlock* block,
-                                                                                             runtime_block_result_type block_result,
-                                                                                             char const* name) noexcept
+                                                                                                       ::llvm::BasicBlock* block,
+                                                                                                       runtime_block_result_type block_result,
+                                                                                                       char const* name) noexcept
 {
     auto const result_count{get_runtime_block_result_count(block_result)};
     if(result_count == 0uz) { return nullptr; }
@@ -4067,7 +4083,7 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 // Record a tiered loop reentry point when the current instruction starts a loop/block body with an empty operand stack.
 // Duplicate Wasm offsets are ignored so each hot loop has at most one OSR entry id.
 [[nodiscard]] inline constexpr bool try_record_runtime_local_func_llvm_jit_tiered_reentry(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                ::llvm::BasicBlock* target_block) noexcept
+                                                                                          ::llvm::BasicBlock* target_block) noexcept
 {
     if(!state.emit_tiered_loop_reentry_entries || !state.operand_stack.empty() || state.current_wasm_op_offset == SIZE_MAX) { return true; }
     if(target_block == nullptr) [[unlikely]] { return false; }
@@ -4108,7 +4124,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 
 // Begin lowering a Wasm `block`.  A block label targets the end block, and the end PHI receives branch/fallthrough
 // values for single-result blocks.
-[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_block(runtime_local_func_llvm_jit_emit_state_t& state, runtime_block_result_type block_result) noexcept
+[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_block(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                               runtime_block_result_type block_result) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_function == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
 
@@ -4156,7 +4173,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 
 // Begin lowering a Wasm `loop`.  A loop label targets the loop body, while fallthrough/branch-to-end values still merge at
 // the loop end block.
-[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_loop(runtime_local_func_llvm_jit_emit_state_t& state, runtime_block_result_type block_result) noexcept
+[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_loop(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                              runtime_block_result_type block_result) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr || state.control_stack.empty())
         [[unlikely]]
@@ -4201,7 +4219,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 }
 
 // Begin lowering a Wasm `if`.  The i32 condition is consumed and converted to an LLVM i1 comparison against zero.
-[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_if(runtime_local_func_llvm_jit_emit_state_t& state, runtime_block_result_type block_result) noexcept
+[[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_if(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                            runtime_block_result_type block_result) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr || state.control_stack.empty())
         [[unlikely]]
@@ -4354,7 +4373,7 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 // Lower Wasm `br` to an unconditional branch and enter unreachable/polymorphic state for the remainder of the source
 // block until a matching structural boundary is encountered.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_br(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                  validation_module_traits_t::wasm_u32 label_index) noexcept
+                                                                            validation_module_traits_t::wasm_u32 label_index) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr || state.control_stack.empty())
         [[unlikely]]
@@ -4374,7 +4393,7 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 // Lower Wasm `br_if`.  The branch value is copied into the target PHI before the conditional branch, while the fallthrough
 // path continues with the original branch value still on the operand stack as required by Wasm semantics.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_br_if(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                     validation_module_traits_t::wasm_u32 label_index) noexcept
+                                                                               validation_module_traits_t::wasm_u32 label_index) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr || state.control_stack.empty())
         [[unlikely]]
@@ -4484,7 +4503,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
     if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     // Add PHI/control-context incoming state for one br_table destination while preserving duplicate switch edges.
-    auto const add_target_incoming{[&](llvm_jit_branch_target_t const& branch_target) constexpr noexcept {
+    auto const add_target_incoming{[&](llvm_jit_branch_target_t const& branch_target) constexpr noexcept
+                                   {
                                        if(expected_arity == 1uz)
                                        {
                                            if(branch_target.phi == nullptr) [[unlikely]] { return false; }
@@ -4536,9 +4556,9 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 
 // Pop and type-check call arguments from the operand stack.  Arguments are popped in reverse stack order and written back
 // into source parameter order for LLVM call creation.
-[[nodiscard]] inline constexpr llvm_jit_prepared_wasm_call_operands_t
-    prepare_runtime_local_func_llvm_jit_wasm_call_operands(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                           ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type) noexcept
+[[nodiscard]] inline constexpr llvm_jit_prepared_wasm_call_operands_t prepare_runtime_local_func_llvm_jit_wasm_call_operands(
+    runtime_local_func_llvm_jit_emit_state_t& state,
+    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type) noexcept
 {
     llvm_jit_prepared_wasm_call_operands_t prepared{};
     prepared.abi_layout = get_runtime_wasm_call_abi_layout(wasm_function_type);
@@ -4573,8 +4593,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 
 // Push a call result back onto the operand stack when the callee has one result.
 [[nodiscard]] inline constexpr bool push_runtime_local_func_llvm_jit_wasm_call_result(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                            llvm_jit_prepared_wasm_call_operands_t const& prepared,
-                                                                            ::llvm::Value* value) noexcept
+                                                                                      llvm_jit_prepared_wasm_call_operands_t const& prepared,
+                                                                                      ::llvm::Value* value) noexcept
 {
     if(!prepared.has_result) { return true; }
     if(value == nullptr) [[unlikely]] { return false; }
@@ -4605,9 +4625,9 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 // Emit a call to a C++ runtime bridge function using the host calling convention.
 template <typename BridgeFunction>
 [[nodiscard]] inline constexpr ::llvm::CallInst* emit_runtime_local_func_llvm_jit_runtime_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                            BridgeFunction bridge_function,
-                                                                                            ::llvm::FunctionType* bridge_function_type,
-                                                                                            ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
+                                                                                                      BridgeFunction bridge_function,
+                                                                                                      ::llvm::FunctionType* bridge_function_type,
+                                                                                                      ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || bridge_function_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -4877,13 +4897,13 @@ struct llvm_jit_lazy_typed_target_emit_result_t
 // Dispatch to the scalar bridge function matching a Wasm value type while keeping each bridge call's C++ type exact.
 template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32BridgeFunction, typename F64BridgeFunction>
 [[nodiscard]] inline constexpr ::llvm::CallInst* emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                                   runtime_operand_stack_value_type value_type,
-                                                                                                   ::llvm::FunctionType* bridge_function_type,
-                                                                                                   ::llvm::ArrayRef<::llvm::Value*> arguments,
-                                                                                                   I32BridgeFunction i32_bridge_function,
-                                                                                                   I64BridgeFunction i64_bridge_function,
-                                                                                                   F32BridgeFunction f32_bridge_function,
-                                                                                                   F64BridgeFunction f64_bridge_function) noexcept
+                                                                                                             runtime_operand_stack_value_type value_type,
+                                                                                                             ::llvm::FunctionType* bridge_function_type,
+                                                                                                             ::llvm::ArrayRef<::llvm::Value*> arguments,
+                                                                                                             I32BridgeFunction i32_bridge_function,
+                                                                                                             I64BridgeFunction i64_bridge_function,
+                                                                                                             F32BridgeFunction f32_bridge_function,
+                                                                                                             F64BridgeFunction f64_bridge_function) noexcept
 {
     switch(value_type)
     {
@@ -5012,7 +5032,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
 // Lower Wasm `local.get` by loading from the corresponding entry-block local alloca.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_local_get(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                         validation_module_traits_t::wasm_u32 local_index) noexcept
+                                                                                   validation_module_traits_t::wasm_u32 local_index) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
 
@@ -5037,7 +5057,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
 // Lower Wasm `local.set` by storing the top operand into the local slot and consuming it.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_local_set(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                         validation_module_traits_t::wasm_u32 local_index) noexcept
+                                                                                   validation_module_traits_t::wasm_u32 local_index) noexcept
 {
     if(!state.valid || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -5058,7 +5078,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
 // Lower Wasm `local.tee` by storing the top operand into the local slot without consuming it.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_local_tee(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                         validation_module_traits_t::wasm_u32 local_index) noexcept
+                                                                                   validation_module_traits_t::wasm_u32 local_index) noexcept
 {
     if(!state.valid || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -5078,7 +5098,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
 // Lower Wasm `global.get`, preferring direct storage loads and falling back to local-imported bridge calls.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_global_get(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                          validation_module_traits_t::wasm_u32 global_index) noexcept
+                                                                                    validation_module_traits_t::wasm_u32 global_index) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr || state.ir_builder == nullptr ||
        state.control_stack.empty()) [[unlikely]]
@@ -5118,7 +5138,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
 // Lower Wasm `global.set`, preferring direct storage stores and falling back to local-imported bridge calls.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_global_set(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                          validation_module_traits_t::wasm_u32 global_index) noexcept
+                                                                                    validation_module_traits_t::wasm_u32 global_index) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr || state.ir_builder == nullptr ||
        state.control_stack.empty()) [[unlikely]]
@@ -5158,7 +5178,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 // Lower Wasm `call`.  The emitter chooses, in order, direct typed JIT calls, lazy typed/raw target calls, or the raw
 // runtime host bridge depending on import status and compilation mode.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_call(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                    validation_module_traits_t::wasm_u32 func_index) noexcept
+                                                                              validation_module_traits_t::wasm_u32 func_index) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr || state.llvm_module == nullptr ||
        state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]]
@@ -5181,24 +5201,29 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto const has_lazy_defined_target_tables{state.lazy_defined_raw_call_target_base_address != 0u &&
                                               state.lazy_defined_typed_entry_target_base_address != 0u && state.lazy_defined_raw_call_target_count != 0uz &&
                                               state.lazy_defined_typed_entry_target_count != 0uz};
-    auto const emit_lazy_defined_target_call{
-        [&](::std::size_t local_function_index, char const* param_buffer_name, char const* result_buffer_name) constexpr noexcept -> llvm_jit_runtime_raw_bridge_emit_result_t
-        {
-            auto const typed_target_result{emit_runtime_local_func_llvm_jit_lazy_typed_target_wasm_call(state,
-                                                                                                        local_function_index,
-                                                                                                        *callee_type_ptr,
-                                                                                                        prepared_call,
-                                                                                                        param_buffer_name,
-                                                                                                        result_buffer_name)};
-            if(typed_target_result.valid) { return {.valid = true, .bridge_call = nullptr, .result_value = typed_target_result.result_value}; }
+    auto const emit_lazy_defined_target_call{[&](::std::size_t local_function_index,
+                                                 char const* param_buffer_name,
+                                                 char const* result_buffer_name) constexpr noexcept -> llvm_jit_runtime_raw_bridge_emit_result_t
+                                             {
+                                                 auto const typed_target_result{
+                                                     emit_runtime_local_func_llvm_jit_lazy_typed_target_wasm_call(state,
+                                                                                                                  local_function_index,
+                                                                                                                  *callee_type_ptr,
+                                                                                                                  prepared_call,
+                                                                                                                  param_buffer_name,
+                                                                                                                  result_buffer_name)};
+                                                 if(typed_target_result.valid)
+                                                 {
+                                                     return {.valid = true, .bridge_call = nullptr, .result_value = typed_target_result.result_value};
+                                                 }
 
-            return emit_runtime_local_func_llvm_jit_raw_target_wasm_call(state,
-                                                                         local_function_index,
-                                                                         *callee_type_ptr,
-                                                                         prepared_call,
-                                                                         param_buffer_name,
-                                                                         result_buffer_name);
-        }};
+                                                 return emit_runtime_local_func_llvm_jit_raw_target_wasm_call(state,
+                                                                                                              local_function_index,
+                                                                                                              *callee_type_ptr,
+                                                                                                              prepared_call,
+                                                                                                              param_buffer_name,
+                                                                                                              result_buffer_name);
+                                             }};
 
     if(state.route_wasm_calls_through_runtime_bridge)
     {
@@ -5289,8 +5314,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 // default table; reference-types/multi-table support must keep the decoded table index, runtime table storage, and this
 // selected-table lowering in sync.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_call_indirect(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                             validation_module_traits_t::wasm_u32 type_index,
-                                                                             validation_module_traits_t::wasm_u32 table_index) noexcept
+                                                                                       validation_module_traits_t::wasm_u32 type_index,
+                                                                                       validation_module_traits_t::wasm_u32 table_index) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr || state.llvm_module == nullptr ||
        state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]]
@@ -5472,8 +5497,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 // the current context.
 template <typename CreateValue>
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_constant(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                        runtime_operand_stack_value_type result_type,
-                                                                        CreateValue&& create_value) noexcept
+                                                                                  runtime_operand_stack_value_type result_type,
+                                                                                  CreateValue&& create_value) noexcept
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -5488,9 +5513,9 @@ template <typename CreateValue>
 // Generic unary emitter used by numeric conversion and arithmetic opcodes.
 template <typename CreateValue>
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_unary(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                     runtime_operand_stack_value_type expected_type,
-                                                                     runtime_operand_stack_value_type result_type,
-                                                                     CreateValue&& create_value) noexcept
+                                                                               runtime_operand_stack_value_type expected_type,
+                                                                               runtime_operand_stack_value_type result_type,
+                                                                               CreateValue&& create_value) noexcept
 {
     if(!state.valid || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -5511,9 +5536,9 @@ template <typename CreateValue>
 // Generic binary emitter used by numeric arithmetic/comparison opcode case files.
 template <typename CreateValue>
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_binary(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                      runtime_operand_stack_value_type expected_type,
-                                                                      runtime_operand_stack_value_type result_type,
-                                                                      CreateValue&& create_value) noexcept
+                                                                                runtime_operand_stack_value_type expected_type,
+                                                                                runtime_operand_stack_value_type result_type,
+                                                                                CreateValue&& create_value) noexcept
 {
     if(!state.valid || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -5536,8 +5561,8 @@ template <typename CreateValue>
 // Emit exactly one Wasm instruction from `instruction_begin..instruction_end`.  The caller slices instructions before
 // calling this function; returning true means the slice was fully consumed and the emit state remains usable.
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_instruction(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                           ::std::byte const* instruction_begin,
-                                                                           ::std::byte const* instruction_end) noexcept
+                                                                                     ::std::byte const* instruction_begin,
+                                                                                     ::std::byte const* instruction_end) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr || state.llvm_module == nullptr ||
        state.llvm_function == nullptr || state.ir_builder == nullptr || instruction_begin == nullptr || instruction_end == nullptr ||
@@ -5565,12 +5590,14 @@ template <typename CreateValue>
     constexpr bool result{};
 
     // Push a typed LLVM value onto the transient operand stack.
-    auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) constexpr noexcept { operand_stack.push_back({.type = type, .value = value}); }};
+    auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) constexpr noexcept
+                            { operand_stack.push_back({.type = type, .value = value}); }};
 
     // Resolve and cache memory 0 on first use.  WebAssembly 1.0/MVP memory instructions target the default memory, so a
     // single cached record is sufficient here.  Multi-memory must replace this with selected-memory resolution, and
     // memory64 must also widen the effective-address/data-path assumptions used by the memory emit helpers.
-    auto const ensure_memory0_access_info{[&]() constexpr noexcept {
+    auto const ensure_memory0_access_info{[&]() constexpr noexcept
+                                          {
                                               if(memory0_access_info_resolved)
                                               {
                                                   return memory0_access_info.memory_p != nullptr || memory0_access_info.local_imported_module_ptr != nullptr;
@@ -5590,13 +5617,15 @@ template <typename CreateValue>
 
     // Local bridge-call helper for dispatcher-only fallbacks.  Higher-level helpers above use the same host convention,
     // but the opcode include files need this compact lambda for memory/global cases.
-    auto const emit_runtime_bridge_call{
-        [&](auto bridge_function, ::llvm::FunctionType* bridge_function_type, ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
-        {
-            auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
-            if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
-            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
-        }};
+    auto const emit_runtime_bridge_call{[&](auto bridge_function,
+                                            ::llvm::FunctionType* bridge_function_type,
+                                            ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
+                                        {
+                                            auto bridge_pointer{
+                                                get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
+                                            if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
+                                            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
+                                        }};
 
     // Select one of four scalar bridge functions based on the Wasm value type.  This keeps bridge signatures exact for
     // integer and floating-point globals/memory operations.
@@ -5686,24 +5715,25 @@ template <typename CreateValue>
 
     // Clamp a Wasm memarg alignment exponent to the natural access size.  Wasm encodes alignment as log2 bytes, while
     // LLVM expects an Align object and treats over-stated alignment as a stronger promise.
-    auto const get_llvm_memory_access_alignment{[](::std::size_t access_size, validation_module_traits_t::wasm_u32 memarg_align) constexpr noexcept -> ::llvm::Align
-                                                {
-                                                    ::std::size_t natural_alignment{access_size == 0uz ? 1uz : access_size};
-                                                    ::std::size_t requested_alignment{1uz};
+    auto const get_llvm_memory_access_alignment{
+        [](::std::size_t access_size, validation_module_traits_t::wasm_u32 memarg_align) constexpr noexcept -> ::llvm::Align
+        {
+            ::std::size_t natural_alignment{access_size == 0uz ? 1uz : access_size};
+            ::std::size_t requested_alignment{1uz};
 
-                                                    if(memarg_align < static_cast<validation_module_traits_t::wasm_u32>(sizeof(::std::size_t) * 8u))
-                                                    {
-                                                        requested_alignment <<= static_cast<unsigned>(memarg_align);
-                                                    }
-                                                    else
-                                                    {
-                                                        requested_alignment = natural_alignment;
-                                                    }
+            if(memarg_align < static_cast<validation_module_traits_t::wasm_u32>(sizeof(::std::size_t) * 8u))
+            {
+                requested_alignment <<= static_cast<unsigned>(memarg_align);
+            }
+            else
+            {
+                requested_alignment = natural_alignment;
+            }
 
-                                                    if(requested_alignment == 0uz) { requested_alignment = natural_alignment; }
-                                                    if(requested_alignment > natural_alignment) { requested_alignment = natural_alignment; }
-                                                    return ::llvm::Align(static_cast<std::uint64_t>(requested_alignment == 0uz ? 1uz : requested_alignment));
-                                                }};
+            if(requested_alignment == 0uz) { requested_alignment = natural_alignment; }
+            if(requested_alignment > natural_alignment) { requested_alignment = natural_alignment; }
+            return ::llvm::Align(static_cast<std::uint64_t>(requested_alignment == 0uz ? 1uz : requested_alignment));
+        }};
 
     // Emit a load of the current direct-memory byte length.  mmap-backed memory uses an acquire atomic length load because
     // growth may publish a new length concurrently with JIT code execution.
@@ -6207,7 +6237,10 @@ template <typename CreateValue>
 
     // Emit a native-memory load bridge call for fallback paths.
     auto const emit_native_memory_load_bridge_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset, ::llvm::Type* llvm_result_type, ::llvm::Value* address_value, auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
+        [&](validation_module_traits_t::wasm_u32 static_offset,
+            ::llvm::Type* llvm_result_type,
+            ::llvm::Value* address_value,
+            auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6525,7 +6558,11 @@ template <typename CreateValue>
     // Build the control flow for memory.grow.  A zero delta returns the current size without a bridge call; requests that
     // statically exceed the limit return -1; all other requests call the runtime/provider grow bridge.
     auto const emit_memory_grow_result_value{
-        [&](::llvm::Value* delta_value, ::llvm::Value* current_page_count, ::llvm::Value* definitely_fail, bool local_imported_path, auto&& emit_bridge_call) constexpr noexcept -> ::llvm::Value*
+        [&](::llvm::Value* delta_value,
+            ::llvm::Value* current_page_count,
+            ::llvm::Value* definitely_fail,
+            bool local_imported_path,
+            auto&& emit_bridge_call) constexpr noexcept -> ::llvm::Value*
         {
             if(delta_value == nullptr || current_page_count == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6770,43 +6807,42 @@ template <typename CreateValue>
                                      }};
 
     // Dispatcher-local unary helper used by included numeric opcode cases.
-    auto const emit_unary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
-                          {
-                              if(operand_stack.empty()) [[unlikely]] { return false; }
+    auto const emit_unary{
+        [&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
+        {
+            if(operand_stack.empty()) [[unlikely]] { return false; }
 
-                              auto const operand{operand_stack.back()};
-                              operand_stack.pop_back();
+            auto const operand{operand_stack.back()};
+            operand_stack.pop_back();
 
-                              if(operand.type != expected_type || operand.value == nullptr) [[unlikely]] { return false; }
+            if(operand.type != expected_type || operand.value == nullptr) [[unlikely]] { return false; }
 
-                              auto value{create_value(operand)};
-                              if(value == nullptr) [[unlikely]] { return false; }
+            auto value{create_value(operand)};
+            if(value == nullptr) [[unlikely]] { return false; }
 
-                              push_operand(result_type, value);
-                              return true;
-                          }};
+            push_operand(result_type, value);
+            return true;
+        }};
 
     // Dispatcher-local binary helper used by included numeric opcode cases.
-    auto const emit_binary{[&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
-                           {
-                               if(operand_stack.size() < 2uz) [[unlikely]] { return false; }
+    auto const emit_binary{
+        [&](runtime_operand_stack_value_type expected_type, runtime_operand_stack_value_type result_type, auto&& create_value) constexpr noexcept -> bool
+        {
+            if(operand_stack.size() < 2uz) [[unlikely]] { return false; }
 
-                               auto const right{operand_stack.back()};
-                               operand_stack.pop_back();
-                               auto const left{operand_stack.back()};
-                               operand_stack.pop_back();
+            auto const right{operand_stack.back()};
+            operand_stack.pop_back();
+            auto const left{operand_stack.back()};
+            operand_stack.pop_back();
 
-                               if(left.type != expected_type || right.type != expected_type || left.value == nullptr || right.value == nullptr) [[unlikely]]
-                               {
-                                   return false;
-                               }
+            if(left.type != expected_type || right.type != expected_type || left.value == nullptr || right.value == nullptr) [[unlikely]] { return false; }
 
-                               auto value{create_value(left, right)};
-                               if(value == nullptr) [[unlikely]] { return false; }
+            auto value{create_value(left, right)};
+            if(value == nullptr) [[unlikely]] { return false; }
 
-                               push_operand(result_type, value);
-                               return true;
-                           }};
+            push_operand(result_type, value);
+            return true;
+        }};
 
     if(control_stack.empty() || code_curr == code_end) [[unlikely]] { return false; }
 

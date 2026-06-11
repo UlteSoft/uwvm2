@@ -62,7 +62,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
 
     /// @brief Wrapper for the section storage structure
     struct limits_type_section_details_wrapper_t
-    { limits_type limits{}; };
+    {
+        limits_type limits{};
+    };
 
     inline constexpr limits_type_section_details_wrapper_t section_details(limits_type limits) noexcept { return {limits}; }
 
@@ -171,11 +173,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     /// @details    New feature
     /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.3.5
     struct memory_type
-    { limits_type limits{}; };
+    {
+        limits_type limits{};
+    };
 
     /// @brief Wrapper for the memory_type storage structure
     struct memory_type_section_details_wrapper_t
-    { memory_type memory{}; };
+    {
+        memory_type memory{};
+    };
 
     inline constexpr memory_type_section_details_wrapper_t section_details(memory_type memory) noexcept { return {memory}; }
 
@@ -234,7 +240,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     };
 
     struct table_type_section_details_wrapper_t
-    { table_type table{}; };
+    {
+        table_type table{};
+    };
 
     inline constexpr table_type_section_details_wrapper_t section_details(table_type table) noexcept { return {table}; }
 
@@ -286,7 +294,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     };
 
     struct global_type_section_details_wrapper_t
-    { global_type global{}; };
+    {
+        global_type global{};
+    };
 
     inline constexpr global_type_section_details_wrapper_t section_details(global_type global) noexcept { return {global}; }
 

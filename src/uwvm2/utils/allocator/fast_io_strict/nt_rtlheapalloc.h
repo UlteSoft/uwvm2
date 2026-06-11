@@ -42,7 +42,8 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return {ptr, ::fast_io::win32::nt::RtlSizeHeap(processheap, 0, ptr)};
         }
 
-        inline constexpr ::fast_io::allocation_least_result nt_rtlreallocate_heap_least_common_impl(void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
+        inline constexpr ::fast_io::allocation_least_result
+            nt_rtlreallocate_heap_least_common_impl(void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         {
             auto processheap{::fast_io::win32::nt::rtl_get_process_heap()};
             auto ptr{details::nt_rtlreallocate_heap_handle_common_impl(processheap, addr, n, flag)};
@@ -68,7 +69,8 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
         inline static constexpr void* reallocate(void* addr, ::std::size_t n) noexcept { return details::nt_rtlreallocate_heap_common_impl(addr, n, 0u); }
 
-        inline static constexpr void* reallocate_zero(void* addr, ::std::size_t n) noexcept { return details::nt_rtlreallocate_heap_common_impl(addr, n, 0x00000008u); }
+        inline static constexpr void* reallocate_zero(void* addr, ::std::size_t n) noexcept
+        { return details::nt_rtlreallocate_heap_common_impl(addr, n, 0x00000008u); }
 
         inline static constexpr void deallocate(void* addr) noexcept
         {

@@ -57,9 +57,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // selector here, then leave all option-specific parsing to
         // wasip1_module_details so single and group targets cannot drift apart.
         [[nodiscard]] inline constexpr parameter_return_type validate_module_arg(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
-                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                       ::uwvm2::utils::container::u8string_view& module_name) noexcept
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* module_arg,
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                                 ::uwvm2::utils::container::u8string_view& module_name) noexcept
         {
             if(module_arg == para_end || !wasip1_module_details::is_argument_result(module_arg->type)) [[unlikely]]
             {
@@ -83,9 +83,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // delegates to the shared target dispatcher for argv/env/fd/mount/socket
         // semantics and conflict checks.
         [[nodiscard]] inline constexpr parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                wasip1_module_details::target_action_t action) noexcept
+                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
+                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                          wasip1_module_details::target_action_t action) noexcept
         {
             auto module_arg{para_curr + 1u};
             ::uwvm2::utils::container::u8string_view module_name{};

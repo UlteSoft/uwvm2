@@ -1,7 +1,7 @@
-// Direct and indirect call validation cases for the WebAssembly 1.0/MVP primary opcode set.
-// Validation keeps callee signatures as ranges, but the current LLVM JIT call ABI is still MVP-oriented for 0/1 results.
-// Multi-value calls, typed function references, and multi-table call_indirect must update this file and the emitter ABI
-// paths together.
+    // Direct and indirect call validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // Validation keeps callee signatures as ranges, but the current LLVM JIT call ABI is still MVP-oriented for 0/1 results.
+    // Multi-value calls, typed function references, and multi-table call_indirect must update this file and the emitter ABI
+    // paths together.
 
 case wasm1_code::call:
 {

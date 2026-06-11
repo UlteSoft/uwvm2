@@ -138,10 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         currp2->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
         auto& add_or_replace_environment{::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_or_replace_environment};
-        if(auto env_iter{add_or_replace_environment.find(env_name_sv)}; env_iter != add_or_replace_environment.end())
-        {
-            env_iter->second = value_sv;
-        }
+        if(auto env_iter{add_or_replace_environment.find(env_name_sv)}; env_iter != add_or_replace_environment.end()) { env_iter->second = value_sv; }
         else
         {
             add_or_replace_environment.emplace(env_name_sv, value_sv);

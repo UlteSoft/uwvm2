@@ -1,7 +1,7 @@
-// Branch opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
-// The current label model is intentionally MVP-shaped: block labels have empty/single-result arity and loop labels have
-// no block parameters.  Multi-value/block-parameter support must replace the scalar shortcuts below with full type ranges
-// and update br_table signature comparison plus LLVM branch/PHI lowering together.
+    // Branch opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // The current label model is intentionally MVP-shaped: block labels have empty/single-result arity and loop labels have
+    // no block parameters.  Multi-value/block-parameter support must replace the scalar shortcuts below with full type ranges
+    // and update br_table signature comparison plus LLVM branch/PHI lowering together.
 
 case wasm1_code::br:
 {
