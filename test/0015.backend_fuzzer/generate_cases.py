@@ -150,6 +150,7 @@ class Case:
     name: str
     types: list[tuple[list[int], list[int]]]
     funcs: list[Func]
+    entry_func_index: int = 0
     has_memory: bool = False
     memory_min: int = 0
     memory_max: int = 0
@@ -161,6 +162,7 @@ class Case:
     table_elems: list[int | None] | None = None
     expect_trap: bool = False
     requires_runtime_calls: bool = False
+    has_local_imported_i32_add: bool = False
 
     def wasm(self) -> bytes:
         out = bytearray(b"\x00asm\x01\x00\x00\x00")
@@ -170,6 +172,12 @@ class Case:
             for params, results in self.types
         )
         out += section(1, type_payload)
+
+        if self.has_local_imported_i32_add:
+            mod = b"backend-local-import"
+            name = b"add_i32"
+            import_payload = vec([uleb(len(mod)) + mod + uleb(len(name)) + name + b"\x00" + uleb(0)])
+            out += section(2, import_payload)
 
         out += section(3, vec(uleb(f.type_index) for f in self.funcs))
 
@@ -182,7 +190,7 @@ class Case:
             out += section(5, vec([limits(self.memory_min, max_pages)]))
 
         name = b"main"
-        export_payload = vec([uleb(len(name)) + name + b"\x00" + uleb(0)])
+        export_payload = vec([uleb(len(name)) + name + b"\x00" + uleb(self.entry_func_index)])
         out += section(7, export_payload)
 
         elem_segments: list[bytes] = []
@@ -767,6 +775,168 @@ def tiered_win32_abi_osr_call_matrix_case(index: int) -> Case:
     )
 
 
+def local_imported_i32_add_loop_case(index: int) -> Case:
+    bound = 4096
+    expected = u32(bound * (bound - 1) // 2)
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + call(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.local_imported_i32_add_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main))],
+        entry_func_index=1,
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_local_imported_nested_defined_loop_case(index: int) -> Case:
+    bound = 4096
+    add_const = 17
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + u32(i + add_const))
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + i32_const(add_const) + call(2) + b"\x6A" + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    helper = local_get(0) + local_get(1) + call(0) + b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_local_imported_nested_defined_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main)), Func(0, [], helper)],
+        entry_func_index=1,
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_osr_local_imported_loop_case(index: int) -> Case:
+    bound = 22000
+    expected = u32(bound * (bound - 1) // 2)
+
+    main = bytearray()
+    main += b"\x01" * 1800
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + call(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_osr_local_imported_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main))],
+        entry_func_index=1,
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_local_imported_call_indirect_loop_case(index: int) -> Case:
+    bound = 4096
+    expected = u32(bound * (bound - 1) // 2)
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + i32_const(0) + call_indirect(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_local_imported_call_indirect_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main))],
+        entry_func_index=1,
+        has_table=True,
+        table_min=1,
+        table_max=1,
+        table_has_max=True,
+        table_elems=[0],
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_mixed_imported_defined_call_indirect_loop_case(index: int) -> Case:
+    bound = 4096
+
+    def helper(acc: int, i: int) -> int:
+        return u32(acc + u32(i * 3))
+
+    expected = 0
+    for i in range(bound):
+        if i & 1:
+            expected = helper(expected, i)
+        else:
+            expected = u32(expected + i)
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + local_get(0) + i32_const(1) + b"\x71" + call_indirect(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    helper_body = local_get(0) + local_get(1) + i32_const(3) + b"\x6C\x6A\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_mixed_imported_defined_call_indirect_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main)), Func(0, [], helper_body)],
+        entry_func_index=1,
+        has_table=True,
+        table_min=2,
+        table_max=2,
+        table_has_max=True,
+        table_elems=[0, 2],
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
 def strategy_cases(start: int) -> list[Case]:
     return [
         local_defined_call_matrix_case(start),
@@ -777,6 +947,11 @@ def strategy_cases(start: int) -> list[Case]:
         tiered_osr_loop_case(start + 5),
         tiered_win32_abi_direct_matrix_case(start + 6),
         tiered_win32_abi_osr_call_matrix_case(start + 7),
+        local_imported_i32_add_loop_case(start + 8),
+        tiered_local_imported_nested_defined_loop_case(start + 9),
+        tiered_osr_local_imported_loop_case(start + 10),
+        tiered_local_imported_call_indirect_loop_case(start + 11),
+        tiered_mixed_imported_defined_call_indirect_loop_case(start + 12),
     ]
 
 
@@ -927,7 +1102,7 @@ def flatten_cases(cases: list[Case]) -> dict[str, list[int] | list[dict[str, obj
                 "type_count": len(case.types),
                 "func_begin": func_begin,
                 "func_count": len(case.funcs),
-                "entry_func_index": 0,
+                "entry_func_index": case.entry_func_index,
                 "has_memory": case.has_memory,
                 "memory_min": case.memory_min,
                 "memory_max": case.memory_max,
@@ -940,6 +1115,7 @@ def flatten_cases(cases: list[Case]) -> dict[str, list[int] | list[dict[str, obj
                 "table_elems_count": len(case.table_elems or []),
                 "expect_trap": case.expect_trap,
                 "requires_runtime_calls": case.requires_runtime_calls,
+                "has_local_imported_i32_add": case.has_local_imported_i32_add,
             }
         )
 
@@ -971,7 +1147,7 @@ def write_header(path: Path, flat: dict[str, object]) -> None:
     lines.append("namespace uwvm2_backend_fuzzer_generated {\n")
     lines.append("struct type_desc { std::uint32_t params_begin; std::uint32_t params_count; std::uint32_t results_begin; std::uint32_t results_count; };\n")
     lines.append("struct func_desc { std::uint32_t type_index; std::uint32_t locals_begin; std::uint32_t locals_count; std::uint32_t code_begin; std::uint32_t code_size; std::uint32_t expr_offset; };\n")
-    lines.append("struct case_desc { char const* name; std::uint32_t type_begin; std::uint32_t type_count; std::uint32_t func_begin; std::uint32_t func_count; std::uint32_t entry_func_index; bool has_memory; std::uint32_t memory_min; std::uint32_t memory_max; bool memory_has_max; bool has_table; std::uint32_t table_min; std::uint32_t table_max; bool table_has_max; std::uint32_t table_elems_begin; std::uint32_t table_elems_count; bool expect_trap; bool requires_runtime_calls; };\n\n")
+    lines.append("struct case_desc { char const* name; std::uint32_t type_begin; std::uint32_t type_count; std::uint32_t func_begin; std::uint32_t func_count; std::uint32_t entry_func_index; bool has_memory; std::uint32_t memory_min; std::uint32_t memory_max; bool memory_has_max; bool has_table; std::uint32_t table_min; std::uint32_t table_max; bool table_has_max; std::uint32_t table_elems_begin; std::uint32_t table_elems_count; bool expect_trap; bool requires_runtime_calls; bool has_local_imported_i32_add; };\n\n")
     lines.append(cxx_array("k_value_types", "std::uint8_t", flat["value_types"]))  # type: ignore[arg-type]
     lines.append(cxx_array("k_local_decls", "std::uint32_t", flat["local_decls"]))  # type: ignore[arg-type]
     lines.append(cxx_array("k_code_bytes", "std::uint8_t", flat["code_bytes"]))  # type: ignore[arg-type]
@@ -1004,7 +1180,8 @@ def write_header(path: Path, flat: dict[str, object]) -> None:
             f"{str(c['has_table']).lower()}, {c['table_min']}u, {c['table_max']}u, {str(c['table_has_max']).lower()}, "
             f"{c['table_elems_begin']}u, {c['table_elems_count']}u, "
             f"{str(c['expect_trap']).lower()}, "
-            f"{str(c['requires_runtime_calls']).lower()}"
+            f"{str(c['requires_runtime_calls']).lower()}, "
+            f"{str(c['has_local_imported_i32_add']).lower()}"
             "},\n"
         )
     lines.append("}};\n")
