@@ -652,6 +652,33 @@ namespace uwvm2::runtime::lib
             ::std::size_t function_index{};
         };
 
+        struct printed_call_stack_frame_tracker
+        {
+            // Trap reports are intentionally small. This fixed tracker lets hybrid tiered reports merge native unwind frames with
+            // interpreter frames without heap allocation or duplicate logical wasm frames.
+            inline static constexpr ::std::size_t max_frames{64uz};
+
+            ::uwvm2::utils::container::array<call_stack_frame, max_frames> frames{};
+            ::std::size_t size{};
+
+            [[nodiscard]] inline constexpr bool contains(::std::size_t module_id, ::std::size_t function_index) const noexcept
+            {
+                for(::std::size_t i{}; i != size; ++i)
+                {
+                    auto const& fr{frames.index_unchecked(i)};
+                    if(fr.module_id == module_id && fr.function_index == function_index) { return true; }
+                }
+
+                return false;
+            }
+
+            inline constexpr void record(::std::size_t module_id, ::std::size_t function_index) noexcept
+            {
+                if(size == max_frames || contains(module_id, function_index)) [[unlikely]] { return; }
+                frames.index_unchecked(size++) = call_stack_frame{module_id, function_index};
+            }
+        };
+
         // Per-thread execution state: logical wasm stack frames plus a tiny call_indirect inline cache. Keeping this state thread-local
         // prevents re-entrant host calls from corrupting another thread's trap report or indirect-call cache.
         struct call_stack_tls_state
@@ -2163,7 +2190,10 @@ namespace uwvm2::runtime::lib
 
         template <typename Output>
         inline constexpr void
-            dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul, ::std::size_t& printed_frame_count, trap_kind current_trap_kind) noexcept
+            dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul,
+                                                            ::std::size_t& printed_frame_count,
+                                                            trap_kind current_trap_kind,
+                                                            printed_call_stack_frame_tracker* printed_frames = nullptr) noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
@@ -2175,10 +2205,13 @@ namespace uwvm2::runtime::lib
                 {
                     if(module_id == suppressed_frame.module_id && function_index == suppressed_frame.function_index) { return; }
 
+                    if(printed_frames != nullptr && printed_frames->contains(module_id, function_index)) { return; }
+
                     if(printed_frame_count != 0uz && module_id == last_printed_module_id && function_index == last_printed_function_index) { return; }
 
                     if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, module_id, function_index))
                     {
+                        if(printed_frames != nullptr) { printed_frames->record(module_id, function_index); }
                         last_printed_module_id = module_id;
                         last_printed_function_index = function_index;
                         ++printed_frame_count;
@@ -2368,18 +2401,38 @@ namespace uwvm2::runtime::lib
             auto const suppressed_frame{get_suppressed_call_stack_frame()};
             auto const n{frames.size()};
             ::std::size_t printed_frame_count{};
+            printed_call_stack_frame_tracker printed_frames{};
+
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(runtime_llvm_jit_unwind_call_stack_requested())
+            {
+                // In tiered OSR traps the current faulting frame may be generated code while its callers are still
+                // interpreter frames. Print the native/DWARF-derived JIT frames first so the report starts at the leaf,
+                // then append the remaining interpreter frames below.
+                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count, current_trap_kind, ::std::addressof(printed_frames));
+            }
+#endif
+
             for(::std::size_t i{}; i != n; ++i)
             {
                 auto const frame_index{n - 1uz - i};
                 auto const& fr{frames.index_unchecked(frame_index)};
                 if(fr.module_id == suppressed_frame.module_id && fr.function_index == suppressed_frame.function_index) { continue; }
-                if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, fr.module_id, fr.function_index)) { ++printed_frame_count; }
+                if(printed_frames.contains(fr.module_id, fr.function_index)) { continue; }
+                if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, fr.module_id, fr.function_index))
+                {
+                    printed_frames.record(fr.module_id, fr.function_index);
+                    ++printed_frame_count;
+                }
             }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             if(printed_frame_count == 0uz && runtime_llvm_jit_unwind_call_stack_requested())
             {
-                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count, current_trap_kind);
+                dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul,
+                                                                printed_frame_count,
+                                                                current_trap_kind,
+                                                                ::std::addressof(printed_frames));
             }
 #endif
 
@@ -2555,7 +2608,13 @@ namespace uwvm2::runtime::lib
         {
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             store_llvm_jit_trap_context(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds,
-                                        llvm_jit_signal_trap_return_address(memerr.instruction_address));
+                                        llvm_jit_signal_trap_return_address(memerr.instruction_address),
+                                        memerr.frame_address);
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+            store_llvm_jit_win64_trap_caller_context(llvm_jit_signal_trap_return_address(memerr.instruction_address),
+                                                     memerr.frame_address,
+                                                     memerr.stack_pointer);
+#  endif
 # endif
             ::uwvm2::object::memory::error::output_mmap_memory_error_line(memerr);
             print_trap_fatal_message(trap_kind::memory_out_of_bounds);

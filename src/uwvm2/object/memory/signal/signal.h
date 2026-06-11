@@ -178,9 +178,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @param      seg                 Registered protected segment containing the fault address.
         /// @param      fault_addr          Address reported by the platform fault mechanism.
         /// @param      instruction_address Best-effort program counter of the faulting instruction.
+        /// @param      frame_address       Best-effort frame pointer captured at the faulting instruction.
+        /// @param      stack_pointer       Best-effort stack pointer captured at the faulting instruction.
         /// @return     Diagnostic data consumed by the default reporter or a custom out-of-bounds hook.
         inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t
-            make_mmap_memory_error(protected_memory_segment_t const& seg, ::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
+            make_mmap_memory_error(protected_memory_segment_t const& seg,
+                                   ::std::byte const* fault_addr,
+                                   ::std::uintptr_t instruction_address,
+                                   ::std::uintptr_t frame_address,
+                                   ::std::uintptr_t stack_pointer) noexcept
         {
             auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};
@@ -188,7 +194,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return {.memory_idx = seg.memory_idx,
                     .memory_offset = static_cast<::std::uint_least64_t>(offset),
                     .memory_length = static_cast<::std::uint_least64_t>(memory_length),
-                    .instruction_address = instruction_address};
+                    .instruction_address = instruction_address,
+                    .frame_address = frame_address,
+                    .stack_pointer = stack_pointer};
         }
 
         /// @brief      Try to consume a platform fault as a wasm mmap memory fault.
@@ -196,7 +204,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    For registered protected segments this function is terminal: it invokes the custom
         ///             handler when present, otherwise prints the default mmap memory error, and then
         ///             terminates. The boolean return exists for the platform handler's pass-through path.
-        inline constexpr bool handle_fault_address(::std::byte const* fault_addr, ::std::uintptr_t instruction_address) noexcept
+        inline constexpr bool handle_fault_address(::std::byte const* fault_addr,
+                                                   ::std::uintptr_t instruction_address,
+                                                   ::std::uintptr_t frame_address = 0u,
+                                                   ::std::uintptr_t stack_pointer = 0u) noexcept
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
 
@@ -204,7 +215,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             {
                 if(seg.begin <= fault_addr && fault_addr < seg.end)
                 {
-                    auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr, instruction_address)};
+                    auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr, instruction_address, frame_address, stack_pointer)};
                     if(auto const handler{mmap_memory_out_of_bounds_func}; handler != nullptr) [[likely]]
                     {
                         handler(mmapmemerr);
@@ -449,6 +460,74 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #  endif
         }
 
+        /// @brief      Extract the frame pointer from a POSIX ucontext, when the platform exposes one.
+        /// @details    Mmap-backed wasm OOB traps arrive as asynchronous signals rather than normal runtime
+        ///             trap calls. Capturing the interrupted frame pointer lets the LLVM-JIT unwind path resume
+        ///             from the generated wasm frame and recover callers that were optimized or inlined.
+        [[nodiscard]] inline constexpr ::std::uintptr_t get_signal_frame_address([[maybe_unused]] void* context) noexcept
+        {
+#  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
+            if(context == nullptr) [[unlikely]] { return 0u; }
+            [[maybe_unused]] auto const uctx{static_cast<::ucontext_t const*>(context)};
+
+#   if defined(__linux__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RBP]);
+#   elif defined(__linux__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_EBP]);
+#   elif defined(__linux__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.regs[29u]);
+#   elif defined(__linux__) && defined(__arm__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_fp);
+#   elif defined(__APPLE__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rbp);
+#   elif defined(__APPLE__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__ebp);
+#   elif defined(__APPLE__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__fp);
+#   else
+            // static_cast<void>(uctx);
+            return 0u;
+#   endif
+#  else
+            // static_cast<void>(context);
+            return 0u;
+#  endif
+        }
+
+        /// @brief      Extract the stack pointer from a POSIX ucontext, when supported.
+        /// @details    The current non-Windows DWARF path can derive a seed stack pointer from the frame
+        ///             record, but preserving the architectural SP keeps the fault report complete for
+        ///             platforms whose unwinders require an exact interrupted stack pointer.
+        [[nodiscard]] inline constexpr ::std::uintptr_t get_signal_stack_pointer([[maybe_unused]] void* context) noexcept
+        {
+#  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
+            if(context == nullptr) [[unlikely]] { return 0u; }
+            [[maybe_unused]] auto const uctx{static_cast<::ucontext_t const*>(context)};
+
+#   if defined(__linux__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RSP]);
+#   elif defined(__linux__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_ESP]);
+#   elif defined(__linux__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.sp);
+#   elif defined(__linux__) && defined(__arm__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_sp);
+#   elif defined(__APPLE__) && defined(__x86_64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rsp);
+#   elif defined(__APPLE__) && defined(__i386__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__esp);
+#   elif defined(__APPLE__) && defined(__aarch64__)
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__sp);
+#   else
+            // static_cast<void>(uctx);
+            return 0u;
+#   endif
+#  else
+            // static_cast<void>(context);
+            return 0u;
+#  endif
+        }
+
         /// @brief      Forward an unhandled POSIX signal to the handler that was installed before UWVM.
         /// @details    Both SA_SIGINFO handlers and classic one-argument handlers are supported. Default
         ///             handlers are restored and re-raised so the process observes the platform's normal
@@ -490,8 +569,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
             auto const instruction_address{get_signal_instruction_address(context)};
+            auto const frame_address{get_signal_frame_address(context)};
+            auto const stack_pointer{get_signal_stack_pointer(context)};
 
-            if(handle_fault_address(fault_addr, instruction_address)) { return; }
+            if(handle_fault_address(fault_addr, instruction_address, frame_address, stack_pointer)) { return; }
 
             if(signal == SIGSEGV && signal_handlers.has_previous_sigsegv)
             {
