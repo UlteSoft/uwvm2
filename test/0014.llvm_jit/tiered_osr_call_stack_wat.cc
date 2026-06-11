@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -16,9 +17,30 @@ namespace
         char const* label;
     };
 
+    struct mode_t
+    {
+        char const* name;
+        char const* args;
+        bool expect_osr_request;
+    };
+
+    struct run_result_t
+    {
+        bool valid{};
+        ::std::vector<::std::size_t> func_indices{};
+        ::std::filesystem::path output_path{};
+        ::std::filesystem::path log_path{};
+    };
+
     inline constexpr ::std::array fixtures{
         fixture_t{"tiered_osr_direct_trap.wat",        "tiered_osr_direct_trap.wasm",        "tiered_osr_direct"       },
         fixture_t{"tiered_osr_call_indirect_trap.wat", "tiered_osr_call_indirect_trap.wasm", "tiered_osr_call_indirect"},
+    };
+
+    inline constexpr ::std::array modes{
+        mode_t{"tiered",       "-Rtiered",                     true },
+        mode_t{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0", false},
+        mode_t{"tiered_no_t2", "-Rtiered -Rtiered-disable-t2", true },
     };
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
@@ -209,16 +231,16 @@ namespace
         return false;
     }
 
-    [[nodiscard]] ::std::array<bool, 3uz> collect_seen_func_indices(::std::string_view output) noexcept
+    [[nodiscard]] ::std::vector<::std::size_t> parse_func_indices(::std::string_view output)
     {
-        ::std::array<bool, 3uz> seen{};
+        ::std::vector<::std::size_t> result{};
         constexpr ::std::string_view prefix{" func_idx="};
         ::std::size_t pos{};
 
         for(;;)
         {
             pos = output.find(prefix, pos);
-            if(pos == ::std::string_view::npos) { return seen; }
+            if(pos == ::std::string_view::npos) { return result; }
             pos += prefix.size();
 
             auto digit_pos{pos};
@@ -239,7 +261,7 @@ namespace
                 ++digit_pos;
             }
 
-            if(digit_pos != value_begin && value < seen.size()) { seen[value] = true; }
+            if(digit_pos != value_begin) { result.push_back(value); }
             pos = digit_pos == value_begin ? digit_pos + 1uz : digit_pos;
         }
     }
@@ -268,32 +290,59 @@ namespace
         return out;
     }
 
-    [[nodiscard]] bool check_trap_stack(::std::filesystem::path const& output_path, char const* label)
+    [[nodiscard]] run_result_t read_trap_result(::std::filesystem::path const& output_path,
+                                                ::std::filesystem::path const& log_path,
+                                                char const* label,
+                                                char const* mode,
+                                                char const* policy)
     {
         ::std::string output{};
-        if(!read_text_file(output_path, output)) { return false; }
+        if(!read_text_file(output_path, output)) { return {.output_path = output_path, .log_path = log_path}; }
 
         auto const plain_output{strip_ansi_codes(output)};
-        auto const seen{collect_seen_func_indices(plain_output)};
-        if(plain_output.find("Call stack:") != ::std::string::npos && plain_output.find(" module=") != ::std::string::npos && seen[0] && seen[1] &&
-           seen[2])
+        auto func_indices{parse_func_indices(plain_output)};
+        if(plain_output.find("Call stack:") != ::std::string::npos && plain_output.find(" module=") != ::std::string::npos &&
+           func_indices == ::std::vector<::std::size_t>{0uz, 1uz, 2uz})
         {
-            return true;
+            return {.valid = true, .func_indices = ::std::move(func_indices), .output_path = output_path, .log_path = log_path};
         }
 
-        ::std::cerr << "missing tiered OSR trap call-stack frames in " << label << " output:\n" << output << '\n';
-        return false;
+        ::std::cerr << "missing tiered OSR trap call-stack frames in " << label << '/' << mode << '/' << policy << " output:\n" << output << '\n';
+        return {.valid = false, .func_indices = ::std::move(func_indices), .output_path = output_path, .log_path = log_path};
     }
 
-    [[nodiscard]] bool check_osr_log(::std::filesystem::path const& log_path, char const* label)
+    [[nodiscard]] bool check_osr_log(::std::filesystem::path const& log_path,
+                                     char const* label,
+                                     char const* mode,
+                                     char const* policy,
+                                     bool expect_osr_request)
     {
         ::std::string log{};
         if(!read_text_file(log_path, log)) { return false; }
 
-        if(log.find("tiered-osr-request") != ::std::string::npos) { return true; }
+        if(!expect_osr_request || log.find("tiered-osr-request") != ::std::string::npos) { return true; }
 
-        ::std::cerr << "missing tiered OSR request evidence in " << label << " log:\n" << log << '\n';
+        ::std::cerr << "missing tiered OSR request evidence in " << label << '/' << mode << '/' << policy << " log:\n" << log << '\n';
         return false;
+    }
+
+    [[nodiscard]] run_result_t run_trap_case(::std::filesystem::path const& uwvm_path,
+                                             ::std::filesystem::path const& wasm_path,
+                                             ::std::filesystem::path const& artifact_dir,
+                                             fixture_t const& fixture,
+                                             mode_t const& mode,
+                                             char const* policy)
+    {
+        auto const stem{::std::string{fixture.label} + "." + mode.name + "." + policy};
+        auto const output_path{artifact_dir / (stem + ".out")};
+        auto const log_path{artifact_dir / (stem + ".log")};
+        auto const command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path) +
+                           " --run " + quote_argument(wasm_path)};
+
+        if(!run_trap_command(command, output_path, stem.c_str())) { return {.output_path = output_path, .log_path = log_path}; }
+        auto result{read_trap_result(output_path, log_path, fixture.label, mode.name, policy)};
+        if(!check_osr_log(log_path, fixture.label, mode.name, policy, mode.expect_osr_request)) { result.valid = false; }
+        return result;
     }
 
     [[nodiscard]] bool run_fixture(::std::filesystem::path const& uwvm_path,
@@ -305,18 +354,22 @@ namespace
         auto const wat_path{wat_dir / fixture.wat_name};
         auto const generated_wat_path{artifact_dir / (::std::string{fixture.label} + ".padded.wat")};
         auto const wasm_path{artifact_dir / fixture.wasm_name};
-        auto const output_path{artifact_dir / (::std::string{fixture.label} + ".out")};
-        auto const log_path{artifact_dir / (::std::string{fixture.label} + ".log")};
 
         if(!compile_wat(wat2wasm_path, wat_path, generated_wat_path, wasm_path, fixture.label)) { return false; }
 
-        auto const command{quote_argument(uwvm_path) +
-                           " -Rtiered -Rllvm-call-stack instruction -Rclog file " + quote_argument(log_path) +
-                           " --run " + quote_argument(wasm_path)};
+        for(auto const& mode: modes)
+        {
+            auto const instruction{run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "instruction")};
+            auto const unwind{run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "unwind")};
+            if(!instruction.valid || !unwind.valid) { return false; }
+            if(instruction.func_indices == unwind.func_indices) { continue; }
 
-        if(!run_trap_command(command, output_path, fixture.label)) { return false; }
-        if(!check_trap_stack(output_path, fixture.label)) { return false; }
-        if(!check_osr_log(log_path, fixture.label)) { return false; }
+            ::std::cerr << "tiered OSR unwind stack mismatch for " << fixture.label << '/' << mode.name << '\n';
+            ::std::cerr << "  instruction output: " << instruction.output_path << '\n';
+            ::std::cerr << "  unwind output: " << unwind.output_path << '\n';
+            return false;
+        }
+
         return true;
     }
 }  // namespace
