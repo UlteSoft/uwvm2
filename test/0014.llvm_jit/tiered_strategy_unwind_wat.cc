@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -299,6 +300,19 @@ namespace
         return nops;
     }
 
+    [[nodiscard]] ::std::string make_dummy_funcs(::std::size_t count)
+    {
+        ::std::string funcs{};
+        funcs.reserve(count * 32uz);
+        for(::std::size_t i{}; i != count; ++i)
+        {
+            funcs += "  (func $dummy_";
+            funcs += ::std::to_string(i);
+            funcs += " (type $v))\n";
+        }
+        return funcs;
+    }
+
     [[nodiscard]] ::std::string make_t0_fallback_wat()
     {
         return R"((module
@@ -402,6 +416,80 @@ namespace
 )";
     }
 
+    [[nodiscard]] ::std::string make_osr_lane_wat(::std::size_t dummy_count, ::std::size_t pad_nops, ::std::uint_least32_t loop_limit)
+    {
+        return ::std::string{R"((module
+  (type $v (func))
+  (type $i (func (param i32)))
+
+  (func $leaf (type $i) (param $trap i32)
+    local.get $trap
+    if
+      unreachable
+    end)
+
+  (func $loop_then_trap (type $i) (param $trap i32)
+    (local $i i32)
+)"} + make_nops(pad_nops) + R"(    i32.const 0
+    local.set $i
+    block $exit
+      loop $hot_loop
+        local.get $i
+        i32.const )" + ::std::to_string(loop_limit) + R"(
+        i32.ge_u
+        br_if $exit
+        local.get $i
+        i32.const 1
+        i32.add
+        local.set $i
+        br $hot_loop
+      end
+    end
+    local.get $trap
+    call $leaf)
+
+  (func $_start (export "_start") (type $v)
+    i32.const 1
+    call $loop_then_trap)
+)" + make_dummy_funcs(dummy_count) + R"()
+)";
+    }
+
+    [[nodiscard]] ::std::string make_tier2_full_direct_wat(::std::string_view leaf_trap_body)
+    {
+        return ::std::string{R"((module
+  (type $v (func))
+  (type $i (func (param i32)))
+  (memory 1)
+
+  (func $leaf (type $i) (param $trap i32)
+)"} + ::std::string{leaf_trap_body} + R"(
+  )
+
+  (func $_start (export "_start") (type $v)
+    (local $i i32)
+    i32.const 0
+    local.set $i
+    block $exit
+      loop $hot
+        local.get $i
+        i32.const 2000000
+        i32.ge_u
+        br_if $exit
+        i32.const 0
+        call $leaf
+        local.get $i
+        i32.const 1
+        i32.add
+        local.set $i
+        br $hot
+      end
+    end
+    i32.const 1
+    call $leaf))
+)";
+    }
+
     [[nodiscard]] ::std::vector<strategy_case_t> make_cases()
     {
         ::std::vector<strategy_case_t> cases{};
@@ -429,6 +517,76 @@ namespace
                          {"[llvm-jit-lazy] demand-request", "lane=inline"},
                          {"[uwvm-int-lazy] demand-request"},
                          make_t0_fallback_wat()});
+        cases.push_back({"tiered_loop_osr_inline",
+                         "-Rtiered -Rtiered-disable-t2",
+                         {0uz, 1uz, 2uz},
+                         {"[llvm-jit-lazy] tiered-osr-request", "lane=inline"},
+                         {},
+                         make_osr_lane_wat(14uz, 1600uz, 350000u)});
+        cases.push_back({"tiered_loop_osr_urgent",
+                         "-Rtiered -Rtiered-disable-t2",
+                         {0uz, 1uz, 2uz},
+                         {"[llvm-jit-lazy] tiered-osr-request", "lane=urgent"},
+                         {},
+                         make_osr_lane_wat(510uz, 4096uz, 500000u)});
+        cases.push_back({"tiered_loop_osr_normal",
+                         "-Rtiered -Rtiered-disable-t2",
+                         {0uz, 1uz, 2uz},
+                         {"[llvm-jit-lazy] tiered-osr-request", "lane=normal"},
+                         {},
+                         make_osr_lane_wat(130uz, 32uz, 12000000u)});
+        auto const add_full_ready_case{[&](char const* name, ::std::string_view leaf_trap_body)
+                                       {
+                                           cases.push_back({name,
+                                                            "-Rtiered -Rct 2 -Rllvm-policy max",
+                                                            {0uz, 1uz},
+                                                            {"[llvm-jit-lazy] tiered-full-request", "[llvm-jit-lazy] tiered-full-ready"},
+                                                            {},
+                                                            make_tier2_full_direct_wat(leaf_trap_body)});
+                                       }};
+
+        add_full_ready_case("tiered_full_ready_unreachable",
+                            R"(    local.get $trap
+    if
+      unreachable
+    end)");
+        add_full_ready_case("tiered_full_ready_i32_divide_zero",
+                            R"(    local.get $trap
+    if
+      i32.const 1
+      i32.const 0
+      i32.div_s
+      drop
+    end)");
+        add_full_ready_case("tiered_full_ready_i64_integer_overflow",
+                            R"(    local.get $trap
+    if
+      i64.const -9223372036854775808
+      i64.const -1
+      i64.div_s
+      drop
+    end)");
+        add_full_ready_case("tiered_full_ready_invalid_conversion",
+                            R"(    local.get $trap
+    if
+      f32.const nan
+      i32.trunc_f32_s
+      drop
+    end)");
+        add_full_ready_case("tiered_full_ready_oob_load",
+                            R"(    local.get $trap
+    if
+      i32.const -1
+      i32.load
+      drop
+    end)");
+        add_full_ready_case("tiered_full_ready_oob_store",
+                            R"(    local.get $trap
+    if
+      i32.const -1
+      i64.const 1
+      i64.store
+    end)");
         return cases;
     }
 }  // namespace

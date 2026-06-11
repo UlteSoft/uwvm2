@@ -655,6 +655,21 @@ namespace uwvm2::runtime::lib
             ::std::size_t function_index{};
         };
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        struct tiered_jit_entry_call_stack_snapshot_t
+        {
+            // Tiered execution can jump from an interpreter frame directly into a T1/T2 raw JIT entry. Native unwind can describe
+            // the generated callee, but the still-live interpreter callers are represented only in the logical TLS stack. Keep a
+            // bounded snapshot at the exact mixed-stack boundary so trap reporting can recover those callers even if an optimized
+            // helper frame or tail path makes the live vector harder to observe at the fatal trap point.
+            inline static constexpr ::std::size_t max_frames{64uz};
+
+            ::uwvm2::utils::container::array<call_stack_frame, max_frames> frames{};
+            ::std::size_t size{};
+            bool active{};
+        };
+#endif
+
         struct printed_call_stack_frame_tracker
         {
             // Trap reports are intentionally small. This fixed tracker lets hybrid tiered reports merge native unwind frames with
@@ -691,6 +706,10 @@ namespace uwvm2::runtime::lib
 
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            tiered_jit_entry_call_stack_snapshot_t tiered_jit_entry_snapshot{};
+#endif
 
             struct call_indirect_cache_entry
             {
@@ -732,6 +751,35 @@ namespace uwvm2::runtime::lib
                 if(!frames.empty()) [[likely]] { frames.pop_back_unchecked(); }
             }
         };
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        struct tiered_jit_entry_call_stack_snapshot_guard
+        {
+            call_stack_tls_state* tls{};
+            tiered_jit_entry_call_stack_snapshot_t saved{};
+
+            inline constexpr explicit tiered_jit_entry_call_stack_snapshot_guard(call_stack_tls_state& s) noexcept : tls{::std::addressof(s)},
+                                                                                                                     saved{s.tiered_jit_entry_snapshot}
+            {
+                auto& snapshot{s.tiered_jit_entry_snapshot};
+                auto const frame_count{s.frames.size()};
+                auto const skip{frame_count > tiered_jit_entry_call_stack_snapshot_t::max_frames
+                                    ? frame_count - tiered_jit_entry_call_stack_snapshot_t::max_frames
+                                    : 0uz};
+                snapshot.size = frame_count - skip;
+                for(::std::size_t i{}; i != snapshot.size; ++i) { snapshot.frames.index_unchecked(i) = s.frames.index_unchecked(skip + i); }
+                snapshot.active = true;
+            }
+
+            tiered_jit_entry_call_stack_snapshot_guard(tiered_jit_entry_call_stack_snapshot_guard const&) = delete;
+            tiered_jit_entry_call_stack_snapshot_guard& operator= (tiered_jit_entry_call_stack_snapshot_guard const&) = delete;
+
+            inline constexpr ~tiered_jit_entry_call_stack_snapshot_guard()
+            {
+                if(tls != nullptr) [[likely]] { tls->tiered_jit_entry_snapshot = saved; }
+            }
+        };
+#endif
 
         struct preload_call_context_t
         {
@@ -2540,6 +2588,28 @@ namespace uwvm2::runtime::lib
                     ++printed_frame_count;
                 }
             }
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            auto const& tiered_snapshot{get_call_stack().tiered_jit_entry_snapshot};
+            if(tiered_snapshot.active)
+            {
+                // Mixed tiered traps need one extra logical source: the interpreter stack captured at the T0-to-JIT boundary.
+                // Native/DWARF frames still decide the generated leaf frames; this pass only fills caller frames that cannot be
+                // discovered by the native unwinder after optimized raw-entry replacement or OSR.
+                for(::std::size_t i{}; i != tiered_snapshot.size; ++i)
+                {
+                    auto const frame_index{tiered_snapshot.size - 1uz - i};
+                    auto const& fr{tiered_snapshot.frames.index_unchecked(frame_index)};
+                    if(fr.module_id == suppressed_frame.module_id && fr.function_index == suppressed_frame.function_index) { continue; }
+                    if(printed_frames.contains(fr.module_id, fr.function_index)) { continue; }
+                    if(dump_call_stack_frame_for_trap(u8log_output_ul, printed_frame_count, fr.module_id, fr.function_index))
+                    {
+                        printed_frames.record(fr.module_id, fr.function_index);
+                        ++printed_frame_count;
+                    }
+                }
+            }
+#endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             if(printed_frame_count == 0uz && runtime_llvm_jit_unwind_call_stack_requested())
@@ -5092,6 +5162,8 @@ namespace uwvm2::runtime::lib
             using entry_fn_t =
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(reentry_address)};
+            auto& call_stack{get_call_stack()};
+            tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, reinterpret_cast<::std::uintptr_t>(result_buffer), result_bytes, reinterpret_cast<::std::uintptr_t>(local_base), local_bytes);
             if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_ready_count.fetch_add(1uz, ::std::memory_order_relaxed); }
             record_tiered_llvm_jit_switch(rec);
@@ -7669,6 +7741,8 @@ namespace uwvm2::runtime::lib
             using entry_fn_t =
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
+            auto& call_stack{get_call_stack()};
+            tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, pointer_to_uintptr(args_begin), result_bytes, pointer_to_uintptr(args_begin), param_bytes);
             *stack_top_ptr = args_begin + result_bytes;
             record_tiered_llvm_jit_switch(rec);
@@ -7717,6 +7791,8 @@ namespace uwvm2::runtime::lib
             using entry_fn_t =
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
+            auto& call_stack{get_call_stack()};
+            tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             record_tiered_llvm_jit_switch(rec);
             return true;
