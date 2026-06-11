@@ -1224,8 +1224,8 @@ namespace uwvm2::runtime::lib
         {
             // The LLVM translator encodes wasm inline-frame identity in synthetic function names. Parsing it here lets trap reports
             // recover inlined wasm calls from DWARF instead of showing only the outer native entry.
-            constexpr char8_t prefix[]{u8"uwvm-inline:m="};
-            constexpr char8_t middle[]{u8":f="};
+            constexpr decltype(auto) prefix{u8"uwvm-inline:m="};
+            constexpr decltype(auto) middle{u8":f="};
             constexpr ::std::size_t prefix_size{sizeof(prefix) - 1uz};
             constexpr ::std::size_t middle_size{sizeof(middle) - 1uz};
             if(name.size() <= prefix_size || ::std::memcmp(name.data(), prefix, prefix_size) != 0) { return false; }
