@@ -1,5 +1,10 @@
+// Call-related opcodes are the boundary between the translated interpreter body and runtime call
+// machinery. The comments emphasize why operands must be materialized, how direct-call metadata is
+// selected, and why stack-top fast paths are guarded by narrow state checks.
 case wasm1_code::return_:
 {
+    // `return` is equivalent to branching to the function frame. We validate result arity/types and
+    // then repair the operand stack because the runtime return helper expects only function results.
     // return ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -83,6 +88,8 @@ case wasm1_code::return_:
 }
 case wasm1_code::call:
 {
+    // Direct calls can target imports or local-defined functions. The translator resolves local
+    // callees to compiled call-info records when possible so the runtime bridge can skip index lookup.
     // call     func_index ...
     // [ safe ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -156,6 +163,8 @@ case wasm1_code::call:
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
     bool const allow_call_fusion{param_count <= 3uz};
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
+    // Normal calls encode module/function identity. Direct local-call fast paths replace that pair
+    // with a pointer to compiled call metadata and mark it with `SIZE_MAX` as the module sentinel.
     ::std::size_t call_module_id{options.curr_wasm_id};
     ::std::size_t call_function_imm{func_index_uz};
     if(func_index_uz < import_func_count)
@@ -186,6 +195,8 @@ case wasm1_code::call:
 
     if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"call", param_count); }
 
+    // Parameters are checked from the top of the operand stack downward because Wasm pushes operands
+    // in declaration order but the newest value is physically at the top.
     if(param_count != 0uz)
     {
         auto const available_param_count{concrete_operand_count()};
@@ -207,6 +218,8 @@ case wasm1_code::call:
     }
 
     // Optional: stack-top fast-path `call` for hot same-type signatures.
+    // It is intentionally conservative: a call can re-enter arbitrary runtime code, so all cached
+    // operands must already be in a layout the bridge understands.
     bool use_stacktop_call_fast{};
     bool use_stacktop_call0_void_fast{};
 
@@ -897,6 +910,8 @@ case wasm1_code::call:
 }
 case wasm1_code::call_indirect:
 {
+    // Indirect calls add one dynamic table index operand on top of the function parameters. That is
+    // why validation computes `param_count + 1` and checks the table index type before parameters.
     // call_indirect  type_index table_index ...
     // [ safe      ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -1362,6 +1377,8 @@ case wasm1_code::call_indirect:
 }
 case wasm1_code::drop:
 {
+    // `drop` has no runtime side effect beyond removing a stack value. It still needs explicit
+    // emission when the value may live in the runtime operand stack or stack-top cache.
     // drop   ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -1401,6 +1418,8 @@ case wasm1_code::drop:
 }
 case wasm1_code::select:
 {
+    // `select` consumes condition, false-value, and true-value, then pushes one value whose type must
+    // match both alternatives. Heavy combine records the pattern for later local.set/local.tee fusion.
     // select ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr

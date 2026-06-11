@@ -1,4 +1,8 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
+// This include fragment is expanded inside one local-function translation frame. The lambdas below
+// deliberately capture parser state, bytecode buffers, label tables, and stack-top state by reference
+// so opcode case files can emit compact bytecode without passing a large context object through every
+// helper call.
 // Keep `-Rclog` useful for runtime decisions without dumping every emitted op.
 constexpr bool runtime_log_emit_opfuncs{false};
 constexpr bool runtime_log_emit_cf{false};
@@ -9,6 +13,9 @@ constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t
 {
+    // These counters are intentionally cheap and coarse-grained: they explain translator decisions
+    // such as thunk creation, branch transforms, and stack-top spill/fill pressure without requiring
+    // every opfunc pointer to be logged.
     ::std::uint_least64_t wasm_op_count{};
     ::std::uint_least64_t opfunc_main_count{};
     ::std::uint_least64_t opfunc_thunk_count{};
@@ -36,6 +43,8 @@ auto const runtime_log_bc_name{[](bool in_thunk) constexpr noexcept -> ::uwvm2::
                                    return ::uwvm2::utils::container::u8string_view{u8"main"};
                                }};
 
+// Keep opcode names centralized here so runtime logs remain stable even when opcode case files are
+// reorganized or compiled out under feature flags.
 auto const runtime_log_op_name{[](::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code op) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
                                {
                                    switch(op)
@@ -248,6 +257,8 @@ auto const bytecode_reserve_suggest{[&]() constexpr noexcept
                                     }()};
 bytecode.reserve(bytecode_reserve_suggest);
 
+// Bytecode emission is append-heavy. Reserving here rather than at each caller keeps opcode cases
+// focused on semantic emission while preserving amortized growth behavior.
 auto const ensure_vec_capacity{[&](bytecode_vec_t& dst, ::std::size_t add_bytes) constexpr UWVM_THROWS
                                {
                                    auto const curr{dst.size()};
@@ -276,6 +287,8 @@ auto const ensure_vec_capacity{[&](bytecode_vec_t& dst, ::std::size_t add_bytes)
                                    dst.reserve(new_cap);
                                }};
 
+// Raw-byte emission is used for thunk splicing and placeholder patching; it deliberately bypasses
+// typed helper overloads because the caller already owns the exact byte representation.
 auto const emit_bytes_to{[&](bytecode_vec_t& dst, ::std::byte const* src, ::std::size_t n) constexpr UWVM_THROWS
                          {
                              if(n == 0uz) { return; }
@@ -285,6 +298,8 @@ auto const emit_bytes_to{[&](bytecode_vec_t& dst, ::std::byte const* src, ::std:
                              ::std::memcpy(out, src, n);
                          }};
 
+// Immediates are copied verbatim into the threaded bytecode stream. Requiring trivially-copyable
+// values prevents hidden constructors or lifetime rules from leaking into interpreter decoding.
 auto const emit_imm_to{[&]<typename T>(bytecode_vec_t& dst, T const& v) constexpr UWVM_THROWS
                        {
                            static_assert(::std::is_trivially_copyable_v<T>);
@@ -299,6 +314,8 @@ auto const emit_imm{[&]<typename T>(T const& v) constexpr UWVM_THROWS { emit_imm
 labels.clear();
 ptr_fixups.clear();
 
+// Labels are logical until all bytecode and thunks are emitted. Keeping label ids stable lets branch
+// cases emit placeholders early and resolve relative offsets at function finalization.
 auto const new_label{[&](bool in_thunk) constexpr UWVM_THROWS -> ::std::size_t
                      {
                          if(labels.size() == labels.capacity()) { labels.reserve(labels.capacity() ? labels.capacity() * 2uz : 64uz); }
@@ -312,6 +329,8 @@ auto const set_label_offset{[&](::std::size_t label_id, ::std::size_t off) const
 // Thunk bytecode (appended after main `bytecode` so it never shifts main offsets).
 thunks.clear();
 
+// Branch immediates cannot be finalized until both main bytecode and thunk bytecode stop moving.
+// Emit a fixed-size placeholder now and record the site for the final fixup pass.
 auto const emit_ptr_label_placeholder{[&](::std::size_t label_id, bool in_thunk) constexpr UWVM_THROWS
                                       {
                                           rel_offset_t const placeholder{};
@@ -361,6 +380,8 @@ auto const get_branch_target_label_id{[&](block_t const& frame) constexpr noexce
                                           return frame.type == block_type::loop ? frame.start_label_id : frame.end_label_id;
                                       }};
 
+// Every emitted opfunc pointer must match the active interpreter calling convention. The static
+// assertion catches accidental emission of a helper from the wrong tail-call/byref mode at compile time.
 auto const emit_opfunc_to{[&](bytecode_vec_t& dst, auto fptr) constexpr UWVM_THROWS
                           {
                               static_assert(::std::same_as<decltype(fptr), details::interpreter_expected_opfunc_ptr_t<CompileOption>>,
@@ -417,6 +438,9 @@ auto const emit_opfunc_to{[&](bytecode_vec_t& dst, auto fptr) constexpr UWVM_THR
 // ============================
 // Stack-top cache manipulation
 // ============================
+// Stack-top helpers maintain a compile-time model of values currently resident in register-like
+// stack-top rings versus values materialized in operand-stack memory. Most control-flow helpers
+// canonicalize at edges so all incoming paths agree on the same runtime layout.
 
 [[maybe_unused]] auto const codegen_stack_push{[&](curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                                {
@@ -1679,6 +1703,8 @@ auto const stacktop_commit_push1_typed{[&](curr_operand_stack_value_type vt) con
                                            }
                                        }};
 
+// Commit-only pop updates the compiler's cache model after an already-emitted opfunc consumes stack
+// values. It emits no bytecode because the runtime helper has already performed the actual pop.
 auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
                                  {
                                      if constexpr(!stacktop_enabled) { return; }
@@ -1780,6 +1806,8 @@ auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
                                      }
                                  }};
 
+// Canonical fill tries to keep the top values cached after a stack-shape change. This is the normal
+// post-op state used by fallthrough code where register-like stack-top values are profitable.
 auto const stacktop_fill_to_canonical{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                                       {
                                           if constexpr(!stacktop_enabled) { return; }
@@ -1803,6 +1831,8 @@ auto const stacktop_fill_to_canonical{[&](bytecode_vec_t& dst) constexpr UWVM_TH
                                           }
                                       }};
 
+// Calls and control-flow joins are layout barriers: all cached values are spilled so every incoming
+// path observes the same operand-stack memory representation.
 auto const stacktop_flush_all_to_operand_stack{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                                                {
                                                    if constexpr(!stacktop_enabled) { return; }
@@ -1852,6 +1882,8 @@ auto const stacktop_flush_all_to_operand_stack{[&](bytecode_vec_t& dst) constexp
         }
     }};
 
+// Edge canonicalization is stricter than a normal spill: it also resets ring cursors and counters so
+// branch targets can start from a deterministic empty-cache state.
 [[maybe_unused]] auto const stacktop_canonicalize_edge_to_memory{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                                                                  {
                                                                      if constexpr(!stacktop_enabled) { return; }
@@ -1972,6 +2004,8 @@ auto const stacktop_after_pop_n_if_reachable{[&](bytecode_vec_t& dst, ::std::siz
                                                                           }
                                                                       }};
 
+// `drop` emission must account for where the value currently lives. A cached value may be removed by
+// metadata updates only, while a memory-backed value needs a real drop helper.
 auto const emit_drop_typed_to{
     [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt) constexpr UWVM_THROWS
     {
@@ -2175,6 +2209,8 @@ auto const emit_drop_typed_to{
         codegen_stack_pop_n(drop_n);
     }};
 
+// Local-get emission is optimized around the stack-top cache: when a spill was just emitted to make
+// room, this helper can patch the spill into a combined spill-then-local-get dispatch.
 auto const emit_local_get_typed_to{
     [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt, local_offset_t off) constexpr UWVM_THROWS
     {
@@ -2435,6 +2471,8 @@ auto const emit_local_get_typed_to{
         }
     }};
 
+// Constants share the same spill-patching strategy as local.get so immediate producers do not add an
+// extra dispatch after the cache has just been adjusted.
 [[maybe_unused]] auto const emit_const_i32_to{
     [&](bytecode_vec_t& dst, wasm_i32 imm) constexpr UWVM_THROWS
     {
@@ -2773,6 +2811,8 @@ auto const emit_local_get_typed_to{
         if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
     }};
 
+// Local-set consumes the top value. When the cache is empty, the helper first fills from memory so
+// the typed setter can read a normal top value instead of depending on a memory-only special case.
 auto const emit_local_set_typed_to{
     [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt, local_offset_t off) constexpr UWVM_THROWS
     {
@@ -2889,6 +2929,8 @@ auto const emit_local_set_typed_to{
         }
     }};
 
+// Local-tee writes a local but keeps the value alive. The helper therefore emits a store-like opfunc
+// without committing a stack pop in the compiler model.
 auto const emit_local_tee_typed_to{
     [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt, local_offset_t off) constexpr UWVM_THROWS -> ::std::size_t
     {
@@ -2940,6 +2982,8 @@ auto const emit_local_tee_typed_to{
         return site;
     }};
 
+// Branch emission records a relative-offset placeholder rather than computing it immediately because
+// targets may be in thunks appended after main bytecode.
 auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_is_thunk) constexpr UWVM_THROWS
                       {
                           namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -3008,6 +3052,8 @@ auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_
         emit_br_to(dst, label_id, dst_is_thunk);
     }};
 
+// Return is a call-like boundary for stack-top state: flush cached values before emitting the runtime
+// return helper so the caller-frame handoff sees a materialized operand stack.
 auto const emit_return_to{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                           {
                               namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;

@@ -1,5 +1,10 @@
+// Integer numeric translation is split between strict Wasm validation and opportunistic combine
+// emission. Every helper emitted here assumes the operand types have already been checked; the
+// surrounding comments explain why some expressions are delayed instead of immediately materialized.
 case wasm1_code::i32_clz:
 {
+    // Unary integer ops preserve stack depth. Local-get fusion avoids pushing a temporary value only
+    // to consume it in the next dispatch.
     validate_numeric_unary(u8"i32.clz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -61,6 +66,8 @@ case wasm1_code::i32_popcnt:
 }
 case wasm1_code::i32_add:
 {
+    // Addition is a high-frequency fusion hub: it can fold constants, combine with local updates,
+    // feed branch patterns, and form reduction/MAC chains while preserving Wasm wraparound semantics.
     validate_numeric_binary(u8"i32.add", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -147,6 +154,8 @@ case wasm1_code::i32_add:
     }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+    // A pending multiply followed by add is kept as state so the later local.set/local.tee can emit
+    // an accumulator-aware MAC helper instead of a generic mul dispatch plus add dispatch.
     if(conbine_pending.kind == conbine_pending_kind::mac_after_mul && conbine_pending.vt == curr_operand_stack_value_type::i32)
     {
         conbine_pending.kind = conbine_pending_kind::mac_after_add;
@@ -649,6 +658,8 @@ case wasm1_code::i32_mul:
 }
 case wasm1_code::i32_div_s:
 {
+    // Signed division must stay in a dedicated runtime helper because Wasm traps on divide-by-zero
+    // and on INT_MIN / -1, unlike ordinary C++ signed division behavior.
     validate_numeric_binary(u8"i32.div_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -667,6 +678,8 @@ case wasm1_code::i32_div_s:
     }
 # endif
 #endif
+    // No immediate fast path is used for the generic signed divide because the helper must inspect
+    // both operands at runtime for trap conditions.
     emit_opfunc_to(bytecode, translate::get_uwvmint_i32_div_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -795,6 +808,8 @@ case wasm1_code::i32_rem_u:
 }
 case wasm1_code::i32_and:
 {
+    // Bitwise operators are common in hash/crypto kernels, so the combine path keeps local and
+    // immediate operands visible long enough to build single-dispatch update helpers.
     validate_numeric_binary(u8"i32.and", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -1646,6 +1661,8 @@ case wasm1_code::i64_popcnt:
 }
 case wasm1_code::i64_add:
 {
+    // The i64 family mirrors the i32 fusion strategy, but immediates and shift counts have wider
+    // storage requirements and must not reuse i32-only helpers.
     validate_numeric_binary(u8"i64.add", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 

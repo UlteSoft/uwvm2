@@ -1,5 +1,10 @@
+// Constants and comparisons are deliberately kept close together because both mostly transform
+// operand-stack shape without touching external state. The comments below call out where immediate
+// parsing, delayed constants, and compare-result stack modeling affect later opcode fusion.
 case wasm1_code::i32_const:
 {
+    // Constants are side-effect free, so the translator can either emit them directly, delay them as
+    // combine state, or elide them entirely when an immediately-following `drop` run proves them dead.
     // i32.const i32 ...
     // [ safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -156,6 +161,8 @@ case wasm1_code::i32_const:
 }
 case wasm1_code::i64_const:
 {
+    // Keep i64 immediates in the pending-combine state when possible; doing so lets later integer
+    // ops emit an immediate-form helper instead of materializing a 64-bit stack slot first.
     // i64.const i64 ...
     // [ safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -269,6 +276,8 @@ case wasm1_code::i64_const:
 }
 case wasm1_code::f32_const:
 {
+    // Floating constants are stored as raw IEEE bits by the Wasm binary format. Reading them with
+    // memcpy-style parsing preserves NaN payloads and avoids host floating-point conversions.
     // f32.const f32 ...
     // [ safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -373,6 +382,8 @@ case wasm1_code::f32_const:
 }
 case wasm1_code::f64_const:
 {
+    // f64 constants use the same bit-preserving path as f32 constants; this matters for NaN payloads
+    // and for exact deterministic replay of Wasm binaries across host compilers.
     // f64.const f64 ...
     // [ safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -477,6 +488,8 @@ case wasm1_code::f64_const:
 }
 case wasm1_code::i32_eqz:
 {
+    // `eqz` is a one-input compare that normalizes any nonzero i32 to the canonical Wasm boolean
+    // result (0 or 1), so the stack model changes type only logically: i32 in, i32 out.
     validate_numeric_unary(u8"i32.eqz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -499,6 +512,8 @@ case wasm1_code::i32_eqz:
     }
     else
     {
+        // Record the compare site for a possible following `br_if`. If the branch appears next,
+        // branch translation can patch this into a single compare-and-branch helper.
         br_if_fuse.kind = br_if_fuse_kind::i32_eqz;
         br_if_fuse.site = bytecode.size();
         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -511,6 +526,8 @@ case wasm1_code::i32_eqz:
 }
 case wasm1_code::i32_eq:
 {
+    // Binary comparisons consume two typed operands and produce an i32 condition. The emission path
+    // favors immediate/local fusion because compare results are commonly consumed by `br_if`.
     validate_numeric_binary(u8"i32.eq", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1131,6 +1148,8 @@ case wasm1_code::i32_ge_u:
 }
 case wasm1_code::i64_eqz:
 {
+    // i64 comparisons still produce i32 booleans, so the translator must update both the type stack
+    // and any stack-top cache range from i64 input state to i32 output state.
     validate_numeric_unary(u8"i64.eqz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1921,6 +1940,8 @@ case wasm1_code::i64_ge_u:
 }
 case wasm1_code::f32_eq:
 {
+    // Floating comparisons delegate NaN and signed-zero semantics to the typed runtime helper; the
+    // translator's job is to prove the operands are f32 and model the i32 boolean result.
     validate_numeric_binary(u8"f32.eq", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
     bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -2324,6 +2345,8 @@ case wasm1_code::f32_ge:
 }
 case wasm1_code::f64_eq:
 {
+    // f64 comparison helpers preserve WebAssembly's ordered/unordered comparison rules while still
+    // returning a compact i32 condition for control-flow consumers.
     validate_numeric_binary(u8"f64.eq", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
     bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -2336,6 +2359,8 @@ case wasm1_code::f64_eq:
     br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
 #endif
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    // f64/f32 comparisons can move from a floating stack-top ring into the i32 boolean ring; prepare
+    // the destination ring before emission so the helper has a valid output slot.
     if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
                  !stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
     {

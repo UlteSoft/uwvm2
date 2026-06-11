@@ -1,5 +1,8 @@
 ﻿case wasm1_code::br:
 {
+    // Branch translation is where Wasm's structured label stack becomes concrete interpreter jumps.
+    // The runtime branch helper does not know the validation stack shape, so this case must validate
+    // target arity and repair the operand stack before emitting the jump.
     // br     label_index ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -49,6 +52,8 @@
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    // Wasm label indices are relative to the innermost control frame, so index 0 means the current
+    // frame and larger indices walk outward through the validation control stack.
     auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
     auto& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
     // Label arity = label_types count. IMPORTANT: for `loop`, label types are parameters (MVP: none),
@@ -915,6 +920,9 @@
 }
 case wasm1_code::br_if:
 {
+    // `br_if` is a conditional version of `br`: it always consumes an i32 condition, but only the
+    // taken edge must have the target label's stack shape. Much of this case exists to keep those
+    // fallthrough and taken-edge stack-top states distinct.
     // br_if  label_index ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -964,6 +972,8 @@ case wasm1_code::br_if:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    // Resolve the label before consuming the condition so validation errors report the branch target
+    // accurately and the later stack repair knows the exact target frame.
     auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
     auto const& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
     auto& target_frame_mut{control_flow_stack.index_unchecked(target_frame_index)};
@@ -980,6 +990,8 @@ case wasm1_code::br_if:
         report_operand_stack_underflow(op_begin, u8"br_if", required_stack_size);
     }
 
+    // The condition is consumed on both taken and fallthrough paths; only branch values are repaired
+    // conditionally for the taken edge.
     if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
         if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
@@ -1173,6 +1185,9 @@ case wasm1_code::br_if:
 #  endif
 # endif
 
+    // Snapshot and clear pending compare fusion state before emission. The patch routine may decide
+    // to replace the already-emitted compare with a compare-and-branch helper, but stale state must
+    // never leak into the next opcode.
     auto const fuse_kind{br_if_fuse.kind};
     auto const fuse_site{br_if_fuse.site};
     auto const fuse_end{br_if_fuse.end};
@@ -2346,6 +2361,8 @@ case wasm1_code::br_if:
         auto const target_base{target_frame.operand_stack_base};
         auto const curr_size{operand_stack.size()};  // condition already popped
 
+        // If extra values sit above the branch payload, the taken edge needs explicit drops before
+        // jumping; otherwise the target frame would observe a stack shape that Wasm validation never allowed.
         bool const need_repair{curr_size > target_base + target_arity};
 
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
@@ -3051,6 +3068,9 @@ case wasm1_code::br_if:
 }
 case wasm1_code::br_table:
 {
+    // `br_table` validates many potential targets up front because the runtime index chooses the
+    // edge dynamically. All targets must agree with Wasm's required label arity/type rules before
+    // we can emit a compact jump table.
     // br_table  target_count ...
     // [ safe ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -3160,6 +3180,8 @@ case wasm1_code::br_table:
     ::std::size_t expected_arity{};
     curr_operand_stack_value_type expected_type{};
 
+    // Reserve once for all explicit targets plus the default target. The earlier byte-count guard
+    // proves this addition is bounded and avoids allocator work for impossible encodings.
     auto const br_table_label_capacity{target_count_uz + 1uz};
 
     ::uwvm2::utils::container::vector<wasm_u32> br_table_label_indices{};

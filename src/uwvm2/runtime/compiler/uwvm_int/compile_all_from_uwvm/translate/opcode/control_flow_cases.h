@@ -1,5 +1,10 @@
+// Structured control-flow opcodes maintain two views at once: Wasm validation state and emitted
+// interpreter labels. The extra comments explain why stack repair and stack-top canonicalization
+// happen around block boundaries instead of being deferred to the runtime branch helper.
 case wasm1_code::unreachable:
 {
+    // `unreachable` emits a trapping helper and then enters polymorphic validation state. From this
+    // point until the next control-flow merge, missing operands are tolerated by the Wasm rules.
     // unreachable ...
     // [   safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -40,6 +45,8 @@ case wasm1_code::nop:
 }
 case wasm1_code::block:
 {
+    // A `block` creates a forward branch target whose label arity is its result type. We record the
+    // operand-stack base now so every later branch can repair the stack back to this boundary.
     // block  blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -118,6 +125,9 @@ case wasm1_code::block:
     }
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    // Large functions may enter tiered execution while looping. Emitting the poll at an outer
+    // block boundary keeps the runtime check rare enough for interpreter speed while still giving
+    // hot loops a deterministic OSR handoff point.
     if constexpr(CompileOption.enable_tiered_loop_osr_poll)
     {
         auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
@@ -174,6 +184,8 @@ case wasm1_code::block:
 }
 case wasm1_code::loop:
 {
+    // A `loop` differs from `block`: its branch target is the loop header, and MVP loop labels take
+    // parameters rather than results. The translator therefore records both start and end labels.
     // loop   blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -375,6 +387,8 @@ case wasm1_code::loop:
 }
 case wasm1_code::if_:
 {
+    // `if` consumes an i32 condition and splits execution into two stack-top states. The generated
+    // else thunk exists so both arms can enter their bodies with the same canonical cache contract.
     // if     blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -564,6 +578,8 @@ case wasm1_code::if_:
         }
     }
 
+    // Save the else-entry stack-top model separately from the then path. The conditional branch
+    // can jump into a thunk first, so the else body must restore the exact state expected there.
     auto else_entry_curr_stacktop{curr_stacktop};
     auto else_entry_memory_count{stacktop_memory_count};
     auto else_entry_cache_count{stacktop_cache_count};
@@ -614,6 +630,8 @@ case wasm1_code::if_:
 }
 case wasm1_code::else_:
 {
+    // At `else`, the then-arm must branch over the else body after validating its result values.
+    // The translator stores the then-end state so `end` can merge the reachable arm correctly.
     // else   ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -751,6 +769,8 @@ case wasm1_code::else_:
 }
 case wasm1_code::end:
 {
+    // `end` is a validation and label-resolution marker, not a runtime opcode by itself. This case
+    // validates the block result, materializes pending labels, and rebuilds the post-block stack.
     // end    ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr

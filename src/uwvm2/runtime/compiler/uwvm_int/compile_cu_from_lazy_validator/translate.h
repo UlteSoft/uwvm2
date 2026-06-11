@@ -58,6 +58,8 @@
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator
 {
+    // Keep the public lazy-compiler surface expressed in wasm and interpreter terms. The aliases make the code below read as a
+    // translation pipeline rather than as a collection of long fully-qualified storage names.
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
     using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -72,12 +74,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     using full_function_symbol_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
     using local_func_storage_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
 
+    // Lazy validation can either re-run the validator at materialization time or trust that the caller already validated all code.
+    // The explicit mode prevents the lazy path from silently weakening validation guarantees.
     enum class lazy_validation_mode : unsigned
     {
         validate_on_lazy_compile,
         assume_full_code_verified
     };
 
+    // Execution units describe structural wasm regions. They are indexing metadata only; actual code generation still materializes
+    // the owning function so control-flow repair and interpreter metadata stay identical to the eager compiler.
     enum class lazy_execution_unit_kind : unsigned
     {
         function,
@@ -86,6 +92,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         if_
     };
 
+    // Compile-unit kinds record why a unit exists. This is mainly diagnostic today, but preserving the reason lets runtime logs
+    // explain whether a compile happened because of policy, structure, or code-size grouping.
     enum class lazy_compile_unit_kind : unsigned
     {
         function,
@@ -93,18 +101,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         code_size_group
     };
 
+    // A compile unit may name a narrow byte range while still requiring whole-function materialization. Keeping the two concepts
+    // separate avoids promising partial code generation before the interpreter backend can safely support it.
     enum class lazy_materialization_scope : unsigned
     {
         whole_function,
         execution_unit_range
     };
 
+    // The execution-unit policy controls index granularity independently from compile-unit scheduling. This keeps bytecode scanning
+    // decisions decoupled from threading and cache policy decisions.
     enum class lazy_execution_unit_split_policy_t : unsigned
     {
         function_only,
         structured_control
     };
 
+    // Compile-unit policy decides how much lazy work becomes externally schedulable. The enum makes the policy explicit instead of
+    // baking one grouping strategy into the scanner.
     enum class lazy_compile_unit_split_policy_t : unsigned
     {
         function,
@@ -153,19 +167,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
     struct lazy_split_config
     {
+        // Structured-control scanning is the default because it provides useful profiling and scheduling boundaries without needing
+        // a full validation pass during module initialization.
         lazy_execution_unit_split_policy_t eu_policy{lazy_execution_unit_split_policy_t::structured_control};
+        // Code-size grouping avoids producing one tiny task per block in heavily structured functions, which would waste scheduler time.
         lazy_compile_unit_split_policy_t cu_policy{lazy_compile_unit_split_policy_t::code_size};
+        // The target is intentionally a soft threshold: groups are flushed at execution-unit boundaries so wasm control structure is
+        // never split in the middle of an immediate or nested construct.
         ::std::size_t cu_code_size{4096uz};
     };
 
     struct lazy_execution_unit_storage_t
     {
+        // The absolute wasm function index is needed by validators and diagnostics; the local index addresses runtime local storage.
         ::std::size_t function_index{};
         ::std::size_t local_function_index{};
+        // SIZE_MAX denotes the synthetic root. A parent index is stored so logs and future range materializers can reconstruct nesting.
         ::std::size_t parent_eu_index{SIZE_MAX};
+        // Depth is recorded during the single scan so later policies do not need to rebuild a control stack.
         ::std::size_t depth{};
+        // Pointers refer into the already-owned wasm code buffer; lazy metadata never copies instruction bytes.
         ::std::byte const* code_begin{};
         ::std::byte const* code_end{};
+        // The byte offset is a stable, serializable description of the range for logging and debugging.
         ::std::size_t code_offset{};
         ::std::size_t code_size{};
         lazy_execution_unit_kind kind{lazy_execution_unit_kind::function};
@@ -173,34 +197,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
     struct lazy_compile_unit_storage_t
     {
+        // Each compile unit carries its own state so a future narrower materializer can synchronize per range.
         ::uwvm2::utils::thread::lazy_compile_unit_state state{};
+        // These indices intentionally mirror execution units, letting the request path jump directly to the owning function.
         ::std::size_t function_index{};
         ::std::size_t local_function_index{};
+        // [begin_eu_index, end_eu_index) is used rather than a vector of indices to keep metadata compact and cache-friendly.
         ::std::size_t begin_eu_index{};
         ::std::size_t end_eu_index{};
+        // The byte span summarizes all execution units covered by this compile unit for diagnostics and prefetch heuristics.
         ::std::byte const* code_begin{};
         ::std::byte const* code_end{};
         ::std::size_t code_offset{};
         ::std::size_t code_size{};
         lazy_compile_unit_kind kind{lazy_compile_unit_kind::function};
+        // The current backend compiles a complete function even when the request was triggered by a smaller structural range.
         lazy_materialization_scope materialization_scope{lazy_materialization_scope::whole_function};
     };
 
     struct lazy_function_storage_t
     {
+        // Whole-function state is the authoritative synchronization point while materialization emits complete functions.
         ::uwvm2::utils::thread::lazy_compile_unit_state materialization_state{};
+        // Both indices are retained because wasm-visible references include imports while local storage excludes them.
         ::std::size_t function_index{};
         ::std::size_t local_function_index{};
+        // Contiguous ranges make module initialization cheap and avoid per-function heap allocation for metadata slices.
         ::std::size_t first_eu_index{};
         ::std::size_t eu_count{};
         ::std::size_t first_cu_index{};
         ::std::size_t cu_count{};
+        // SIZE_MAX means no schedulable compile unit has been selected yet; a fallback function unit is created in that case.
         ::std::size_t primary_cu_index{SIZE_MAX};
     };
 
     struct lazy_module_storage_t
     {
+        // The compiled symbol table has the same shape as eager compilation so interpreter dispatch does not need a lazy-only ABI.
         full_function_symbol_t compiled{};
+        // Metadata is stored in module-wide arrays, allowing requests to pass around small indices instead of owning subobjects.
         ::uwvm2::utils::container::vector<lazy_function_storage_t> functions{};
         ::uwvm2::utils::container::vector<lazy_execution_unit_storage_t> execution_units{};
         ::uwvm2::utils::container::vector<lazy_compile_unit_storage_t> compile_units{};
@@ -208,17 +243,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
     struct lazy_compile_options
     {
+        // The lazy path forwards normal interpreter compile options to the eager function compiler to keep emitted code identical.
         ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option compile_options{};
+        // Validation needs parser-level module metadata. It is optional only when the caller explicitly promises prior validation.
         parser_module_storage_t const* validator_module_storage{};
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
     };
 
     struct lazy_compile_request_context
     {
+        // The request owns no storage; it binds scheduler work to module lifetime managed by the runtime.
         runtime_module_storage_t const* curr_module{};
         lazy_module_storage_t* lazy_storage{};
         lazy_compile_options options{};
+        // A compile request is addressed by index so it remains trivially movable and cheap to enqueue.
         ::std::size_t compile_unit_index{};
+        // The caller may provide an error object for synchronous reporting; asynchronous callers can fall back to a local one.
         ::uwvm2::validation::error::code_validation_error_impl* err{};
         ::uwvm2::utils::container::u8string_view module_name{};
     };
@@ -227,15 +267,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     {
         struct lazy_split_control_frame
         {
+            // The scanner only needs the current unit and its kind to assign parentage and validate else/end placement.
             ::std::size_t eu_index{};
             lazy_execution_unit_kind kind{lazy_execution_unit_kind::function};
         };
 
+        // Centralize the "top of control stack is the current parent" rule so the scanner stays readable at nesting sites.
         [[nodiscard]] inline constexpr ::std::size_t active_parent_eu_index(lazy_split_control_frame const& frame) noexcept { return frame.eu_index; }
 
+        // Offsets are computed from raw pointers during scanning because the wasm body is already memory mapped or owned elsewhere.
         [[nodiscard]] inline constexpr ::std::size_t byte_offset(::std::byte const* base, ::std::byte const* curr) noexcept
         { return static_cast<::std::size_t>(curr - base); }
 
+        // Lazy splitting reports the same validation error categories as the real validator. This keeps diagnostics stable even
+        // though this scanner only reads enough wasm to find structural ranges.
         inline constexpr void fail_lazy_split(::std::byte const* op_begin,
                                               code_validation_error_code ec,
                                               ::uwvm2::validation::error::code_validation_error_impl& err,
@@ -243,6 +288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             err.err_curr = op_begin;
             err.err_code = ec;
+            // Throw through the parser path so callers observe the same failure mechanism used by normal wasm validation.
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(pc);
         }
 
@@ -253,6 +299,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                  code_validation_error_code ec,
                                                  ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Immediates are decoded, not interpreted: the scanner must advance exactly like the validator while avoiding semantic work.
             T value;  // No initialization necessary
 
             using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -260,6 +307,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             auto const [next, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                   ::fast_io::mnp::leb128_get(value))};
+            // Reuse the caller-provided error code so each opcode reports the immediate field that failed, not a generic scan error.
             if(parse_err != ::fast_io::parse_code::ok) [[unlikely]] { fail_lazy_split(op_begin, ec, err, parse_err); }
 
             code_curr = reinterpret_cast<::std::byte const*>(next);
@@ -272,6 +320,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                    ::std::size_t bytes,
                                                    ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Fixed-width constants can be skipped by length, but the bounds check must still run here because the lazy scanner may
+            // execute before full validation when validation-on-compile is selected.
             auto const remaining{static_cast<::std::size_t>(code_end - code_curr)};
             if(bytes > remaining) [[unlikely]]
             {
@@ -290,7 +340,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                              ::std::byte const* code_end,
                                                              lazy_execution_unit_kind kind) noexcept
         {
+            // Append-only indices remain stable for the rest of initialization, which lets control-stack frames store plain indices.
             auto const eu_index{storage.execution_units.size()};
+            // Open structural units are appended with a null end and closed when the matching end opcode is seen.
             auto const size{code_end == nullptr ? 0uz : static_cast<::std::size_t>(code_end - code_begin)};
             storage.execution_units.push_back({.function_index = function_index,
                                                .local_function_index = local_function_index,
@@ -307,6 +359,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         inline constexpr void set_execution_unit_end(lazy_module_storage_t& storage, ::std::size_t eu_index, ::std::byte const* code_end) noexcept
         {
             auto& eu{storage.execution_units.index_unchecked(eu_index)};
+            // The end pointer is exclusive and includes the closing opcode, matching wasm body slicing conventions elsewhere.
             eu.code_end = code_end;
             eu.code_size = static_cast<::std::size_t>(code_end - eu.code_begin);
         }
@@ -318,6 +371,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                          lazy_compile_unit_kind kind,
                                                                          lazy_materialization_scope scope) noexcept
         {
+            // Compile units cover a contiguous execution-unit range. The byte range is widened to the maximum end because nested
+            // units can have different sizes while still sharing the same function-owned code buffer.
             auto const cu_index{storage.compile_units.size()};
             auto const& first_eu{storage.execution_units.index_unchecked(begin_eu_index)};
             auto const code_begin{first_eu.code_begin};
@@ -344,6 +399,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             fn.first_cu_index = storage.compile_units.size();
 
+            // A single whole-function unit is the conservative fallback and also the requested behavior for function-only policy.
             if(cfg.cu_policy == lazy_compile_unit_split_policy_t::function || fn.eu_count <= 1uz)
             {
                 fn.primary_cu_index = append_compile_unit_from_eu_range(storage,
@@ -358,12 +414,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             auto const is_candidate{[&](lazy_execution_unit_storage_t const& eu) constexpr noexcept
                                     {
+                                        // The synthetic function unit would duplicate the fallback range, so only nested structures
+                                        // are eligible for structural or size-based compile-unit grouping.
                                         if(eu.kind == lazy_execution_unit_kind::function) { return false; }
                                         return true;
                                     }};
 
             if(cfg.cu_policy == lazy_compile_unit_split_policy_t::execution_unit)
             {
+                // One compile unit per structural range maximizes scheduling precision and gives logs the clearest trigger point.
                 for(::std::size_t i{fn.first_eu_index}; i != fn.first_eu_index + fn.eu_count; ++i)
                 {
                     if(!is_candidate(storage.execution_units.index_unchecked(i))) { continue; }
@@ -379,12 +438,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             else
             {
                 auto const target_size{cfg.cu_code_size == 0uz ? 1uz : cfg.cu_code_size};
+                // Size grouping is a compromise: it keeps lazy work coarse enough for the scheduler while still preserving useful
+                // structural boundaries for diagnostics and future partial materialization.
                 ::std::size_t group_begin{SIZE_MAX};
                 ::std::size_t group_end{SIZE_MAX};
                 ::std::size_t group_size{};
 
                 auto const flush_group{[&]() constexpr noexcept
                                        {
+                                           // Empty groups are represented by SIZE_MAX so the hot loop can flush unconditionally.
                                            if(group_begin == SIZE_MAX) { return; }
                                            auto const cu{append_compile_unit_from_eu_range(storage,
                                                                                            fn,
@@ -421,6 +483,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         group_end = i + 1uz;
                         if(eu.code_size > (::std::numeric_limits<::std::size_t>::max() - group_size)) [[unlikely]]
                         {
+                            // Saturating here is enough: the next threshold check will flush the group without risking overflow.
                             group_size = ::std::numeric_limits<::std::size_t>::max();
                         }
                         else
@@ -435,6 +498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             if(fn.primary_cu_index == SIZE_MAX)
             {
+                // Functions without nested structural candidates still need a schedulable trigger, so create a whole-function unit.
                 fn.primary_cu_index = append_compile_unit_from_eu_range(storage,
                                                                         fn,
                                                                         fn.first_eu_index,
@@ -452,6 +516,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    wasm1_code curr_opbase,
                                                                    ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Non-structural immediates are skipped precisely so the scanner can continue finding block/loop/if/else/end opcodes
+            // without performing full stack validation or semantic checks.
             switch(curr_opbase)
             {
                 case wasm1_code::br:
@@ -462,6 +528,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 }
                 case wasm1_code::br_table:
                 {
+                    // br_table is length-prefixed, so validate the count before reading the target list to avoid walking past code_end.
                     auto const target_count{
                         read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_label_index, err)};
 
@@ -472,6 +539,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    target_count_uz == ::std::numeric_limits<::std::size_t>::max()};
                     if(target_count_exceeds_size_t || target_count_plus_default_overflows || target_count_uz + 1uz > remaining_bytes) [[unlikely]]
                     {
+                        // Populate the richer selectable payload used by the standard validator for the same malformed table case.
                         err.err_curr = op_begin;
                         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
                         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.remaining_bytes = remaining_bytes;
@@ -572,9 +640,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                        curr_opbase == wasm1_code::unreachable || curr_opbase == wasm1_code::nop || curr_opbase == wasm1_code::drop ||
                        curr_opbase == wasm1_code::select || curr_opbase == wasm1_code::return_)
                     {
+                        // MVP numeric and simple stack/control opcodes carry no immediates that matter to structural splitting.
                         return;
                     }
 
+                    // Unknown opcodes are rejected early because a wrong skip length would corrupt every later structural boundary.
                     err.err_curr = op_begin;
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(op_byte);
                     err.err_code = code_validation_error_code::illegal_opbase;
@@ -589,6 +659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                   lazy_split_config cfg,
                                                                   ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Build the lazy index from the runtime module because it owns the final function ordering used by interpreter dispatch.
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
             auto const function_index{import_func_count + local_function_index};
             auto const& curr_local_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
@@ -601,6 +672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             fn.local_function_index = local_function_index;
             fn.first_eu_index = storage.execution_units.size();
 
+            // The root execution unit covers the entire function and gives every function a legal fallback materialization range.
             auto const function_eu_index{append_execution_unit(storage,
                                                                function_index,
                                                                local_function_index,
@@ -613,6 +685,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             if(cfg.eu_policy == lazy_execution_unit_split_policy_t::function_only)
             {
+                // Function-only splitting avoids the structural scan cost while preserving the same lazy compilation interface.
                 set_execution_unit_end(storage, function_eu_index, code_end);
                 fn.eu_count = storage.execution_units.size() - fn.first_eu_index;
                 append_function_compile_units(storage, fn, cfg);
@@ -643,6 +716,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                 auto const op_begin{code_curr};
 
+                // Read the opcode byte with memcpy to avoid aliasing and alignment assumptions on the wasm byte stream.
                 wasm1_code curr_opbase;  // No initialization necessary
                 ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
                 ++code_curr;
@@ -672,6 +746,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [     safe    ] unsafe (could be the section_end)
                         //                 ^^ code_curr
 
+                        // Opening a structural instruction starts a child execution unit at the opcode itself so the range remains
+                        // directly readable in diagnostics and can be re-parsed independently later.
                         auto const parent_eu_index{active_parent_eu_index(control_stack.back_unchecked())};
                         auto const depth{control_stack.size()};
                         auto const kind{curr_opbase == wasm1_code::block  ? lazy_execution_unit_kind::block
@@ -690,6 +766,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                         if(control_stack.empty() || control_stack.back_unchecked().kind != lazy_execution_unit_kind::if_) [[unlikely]]
                         {
+                            // An else only belongs to the currently open if; catching this here prevents an invalid split tree.
                             fail_lazy_split(op_begin, code_validation_error_code::illegal_else, err);
                         }
                         break;
@@ -709,11 +786,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
 
                         auto const frame{control_stack.back_unchecked()};
+                        // Closing the unit at code_curr includes the end opcode, which matches the complete structured expression.
                         set_execution_unit_end(storage, frame.eu_index, code_curr);
                         control_stack.pop_back_unchecked();
 
                         if(frame.kind == lazy_execution_unit_kind::function)
                         {
+                            // The function root closes the wasm body. Anything after that would make offsets ambiguous and invalid.
                             if(code_curr != code_end) [[unlikely]] { fail_lazy_split(op_begin, code_validation_error_code::trailing_code_after_end, err); }
 
                             fn.eu_count = storage.execution_units.size() - fn.first_eu_index;
@@ -740,6 +819,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
         { return ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::match_trivial_call_inline_body(code_ptr); }
 
+        // Precompute local call metadata before any function is materialized. Lazy compilation still needs direct-call targets and
+        // trivial inline-call recognition to be available as soon as the first function compiles.
         inline constexpr void fill_lazy_local_defined_call_info(runtime_module_storage_t const& curr_module,
                                                                 ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
                                                                 full_function_symbol_t& storage) noexcept
@@ -759,9 +840,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 info.function_index = import_func_count + i;
             }
 
+// The include fragment fills per-function call information in this lexical scope, reusing the eager compiler's exact logic so lazy
+// and eager modes agree on function symbols, inline-call candidates, and metadata layout.
 # include "../compile_all_from_uwvm/translate/single_func_call_info.h"
         }
 
+        // The interpreter allocates local and operand-stack storage from module-wide maxima. Recompute those maxima after call-info
+        // setup because lazy module initialization does not compile every function immediately.
         inline constexpr void aggregate_lazy_local_function_storage(full_function_symbol_t& storage) noexcept
         {
             storage.local_count = 0uz;
@@ -786,9 +871,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                 lazy_function_storage_t& fn,
                                                                 ::uwvm2::utils::thread::lazy_compile_state state) noexcept
         {
+            // Publish the function state first because whole-function materialization is currently authoritative for execution.
             fn.materialization_state.state.store(state, ::std::memory_order_release);
             for(::std::size_t i{fn.first_cu_index}; i != fn.first_cu_index + fn.cu_count; ++i)
             {
+                // Mirror the state onto child compile units so diagnostics and future per-range scheduling observe a consistent view.
                 storage.compile_units.index_unchecked(i).state.state.store(state, ::std::memory_order_release);
             }
         }
@@ -798,6 +885,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                           ::std::size_t local_function_index,
                                                           ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Validation is intentionally delayed to materialization when requested, allowing module setup to build only lightweight
+            // structural metadata while preserving a strict validation barrier before code becomes executable.
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
                 // Lazy validation must use the standard wasm1 validator directly. This keeps the lazy path aligned with
@@ -827,8 +916,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                           ::std::size_t local_function_index,
                                                           ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
+            // Validate immediately before compilation so a function cannot be installed into the interpreter if validation fails.
             validate_function_if_needed(curr_module, options, local_function_index, err);
 
+            // Materialize with the eager single-function compiler. This deliberately trades partial compilation for identical emitted
+            // opfunc streams, stack metadata, and call handling across lazy and non-lazy modes.
             ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::compile_all_from_uwvm_local_func<CompileOption>(curr_module,
                                                                                                                                   options.compile_options,
                                                                                                                                   storage.compiled,
@@ -839,6 +931,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
         inline constexpr void lazy_compile_request_entry(void* user_data) noexcept
         {
+            // Scheduler callbacks are noexcept and receive erased user data, so every pointer/index check must fail closed.
             auto const ctx{static_cast<lazy_compile_request_context*>(user_data)};
             if(ctx == nullptr || ctx->curr_module == nullptr || ctx->lazy_storage == nullptr) [[unlikely]] { return; }
 
@@ -854,6 +947,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::fast_io::unix_timestamp compile_start_time{};
             if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
             {
+                // Timing is best-effort diagnostic data; logging must never make lazy compilation fail.
 # ifdef UWVM_CPP_EXCEPTIONS
                 try
 # endif
@@ -895,7 +989,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             try
 # endif
             {
+                // The request may name a subrange, but the current materializer compiles the entire owning function once.
                 compile_lazy_local_function<CompileOption>(*ctx->curr_module, storage, ctx->options, cu.local_function_index, err);
+                // A successful whole-function compile satisfies all compile units for that function.
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
                 ::fast_io::unix_timestamp compile_end_time{};
                 if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
@@ -933,6 +1029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
             {
+                // Mark every unit for this function failed so waiters do not spin on a compile that cannot complete.
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::failed);
                 ::fast_io::unix_timestamp compile_end_time{};
                 if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
@@ -971,6 +1068,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         lazy_module_storage_t storage{};
 
         auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
+        // Call metadata is required before lazy materialization because direct-call targets may be queried by the first compiled body.
         details::fill_lazy_local_defined_call_info(curr_module, options, storage.compiled);
 
         storage.functions.clear();
@@ -980,6 +1078,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         storage.execution_units.reserve(local_func_count);
         storage.compile_units.reserve(local_func_count);
 
+        // Build only indexing metadata during initialization. Real validation and bytecode emission can be deferred to the first use.
         for(::std::size_t local_function_index{}; local_function_index != local_func_count; ++local_function_index)
         {
             details::build_lazy_function_execution_units(curr_module, storage, local_function_index, split_config, err);
@@ -994,10 +1093,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                          ::std::size_t compile_unit_index,
                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
+        // Public synchronous entry point: invalid indices are internal runtime bugs, so terminate rather than fabricating a wasm error.
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::fast_io::unix_timestamp compile_start_time{};
         if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
         {
+            // Logging timestamps remain optional because platforms or builds may not support the clock path.
 # ifdef UWVM_CPP_EXCEPTIONS
             try
 # endif
@@ -1038,9 +1139,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         bool counted_wait{};
         for(;;)
         {
+            // Acquire pairs with release stores from mark_function_compile_units_state so a compiled state also publishes code data.
             auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled)
             {
+                // Another thread already materialized this function; the requested compile unit is therefore satisfied.
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-hit module_id=",
                                                                              options.compile_options.curr_wasm_id,
                                                                              u8" local_fn=",
@@ -1054,6 +1157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
             {
                 auto expected{::uwvm2::utils::thread::lazy_compile_state::uncompiled};
+                // Claim exactly one compiler for the function. Even multiple compile-unit requests converge on the same materializer.
                 if(fn.materialization_state.state.compare_exchange_strong(expected,
                                                                           ::uwvm2::utils::thread::lazy_compile_state::compiling,
                                                                           ::std::memory_order_acq_rel,
@@ -1073,6 +1177,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             if(!counted_wait)
             {
+                // Log the first wait only; repeated wait logging would hide the useful compile-start/compile-end events.
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-wait module_id=",
                                                                              options.compile_options.curr_wasm_id,
                                                                              u8" local_fn=",
@@ -1086,6 +1191,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::uwvm2::utils::thread::lazy_compile_thread_yield();
         }
 
+        // Once this thread owns compilation, emit the full function and publish completion to all sibling compile units.
         details::compile_lazy_local_function<CompileOption>(curr_module, storage, options, cu.local_function_index, err);
         details::mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
         ::fast_io::unix_timestamp compile_end_time{};
@@ -1118,12 +1224,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     [[nodiscard]] inline constexpr ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context & ctx,
                                                                                                           unsigned priority = 0u) noexcept
     {
+        // Invalid requests produce an empty descriptor so callers can skip enqueueing without throwing from a scheduling path.
         if(ctx.lazy_storage == nullptr || ctx.compile_unit_index >= ctx.lazy_storage->compile_units.size()) [[unlikely]] { return {}; }
 
         auto& cu{ctx.lazy_storage->compile_units.index_unchecked(ctx.compile_unit_index)};
         if(cu.local_function_index >= ctx.lazy_storage->functions.size()) [[unlikely]] { return {}; }
         auto& fn{ctx.lazy_storage->functions.index_unchecked(cu.local_function_index)};
 
+        // Choose the synchronization object according to the materialization scope. Today this is normally the whole-function state,
+        // but preserving the distinction keeps the request ABI ready for true execution-unit materialization.
         auto unit{cu.materialization_scope == lazy_materialization_scope::whole_function ? ::std::addressof(fn.materialization_state)
                                                                                          : ::std::addressof(cu.state)};
         return {.unit = unit, .compile = details::lazy_compile_request_entry<CompileOption>, .user_data = ::std::addressof(ctx), .priority = priority};
