@@ -87,6 +87,16 @@ namespace
         return ::std::string{"\""} + path.string() + "\"";
     }
 
+    [[nodiscard]] int run_system_command(::std::string const& command)
+    {
+#ifdef _WIN32
+        auto const wrapped{::std::string{"cmd.exe /S /C \""} + command + "\""};
+        return ::std::system(wrapped.c_str());
+#else
+        return ::std::system(command.c_str());
+#endif
+    }
+
     [[nodiscard]] bool read_text_file(::std::filesystem::path const& path, ::std::string& text)
     {
         ::std::ifstream input(path);
@@ -155,7 +165,7 @@ namespace
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
         ::std::cout << "[llvm_jit] " << full_command << '\n';
 
-        auto const status{::std::system(full_command.c_str())};
+        auto const status{run_system_command(full_command)};
         if(status == 0) [[unlikely]]
         {
             ::std::cerr << "uwvm trap command unexpectedly returned success for " << label << '\n';
@@ -192,14 +202,39 @@ namespace
         }
     }
 
+    [[nodiscard]] ::std::string strip_ansi_codes(::std::string_view text)
+    {
+        ::std::string out{};
+        out.reserve(text.size());
+
+        for(::std::size_t i{}; i != text.size();)
+        {
+            if(text[i] == '\x1b' && i + 1uz < text.size() && text[i + 1uz] == '[')
+            {
+                i += 2uz;
+                while(i != text.size())
+                {
+                    auto const ch{text[i++]};
+                    if(ch >= '@' && ch <= '~') { break; }
+                }
+                continue;
+            }
+
+            out.push_back(text[i++]);
+        }
+
+        return out;
+    }
+
     [[nodiscard]] bool check_inline_call_stack_trap_output(::std::filesystem::path const& output_path, char const* label)
     {
         ::std::string output{};
         if(!read_text_file(output_path, output)) [[unlikely]] { return false; }
 
-        auto const has_call_stack_header{output.find("Call stack:") != ::std::string::npos};
-        auto const has_module{output.find(" module=") != ::std::string::npos};
-        auto const seen{collect_inline_call_stack_func_idx(output)};
+        auto const plain_output{strip_ansi_codes(output)};
+        auto const has_call_stack_header{plain_output.find("Call stack:") != ::std::string::npos};
+        auto const has_module{plain_output.find(" module=") != ::std::string::npos};
+        auto const seen{collect_inline_call_stack_func_idx(plain_output)};
         if(has_call_stack_header && has_module && seen[0uz] && seen[1uz] && seen[2uz] && seen[3uz]) [[likely]] { return true; }
 
         ::std::cerr << "missing expected LLVM JIT inline call-stack frame chain in " << label << " output:\n" << output << '\n';
@@ -211,9 +246,10 @@ namespace
         ::std::string output{};
         if(!read_text_file(output_path, output)) [[unlikely]] { return false; }
 
-        auto const has_unwind_header{output.find("Call stack:") != ::std::string::npos};
-        auto const has_module{output.find(" module=") != ::std::string::npos};
-        auto const has_func_idx{output.find(" func_idx=") != ::std::string::npos};
+        auto const plain_output{strip_ansi_codes(output)};
+        auto const has_unwind_header{plain_output.find("Call stack:") != ::std::string::npos};
+        auto const has_module{plain_output.find(" module=") != ::std::string::npos};
+        auto const has_func_idx{plain_output.find(" func_idx=") != ::std::string::npos};
         if(has_unwind_header && has_module && has_func_idx) [[likely]] { return true; }
 
         ::std::cerr << "missing LLVM JIT unwind frame in " << label << " output:\n" << output << '\n';
@@ -232,7 +268,7 @@ namespace
         auto const command{quote_argument(uwvm_path) + " -Raot -Rclog file " + quote_argument(log_path) + " --run " + quote_argument(wasm_path)};
         ::std::cout << "[llvm_jit] " << command << '\n';
 
-        auto const status{::std::system(command.c_str())};
+        auto const status{run_system_command(command)};
         if(status != 0) [[unlikely]]
         {
             ::std::cerr << "uwvm returned non-zero status while probing default LLVM JIT call-stack policy: " << status << '\n';
@@ -294,6 +330,10 @@ namespace
             return true;
         }
 
+        if(!run_inline_mode("unwind", "full", "-Rcm full -Rcc jit", false)) [[unlikely]] { return false; }
+        if(!run_inline_mode("unwind", "aot", "-Raot", false)) [[unlikely]] { return false; }
+        if(!run_inline_mode("unwind", "lazy", "-Rjit", false)) [[unlikely]] { return false; }
+        if(!run_inline_mode("unwind", "lazy_verification", "-Rcm lazy+verification -Rcc jit", false)) [[unlikely]] { return false; }
         if(!run_inline_mode("unwind-uncheck", "full", "-Rcm full -Rcc jit", false)) [[unlikely]] { return false; }
         if(!run_inline_mode("unwind-uncheck", "aot", "-Raot", false)) [[unlikely]] { return false; }
         if(!run_inline_mode("unwind-uncheck", "lazy", "-Rjit", false)) [[unlikely]] { return false; }
@@ -305,7 +345,7 @@ namespace
     {
         ::std::cout << "[llvm_jit] " << command << '\n';
 
-        auto const status{::std::system(command.c_str())};
+        auto const status{run_system_command(command)};
         if(status == 0) [[likely]] { return true; }
 
         ::std::cerr << "uwvm returned non-zero status for " << label << ": " << status << '\n';

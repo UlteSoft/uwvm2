@@ -411,11 +411,20 @@ inline constexpr void apply_llvm_jit_semantic_function_attrs(::llvm::Function& f
     function.addFnAttr(get_llvm_string_ref(u8"disable-tail-calls"), get_llvm_string_ref(u8"true"));
 }
 
+// Keep a physical frame pointer in functions that may need to report an exact trap call-site frame.
+inline constexpr void apply_llvm_jit_frame_pointer_function_attrs(::llvm::Function& function) noexcept
+{ function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all")); }
+
 // Apply all common attributes shared by public, private, and raw-entry JIT functions.
 inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& function) noexcept
 {
     apply_llvm_jit_platform_function_attrs(function);
     apply_llvm_jit_semantic_function_attrs(function);
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    // Win64 trap bridges always pass explicit generated-frame context via read_register("rbp"/"rsp").  LLVM rejects
+    // reading rbp from a function where rbp remains allocatable, so every generated caller needs a fixed frame pointer.
+    apply_llvm_jit_frame_pointer_function_attrs(function);
+#endif
 }
 
 // Preserve unwind metadata for trap reporting and logical Wasm stack reconstruction.
@@ -429,7 +438,7 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
 
     // Keep a physical frame pointer in generated functions.  Trap bridges capture the current frame address explicitly,
     // and a stable frame chain makes mixed JIT/runtime unwinding resilient after LLVM has inlined or optimized Wasm calls.
-    function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all"));
+    apply_llvm_jit_frame_pointer_function_attrs(function);
 }
 
 // Set the calling convention on an LLVM function and attach the common JIT attributes expected for generated functions.
