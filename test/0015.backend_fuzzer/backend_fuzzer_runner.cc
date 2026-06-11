@@ -301,13 +301,20 @@ namespace
                     auto const func_index{fuzzer::k_table_elems[c.table_elems_begin + i]};
                     if(func_index == k_null_table_elem) { continue; }
                     auto const import_count{module.imported_function_vec_storage.size()};
-                    if(func_index < import_count) { die("generated imported table elements are not supported by this runner"); }
-                    auto const local_index{static_cast<::std::size_t>(func_index - import_count)};
-                    if(local_index >= module.local_defined_function_vec_storage.size()) { die("table element function index out of range"); }
-
                     auto& elem{table.elems.index_unchecked(i)};
-                    elem.type = storage::local_defined_table_elem_storage_type_t::func_ref_defined;
-                    elem.storage.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index));
+                    if(func_index < import_count)
+                    {
+                        elem.type = storage::local_defined_table_elem_storage_type_t::func_ref_imported;
+                        elem.storage.imported_ptr = ::std::addressof(module.imported_function_vec_storage.index_unchecked(func_index));
+                    }
+                    else
+                    {
+                        auto const local_index{static_cast<::std::size_t>(func_index - import_count)};
+                        if(local_index >= module.local_defined_function_vec_storage.size()) { die("table element function index out of range"); }
+
+                        elem.type = storage::local_defined_table_elem_storage_type_t::func_ref_defined;
+                        elem.storage.defined_ptr = ::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index));
+                    }
                 }
 
                 module.local_defined_table_vec_storage.reserve(1uz);

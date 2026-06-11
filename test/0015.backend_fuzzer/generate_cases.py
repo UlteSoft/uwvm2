@@ -802,6 +802,141 @@ def local_imported_i32_add_loop_case(index: int) -> Case:
     )
 
 
+def tiered_local_imported_nested_defined_loop_case(index: int) -> Case:
+    bound = 4096
+    add_const = 17
+    expected = 0
+    for i in range(bound):
+        expected = u32(expected + u32(i + add_const))
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + i32_const(add_const) + call(2) + b"\x6A" + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    helper = local_get(0) + local_get(1) + call(0) + b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_local_imported_nested_defined_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main)), Func(0, [], helper)],
+        entry_func_index=1,
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_osr_local_imported_loop_case(index: int) -> Case:
+    bound = 22000
+    expected = u32(bound * (bound - 1) // 2)
+
+    main = bytearray()
+    main += b"\x01" * 1800
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + call(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_osr_local_imported_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main))],
+        entry_func_index=1,
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_local_imported_call_indirect_loop_case(index: int) -> Case:
+    bound = 4096
+    expected = u32(bound * (bound - 1) // 2)
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + i32_const(0) + call_indirect(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_local_imported_call_indirect_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main))],
+        entry_func_index=1,
+        has_table=True,
+        table_min=1,
+        table_max=1,
+        table_has_max=True,
+        table_elems=[0],
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
+def tiered_mixed_imported_defined_call_indirect_loop_case(index: int) -> Case:
+    bound = 4096
+
+    def helper(acc: int, i: int) -> int:
+        return u32(acc + u32(i * 3))
+
+    expected = 0
+    for i in range(bound):
+        if i & 1:
+            expected = helper(expected, i)
+        else:
+            expected = u32(expected + i)
+
+    main = bytearray()
+    main += i32_const(0) + local_set(0)
+    main += i32_const(0) + local_set(1)
+    main += b"\x02\x40"
+    main += b"\x03\x40"
+    main += local_get(0) + i32_const(bound) + b"\x4F" + b"\x0D" + uleb(1)
+    main += local_get(1) + local_get(0) + local_get(0) + i32_const(1) + b"\x71" + call_indirect(0) + local_set(1)
+    main += local_get(0) + i32_const(1) + b"\x6A" + local_set(0)
+    main += b"\x0C" + uleb(0)
+    main += b"\x0b\x0b"
+    main += local_get(1) + check_i32(expected)
+    main += b"\x0b"
+
+    helper_body = local_get(0) + local_get(1) + i32_const(3) + b"\x6C\x6A\x0b"
+
+    return Case(
+        name=f"{index:04d}.tiered_mixed_imported_defined_call_indirect_loop",
+        types=[([I32, I32], [I32]), ([], [])],
+        funcs=[Func(1, [(2, I32)], bytes(main)), Func(0, [], helper_body)],
+        entry_func_index=1,
+        has_table=True,
+        table_min=2,
+        table_max=2,
+        table_has_max=True,
+        table_elems=[0, 2],
+        requires_runtime_calls=True,
+        has_local_imported_i32_add=True,
+    )
+
+
 def strategy_cases(start: int) -> list[Case]:
     return [
         local_defined_call_matrix_case(start),
@@ -813,6 +948,10 @@ def strategy_cases(start: int) -> list[Case]:
         tiered_win32_abi_direct_matrix_case(start + 6),
         tiered_win32_abi_osr_call_matrix_case(start + 7),
         local_imported_i32_add_loop_case(start + 8),
+        tiered_local_imported_nested_defined_loop_case(start + 9),
+        tiered_osr_local_imported_loop_case(start + 10),
+        tiered_local_imported_call_indirect_loop_case(start + 11),
+        tiered_mixed_imported_defined_call_indirect_loop_case(start + 12),
     ]
 
 
