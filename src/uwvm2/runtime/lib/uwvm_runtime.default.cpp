@@ -662,6 +662,11 @@ namespace uwvm2::runtime::lib
             // the generated callee, but the still-live interpreter callers are represented only in the logical TLS stack. Keep a
             // bounded snapshot at the exact mixed-stack boundary so trap reporting can recover those callers even if an optimized
             // helper frame or tail path makes the live vector harder to observe at the fatal trap point.
+            // This snapshot is deliberately a fallback source for caller frames, not a replacement for DWARF/native unwind. The
+            // native unwinder still owns generated leaf frames, including inlined LLVM frames when debug/unwind metadata exposes
+            // them; the snapshot only preserves the interpreter side that native unwind has no architectural reason to know about.
+            // Keep the bound small and allocation-free because fatal traps may arrive from signal/terminate paths where allocation,
+            // locking, or walking large diagnostic structures would make the original trap harder to report deterministically.
             inline static constexpr ::std::size_t max_frames{64uz};
 
             ::uwvm2::utils::container::array<call_stack_frame, max_frames> frames{};
@@ -708,6 +713,8 @@ namespace uwvm2::runtime::lib
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            // Active only while a tiered raw JIT entry is executing below an interpreter caller. It lives in the same TLS object as
+            // the logical stack so a trap can merge both views without consulting shared runtime state during unwinding.
             tiered_jit_entry_call_stack_snapshot_t tiered_jit_entry_snapshot{};
 #endif
 
@@ -761,13 +768,20 @@ namespace uwvm2::runtime::lib
             inline constexpr explicit tiered_jit_entry_call_stack_snapshot_guard(call_stack_tls_state& s) noexcept : tls{::std::addressof(s)},
                                                                                                                      saved{s.tiered_jit_entry_snapshot}
             {
+                // Save/restore the previous snapshot because tiered execution can re-enter generated code recursively through
+                // imports or host callbacks. A nested raw-entry trap must see the innermost mixed-stack boundary, while returning
+                // from that nested call must restore the outer boundary for any later trap in the outer JIT activation.
                 auto& snapshot{s.tiered_jit_entry_snapshot};
                 auto const frame_count{s.frames.size()};
+                // Retain the most recent logical frames because they are the only interpreter callers that can appear directly
+                // below the generated activation. Older frames are less useful in a bounded fatal-trap report and would only
+                // increase work on already fragile signal/terminate paths.
                 auto const skip{frame_count > tiered_jit_entry_call_stack_snapshot_t::max_frames
                                     ? frame_count - tiered_jit_entry_call_stack_snapshot_t::max_frames
                                     : 0uz};
                 snapshot.size = frame_count - skip;
                 for(::std::size_t i{}; i != snapshot.size; ++i) { snapshot.frames.index_unchecked(i) = s.frames.index_unchecked(skip + i); }
+                // Set active last so an interrupted observer never treats a partially initialized buffer as a valid fallback stack.
                 snapshot.active = true;
             }
 
@@ -776,6 +790,8 @@ namespace uwvm2::runtime::lib
 
             inline constexpr ~tiered_jit_entry_call_stack_snapshot_guard()
             {
+                // Restoring also clears active for the common non-nested case, preventing a later interpreter-only trap from
+                // accidentally appending stale tiered boundary frames.
                 if(tls != nullptr) [[likely]] { tls->tiered_jit_entry_snapshot = saved; }
             }
         };
@@ -2576,6 +2592,9 @@ namespace uwvm2::runtime::lib
                 // In tiered OSR traps the current faulting frame may be generated code while its callers are still
                 // interpreter frames. Print the native/DWARF-derived JIT frames first so the report starts at the leaf,
                 // then append the remaining interpreter frames below.
+                // Memory-OOB and call_indirect type traps can be raised by runtime helpers with a precise logical wasm frame
+                // already on the TLS stack; for those cases the logical stack is the less lossy source and avoids native helper
+                // frames hiding the wasm caller that actually triggered the trap.
                 dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count, current_trap_kind, ::std::addressof(printed_frames));
             }
 #endif
@@ -2600,6 +2619,9 @@ namespace uwvm2::runtime::lib
                 // Mixed tiered traps need one extra logical source: the interpreter stack captured at the T0-to-JIT boundary.
                 // Native/DWARF frames still decide the generated leaf frames; this pass only fills caller frames that cannot be
                 // discovered by the native unwinder after optimized raw-entry replacement or OSR.
+                // Do this after the live logical stack so ordinary interpreter frames keep their natural order, but use the
+                // duplicate tracker for every source. Without that deduplication, a trap taken just after an OSR/raw-entry handoff
+                // can print the same wasm function once from the native unwind map and again from the saved boundary snapshot.
                 for(::std::size_t i{}; i != tiered_snapshot.size; ++i)
                 {
                     auto const frame_index{tiered_snapshot.size - 1uz - i};
@@ -2618,6 +2640,9 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             if(printed_frame_count == 0uz && use_llvm_jit_unwind_call_stack && !prefer_logical_jit_frames)
             {
+                // If all logical sources were filtered out, make one final native unwind attempt so optimized JIT-only traps still
+                // produce useful output instead of an empty call stack. The tracker remains shared so fallback frames cannot repeat
+                // anything printed by an earlier source.
                 dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul,
                                                                 printed_frame_count,
                                                                 current_trap_kind,
@@ -5172,6 +5197,9 @@ namespace uwvm2::runtime::lib
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(reentry_address)};
             auto& call_stack{get_call_stack()};
+            // OSR transfers control from an interpreter loop into a generated loop body without creating a normal wasm native-call
+            // edge for the interpreter callers. Capture the boundary before the raw entry so a trap inside an inlined or optimized
+            // loop body can still report the interpreter caller chain below the generated frame.
             tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, reinterpret_cast<::std::uintptr_t>(result_buffer), result_bytes, reinterpret_cast<::std::uintptr_t>(local_base), local_bytes);
             if(log_enabled) [[unlikely]] { g_runtime.tiered_osr_ready_count.fetch_add(1uz, ::std::memory_order_relaxed); }
@@ -7751,6 +7779,9 @@ namespace uwvm2::runtime::lib
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             auto& call_stack{get_call_stack()};
+            // A direct tiered call replaces the interpreter callee with a raw JIT entry while the caller remains on the logical
+            // interpreter stack. The guard makes that mixed boundary explicit, which is necessary when LLVM inlines the faulting
+            // callee or folds the raw wrapper such that platform unwind data no longer exposes the original wasm caller chain.
             tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, pointer_to_uintptr(args_begin), result_bytes, pointer_to_uintptr(args_begin), param_bytes);
             *stack_top_ptr = args_begin + result_bytes;
@@ -7801,6 +7832,9 @@ namespace uwvm2::runtime::lib
                 void(UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_PTR_ABI*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             auto& call_stack{get_call_stack()};
+            // Raw-buffer tiered entry has the same unwind hazard as the stack-active path: the generated frame may be visible to
+            // native unwind, but its interpreter-side caller frames live only in TLS. Keep a short boundary snapshot across the
+            // call so traps raised before control returns can merge both views into one wasm call stack.
             tiered_jit_entry_call_stack_snapshot_guard snapshot_guard{call_stack};
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             record_tiered_llvm_jit_switch(rec);
