@@ -350,9 +350,25 @@ namespace
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
         ::uwvm2::uwvm::io::enable_runtime_log = false;
+        if(auto const env{::std::getenv("UWVM_BACKEND_FUZZER_RUNTIME_LOG")};
+           env != nullptr && env[0] != '\0' && !(env[0] == '0' && env[1] == '\0'))
+        {
+            ::uwvm2::uwvm::io::enable_runtime_log = true;
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_dup, ::fast_io::u8err());
+        }
         rtmode::runtime_compile_threads_existed = true;
         rtmode::global_runtime_compile_threads = 0;
         rtmode::global_runtime_compile_threads_resolved = 0;
+        if(auto const env{::std::getenv("UWVM_BACKEND_FUZZER_RUNTIME_THREADS")}; env != nullptr && env[0] != '\0')
+        {
+            char* end{};
+            auto const value{::std::strtoll(env, ::std::addressof(end), 10)};
+            if(end != env && *end == '\0' && value >= 0)
+            {
+                rtmode::global_runtime_compile_threads = static_cast<rtmode::runtime_compile_threads_type>(value);
+                rtmode::global_runtime_compile_threads_resolved = static_cast<::std::size_t>(value);
+            }
+        }
         rtmode::runtime_scheduling_policy_existed = true;
         rtmode::global_runtime_scheduling_policy = rtmode::runtime_scheduling_policy_t::function_count;
         rtmode::global_runtime_scheduling_size = 1uz;

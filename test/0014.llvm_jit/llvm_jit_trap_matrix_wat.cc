@@ -31,14 +31,19 @@ namespace
     };
 
     inline constexpr ::std::array fixtures{
-        fixture_t{"oob_load",           "oob_load.wat"          },
-        fixture_t{"oob_store",          "oob_store.wat"         },
-        fixture_t{"divide_zero",        "divide_zero.wat"       },
-        fixture_t{"i64_divide_zero",    "i64_divide_zero.wat"   },
-        fixture_t{"integer_overflow",   "integer_overflow.wat"  },
-        fixture_t{"invalid_conversion", "invalid_conversion.wat"},
-        fixture_t{"unreachable",        "unreachable.wat"       },
-        fixture_t{"call_indirect_null", "call_indirect_null.wat"},
+        fixture_t{"oob_load",                        "oob_load.wat"                       },
+        fixture_t{"oob_store",                       "oob_store.wat"                      },
+        fixture_t{"divide_zero",                     "divide_zero.wat"                    },
+        fixture_t{"i64_divide_zero",                 "i64_divide_zero.wat"                },
+        fixture_t{"integer_overflow",                "integer_overflow.wat"               },
+        fixture_t{"invalid_conversion",              "invalid_conversion.wat"             },
+        fixture_t{"invalid_conversion_f64_i64",      "invalid_conversion_f64_i64.wat"     },
+        fixture_t{"invalid_conversion_f32_overflow", "invalid_conversion_f32_overflow.wat"},
+        fixture_t{"invalid_conversion_f64_overflow", "invalid_conversion_f64_overflow.wat"},
+        fixture_t{"unreachable",                     "unreachable.wat"                    },
+        fixture_t{"call_indirect_null",              "call_indirect_null.wat"             },
+        fixture_t{"call_indirect_oob",               "call_indirect_oob.wat"              },
+        fixture_t{"call_indirect_type",              "call_indirect_type.wat"             },
     };
 
     inline constexpr ::std::array modes{
