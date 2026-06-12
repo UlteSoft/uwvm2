@@ -2582,19 +2582,31 @@ namespace uwvm2::runtime::lib
             ::std::size_t printed_frame_count{};
             printed_call_stack_frame_tracker printed_frames{};
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            auto const& tiered_snapshot_for_trap{get_call_stack().tiered_jit_entry_snapshot};
+            auto const tiered_snapshot_active_for_native_order{tiered_snapshot_for_trap.active};
+#endif
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             auto const use_llvm_jit_unwind_call_stack{runtime_llvm_jit_unwind_call_stack_requested()};
-            auto const prefer_logical_jit_frames{
-                use_llvm_jit_unwind_call_stack && n != 0uz &&
-                (current_trap_kind == trap_kind::memory_out_of_bounds || current_trap_kind == trap_kind::call_indirect_type_mismatch)};
-            if(use_llvm_jit_unwind_call_stack && !prefer_logical_jit_frames)
+            auto const defer_native_jit_frames{
+                use_llvm_jit_unwind_call_stack && n != 0uz && current_trap_kind == trap_kind::call_indirect_type_mismatch
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                && !tiered_snapshot_active_for_native_order
+# endif
+            };
+            if(use_llvm_jit_unwind_call_stack && !defer_native_jit_frames)
             {
                 // In tiered OSR traps the current faulting frame may be generated code while its callers are still
                 // interpreter frames. Print the native/DWARF-derived JIT frames first so the report starts at the leaf,
                 // then append the remaining interpreter frames below.
-                // Memory-OOB and call_indirect type traps can be raised by runtime helpers with a precise logical wasm frame
-                // already on the TLS stack; for those cases the logical stack is the less lossy source and avoids native helper
-                // frames hiding the wasm caller that actually triggered the trap.
+                // Memory-OOB is allowed to use native unwind first because this helper prints only resolved wasm frames and the
+                // duplicate tracker removes any frame later seen through TLS. This is important for OSR/inline traps where the
+                // live logical stack can miss an optimized host-entry frame that DWARF/native unwind can still recover.
+                // call_indirect type mismatch stays logical-first because the runtime already knows the exact mismatched table
+                // target, and native raw-wrapper frames can otherwise make the diagnostic less precise.
+                // The exception is an active tiered OSR snapshot: in that mixed stack the logical side starts at the interpreter
+                // caller below the generated OSR body, while native/DWARF unwind is the only source for the optimized JIT leaf.
                 dump_llvm_jit_unwind_call_stack_frames_for_trap(u8log_output_ul, printed_frame_count, current_trap_kind, ::std::addressof(printed_frames));
             }
 #endif
@@ -2613,7 +2625,7 @@ namespace uwvm2::runtime::lib
             }
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            auto const& tiered_snapshot{get_call_stack().tiered_jit_entry_snapshot};
+            auto const& tiered_snapshot{tiered_snapshot_for_trap};
             if(tiered_snapshot.active)
             {
                 // Mixed tiered traps need one extra logical source: the interpreter stack captured at the T0-to-JIT boundary.
@@ -2638,7 +2650,7 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(printed_frame_count == 0uz && use_llvm_jit_unwind_call_stack && !prefer_logical_jit_frames)
+            if(printed_frame_count == 0uz && use_llvm_jit_unwind_call_stack)
             {
                 // If all logical sources were filtered out, make one final native unwind attempt so optimized JIT-only traps still
                 // produce useful output instead of an empty call stack. The tracker remains shared so fallback frames cannot repeat
@@ -3587,6 +3599,19 @@ namespace uwvm2::runtime::lib
             // Convert the runtime call-stack policy into codegen switches before IR is emitted.
             validate_runtime_llvm_jit_unwind_call_stack_or_fatal();
             opt.emit_call_stack_frames = runtime_llvm_jit_uses_instruction_call_stack_frames();
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            // Tiered/no-T0 has no interpreter caller stack to merge with native unwind. Runtime-helper traps such as
+            // call_indirect type mismatch can be reached after LLVM has inlined or folded the generated call chain, leaving
+            // platform unwind with only the raw entry frame. Keep the lightweight logical frame instrumentation enabled in this
+            // specific unwind configuration so the fatal reporter can recover the wasm caller chain through TLS.
+            // Do not use tiered_runtime_active() here: compile options are configured during lazy initialization before
+            // g_runtime.lazy_compile_active is set, so the execution-time predicate would incorrectly disable this fallback.
+            auto const tiered_backend_for_call_stack{
+                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
+            opt.emit_call_stack_frames =
+                opt.emit_call_stack_frames || (runtime_llvm_jit_unwind_call_stack_requested() && tiered_backend_for_call_stack && !tiered_t0_enabled());
+# endif
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
             // Some Win64 trap sites are synthetic pre-dispatch checks or detailed runtime bridges where SEH can only
             // recover the JIT leaf. Keep logical frames available so diagnostics can avoid reporting a partial stack.
@@ -12593,6 +12618,12 @@ namespace uwvm2::runtime::lib
                                     }
                                     else
                                     {
+                                        // T0-enabled tiered mode can still enter a published raw JIT entry directly from the host
+                                        // when unwind mode or prior preparation made the entry target ready before dispatch. Keep the
+                                        // wasm entry frame on the logical stack so OSR/full-ready traps below it can merge the host
+                                        // entry edge with native unwind output instead of losing func_idx=entry.
+                                        auto& call_stack{get_call_stack()};
+                                        call_stack_guard g{call_stack, llvm_jit_entry_module_id, llvm_jit_entry_function_index};
                                         entry_fn(context_address,
                                                  pointer_to_uintptr(cfg.entry_abi_buffers.result_buffer),
                                                  result_bytes,
