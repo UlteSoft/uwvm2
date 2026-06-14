@@ -105,13 +105,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
     using u32string = ::uwvm2::utils::container::basic_string<char32_t>;
 
     template <::std::integral chartype, typename allocator = ::fast_io::native_global_allocator>
-    using basic_ostring_ref_uwvm = ::fast_io::io_strlike_reference_wrapper<chartype, ::uwvm2::utils::container::basic_string<chartype, allocator>>;
+    using basic_string_ref_uwvm = ::fast_io::io_strlike_reference_wrapper<chartype, ::uwvm2::utils::container::basic_string<chartype, allocator>>;
 
-    using ostring_ref_uwvm = ::uwvm2::utils::container::basic_ostring_ref_uwvm<char>;
-    using wostring_ref_uwvm = ::uwvm2::utils::container::basic_ostring_ref_uwvm<wchar_t>;
-    using u8ostring_ref_uwvm = ::uwvm2::utils::container::basic_ostring_ref_uwvm<char8_t>;
-    using u16ostring_ref_uwvm = ::uwvm2::utils::container::basic_ostring_ref_uwvm<char16_t>;
-    using u32ostring_ref_uwvm = ::uwvm2::utils::container::basic_ostring_ref_uwvm<char32_t>;
+    using string_ref_uwvm = ::uwvm2::utils::container::basic_string_ref_uwvm<char>;
+    using wstring_ref_uwvm = ::uwvm2::utils::container::basic_string_ref_uwvm<wchar_t>;
+    using u8string_ref_uwvm = ::uwvm2::utils::container::basic_string_ref_uwvm<char8_t>;
+    using u16string_ref_uwvm = ::uwvm2::utils::container::basic_string_ref_uwvm<char16_t>;
+    using u32string_ref_uwvm = ::uwvm2::utils::container::basic_string_ref_uwvm<char32_t>;
 
     namespace tlc
     {
@@ -125,13 +125,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
         using u32string = ::uwvm2::utils::container::tlc::basic_string<char32_t>;
 
         template <::std::integral chartype, typename allocator = ::fast_io::native_thread_local_allocator>
-        using basic_ostring_ref_uwvm_tlc = ::fast_io::io_strlike_reference_wrapper<chartype, ::uwvm2::utils::container::tlc::basic_string<chartype, allocator>>;
+        using basic_string_ref_uwvm_tlc = ::fast_io::io_strlike_reference_wrapper<chartype, ::uwvm2::utils::container::tlc::basic_string<chartype, allocator>>;
 
-        using ostring_ref_uwvm_tlc = basic_ostring_ref_uwvm_tlc<char>;
-        using wostring_ref_uwvm_tlc = basic_ostring_ref_uwvm_tlc<wchar_t>;
-        using u8ostring_ref_uwvm_tlc = basic_ostring_ref_uwvm_tlc<char8_t>;
-        using u16ostring_ref_uwvm_tlc = basic_ostring_ref_uwvm_tlc<char16_t>;
-        using u32ostring_ref_uwvm_tlc = basic_ostring_ref_uwvm_tlc<char32_t>;
+        using string_ref_uwvm_tlc = basic_string_ref_uwvm_tlc<char>;
+        using wstring_ref_uwvm_tlc = basic_string_ref_uwvm_tlc<wchar_t>;
+        using u8string_ref_uwvm_tlc = basic_string_ref_uwvm_tlc<char8_t>;
+        using u16string_ref_uwvm_tlc = basic_string_ref_uwvm_tlc<char16_t>;
+        using u32string_ref_uwvm_tlc = basic_string_ref_uwvm_tlc<char32_t>;
     }  // namespace tlc
 
     /// @brief vector

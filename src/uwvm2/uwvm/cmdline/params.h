@@ -103,6 +103,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_full_policy),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_call_stack),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_disable_ir_verifaction),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_no_sign),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_no_verify),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_path),
 # endif
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_uwvm_int_lazy_interpreter),

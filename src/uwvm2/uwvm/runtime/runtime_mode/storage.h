@@ -100,6 +100,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         unwind,
         unwind_uncheck
     };
+
+    enum class runtime_llvm_jit_cache_path_mode_t : unsigned
+    {
+        default_path,
+        disabled,
+        custom_path
+    };
 #endif
 
     inline bool custom_runtime_mode_existed{};      // [global]
@@ -193,6 +200,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache signature generation is disabled by command line.
+    inline bool runtime_llvm_jit_cache_no_sign{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache signature verification is disabled by command line.
+    inline bool runtime_llvm_jit_cache_no_verify{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache path mode was explicitly configured.
+    inline bool runtime_llvm_jit_cache_path_existed{};  // [global]
+
+    /// @brief Runtime LLVM JIT cache path mode.
+    inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{
+        runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
+
+    /// @brief Runtime LLVM JIT custom cache directory path.
+    inline ::uwvm2::utils::container::u8string global_runtime_llvm_jit_cache_path{};  // [global]
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)

@@ -70,6 +70,7 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
+# include <uwvm2/runtime/llvm_jit_cache/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -742,7 +743,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 return false;
             }
 
-            auto raw_engine{
+            auto const llvm_jit_cache_key{::uwvm2::utils::container::u8concat_uwvm(
+                u8"lazy-single:", all_details::get_uwvm_u8string_view(llvm_module->getModuleIdentifier()))};
+            auto const llvm_jit_cache_codegen_policy{
+                ::uwvm2::utils::container::u8concat_uwvm(u8"lazy-single;codegen=", static_cast<unsigned>(options.codegen_opt_level))};
+            auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
+                *target_machine)};
+            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
+                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+            
+                auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
@@ -756,6 +768,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+
+            engine->setObjectCache(::std::addressof(llvm_jit_object_cache));
             if(options.jit_event_listener != nullptr)
             {
                 // Lazy unwind call-stack mode needs DWARF sections as well as executable sections so optimized inline
@@ -764,6 +778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
             auto const function_index{import_func_count + local_function_index};
@@ -865,7 +880,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 return false;
             }
 
-            auto raw_engine{
+            auto const llvm_jit_cache_key{::uwvm2::utils::container::u8concat_uwvm(
+                u8"lazy-group:", all_details::get_uwvm_u8string_view(llvm_module->getModuleIdentifier()))};
+            auto const llvm_jit_cache_codegen_policy{
+                ::uwvm2::utils::container::u8concat_uwvm(u8"lazy-group;codegen=", static_cast<unsigned>(options.codegen_opt_level))};
+            auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
+                *target_machine)};
+            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
+                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+            
+                auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
@@ -879,6 +905,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+            
+            engine->setObjectCache(::std::addressof(llvm_jit_object_cache));
             if(options.jit_event_listener != nullptr)
             {
                 // Lazy group materialization can inline or split functions across one MCJIT object; keep DWARF metadata
@@ -887,6 +915,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
             using wasm_u32 = all_details::validation_module_traits_t::wasm_u32;

@@ -200,6 +200,7 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_cu_from_lazy_validator/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
+# include <uwvm2/runtime/llvm_jit_cache/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
@@ -9981,6 +9982,21 @@ namespace uwvm2::runtime::lib
                 }
             }
 
+            auto const llvm_jit_cache_key{::uwvm2::utils::container::u8concat_uwvm(u8"full:", rec.module_name)};
+            auto const llvm_jit_cache_codegen_policy{
+                ::uwvm2::utils::container::u8concat_uwvm(u8"full;pipeline=",
+                                                         get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline),
+                                                         u8";codegen=",
+                                                         get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level),
+                                                         u8";policy=",
+                                                         full_materialize_strategy.policy_name,
+                                                         u8";call_stack=",
+                                                         get_runtime_llvm_jit_call_stack_mode_name())};
+            auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
+                *target_machine)};
+
             ::llvm::ExecutionEngine* raw_engine{};
             if(use_parallel_objects)
             {
@@ -10034,6 +10050,9 @@ namespace uwvm2::runtime::lib
             // From this point the ExecutionEngine owns the target machine and all executable allocations are tracked by rec.
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
+            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
+                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+            if(!use_parallel_objects) { llvm_jit_engine->setObjectCache(::std::addressof(llvm_jit_object_cache)); }
             if(runtime_llvm_jit_unwind_call_stack_requested())
             {
                 // Preserve non-executable metadata sections for the debug listener/fallback object copy.  Optimized inline
@@ -10095,6 +10114,7 @@ namespace uwvm2::runtime::lib
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-start module=\"", rec.module_name, u8"\"");
             // finalizeObject performs relocation, memory permission changes, and JIT event notifications.
             llvm_jit_engine->finalizeObject();
+            if(!use_parallel_objects) { llvm_jit_engine->setObjectCache(nullptr); }
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-end module=\"",
                                                   rec.module_name,
                                                   u8"\" time=",
