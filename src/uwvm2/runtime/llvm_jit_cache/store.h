@@ -45,6 +45,10 @@
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include "format.h"
 # include "compress.h"
+# if !defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
+#  error "LLVM JIT cache Ed25519 signatures require OpenSSL."
+# endif
+# include <openssl/evp.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -55,7 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
     namespace details
     {
-        using sha256_digest = ::uwvm2::utils::container::array<::std::byte, ::uwvm2::runtime::llvm_jit_cache::cache_hmac_sha256_size>;
+        using sha256_digest = ::uwvm2::utils::container::array<::std::byte, ::uwvm2::runtime::llvm_jit_cache::cache_sha256_digest_size>;
 
         inline constexpr void append_hex_byte(::uwvm2::utils::container::u8string& out, ::std::byte b) noexcept
         {
@@ -86,62 +90,113 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             auto const digest{sha256_bytes(bytes.cbegin(), bytes.cend())};
             ::uwvm2::utils::container::u8string out{};
-            out.reserve(::uwvm2::runtime::llvm_jit_cache::cache_hmac_sha256_size * 2uz);
+            out.reserve(::uwvm2::runtime::llvm_jit_cache::cache_sha256_digest_size * 2uz);
             for(auto b: digest) { append_hex_byte(out, b); }
             return out;
         }
 
-        [[nodiscard]] inline constexpr sha256_digest hmac_sha256_identity(cache_context const& ctx,
-                                                                          ::uwvm2::utils::container::vector<::std::byte> const& header,
-                                                                          ::uwvm2::utils::container::vector<::std::byte> const& isa_metadata,
-                                                                          ::uwvm2::utils::container::vector<::std::byte> const& context_metadata,
-                                                                          ::uwvm2::utils::container::vector<::std::byte> const& payload) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte>
+            ed25519_signature_message(::uwvm2::utils::container::vector<::std::byte> const& header,
+                                      ::uwvm2::utils::container::vector<::std::byte> const& isa_metadata,
+                                      ::uwvm2::utils::container::vector<::std::byte> const& context_metadata,
+                                      ::uwvm2::utils::container::vector<::std::byte> const& payload) noexcept
         {
-            constexpr ::std::size_t block_size{64uz};
-            ::uwvm2::utils::container::array<::std::byte, block_size> key_block{};
-
-            auto const identity_first{reinterpret_cast<::std::byte const*>(ctx.identity.cbegin())};
-            auto const identity_last{reinterpret_cast<::std::byte const*>(ctx.identity.cend())};
-            auto const ctx_identity_size{ctx.identity.size()};
-            if(ctx_identity_size > block_size)
-            {
-                auto const hashed{sha256_bytes(identity_first, identity_last)};
-                ::std::copy(hashed.begin(), hashed.end(), key_block.begin());
-            }
-            else if(ctx_identity_size != 0uz) { ::std::copy(identity_first, identity_last, key_block.begin()); }
-
-            ::uwvm2::utils::container::array<::std::byte, block_size> ipad{};
-            ::uwvm2::utils::container::array<::std::byte, block_size> opad{};
-            for(::std::size_t i{}; i != block_size; ++i)
-            {
-                ipad[i] = static_cast<::std::byte>(::std::to_integer<unsigned>(key_block[i]) ^ 0x36u);
-                opad[i] = static_cast<::std::byte>(::std::to_integer<unsigned>(key_block[i]) ^ 0x5cu);
-            }
-
-            ::fast_io::sha256_context inner{};
-            sha256_update(inner, ipad.cbegin(), ipad.cend());
-            sha256_update(inner, header.cbegin(), header.cend());
-            sha256_update(inner, isa_metadata.cbegin(), isa_metadata.cend());
-            sha256_update(inner, context_metadata.cbegin(), context_metadata.cend());
-            sha256_update(inner, payload.cbegin(), payload.cend());
-            inner.do_final();
-            sha256_digest inner_digest{};
-            inner.digest_to_byte_ptr(inner_digest.data());
-
-            ::fast_io::sha256_context outer{};
-            sha256_update(outer, opad.cbegin(), opad.cend());
-            sha256_update(outer, inner_digest.cbegin(), inner_digest.cend());
-            outer.do_final();
-            sha256_digest out{};
-            outer.digest_to_byte_ptr(out.data());
-            return out;
+            ::uwvm2::utils::container::vector<::std::byte> message{};
+            message.reserve(header.size() + isa_metadata.size() + context_metadata.size() + payload.size());
+            append_bytes(message, header.cbegin(), header.cend());
+            append_bytes(message, isa_metadata.cbegin(), isa_metadata.cend());
+            append_bytes(message, context_metadata.cbegin(), context_metadata.cend());
+            append_bytes(message, payload.cbegin(), payload.cend());
+            return message;
         }
 
-        [[nodiscard]] inline constexpr bool constant_time_equal(::std::byte const* first, ::std::byte const* last, ::std::byte const* expected) noexcept
+        [[nodiscard]] inline constexpr bool ed25519_identity_sign(cache_context const& ctx,
+                                                                  ::uwvm2::utils::container::vector<::std::byte> const& header,
+                                                                  ::uwvm2::utils::container::vector<::std::byte> const& isa_metadata,
+                                                                  ::uwvm2::utils::container::vector<::std::byte> const& context_metadata,
+                                                                  ::uwvm2::utils::container::vector<::std::byte> const& payload,
+                                                                  ::uwvm2::utils::container::vector<::std::byte>& signature) noexcept
         {
-            unsigned diff{};
-            for(; first != last; ++first, ++expected) { diff |= ::std::to_integer<unsigned>(*first) ^ ::std::to_integer<unsigned>(*expected); }
-            return diff == 0u;
+#if defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
+            if(!ctx.has_signature_seed) { return false; }
+            auto const message{ed25519_signature_message(header, isa_metadata, context_metadata, payload)};
+            auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
+            auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
+            if(private_key == nullptr) { return false; }
+
+            auto md_ctx{::EVP_MD_CTX_new()};
+            if(md_ctx == nullptr)
+            {
+                ::EVP_PKEY_free(private_key);
+                return false;
+            }
+
+            ::std::size_t signature_size{cache_ed25519_signature_size};
+            signature.resize(signature_size);
+            auto const ok{::EVP_DigestSignInit(md_ctx, nullptr, nullptr, nullptr, private_key) == 1 &&
+                          ::EVP_DigestSign(md_ctx,
+                                           reinterpret_cast<unsigned char*>(signature.data()),
+                                           ::std::addressof(signature_size),
+                                           reinterpret_cast<unsigned char const*>(message.data()),
+                                           message.size()) == 1};
+            ::EVP_MD_CTX_free(md_ctx);
+            ::EVP_PKEY_free(private_key);
+            if(!ok) { return false; }
+            signature.resize(signature_size);
+            return signature_size == cache_ed25519_signature_size;
+#else
+# error "LLVM JIT cache Ed25519 signatures require OpenSSL."
+#endif
+        }
+
+        [[nodiscard]] inline constexpr bool ed25519_identity_verify(cache_context const& ctx,
+                                                                    ::uwvm2::utils::container::vector<::std::byte> const& header,
+                                                                    ::uwvm2::utils::container::vector<::std::byte> const& isa_metadata,
+                                                                    ::uwvm2::utils::container::vector<::std::byte> const& context_metadata,
+                                                                    ::std::byte const* signature,
+                                                                    ::uwvm2::utils::container::vector<::std::byte> const& payload) noexcept
+        {
+#if defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
+            if(!ctx.has_signature_seed || signature == nullptr) { return false; }
+            auto const message{ed25519_signature_message(header, isa_metadata, context_metadata, payload)};
+            auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
+            auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
+            if(private_key == nullptr) { return false; }
+
+            ::uwvm2::utils::container::array<::std::byte, 32uz> public_key{};
+            ::std::size_t public_key_size{public_key.size()};
+            auto const public_key_ok{::EVP_PKEY_get_raw_public_key(private_key,
+                                                                    reinterpret_cast<unsigned char*>(public_key.data()),
+                                                                    ::std::addressof(public_key_size)) == 1 &&
+                                     public_key_size == public_key.size()};
+            ::EVP_PKEY_free(private_key);
+            if(!public_key_ok) { return false; }
+
+            auto verify_key{::EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519,
+                                                          nullptr,
+                                                          reinterpret_cast<unsigned char const*>(public_key.data()),
+                                                          public_key.size())};
+            if(verify_key == nullptr) { return false; }
+
+            auto md_ctx{::EVP_MD_CTX_new()};
+            if(md_ctx == nullptr)
+            {
+                ::EVP_PKEY_free(verify_key);
+                return false;
+            }
+
+            auto const ok{::EVP_DigestVerifyInit(md_ctx, nullptr, nullptr, nullptr, verify_key) == 1 &&
+                          ::EVP_DigestVerify(md_ctx,
+                                             reinterpret_cast<unsigned char const*>(signature),
+                                             cache_ed25519_signature_size,
+                                             reinterpret_cast<unsigned char const*>(message.data()),
+                                             message.size()) == 1};
+            ::EVP_MD_CTX_free(md_ctx);
+            ::EVP_PKEY_free(verify_key);
+            return ok;
+#else
+# error "LLVM JIT cache Ed25519 signatures require OpenSSL."
+#endif
         }
 
         [[nodiscard]] inline constexpr bool cache_path_separator(char8_t ch) noexcept
@@ -419,9 +474,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr bool valid_signature_shape(cache_blob_view const& view) noexcept
         {
             if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::none)) { return view.header.signature_size == 0u; }
-            if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::hmac_sha256_identity))
+            if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::ed25519_identity))
             {
-                return view.header.signature_size == cache_hmac_sha256_size;
+                return view.header.signature_size == cache_ed25519_signature_size;
             }
             return true;
         }
@@ -489,21 +544,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             header.version = cache_format_version;
             header.fixed_header_size = static_cast<::std::uint_least32_t>(cache_fixed_header_size);
             header.compression = static_cast<::std::uint_least32_t>(compression);
-            header.signature = policy.generate_signature ? static_cast<::std::uint_least32_t>(signature_kind::hmac_sha256_identity)
+            header.signature = policy.generate_signature ? static_cast<::std::uint_least32_t>(signature_kind::ed25519_identity)
                                                          : static_cast<::std::uint_least32_t>(signature_kind::none);
             header.uncompressed_size = static_cast<::std::uint_least64_t>(size);
             header.payload_size = static_cast<::std::uint_least64_t>(payload.size());
             header.isa_metadata_size = static_cast<::std::uint_least64_t>(isa_metadata.size());
             header.context_metadata_size = static_cast<::std::uint_least64_t>(context_metadata.size());
-            header.signature_size = policy.generate_signature ? cache_hmac_sha256_size : 0uz;
+            header.signature_size = policy.generate_signature ? cache_ed25519_signature_size : 0uz;
 
             auto header_bytes{serialize_fixed_header(header)};
             ::uwvm2::utils::container::vector<::std::byte> signature{};
             if(policy.generate_signature)
             {
-                auto const digest{details::hmac_sha256_identity(ctx, header_bytes, isa_metadata, context_metadata, payload)};
-                signature.reserve(digest.size());
-                details::append_bytes(signature, digest.cbegin(), digest.cend());
+                if(!cache_ed25519_identity_signature_available) { return cache_status::unsupported_signature; }
+                signature.reserve(cache_ed25519_signature_size);
+                if(!details::ed25519_identity_sign(ctx, header_bytes, isa_metadata, context_metadata, payload, signature)) { return cache_status::unsupported_signature; }
+                if(signature.size() != cache_ed25519_signature_size) [[unlikely]] { return cache_status::unsupported_signature; }
             }
 
             ::uwvm2::utils::container::vector<::std::byte> blob{};
@@ -598,7 +654,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                     result.status = cache_status::signature_missing;
                     return result;
                 }
-                if(view.header.signature != static_cast<::std::uint_least32_t>(signature_kind::hmac_sha256_identity))
+                if(view.header.signature != static_cast<::std::uint_least32_t>(signature_kind::ed25519_identity))
+                {
+                    result.status = cache_status::unsupported_signature;
+                    return result;
+                }
+                if(!cache_ed25519_identity_signature_available)
                 {
                     result.status = cache_status::unsupported_signature;
                     return result;
@@ -621,8 +682,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 payload.reserve(payload_size);
                 details::append_bytes(payload, view.payload, view.payload + payload_size);
 
-                auto const digest{details::hmac_sha256_identity(ctx, header_bytes, isa_metadata, context_metadata, payload)};
-                if(!details::constant_time_equal(view.signature, view.signature + cache_hmac_sha256_size, digest.data()))
+                if(!details::ed25519_identity_verify(ctx, header_bytes, isa_metadata, context_metadata, view.signature, payload))
                 {
                     result.status = cache_status::signature_mismatch;
                     return result;

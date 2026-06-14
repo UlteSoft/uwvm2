@@ -36,6 +36,10 @@ module;
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 #include <fast_io_device.h>
+#if !defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
+# error "LLVM JIT cache Ed25519 signatures require OpenSSL."
+#endif
+#include <openssl/evp.h>
 
 export module uwvm2.runtime.llvm_jit_cache:store;
 

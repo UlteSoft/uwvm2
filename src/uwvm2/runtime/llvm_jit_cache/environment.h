@@ -25,6 +25,7 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
+# include <concepts>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -44,6 +45,7 @@
 # endif
 // import
 # include <fast_io.h>
+# include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include "format.h"
@@ -106,6 +108,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
             ::fast_io::io::print(ref, v);
+        }
+
+        inline constexpr void seed_sha256_update(::fast_io::sha256_context& sha, ::std::byte const* first, ::std::byte const* last) noexcept
+        {
+            if(first != last) { sha.update(first, last); }
+        }
+
+        inline constexpr void seed_sha256_update(::fast_io::sha256_context& sha, ::uwvm2::utils::container::u8string const& v) noexcept
+        { seed_sha256_update(sha, reinterpret_cast<::std::byte const*>(v.cbegin()), reinterpret_cast<::std::byte const*>(v.cend())); }
+
+        template <::std::size_t N>
+        inline constexpr void seed_sha256_update_literal(::fast_io::sha256_context& sha, char8_t const (&v)[N]) noexcept
+        { seed_sha256_update(sha, reinterpret_cast<::std::byte const*>(v), reinterpret_cast<::std::byte const*>(v + N - 1uz)); }
+
+        template <::std::integral T>
+        inline constexpr void seed_sha256_update_le(::fast_io::sha256_context& sha, T v) noexcept
+        {
+            auto const le{::fast_io::little_endian(v)};
+            auto const first{reinterpret_cast<::std::byte const*>(::std::addressof(le))};
+            seed_sha256_update(sha, first, first + sizeof(le));
         }
 
 #if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
@@ -305,26 +327,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         return default_cache_directory();
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string collect_user_identity() noexcept
-    {
-        ::uwvm2::utils::container::u8string out{};
-        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
-#if defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
-        ::fast_io::io::print(ref, u8"uid=", static_cast<::std::uint_least64_t>(::getuid()));
-#elif defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
-        ::fast_io::io::print(ref, u8"winuser=");
-# ifndef _WIN32_WINDOWS
-        if(auto const user{details::win32_environment_variable(u"USERNAME")}; !user.empty()) { ::fast_io::io::print(ref, user); }
-# else
-        if(auto const user{details::win32_environment_variable("USERNAME")}; !user.empty()) { ::fast_io::io::print(ref, user); }
-# endif
-        else { ::fast_io::io::print(ref, u8"unknown"); }
-#else
-        ::fast_io::io::print(ref, u8"user=unknown");
-#endif
-        return out;
-    }
-
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string collect_target_triple() noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -399,14 +401,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 #endif
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string collect_signature_identity(cache_context const& ctx) noexcept
-    {
-        auto out{collect_user_identity()};
-        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
-        ::fast_io::io::print(ref, u8";target=", ctx.target_triple, u8";cpu=", ctx.cpu_name, u8";features=", ctx.cpu_features);
-        return out;
-    }
-
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string default_codegen_policy_name() noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
@@ -421,6 +415,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
     }
 
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size>
+        collect_signature_seed(cache_context const& ctx) noexcept
+    {
+        ::fast_io::sha256_context sha{};
+        details::seed_sha256_update_literal(sha, u8"uwvm2-llvm-jit-cache-ed25519-seed-v1");
+#if defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
+        details::seed_sha256_update_literal(sha, u8"posix-user");
+        details::seed_sha256_update_le(sha, static_cast<::std::uint_least64_t>(::getuid()));
+#elif defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
+        details::seed_sha256_update_literal(sha, u8"win32-user");
+# ifndef _WIN32_WINDOWS
+        details::seed_sha256_update(sha, details::win32_environment_variable(u"USERNAME"));
+# else
+        details::seed_sha256_update(sha, details::win32_environment_variable("USERNAME"));
+# endif
+#else
+        details::seed_sha256_update_literal(sha, u8"unknown-user");
+#endif
+        details::seed_sha256_update_literal(sha, u8"target");
+        details::seed_sha256_update(sha, ctx.target_triple);
+        details::seed_sha256_update_literal(sha, u8"cpu");
+        details::seed_sha256_update(sha, ctx.cpu_name);
+        details::seed_sha256_update_literal(sha, u8"features");
+        details::seed_sha256_update(sha, ctx.cpu_features);
+        details::seed_sha256_update_literal(sha, u8"codegen");
+        details::seed_sha256_update(sha, ctx.codegen_policy);
+        sha.do_final();
+
+        ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> out{};
+        sha.digest_to_byte_ptr(out.data());
+        return out;
+    }
+
     [[nodiscard]] inline constexpr cache_policy default_cache_policy() noexcept
     {
         cache_policy policy{};
@@ -430,6 +457,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         policy.generate_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_sign;
         policy.verify_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_verify;
 #endif
+        if(policy.enable && (policy.generate_signature || policy.verify_signature) && !cache_ed25519_identity_signature_available) { policy.enable = false; }
         return policy;
     }
 
@@ -451,7 +479,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::u8string_ref_uwvm codegen_policy_ref{::std::addressof(ctx.codegen_policy)};
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
-        ctx.identity = collect_signature_identity(ctx);
+        ctx.signature_seed = collect_signature_seed(ctx);
+        ctx.has_signature_seed = true;
         return ctx;
     }
 
@@ -475,7 +504,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::u8string_ref_uwvm codegen_policy_ref{::std::addressof(ctx.codegen_policy)};
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
-        ctx.identity = collect_signature_identity(ctx);
+        ctx.signature_seed = collect_signature_seed(ctx);
+        ctx.has_signature_seed = true;
         return ctx;
     }
 #endif

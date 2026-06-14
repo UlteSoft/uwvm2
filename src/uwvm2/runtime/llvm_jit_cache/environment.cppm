@@ -24,6 +24,7 @@ module;
 
 // std
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -45,6 +46,7 @@ module;
 export module uwvm2.runtime.llvm_jit_cache:environment;
 
 import fast_io;
+import fast_io_crypto;
 import uwvm2.utils.container;
 import uwvm2.uwvm.runtime.runtime_mode;
 import :format;

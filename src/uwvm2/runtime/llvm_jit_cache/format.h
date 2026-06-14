@@ -75,8 +75,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     enum class signature_kind : ::std::uint_least32_t
     {
         none = 0u,
-        hmac_sha256_identity = 1u
+        ed25519_identity = 1u
     };
+
+    inline constexpr ::std::size_t cache_ed25519_seed_size{32uz};
 
     struct cache_policy
     {
@@ -94,10 +96,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::u8string target_triple{};
         ::uwvm2::utils::container::u8string cpu_name{};
         ::uwvm2::utils::container::u8string cpu_features{};
-        ::uwvm2::utils::container::u8string identity{};
         ::uwvm2::utils::container::u8string llvm_version{};
         ::uwvm2::utils::container::u8string uwvm_abi{};
         ::uwvm2::utils::container::u8string codegen_policy{};
+        ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> signature_seed{};
+        bool has_signature_seed{};
     };
 
     struct cache_load_result
@@ -139,9 +142,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                 ::std::byte{'J'},
                                                 ::std::byte{'C'},
                                                 ::std::byte{0x01u}};
-    inline constexpr ::std::uint_least32_t cache_format_version{1u};
+    inline constexpr ::std::uint_least32_t cache_format_version{2u};
     inline constexpr ::std::size_t cache_fixed_header_size{64uz};
-    inline constexpr ::std::size_t cache_hmac_sha256_size{32uz};
+    inline constexpr ::std::size_t cache_sha256_digest_size{32uz};
+    inline constexpr ::std::size_t cache_ed25519_signature_size{64uz};
+    inline constexpr bool cache_ed25519_identity_signature_available{true};
 
     namespace details
     {
