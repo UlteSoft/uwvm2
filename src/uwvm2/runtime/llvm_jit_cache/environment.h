@@ -374,7 +374,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto feature_name{details::u8string_from_chars(name.data(), name.size())};
             ::uwvm2::utils::container::u8string item{};
             ::uwvm2::utils::container::u8string_ref_uwvm item_ref{::std::addressof(item)};
-            ::fast_io::io::print(item_ref, enabled ? u8'+' : u8'-', feature_name);
+            ::fast_io::io::print(item_ref, enabled ? u8"+" : u8"-", feature_name);
             storage.push_back(::std::move(item));
         }
         ::std::sort(storage.begin(), storage.end());
@@ -383,7 +383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
         for(auto const& feature: storage)
         {
-            if(!out.empty()) { ::fast_io::io::print(ref, u8','); }
+            if(!out.empty()) { ::fast_io::io::print(ref, u8","); }
             ::fast_io::io::print(ref, feature);
         }
         if(out.empty()) { ::fast_io::io::print(ref, u8"generic"); }

@@ -909,7 +909,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 bool first_index{true};
                 for(auto const local_function_index: local_function_indices)
                 {
-                    if(!first_index) { ::fast_io::io::print(key_ref, u8','); }
+                    if(!first_index) { ::fast_io::io::print(key_ref, u8","); }
                     first_index = false;
                     ::fast_io::io::print(key_ref, local_function_index);
                 }

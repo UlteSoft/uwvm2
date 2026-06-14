@@ -215,7 +215,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(!cache_path_separator(last))
             {
                 ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
-                ::fast_io::io::print(ref, u8'/');
+                ::fast_io::io::print(ref, u8"/");
             }
         }
 

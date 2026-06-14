@@ -75,6 +75,8 @@ Avoid fmt-based formatting in uwvm2. Prefer `fast_io` for formatting and output:
 
 If a hosted facade is necessary, build it atop `fast_io`, keep the API narrow, and document locale/allocation semantics.
 
+When writing text with `fast_io::io::print`/`println`/`perr`/`perrln`, or when building text with project concat helpers such as `u8concat_uwvm`, do not pass character literals like `u8','`, `u8'+'`, or `','` as text fragments. These may be formatted as integer values. Use string literals instead, such as `u8","`, `u8"+"`, or `","`.
+
 ### Concept-Oriented Programming (COP) in uwvm2
 - uwvm2 applies concept-oriented design (per Alexandr Savinov) using modern C++:
   - Separate concepts (interfaces/constraints) from implementations using C++ `concept` and module partitions.
