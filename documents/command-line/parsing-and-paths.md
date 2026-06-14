@@ -25,9 +25,9 @@ During preprocessing:
 - Unknown parameters are recorded as invalid. Later the parser prints `invalid parameter` and may suggest the closest known parameter by edit distance.
 - Known parameters with an `is_exist` guard are checked immediately. A second occurrence is recorded as a duplicate before callbacks run.
 - Known parameters without an `is_exist` guard are parser-repeatable, although their callback may reject repeated or conflicting target state.
-- Plain tokens before `--run` are recorded as `arg` and must be consumed by a previous option callback.
+- Plain tokens before an explicit `--run` are recorded as `arg`. They must either be consumed by a previous option callback or become the implicit run tail described below.
 
-After callbacks run, any remaining `arg` token before `--run` is an `invalid option`. This is why optional arguments matter: a callback that decides not to consume a token leaves it available for the final unconsumed-argument check.
+After callbacks run, if no explicit `--run`, `-r`, or `--` was seen, the parser can turn a trailing suffix of remaining plain `arg` tokens into the Wasm path and guest argv. Any other remaining `arg` token before `--run` is an `invalid option`. This is why optional arguments matter: a callback that decides not to consume a token leaves it available for implicit-run detection or the final unconsumed-argument check.
 
 ## `--run` Stops Host Parsing
 
@@ -56,6 +56,30 @@ uwvm --run app.wasm --runtime-jit
 `--runtime-jit` is not a runtime selector here; it is guest `argv[1]`.
 
 `--run` with no following token is a usage error. A host option that appears after `--run` cannot fix that, because host parsing has already ended.
+
+## Implicit Run Tail Without `--run`
+
+For simple execution commands, `--run`, `-r`, and `--` may be omitted. When no explicit run boundary was found, the parser scans backward from the final token after callbacks finish. The trailing consecutive plain `arg` tokens become the implicit run tail:
+
+- The first token in that trailing suffix becomes the Wasm file path.
+- The remaining tokens become guest argv entries.
+- Those tokens are marked occupied before the final unconsumed-argument check.
+
+Examples:
+
+```bash
+uwvm --runtime-aot app.wasm hello world
+uwvm -Raot app.wasm hello world
+```
+
+These are equivalent to:
+
+```bash
+uwvm --runtime-aot --run app.wasm hello world
+uwvm -Raot -- app.wasm hello world
+```
+
+Only plain tokens participate in the implicit suffix. Use an explicit `--run`, `-r`, or `--` when any guest argument starts with `-`, when the Wasm file path itself starts with `-`, or when you want the parser to stop interpreting later tokens as host options immediately.
 
 ## Negative Values And Pretreatment
 

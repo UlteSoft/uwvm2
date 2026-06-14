@@ -43,7 +43,7 @@ uwvm --help wasi
 
 ## Fast Orientation
 
-- Put host-side options before `--run`, `-r`, or `--`; everything after that boundary is guest argv.
+- Put host-side options before `--run`, `-r`, or `--`; everything after that boundary is guest argv. For simple runs, `--run` may be omitted when the Wasm path and guest argv are trailing plain arguments.
 - Read [parsing-and-paths.md](command-line/parsing-and-paths.md) before debugging surprising argument behavior.
 - On Windows NT builds, paths beginning with `::NT::` are special in specific file-opening callbacks; see [parsing-and-paths.md](command-line/parsing-and-paths.md#windows-nt-nt-path-prefix).
 - WASI Preview 1 has three configuration layers: global defaults, single-module overrides, and named groups. See [wasi.md](command-line/wasi.md) for the full combination rules.

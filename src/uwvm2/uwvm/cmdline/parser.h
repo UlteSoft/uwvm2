@@ -415,6 +415,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             if(needexit) [[unlikely]] { return parsing_return_val::returnm1; }
         }
 
+        // Infer an implicit run tail when --run/-- is absent, so trailing free arguments become the wasm path and argv.
+        if(wasm_file_ppos == nullptr)
+        {
+            using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
+
+            auto const pr_begin{pr.begin()};
+            auto const pr_end{pr.end()};
+
+            auto implicit_run_begin{pr_end};
+            for(auto curr_pr{pr_end}; static_cast<::std::size_t>(curr_pr - pr_begin) > 1uz;)
+            {
+                --curr_pr;
+                if(curr_pr->type != parameter_type::arg) { break; }
+                implicit_run_begin = curr_pr;
+            }
+
+            if(implicit_run_begin != pr_end)
+            {
+                wasm_file_ppos = implicit_run_begin;
+                for(auto curr_pr{implicit_run_begin}; curr_pr != pr_end; ++curr_pr) { curr_pr->type = parameter_type::occupied_arg; }
+            }
+        }
+
         // Check for unmarked arg
         {
             // Here, as an entire output, the mutex needs to be controlled uniformly.
