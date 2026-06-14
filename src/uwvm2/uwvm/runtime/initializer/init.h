@@ -5549,6 +5549,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     details::current_initializing_module_name = module_name;
                     details::initialize_from_wasm_file(*mod.module_storage_ptr.wf, rt);
                     details::current_initializing_module_name = {};
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    rt.module_name = module_name;
+#endif
                     if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                     {
                         details::verbose_info(u8"initializer: Module \"",

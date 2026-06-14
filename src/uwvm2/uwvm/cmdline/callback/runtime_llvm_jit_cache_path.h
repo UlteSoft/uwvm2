@@ -88,6 +88,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode = cache_path_mode_t::disabled;
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path.clear();
         }
+        else if(currp1_str == u8"default")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode = cache_path_mode_t::default_path;
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path.clear();
+        }
         else if(currp1_str == u8"path")
         {
             auto currp2{para_curr + 2u};
@@ -119,6 +124,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"\". Expected ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"disable",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", or ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                u8"default",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8", or ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),

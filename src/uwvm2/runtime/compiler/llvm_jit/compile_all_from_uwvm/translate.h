@@ -56,6 +56,7 @@
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
+#  include <llvm/Support/DynamicLibrary.h>
 # endif
 // import
 # include <fast_io.h>

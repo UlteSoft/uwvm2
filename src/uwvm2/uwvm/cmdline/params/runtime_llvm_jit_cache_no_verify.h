@@ -54,7 +54,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_cache_no_verify{
         .name{u8"--runtime-llvm-jit-cache-no-verify"},
-        .describe{u8"Do not verify identity HMAC signatures when reading LLVM JIT cache objects."},
+        .describe{u8"Do not verify Ed25519 signatures when reading LLVM JIT cache objects."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_cache_no_verify_alias), 1uz}},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_verify)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};

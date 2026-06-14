@@ -97,7 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto ctx{base_context};
             ::uwvm2::utils::container::u8string key{};
             ::uwvm2::utils::container::u8string_ref_uwvm key_ref{::std::addressof(key)};
-            ::fast_io::io::print(key_ref, ctx.cache_key, u8'\n', details::llvm_ref_to_u8(module.getModuleIdentifier()), u8'\n', details::module_bitcode_hash(module));
+            ::fast_io::io::print(key_ref, ctx.cache_key, u8"\n", details::module_bitcode_hash(module));
             ctx.cache_key = ::std::move(key);
             return ctx;
         }
@@ -151,9 +151,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         inline constexpr void notifyObjectCompiled(::llvm::Module const* module, ::llvm::MemoryBufferRef object) UWVM_THROWS override
         {
             if(module == nullptr) [[unlikely]] { return; }
+            auto ctx{make_module_context(*module)};
+            if(load_object(ctx, policy).status == cache_status::ok) { return; }
+
             auto const buffer{object.getBuffer()};
             auto const first{reinterpret_cast<::std::byte const*>(buffer.data())};
-            (void)store_object(make_module_context(*module), first, buffer.size(), policy);
+            (void)store_object(ctx, first, buffer.size(), policy);
         }
 
         [[nodiscard]] inline constexpr ::std::unique_ptr<::llvm::MemoryBuffer> getObject(::llvm::Module const* module) UWVM_THROWS override

@@ -342,6 +342,57 @@ template <typename FunctionPtr>
 #endif
 }
 
+template <auto Function>
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_runtime_bridge_function_symbol_name() noexcept
+{
+    char const* pretty{__PRETTY_FUNCTION__};
+    ::std::size_t pretty_size{};
+    while(pretty[pretty_size] != '\0') { ++pretty_size; }
+
+    auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(pretty), pretty_size)};
+    return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_bridge_", ::fast_io::mnp::hex<false, true>(hash));
+}
+
+template <auto Function>
+[[nodiscard]] inline constexpr ::llvm::Value*
+    get_llvm_runtime_bridge_function_symbol_value(::llvm::IRBuilder<>& ir_builder, ::llvm::FunctionType* function_type) noexcept
+{
+    if(function_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
+    auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
+    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+
+    auto symbol_name{get_llvm_runtime_bridge_function_symbol_name<Function>()};
+    auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
+    auto const function_address{get_llvm_runtime_bridge_function_address(Function)};
+    if(function_address == 0u) [[unlikely]] { return nullptr; }
+
+    ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(function_address));
+    if(auto existing{llvm_module->getFunction(symbol_name_ref)}; existing != nullptr) { return existing; }
+    return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
+}
+
+[[nodiscard]] inline constexpr ::llvm::Constant*
+    get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
+                                          ::std::uintptr_t host_address,
+                                          ::llvm::Type* object_type,
+                                          ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+{
+    if(host_address == 0u || object_type == nullptr || symbol_name.empty()) [[unlikely]] { return nullptr; }
+
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
+    auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
+    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+
+    auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
+    ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
+    if(auto existing{llvm_module->getGlobalVariable(symbol_name_ref, true)}; existing != nullptr) { return existing; }
+    return new ::llvm::GlobalVariable(*llvm_module, object_type, false, ::llvm::GlobalValue::ExternalLinkage, nullptr, symbol_name_ref);
+}
+
 // Allocate stack storage in the function entry block, regardless of the caller's current insertion point.  LLVM's mem2reg
 // and lifetime reasoning work best when all allocas are anchored at the entry.
 [[nodiscard]] inline constexpr ::llvm::AllocaInst*
@@ -684,7 +735,7 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
     auto function_type{get_llvm_runtime_trap_bridge_function_type(llvm_context)};
     if(function_type == nullptr) [[unlikely]] { return; }
 
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_runtime_trap)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_runtime_trap>(ir_builder, function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto trap_kind_type{function_type->getParamType(0u)};
@@ -745,7 +796,8 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     auto llvm_intptr_type{function_type->getParamType(0u)};
     auto llvm_i64_type{function_type->getParamType(1u)};
     auto llvm_i32_type{function_type->getParamType(3u)};
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap)};
+    auto bridge_pointer{
+        get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap>(ir_builder, function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto memory_offset_arg{memory_offset == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
@@ -1168,11 +1220,20 @@ struct runtime_direct_callee_resolution_t
     }
 }
 
-// Unique symbol prefix for all LLVM IR objects derived from one runtime module.  The module address is used to avoid
-// collisions between separate instantiated modules that contain identical Wasm function indices.
+// Unique symbol prefix for all LLVM IR objects derived from one runtime module.  Module names are globally unique after
+// loading, so their stable hash keeps IR/object-cache identities independent from runtime storage addresses.
 [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
     get_llvm_runtime_module_symbol_prefix(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
-{ return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_m_", reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))); }
+{
+    auto const module_name{runtime_module.module_name};
+    if(!module_name.empty()) [[likely]]
+    {
+        auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(module_name.cbegin()), module_name.size())};
+        return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_m_", ::fast_io::mnp::hex<false, true>(hash));
+    }
+
+    return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_m_addr_", reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module)));
+}
 
 // Public typed Wasm entry name.  This is the symbol used for direct JIT-to-JIT calls inside the same runtime module.
 [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
@@ -2792,7 +2853,7 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
     auto& llvm_context{ir_builder.getContext()};
     auto llvm_size_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::size_t) * 8u))};
     auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_size_type, llvm_size_type}, false)};
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame>(ir_builder, function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
     apply_llvm_jit_host_calling_conv(
@@ -2807,7 +2868,7 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
 {
     auto& llvm_context{ir_builder.getContext()};
     auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, function_type, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame>(ir_builder, function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
     apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(function_type, bridge_pointer, {}));
@@ -5724,18 +5785,6 @@ template <typename CreateValue>
                                                    llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>);
         }};
 
-    // Local pointer-constant builder bound to the dispatcher's LLVM context.  This shadows the file-level helper only to
-    // avoid repeatedly passing the same context inside dense memory-emission lambdas.
-    auto const get_llvm_host_pointer_constant{[&](::std::uintptr_t host_address, ::llvm::Type* pointer_type) constexpr noexcept -> ::llvm::Constant*
-                                              {
-                                                  if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
-
-                                                  auto llvm_intptr_type{
-                                                      ::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-                                                  auto host_address_value{::llvm::ConstantInt::get(llvm_intptr_type, host_address)};
-                                                  return ::llvm::ConstantExpr::getIntToPtr(host_address_value, pointer_type);
-                                              }};
-
     // Clamp a Wasm memarg alignment exponent to the natural access size.  Wasm encodes alignment as log2 bytes, while
     // LLVM expects an Align object and treats over-stated alignment as a stronger promise.
     auto const get_llvm_memory_access_alignment{
@@ -5770,8 +5819,15 @@ template <typename CreateValue>
 
             if constexpr(runtime_native_memory_t::can_mmap)
             {
-                auto memory_length_ptr{get_llvm_host_pointer_constant(reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_length_p),
-                                                                      get_llvm_pointer_type(llvm_intptr_type))};
+                auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+                if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+                auto const memory_length_symbol_name{
+                    ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(*runtime_module_ptr), u8"_memory0_length")};
+                auto memory_length_ptr{get_llvm_external_host_object_pointer(
+                    ir_builder,
+                    reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_length_p),
+                    llvm_intptr_type,
+                    ::uwvm2::utils::container::u8string_view{memory_length_symbol_name.data(), memory_length_symbol_name.size()})};
                 if(memory_length_ptr == nullptr) [[unlikely]] { return nullptr; }
 
                 auto load_inst{ir_builder.CreateLoad(llvm_intptr_type, memory_length_ptr, get_llvm_string_ref(u8"memory.length"))};
@@ -5782,8 +5838,15 @@ template <typename CreateValue>
             else
             {
                 if(memory0_access_info.stable_memory_length_value_p == nullptr) [[unlikely]] { return nullptr; }
-                auto memory_length_ptr{get_llvm_host_pointer_constant(reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_length_value_p),
-                                                                      get_llvm_pointer_type(llvm_intptr_type))};
+                auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+                if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+                auto const memory_length_symbol_name{
+                    ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(*runtime_module_ptr), u8"_memory0_length_value")};
+                auto memory_length_ptr{get_llvm_external_host_object_pointer(
+                    ir_builder,
+                    reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_length_value_p),
+                    llvm_intptr_type,
+                    ::uwvm2::utils::container::u8string_view{memory_length_symbol_name.data(), memory_length_symbol_name.size()})};
                 if(memory_length_ptr == nullptr) [[unlikely]] { return nullptr; }
                 auto load_inst{ir_builder.CreateLoad(llvm_intptr_type, memory_length_ptr, get_llvm_string_ref(u8"memory.length"))};
                 load_inst->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
@@ -5848,8 +5911,16 @@ template <typename CreateValue>
                 // below.
                 auto effective_offset{ir_builder.CreateAdd(ir_builder.CreateSExt(address_value, llvm_i64_type),
                                                            ::llvm::ConstantInt::get(llvm_i64_type, static_cast<::std::uint_least32_t>(static_offset)))};
-                auto stable_memory_begin{
-                    get_llvm_host_pointer_constant(reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_begin), llvm_i8_ptr_type)};
+                static_cast<void>(llvm_i8_ptr_type);
+                auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+                if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+                auto const memory_begin_symbol_name{
+                    ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(*runtime_module_ptr), u8"_memory0_begin")};
+                auto stable_memory_begin{get_llvm_external_host_object_pointer(
+                    ir_builder,
+                    reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_begin),
+                    llvm_i8_type,
+                    ::uwvm2::utils::container::u8string_view{memory_begin_symbol_name.data(), memory_begin_symbol_name.size()})};
                 if(stable_memory_begin == nullptr) [[unlikely]] { return nullptr; }
 
                 if(memory0_access_info.mmap_requires_dynamic_bounds)
