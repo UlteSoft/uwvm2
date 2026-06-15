@@ -60,6 +60,7 @@ import uwvm2.uwvm_predefine.io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.utils.hash;
 import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;

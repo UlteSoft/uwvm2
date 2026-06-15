@@ -28,7 +28,6 @@
 #include <cstring>
 #include <functional>
 #include <limits>
-#include <new>
 #include <type_traits>
 #include <utility>
 // macro

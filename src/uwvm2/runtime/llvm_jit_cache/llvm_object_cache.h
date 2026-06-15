@@ -85,6 +85,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             append_bytes(bytes, first, first + bitcode.size());
             return sha256_hex_for_path(bytes);
         }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view cache_status_name(cache_status status) noexcept
+        {
+            switch(status)
+            {
+                case cache_status::ok: return u8"ok";
+                case cache_status::disabled: return u8"disabled";
+                case cache_status::io_error: return u8"io-error";
+                case cache_status::malformed: return u8"malformed";
+                case cache_status::invalid_magic: return u8"invalid-magic";
+                case cache_status::unsupported_version: return u8"unsupported-version";
+                case cache_status::isa_mismatch: return u8"isa-mismatch";
+                case cache_status::context_mismatch: return u8"context-mismatch";
+                case cache_status::signature_missing: return u8"signature-missing";
+                case cache_status::signature_mismatch: return u8"signature-mismatch";
+                case cache_status::unsupported_signature: return u8"unsupported-signature";
+                case cache_status::unsupported_compression: return u8"unsupported-compression";
+                case cache_status::decompression_failed: return u8"decompression-failed";
+                case cache_status::size_limit_exceeded: return u8"size-limit-exceeded";
+            }
+            return u8"unknown";
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view module_identifier_view(llvm::Module const& module) noexcept
+        {
+            auto const& identifier{module.getModuleIdentifier()};
+            return ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(identifier.data()), identifier.size()};
+        }
+
+        template <typename... Args>
+        inline constexpr void runtime_log_line(Args&&... args) noexcept
+        {
+# if defined(UWVM)
+            if(!::uwvm2::uwvm::io::enable_runtime_log) { return; }
+
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-cache] ", ::std::forward<Args>(args)...);
+# else
+            ((void)args, ...);
+# endif
+        }
     }  // namespace details
 
     class llvm_jit_object_cache final : public ::llvm::ObjectCache
@@ -95,9 +135,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) const UWVM_THROWS
         {
             auto ctx{base_context};
-            ::uwvm2::utils::container::u8string key{};
-            ::uwvm2::utils::container::u8string_ref_uwvm key_ref{::std::addressof(key)};
-            ::fast_io::io::print(key_ref, ctx.cache_key, u8"\n", details::module_bitcode_hash(module));
+            if(ctx.cache_key_is_complete) { return ctx; }
+
+            auto key{details::make_cache_key(u8"llvm-module-object")};
+            details::append_cache_key_value(key, u8"base-key", ctx.cache_key);
+            auto bitcode_hash{details::module_bitcode_hash(module)};
+            details::append_cache_key_value(key, u8"bitcode-hash", bitcode_hash);
             ctx.cache_key = ::std::move(key);
             return ctx;
         }
@@ -152,11 +195,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             if(module == nullptr) [[unlikely]] { return; }
             auto ctx{make_module_context(*module)};
-            if(load_object(ctx, policy).status == cache_status::ok) { return; }
+            auto const module_name{details::module_identifier_view(*module)};
+            if(load_object(ctx, policy).status == cache_status::ok)
+            {
+                details::runtime_log_line(u8"object-cache-store-skip module=\"", module_name, u8"\" reason=object-cache-hit");
+                return;
+            }
 
             auto const buffer{object.getBuffer()};
             auto const first{reinterpret_cast<::std::byte const*>(buffer.data())};
-            (void)store_object(ctx, first, buffer.size(), policy);
+            auto const status{store_object_async(ctx, first, buffer.size(), policy)};
+            details::runtime_log_line(
+                u8"object-cache-store module=\"", module_name, u8"\" status=", details::cache_status_name(status), u8" bytes=", buffer.size());
         }
 
         [[nodiscard]] inline constexpr ::std::unique_ptr<::llvm::MemoryBuffer> getObject(::llvm::Module const* module) UWVM_THROWS override
@@ -168,6 +218,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 if(load.status == cache_status::signature_missing) [[unlikely]] { warn_signature_missing_once(); }
                 return {};
             }
+            details::runtime_log_line(u8"object-cache-hit module=\"",
+                                      details::module_identifier_view(*module),
+                                      u8"\" bytes=",
+                                      load.object.size(),
+                                      u8" signature_verified=",
+                                      load.signature_verified ? u8"1" : u8"0");
             auto const first{reinterpret_cast<char const*>(load.object.data())};
             return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2-llvm-jit-cache");
         }

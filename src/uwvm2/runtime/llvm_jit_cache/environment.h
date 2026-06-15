@@ -404,15 +404,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string default_codegen_policy_name() noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        ::uwvm2::utils::container::u8string out{};
-        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
-        ::fast_io::io::print(ref,
-                             u8"llvm-jit;policy=",
-                             details::llvm_jit_policy_name(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_policy));
+        auto out{details::make_cache_key(u8"codegen-policy")};
+        details::append_cache_key_value(out, u8"backend", u8"llvm-jit");
+        details::append_cache_key_value(out,
+                                        u8"policy",
+                                        details::llvm_jit_policy_name(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_policy));
         return out;
 #else
-        return ::uwvm2::utils::container::u8string{u8"llvm-jit-disabled"};
+        auto out{details::make_cache_key(u8"codegen-policy")};
+        details::append_cache_key_value(out, u8"backend", u8"llvm-jit-disabled");
+        return out;
 #endif
+    }
+
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string uwvm_runtime_abi_fingerprint() noexcept
+    {
+        auto out{details::make_cache_key(u8"uwvm-runtime-abi")};
+        details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v2");
+#if defined(UWVM_VERSION_X)
+        details::append_cache_key_value_u64(out, u8"version-x", static_cast<::std::uint_least64_t>(UWVM_VERSION_X));
+#else
+        details::append_cache_key_value(out, u8"version-x", u8"unknown");
+#endif
+#if defined(UWVM_VERSION_Y)
+        details::append_cache_key_value_u64(out, u8"version-y", static_cast<::std::uint_least64_t>(UWVM_VERSION_Y));
+#else
+        details::append_cache_key_value(out, u8"version-y", u8"unknown");
+#endif
+#if defined(UWVM_VERSION_Z)
+        details::append_cache_key_value_u64(out, u8"version-z", static_cast<::std::uint_least64_t>(UWVM_VERSION_Z));
+#else
+        details::append_cache_key_value(out, u8"version-z", u8"unknown");
+#endif
+#if defined(UWVM_VERSION_S)
+        details::append_cache_key_value_u64(out, u8"version-s", static_cast<::std::uint_least64_t>(UWVM_VERSION_S));
+#else
+        details::append_cache_key_value(out, u8"version-s", u8"unknown");
+#endif
+#if defined(UWVM_GIT_COMMIT_ID)
+        details::append_cache_key_value(out, u8"git-commit", UWVM_GIT_COMMIT_ID);
+#else
+        details::append_cache_key_value(out, u8"git-commit", u8"unknown");
+#endif
+#if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
+        details::append_cache_key_value(out, u8"git-dirty", u8"1");
+        auto const build_date{details::u8string_from_cstr(__DATE__)};
+        auto const build_time{details::u8string_from_cstr(__TIME__)};
+        details::append_cache_key_value(out, u8"dirty-build-date", build_date);
+        details::append_cache_key_value(out, u8"dirty-build-time", build_time);
+#else
+        details::append_cache_key_value(out, u8"git-dirty", u8"0");
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        details::append_cache_key_value(out, u8"runtime-jit", u8"uwvm-int-llvm-jit-tiered");
+#elif defined(UWVM_RUNTIME_LLVM_JIT)
+        details::append_cache_key_value(out, u8"runtime-jit", u8"llvm-jit");
+#else
+        details::append_cache_key_value(out, u8"runtime-jit", u8"none");
+#endif
+        return out;
     }
 
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size>
@@ -472,7 +522,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ctx.cpu_name = collect_cpu_name();
         ctx.cpu_features = collect_cpu_features();
         ctx.llvm_version = details::llvm_version_string();
-        ctx.uwvm_abi = ::uwvm2::utils::container::u8string{u8"uwvm2-runtime-abi-v1"};
+        ctx.uwvm_abi = uwvm_runtime_abi_fingerprint();
         if(codegen_policy.empty()) { ctx.codegen_policy = default_codegen_policy_name(); }
         else
         {
@@ -497,7 +547,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ctx.cpu_name = collect_cpu_name(target_machine);
         ctx.cpu_features = collect_cpu_features(target_machine);
         ctx.llvm_version = details::llvm_version_string();
-        ctx.uwvm_abi = ::uwvm2::utils::container::u8string{u8"uwvm2-runtime-abi-v1"};
+        ctx.uwvm_abi = uwvm_runtime_abi_fingerprint();
         if(codegen_policy.empty()) { ctx.codegen_policy = default_codegen_policy_name(); }
         else
         {

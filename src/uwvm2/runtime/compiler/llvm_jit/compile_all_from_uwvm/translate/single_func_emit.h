@@ -256,9 +256,7 @@ template <typename FunctionPtr>
 // or direct local C++ function constants through relocations that become zero/truncated when JIT code is allocated far
 // from the host image.  A private non-constant global is loaded RIP-relatively from JIT data and carries the full address.
 [[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_win64_jit_host_address_value(::llvm::IRBuilder<>& ir_builder,
-                                          ::std::uintptr_t host_address,
-                                          ::llvm::StringRef name_prefix) noexcept
+    get_llvm_win64_jit_host_address_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::StringRef name_prefix) noexcept
 {
     if(host_address == 0u) [[unlikely]] { return nullptr; }
 
@@ -274,12 +272,16 @@ template <typename FunctionPtr>
 
     // Store the absolute host address as data owned by the JIT object.  A non-constant private global prevents LLVM from
     // folding the load back into an immediate `inttoptr`, while PrivateLinkage keeps the carrier local to this module.
-    auto address_global = new ::llvm::GlobalVariable(*llvm_module,
-                                                     llvm_intptr_type,
-                                                     false,
-                                                     ::llvm::GlobalValue::PrivateLinkage,
-                                                     ::llvm::ConstantInt::get(llvm_intptr_type, host_address),
-                                                     name_prefix);
+    ::uwvm2::utils::container::u8string address_symbol_name{};
+    {
+        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(address_symbol_name)};
+        ::fast_io::io::print(ref,
+                             ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(name_prefix.data()), name_prefix.size()},
+                             ::fast_io::mnp::hex<false, true>(host_address));
+    }
+    auto address_global{llvm_module->getOrInsertGlobal(get_llvm_string_ref(address_symbol_name), llvm_intptr_type)};
+    address_global->setLinkage(::llvm::GlobalValue::PrivateLinkage);
+    address_global->setInitializer(::llvm::ConstantInt::get(llvm_intptr_type, host_address));
 
     // The value itself has no externally observable identity, but its storage must be naturally aligned because the
     // generated code performs a real pointer-sized load from the JIT data section.
@@ -354,8 +356,8 @@ template <auto Function>
 }
 
 template <auto Function>
-[[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_runtime_bridge_function_symbol_value(::llvm::IRBuilder<>& ir_builder, ::llvm::FunctionType* function_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_runtime_bridge_function_symbol_value(::llvm::IRBuilder<>& ir_builder,
+                                                                                            ::llvm::FunctionType* function_type) noexcept
 {
     if(function_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -374,11 +376,10 @@ template <auto Function>
     return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
 }
 
-[[nodiscard]] inline constexpr ::llvm::Constant*
-    get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
-                                          ::std::uintptr_t host_address,
-                                          ::llvm::Type* object_type,
-                                          ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+[[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
+                                                                                       ::std::uintptr_t host_address,
+                                                                                       ::llvm::Type* object_type,
+                                                                                       ::uwvm2::utils::container::u8string_view symbol_name) noexcept
 {
     if(host_address == 0u || object_type == nullptr || symbol_name.empty()) [[unlikely]] { return nullptr; }
 
@@ -390,16 +391,31 @@ template <auto Function>
     auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
     ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
     if(auto existing{llvm_module->getGlobalVariable(symbol_name_ref, true)}; existing != nullptr) { return existing; }
-    return new ::llvm::GlobalVariable(*llvm_module, object_type, false, ::llvm::GlobalValue::ExternalLinkage, nullptr, symbol_name_ref);
+    auto global{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
+    global->setLinkage(::llvm::GlobalValue::ExternalLinkage);
+    global->setInitializer(nullptr);
+    return global;
+}
+
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_address(::llvm::IRBuilder<>& ir_builder,
+                                                                                    ::std::uintptr_t host_address,
+                                                                                    ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+{
+    if(host_address == 0u || symbol_name.empty()) [[unlikely]] { return nullptr; }
+
+    auto& llvm_context{ir_builder.getContext()};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto object_pointer{get_llvm_external_host_object_pointer(ir_builder, host_address, ::llvm::Type::getInt8Ty(llvm_context), symbol_name)};
+    if(object_pointer == nullptr) [[unlikely]] { return nullptr; }
+    return ir_builder.CreatePtrToInt(object_pointer, llvm_intptr_type, get_llvm_string_ref(u8"uwvm.host.object.addr"));
 }
 
 // Allocate stack storage in the function entry block, regardless of the caller's current insertion point.  LLVM's mem2reg
 // and lifetime reasoning work best when all allocas are anchored at the entry.
-[[nodiscard]] inline constexpr ::llvm::AllocaInst*
-    create_llvm_jit_entry_block_alloca(::llvm::IRBuilder<>& ir_builder,
-                                       ::llvm::Type* allocated_type,
-                                       ::llvm::Value* array_size,
-                                       ::llvm::StringRef name) noexcept
+[[nodiscard]] inline constexpr ::llvm::AllocaInst* create_llvm_jit_entry_block_alloca(::llvm::IRBuilder<>& ir_builder,
+                                                                                      ::llvm::Type* allocated_type,
+                                                                                      ::llvm::Value* array_size,
+                                                                                      ::llvm::StringRef name) noexcept
 {
     if(allocated_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -483,7 +499,7 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
 {
     // Emit asynchronous unwind tables, not only call-site unwind info.  Wasm traps can be reported from arbitrary
     // instruction PCs after bounds checks, helper calls, or target signals/SEH faults, so the runtime unwinder needs CFI
-// that remains valid between calls when reconstructing optimized JIT frames.  On Win64 this causes LLVM to emit
+    // that remains valid between calls when reconstructing optimized JIT frames.  On Win64 this causes LLVM to emit
     // .pdata/.xdata records; on DWARF targets it keeps enough CFI in .eh_frame for seeded or asynchronous stack walks.
     function.setUWTableKind(::llvm::UWTableKind::Async);
 
@@ -796,8 +812,7 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     auto llvm_intptr_type{function_type->getParamType(0u)};
     auto llvm_i64_type{function_type->getParamType(1u)};
     auto llvm_i32_type{function_type->getParamType(3u)};
-    auto bridge_pointer{
-        get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap>(ir_builder, function_type)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_memory_out_of_bounds_trap>(ir_builder, function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto memory_offset_arg{memory_offset == nullptr ? ::llvm::ConstantInt::get(llvm_i64_type, 0u)
@@ -1272,10 +1287,66 @@ struct runtime_direct_callee_resolution_t
 {
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
     return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
-                                                  u8"_tiered_loop_raw_func_",
-                                                  func_index_uz,
-                                                  u8"_off_",
-                                                  wasm_code_offset);
+                                                    u8"_tiered_loop_raw_func_",
+                                                    func_index_uz,
+                                                    u8"_off_",
+                                                    wasm_code_offset);
+}
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_lazy_raw_target_table_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+{ return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), u8"_lazy_raw_targets"); }
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_lazy_typed_entry_target_table_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+{ return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), u8"_lazy_typed_entry_targets"); }
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_call_indirect_table_view_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+{ return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), u8"_call_indirect_table_views"); }
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_global_storage_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                        validation_module_traits_t::wasm_u32 global_index) noexcept
+{
+    return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
+                                                    u8"_global_",
+                                                    static_cast<::std::size_t>(global_index),
+                                                    u8"_storage");
+}
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_local_imported_global_module_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                      validation_module_traits_t::wasm_u32 global_index) noexcept
+{
+    return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
+                                                    u8"_global_",
+                                                    static_cast<::std::size_t>(global_index),
+                                                    u8"_local_imported_module");
+}
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_runtime_module_object_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+{ return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), u8"_runtime_module"); }
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_local_imported_memory_module_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                      validation_module_traits_t::wasm_u32 memory_index) noexcept
+{
+    return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
+                                                    u8"_memory_",
+                                                    static_cast<::std::size_t>(memory_index),
+                                                    u8"_local_imported_module");
+}
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_native_memory_object_symbol_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                              validation_module_traits_t::wasm_u32 memory_index) noexcept
+{
+    return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
+                                                    u8"_memory_",
+                                                    static_cast<::std::size_t>(memory_index),
+                                                    u8"_native_memory");
 }
 
 // Per-function IR module name used by clients that compile one local function in isolation.
@@ -1702,8 +1773,11 @@ struct runtime_global_access_info_t
     return result;
 }
 
-// Build an LLVM constant pointer to the concrete scalar field inside a directly addressable global storage record.
+// Build an LLVM external-symbol pointer to the concrete scalar field inside a directly addressable global storage record.
 [[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
+                                                                                 ::llvm::IRBuilder<>& ir_builder,
+                                                                                 ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                                 validation_module_traits_t::wasm_u32 global_index,
                                                                                  ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
                                                                                  runtime_operand_stack_value_type value_type) noexcept
 {
@@ -1743,9 +1817,11 @@ struct runtime_global_access_info_t
         }
     }
 
-    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type, storage_address)};
-    return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(llvm_value_type));
+    auto const symbol_name{get_llvm_global_storage_symbol_name(runtime_module, global_index)};
+    return get_llvm_external_host_object_pointer(ir_builder,
+                                                 storage_address,
+                                                 llvm_value_type,
+                                                 ::uwvm2::utils::container::u8string_view{symbol_name.data(), symbol_name.size()});
 }
 
 // Host bridge used by generated code to read a local-imported global.  The template keeps the LLVM function signature
@@ -2325,11 +2401,7 @@ inline constexpr void llvm_jit_store_little_endian_integer(::std::byte* memory_p
 
 // Generic memory trap bridge used when detailed access metadata is unavailable.
 inline constexpr void llvm_jit_memory_bridge_trap() noexcept
-{
-    ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds,
-                                                 0u,
-                                                 0u);
-}
+{ ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds, 0u, 0u); }
 
 // Detailed memory trap bridge for native checked-memory access fallback paths.
 inline constexpr void llvm_jit_memory_bridge_trap(::std::size_t memory_idx,
@@ -3287,8 +3359,12 @@ struct runtime_local_func_llvm_jit_emit_state_t
         module_storage.llvm_module->addModuleFlag(::llvm::Module::Warning, get_llvm_string_ref(u8"Dwarf Version"), 4);
 
         module_storage.llvm_di_file = module_storage.llvm_di_builder->createFile(get_llvm_string_ref(llvm_module_name), get_llvm_string_ref(u8"."));
-        module_storage.llvm_di_compile_unit =
-            module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C, module_storage.llvm_di_file, get_llvm_string_ref(u8"uwvm2-llvm-jit"), false, get_llvm_string_ref(u8""), 0);
+        module_storage.llvm_di_compile_unit = module_storage.llvm_di_builder->createCompileUnit(::llvm::dwarf::DW_LANG_C,
+                                                                                                module_storage.llvm_di_file,
+                                                                                                get_llvm_string_ref(u8"uwvm2-llvm-jit"),
+                                                                                                false,
+                                                                                                get_llvm_string_ref(u8""),
+                                                                                                0);
         return module_storage.llvm_di_file != nullptr && module_storage.llvm_di_compile_unit != nullptr;
     }
 
@@ -3438,7 +3514,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
         // This subprogram name is intentionally machine-parseable by the runtime unwind reporter.  When LLVM inlines this
         // function, the emitted DWARF inline chain is the only reliable source for the original Wasm function index stack.
         auto const line{static_cast<unsigned>(local_func_storage.function_index + 1uz)};
-        auto const di_name{::uwvm2::utils::container::u8concat_uwvm(u8"uwvm-inline:m=", local_func_storage.module_id, u8":f=", local_func_storage.function_index)};
+        auto const di_name{
+            ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm-inline:m=", local_func_storage.module_id, u8":f=", local_func_storage.function_index)};
         state.llvm_di_subprogram =
             state.llvm_di_builder->createFunction(state.llvm_di_file,
                                                   get_llvm_string_ref(di_name),
@@ -3661,7 +3738,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 switch_inst->addCase(::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), reentry.entry_id), load_block);
 
                 ::llvm::IRBuilder<> load_builder(load_block);
-                auto local_base_ptr{load_builder.CreateIntToPtr(state.tiered_core_local_base_arg, llvm_i8_ptr_type, get_llvm_string_ref(u8"tiered.local.base"))};
+                auto local_base_ptr{
+                    load_builder.CreateIntToPtr(state.tiered_core_local_base_arg, llvm_i8_ptr_type, get_llvm_string_ref(u8"tiered.local.base"))};
                 for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
                 {
                     // Locals are serialized using the same offsets computed during preparation.  They are reloaded into
@@ -3675,8 +3753,10 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                        local_base_ptr,
                                                        {::llvm::ConstantInt::get(llvm_intptr_type, state.local_offsets.index_unchecked(local_index))},
                                                        get_llvm_string_ref(u8"tiered.local.addr"))};
-                    auto typed_local_address{load_builder.CreateBitCast(local_address, get_llvm_pointer_type(llvm_local_type), get_llvm_string_ref(u8"tiered.local.typed.addr"))};
-                    load_builder.CreateStore(load_builder.CreateLoad(llvm_local_type, typed_local_address, get_llvm_string_ref(u8"tiered.local")), local_pointer);
+                    auto typed_local_address{
+                        load_builder.CreateBitCast(local_address, get_llvm_pointer_type(llvm_local_type), get_llvm_string_ref(u8"tiered.local.typed.addr"))};
+                    load_builder.CreateStore(load_builder.CreateLoad(llvm_local_type, typed_local_address, get_llvm_string_ref(u8"tiered.local")),
+                                             local_pointer);
                 }
                 load_builder.CreateBr(target_block);
             }
@@ -3878,8 +3958,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     if(llvm_result_type == nullptr || core_function->getReturnType() != llvm_result_type) [[unlikely]] { return false; }
 
                     auto result_buffer_base{osr_builder.CreateIntToPtr(result_buffer_address, llvm_i8_ptr_type, get_llvm_string_ref(u8"tiered.result.base"))};
-                    auto typed_result_address{
-                        osr_builder.CreateBitCast(result_buffer_base, get_llvm_pointer_type(llvm_result_type), get_llvm_string_ref(u8"tiered.result.typed.addr"))};
+                    auto typed_result_address{osr_builder.CreateBitCast(result_buffer_base,
+                                                                        get_llvm_pointer_type(llvm_result_type),
+                                                                        get_llvm_string_ref(u8"tiered.result.typed.addr"))};
                     osr_builder.CreateStore(core_call, typed_result_address);
                 }
 
@@ -4032,7 +4113,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                                         param_buffer_base,
                                                                         {::llvm::ConstantInt::get(llvm_intptr_type, param_offset)},
                                                                         get_llvm_string_ref(u8"raw.param.addr"))};
-                auto typed_parameter_address{raw_ir_builder.CreateBitCast(parameter_address, get_llvm_pointer_type(llvm_param_type), get_llvm_string_ref(u8"raw.param.typed.addr"))};
+                auto typed_parameter_address{
+                    raw_ir_builder.CreateBitCast(parameter_address, get_llvm_pointer_type(llvm_param_type), get_llvm_string_ref(u8"raw.param.typed.addr"))};
                 call_arguments.push_back(raw_ir_builder.CreateLoad(llvm_param_type, typed_parameter_address, get_llvm_string_ref(u8"raw.param")));
                 param_offset += abi_size;
             }
@@ -4046,7 +4128,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 if(llvm_result_type == nullptr || llvm_function->getReturnType() != llvm_result_type) [[unlikely]] { return false; }
 
                 auto result_buffer_base{raw_ir_builder.CreateIntToPtr(result_buffer_address, llvm_i8_ptr_type, get_llvm_string_ref(u8"raw.result.base"))};
-                auto typed_result_address{raw_ir_builder.CreateBitCast(result_buffer_base, get_llvm_pointer_type(llvm_result_type), get_llvm_string_ref(u8"raw.result.typed.addr"))};
+                auto typed_result_address{
+                    raw_ir_builder.CreateBitCast(result_buffer_base, get_llvm_pointer_type(llvm_result_type), get_llvm_string_ref(u8"raw.result.typed.addr"))};
                 raw_ir_builder.CreateStore(typed_call, typed_result_address);
             }
 
@@ -4707,9 +4790,8 @@ inline constexpr void truncate_runtime_local_func_llvm_jit_operand_stack_to(runt
 }
 
 // Emit a call to a C++ runtime bridge function using the host calling convention.
-template <typename BridgeFunction>
+template <auto BridgeFunction>
 [[nodiscard]] inline constexpr ::llvm::CallInst* emit_runtime_local_func_llvm_jit_runtime_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                                      BridgeFunction bridge_function,
                                                                                                       ::llvm::FunctionType* bridge_function_type,
                                                                                                       ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
 {
@@ -4717,7 +4799,7 @@ template <typename BridgeFunction>
 
     auto& ir_builder{*state.ir_builder};
 
-    auto bridge_pointer{get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
+    auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<BridgeFunction>(ir_builder, bridge_function_type)};
     if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
     return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
 }
@@ -4765,9 +4847,10 @@ template <typename EmitBridgeCallFromBuffers>
                                                         ::llvm::StringRef param_buffer_name,
                                                         ::llvm::StringRef result_buffer_name) noexcept
 {
-    if(!state.valid || state.llvm_context_holder == nullptr) [[unlikely]] { return {}; }
+    if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr) [[unlikely]] { return {}; }
 
     auto& llvm_context{*state.llvm_context_holder};
+    auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     auto const abi_layout{prepared_call.abi_layout};
@@ -4783,14 +4866,17 @@ template <typename EmitBridgeCallFromBuffers>
             // Pass the module address and original module function index to the runtime.  The runtime owns import
             // resolution for host/dynamic targets that cannot be represented by a typed LLVM declaration.
             auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
-            using raw_host_api_fn_t = void (*)(void const*, ::std::uint_least32_t, void*, ::std::size_t, void const*, ::std::size_t) noexcept;
-            auto const raw_host_api{static_cast<raw_host_api_fn_t>(::uwvm2::runtime::lib::llvm_jit_call_raw_host_api)};
+            auto const module_symbol_name{get_llvm_runtime_module_object_symbol_name(runtime_module)};
+            auto module_address{
+                get_llvm_external_host_object_address(ir_builder,
+                                                      reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module)),
+                                                      ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+            if(module_address == nullptr) [[unlikely]] { return nullptr; }
 
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<::uwvm2::runtime::lib::llvm_jit_call_raw_host_api>(
                 state,
-                raw_host_api,
                 bridge_function_type,
-                {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))),
+                {module_address,
                  ::llvm::ConstantInt::get(llvm_i32_type, func_index),
                  raw_call_buffers.result_buffer_address,
                  ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
@@ -4832,8 +4918,14 @@ template <typename EmitBridgeCallFromBuffers>
             auto raw_target_struct_type{get_llvm_runtime_raw_call_target_struct_type(llvm_context)};
             if(raw_entry_function_type == nullptr || raw_target_struct_type == nullptr) [[unlikely]] { return nullptr; }
 
-            auto target_base_ptr{
-                get_llvm_host_pointer_value(ir_builder, state.lazy_defined_raw_call_target_base_address, get_llvm_pointer_type(raw_target_struct_type))};
+            auto runtime_module_ptr{state.local_func_storage_ptr == nullptr ? nullptr : state.local_func_storage_ptr->runtime_module_ptr};
+            if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+            auto const target_table_symbol_name{get_llvm_lazy_raw_target_table_symbol_name(*runtime_module_ptr)};
+            auto target_base_ptr{get_llvm_external_host_object_pointer(
+                ir_builder,
+                state.lazy_defined_raw_call_target_base_address,
+                raw_target_struct_type,
+                ::uwvm2::utils::container::u8string_view{target_table_symbol_name.data(), target_table_symbol_name.size()})};
             if(target_base_ptr == nullptr) [[unlikely]] { return nullptr; }
 
             auto target_ptr{ir_builder.CreateInBoundsGEP(raw_target_struct_type,
@@ -4859,7 +4951,8 @@ template <typename EmitBridgeCallFromBuffers>
                                        ir_builder.CreateICmpEQ(entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
                                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::runtime_invariant_failure);
 
-            auto raw_entry_function_ptr{ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), get_llvm_string_ref(u8"call.lazy.entry.ptr"))};
+            auto raw_entry_function_ptr{
+                ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), get_llvm_string_ref(u8"call.lazy.entry.ptr"))};
             return apply_llvm_jit_raw_entry_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
                                                                                raw_entry_function_ptr,
                                                                                {context_address,
@@ -4908,7 +5001,14 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto callee_function_type{get_llvm_function_type_from_wasm_function_type(llvm_context, wasm_function_type)};
     if(typed_entry_ptr_type == nullptr || callee_function_type == nullptr) [[unlikely]] { return {}; }
 
-    auto target_base_ptr{get_llvm_host_pointer_value(ir_builder, state.lazy_defined_typed_entry_target_base_address, typed_entry_ptr_type)};
+    auto runtime_module_ptr{state.local_func_storage_ptr == nullptr ? nullptr : state.local_func_storage_ptr->runtime_module_ptr};
+    if(runtime_module_ptr == nullptr) [[unlikely]] { return {}; }
+    auto const target_table_symbol_name{get_llvm_lazy_typed_entry_target_table_symbol_name(*runtime_module_ptr)};
+    auto target_base_ptr{
+        get_llvm_external_host_object_pointer(ir_builder,
+                                              state.lazy_defined_typed_entry_target_base_address,
+                                              llvm_intptr_type,
+                                              ::uwvm2::utils::container::u8string_view{target_table_symbol_name.data(), target_table_symbol_name.size()})};
     if(target_base_ptr == nullptr) [[unlikely]] { return {}; }
 
     auto const known_typed_entry_targets{reinterpret_cast<::std::uintptr_t const*>(state.lazy_defined_typed_entry_target_base_address)};
@@ -4944,7 +5044,8 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     ir_builder.CreateCondBr(ir_builder.CreateICmpNE(typed_entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)), fast_block, slow_block);
 
     ir_builder.SetInsertPoint(fast_block);
-    auto typed_entry_function_ptr{ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(callee_function_type), get_llvm_string_ref(u8"call.lazy.typed.entry.ptr"))};
+    auto typed_entry_function_ptr{
+        ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(callee_function_type), get_llvm_string_ref(u8"call.lazy.typed.entry.ptr"))};
     auto fast_call{apply_llvm_jit_wasm_calling_conv(
         ir_builder.CreateCall(callee_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
     if(fast_call == nullptr) [[unlikely]] { return {}; }
@@ -4979,26 +5080,23 @@ struct llvm_jit_lazy_typed_target_emit_result_t
 }
 
 // Dispatch to the scalar bridge function matching a Wasm value type while keeping each bridge call's C++ type exact.
-template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32BridgeFunction, typename F64BridgeFunction>
-[[nodiscard]] inline constexpr ::llvm::CallInst* emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                                                             runtime_operand_stack_value_type value_type,
-                                                                                                             ::llvm::FunctionType* bridge_function_type,
-                                                                                                             ::llvm::ArrayRef<::llvm::Value*> arguments,
-                                                                                                             I32BridgeFunction i32_bridge_function,
-                                                                                                             I64BridgeFunction i64_bridge_function,
-                                                                                                             F32BridgeFunction f32_bridge_function,
-                                                                                                             F64BridgeFunction f64_bridge_function) noexcept
+template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction, auto F64BridgeFunction>
+[[nodiscard]] inline constexpr ::llvm::CallInst*
+    emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                runtime_operand_stack_value_type value_type,
+                                                                ::llvm::FunctionType* bridge_function_type,
+                                                                ::llvm::ArrayRef<::llvm::Value*> arguments) noexcept
 {
     switch(value_type)
     {
         case runtime_operand_stack_value_type::i32:
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(state, i32_bridge_function, bridge_function_type, arguments);
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<I32BridgeFunction>(state, bridge_function_type, arguments);
         case runtime_operand_stack_value_type::i64:
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(state, i64_bridge_function, bridge_function_type, arguments);
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<I64BridgeFunction>(state, bridge_function_type, arguments);
         case runtime_operand_stack_value_type::f32:
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(state, f32_bridge_function, bridge_function_type, arguments);
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<F32BridgeFunction>(state, bridge_function_type, arguments);
         case runtime_operand_stack_value_type::f64:
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(state, f64_bridge_function, bridge_function_type, arguments);
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<F64BridgeFunction>(state, bridge_function_type, arguments);
         [[unlikely]] default:
             return nullptr;
     }
@@ -5007,65 +5105,89 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 // Emit the local-imported global.get bridge call for the resolved scalar type.
 [[nodiscard]] inline constexpr ::llvm::CallInst*
     emit_runtime_local_func_llvm_jit_local_imported_global_get_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                           validation_module_traits_t::wasm_u32 global_index,
                                                                            runtime_global_access_info_t const& global_access_info,
                                                                            ::llvm::Type* llvm_global_type) noexcept
 {
-    if(!state.valid || state.llvm_context_holder == nullptr || global_access_info.local_imported_module_ptr == nullptr || llvm_global_type == nullptr)
-        [[unlikely]]
+    if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || global_access_info.local_imported_module_ptr == nullptr ||
+       llvm_global_type == nullptr) [[unlikely]]
     {
         return nullptr;
     }
 
     auto& llvm_context{*state.llvm_context_holder};
+    auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto bridge_function_type{::llvm::FunctionType::get(llvm_global_type, {llvm_intptr_type, llvm_intptr_type}, false)};
-    auto const bridge_arguments{
-        ::llvm::ArrayRef<::llvm::Value*>{
-                                         ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr)),
-                                         ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index)}
-    };
 
-    return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(state,
-                                                                       global_access_info.value_type,
-                                                                       bridge_function_type,
-                                                                       bridge_arguments,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+    auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(runtime_module, global_index)};
+    auto module_pointer{get_llvm_external_host_object_pointer(ir_builder,
+                                                              reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
+                                                              ::llvm::Type::getInt8Ty(llvm_context),
+                                                              ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+    if(module_pointer == nullptr) [[unlikely]] { return nullptr; }
+
+    auto module_address{ir_builder.CreatePtrToInt(module_pointer, llvm_intptr_type, get_llvm_string_ref(u8"global.local_imported.module.addr"))};
+    ::llvm::Value* bridge_arguments_array[]{
+        module_address,
+        ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
+    };
+    auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
+
+    return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
                                                                        llvm_jit_local_imported_global_get_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>);
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>>(
+        state,
+        global_access_info.value_type,
+        bridge_function_type,
+        bridge_arguments);
 }
 
 // Emit the local-imported global.set bridge call for the resolved scalar type.
 [[nodiscard]] inline constexpr ::llvm::CallInst*
     emit_runtime_local_func_llvm_jit_local_imported_global_set_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                           validation_module_traits_t::wasm_u32 global_index,
                                                                            runtime_global_access_info_t const& global_access_info,
                                                                            ::llvm::Type* llvm_value_type,
                                                                            ::llvm::Value* value) noexcept
 {
-    if(!state.valid || state.llvm_context_holder == nullptr || global_access_info.local_imported_module_ptr == nullptr || llvm_value_type == nullptr ||
-       value == nullptr) [[unlikely]]
+    if(!state.valid || state.llvm_context_holder == nullptr || state.ir_builder == nullptr || global_access_info.local_imported_module_ptr == nullptr ||
+       llvm_value_type == nullptr || value == nullptr) [[unlikely]]
     {
         return nullptr;
     }
 
     auto& llvm_context{*state.llvm_context_holder};
+    auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto bridge_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, llvm_value_type}, false)};
-    auto const bridge_arguments{
-        ::llvm::ArrayRef<::llvm::Value*>{
-                                         ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr)),
-                                         ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
-                                         value}
-    };
 
-    return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(state,
-                                                                       global_access_info.value_type,
-                                                                       bridge_function_type,
-                                                                       bridge_arguments,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
+    auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(runtime_module, global_index)};
+    auto module_pointer{get_llvm_external_host_object_pointer(ir_builder,
+                                                              reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
+                                                              ::llvm::Type::getInt8Ty(llvm_context),
+                                                              ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+    if(module_pointer == nullptr) [[unlikely]] { return nullptr; }
+
+    auto module_address{ir_builder.CreatePtrToInt(module_pointer, llvm_intptr_type, get_llvm_string_ref(u8"global.local_imported.module.addr"))};
+    ::llvm::Value* bridge_arguments_array[]{
+        module_address,
+        ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
+        value,
+    };
+    auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
+
+    return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call<llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
                                                                        llvm_jit_local_imported_global_set_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>);
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>>(
+        state,
+        global_access_info.value_type,
+        bridge_function_type,
+        bridge_arguments);
 }
 
 // Lower Wasm `drop` by removing one value from the JIT operand stack.
@@ -5203,7 +5325,12 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
     if(global_access_info.storage_ptr != nullptr)
     {
-        auto global_pointer{get_llvm_global_storage_pointer(llvm_context, global_access_info.storage_ptr, global_access_info.value_type)};
+        auto global_pointer{get_llvm_global_storage_pointer(llvm_context,
+                                                            ir_builder,
+                                                            *runtime_module_ptr,
+                                                            global_index,
+                                                            global_access_info.storage_ptr,
+                                                            global_access_info.value_type)};
         if(global_pointer == nullptr) [[unlikely]] { return false; }
 
         auto loaded_value{ir_builder.CreateLoad(llvm_global_type, global_pointer, get_llvm_string_ref(u8"global.get"))};
@@ -5213,7 +5340,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         return true;
     }
 
-    auto bridge_call{emit_runtime_local_func_llvm_jit_local_imported_global_get_bridge_call(state, global_access_info, llvm_global_type)};
+    auto bridge_call{
+        emit_runtime_local_func_llvm_jit_local_imported_global_get_bridge_call(state, *runtime_module_ptr, global_index, global_access_info, llvm_global_type)};
     if(bridge_call == nullptr) [[unlikely]] { return false; }
 
     state.operand_stack.push_back({.type = global_access_info.value_type, .value = bridge_call});
@@ -5246,7 +5374,12 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto& llvm_context{*state.llvm_context_holder};
     if(global_access_info.storage_ptr != nullptr)
     {
-        auto global_pointer{get_llvm_global_storage_pointer(llvm_context, global_access_info.storage_ptr, global_access_info.value_type)};
+        auto global_pointer{get_llvm_global_storage_pointer(llvm_context,
+                                                            *state.ir_builder,
+                                                            *runtime_module_ptr,
+                                                            global_index,
+                                                            global_access_info.storage_ptr,
+                                                            global_access_info.value_type)};
         if(global_pointer == nullptr) [[unlikely]] { return false; }
 
         state.ir_builder->CreateStore(value.value, global_pointer);
@@ -5256,7 +5389,12 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto llvm_value_type{get_llvm_type_from_wasm_value_type(llvm_context, global_access_info.value_type)};
     if(llvm_value_type == nullptr) [[unlikely]] { return false; }
 
-    return emit_runtime_local_func_llvm_jit_local_imported_global_set_bridge_call(state, global_access_info, llvm_value_type, value.value) != nullptr;
+    return emit_runtime_local_func_llvm_jit_local_imported_global_set_bridge_call(state,
+                                                                                  *runtime_module_ptr,
+                                                                                  global_index,
+                                                                                  global_access_info,
+                                                                                  llvm_value_type,
+                                                                                  value.value) != nullptr;
 }
 
 // Lower Wasm `call`.  The emitter chooses, in order, direct typed JIT calls, lazy typed/raw target calls, or the raw
@@ -5317,7 +5455,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         if(static_cast<::std::size_t>(func_index) >= import_func_count)
         {
             auto const local_function_index{static_cast<::std::size_t>(func_index) - import_func_count};
-            auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
+            auto const lazy_target_result{
+                emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
             if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
         }
 
@@ -5347,7 +5486,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             if(has_lazy_defined_target_tables && static_cast<::std::size_t>(callee_resolution.func_index) >= import_func_count)
             {
                 auto const local_function_index{static_cast<::std::size_t>(callee_resolution.func_index) - import_func_count};
-                auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
+                auto const lazy_target_result{
+                    emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
                 if(lazy_target_result.valid)
                 {
                     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value);
@@ -5384,7 +5524,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         // table whenever lazy tables are present; eager/full-module JIT, where all definitions are in the module, keeps
         // the direct typed call below.
         auto const local_function_index{static_cast<::std::size_t>(func_index) - import_func_count};
-        auto const lazy_target_result{emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
+        auto const lazy_target_result{
+            emit_lazy_defined_target_call(local_function_index, get_llvm_string_ref(u8"call.params"), get_llvm_string_ref(u8"call.result.buf"))};
         if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
     }
 
@@ -5460,8 +5601,12 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         return false;
     }
 
+    auto const table_view_symbol_name{get_llvm_call_indirect_table_view_symbol_name(*runtime_module_ptr)};
     auto table_view_base_ptr{
-        get_llvm_host_pointer_value(ir_builder, reinterpret_cast<::std::uintptr_t>(table_view_begin), get_llvm_pointer_type(table_view_struct_type))};
+        get_llvm_external_host_object_pointer(ir_builder,
+                                              reinterpret_cast<::std::uintptr_t>(table_view_begin),
+                                              table_view_struct_type,
+                                              ::uwvm2::utils::container::u8string_view{table_view_symbol_name.data(), table_view_symbol_name.size()})};
     if(table_view_base_ptr == nullptr) [[unlikely]] { return false; }
 
     auto selector_index{ir_builder.CreateZExt(selector.value, llvm_intptr_type, get_llvm_string_ref(u8"call_indirect.selector.index"))};
@@ -5469,7 +5614,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
                                                      table_view_base_ptr,
                                                      {::llvm::ConstantInt::get(llvm_intptr_type, table_index)},
                                                      get_llvm_string_ref(u8"call_indirect.table_view.ptr"))};
-    auto table_data_address_ptr{ir_builder.CreateStructGEP(table_view_struct_type, table_view_ptr, 0u, get_llvm_string_ref(u8"call_indirect.table.data.addr.ptr"))};
+    auto table_data_address_ptr{
+        ir_builder.CreateStructGEP(table_view_struct_type, table_view_ptr, 0u, get_llvm_string_ref(u8"call_indirect.table.data.addr.ptr"))};
     auto table_size_ptr{ir_builder.CreateStructGEP(table_view_struct_type, table_view_ptr, 1u, get_llvm_string_ref(u8"call_indirect.table.size.ptr"))};
     auto table_data_address{ir_builder.CreateLoad(llvm_intptr_type, table_data_address_ptr, get_llvm_string_ref(u8"call_indirect.table.data.addr"))};
     auto table_size{ir_builder.CreateLoad(llvm_intptr_type, table_size_ptr, get_llvm_string_ref(u8"call_indirect.table.size"))};
@@ -5485,12 +5631,14 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
                                ir_builder.CreateICmpEQ(table_data_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
                                ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_null_element);
 
-    auto target_base_ptr{ir_builder.CreateIntToPtr(table_data_address, get_llvm_pointer_type(raw_target_struct_type), get_llvm_string_ref(u8"call_indirect.target.base.ptr"))};
+    auto target_base_ptr{
+        ir_builder.CreateIntToPtr(table_data_address, get_llvm_pointer_type(raw_target_struct_type), get_llvm_string_ref(u8"call_indirect.target.base.ptr"))};
     auto target_ptr{ir_builder.CreateInBoundsGEP(raw_target_struct_type, target_base_ptr, selector_index, get_llvm_string_ref(u8"call_indirect.target.ptr"))};
     auto entry_address_ptr{ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 0u, get_llvm_string_ref(u8"call_indirect.entry.addr.ptr"))};
     auto context_address_ptr{ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 1u, get_llvm_string_ref(u8"call_indirect.context.addr.ptr"))};
     auto encoded_type_id_ptr{ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 2u, get_llvm_string_ref(u8"call_indirect.type.id.ptr"))};
-    auto typed_entry_address_ptr{ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 3u, get_llvm_string_ref(u8"call_indirect.typed.entry.addr.ptr"))};
+    auto typed_entry_address_ptr{
+        ir_builder.CreateStructGEP(raw_target_struct_type, target_ptr, 3u, get_llvm_string_ref(u8"call_indirect.typed.entry.addr.ptr"))};
     auto entry_address{ir_builder.CreateLoad(llvm_intptr_type, entry_address_ptr, get_llvm_string_ref(u8"call_indirect.entry.addr"))};
     auto context_address{ir_builder.CreateLoad(llvm_intptr_type, context_address_ptr, get_llvm_string_ref(u8"call_indirect.context.addr"))};
     auto encoded_type_id{ir_builder.CreateLoad(llvm_i32_type, encoded_type_id_ptr, get_llvm_string_ref(u8"call_indirect.type.id"))};
@@ -5533,8 +5681,9 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     ir_builder.CreateCondBr(ir_builder.CreateICmpNE(typed_entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)), typed_block, raw_block);
 
     ir_builder.SetInsertPoint(typed_block);
-    auto typed_entry_function_ptr{
-        ir_builder.CreateIntToPtr(typed_entry_address, get_llvm_pointer_type(typed_entry_function_type), get_llvm_string_ref(u8"call_indirect.typed.entry.ptr"))};
+    auto typed_entry_function_ptr{ir_builder.CreateIntToPtr(typed_entry_address,
+                                                            get_llvm_pointer_type(typed_entry_function_type),
+                                                            get_llvm_string_ref(u8"call_indirect.typed.entry.ptr"))};
     auto typed_call{apply_llvm_jit_wasm_calling_conv(
         ir_builder.CreateCall(typed_entry_function_type, typed_entry_function_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
     if(typed_call == nullptr) [[unlikely]] { return false; }
@@ -5550,7 +5699,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
         get_llvm_string_ref(u8"call_indirect.result.buf"),
         [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) constexpr noexcept -> ::llvm::CallInst*
         {
-            auto raw_entry_function_ptr{ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), get_llvm_string_ref(u8"call_indirect.entry.ptr"))};
+            auto raw_entry_function_ptr{
+                ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), get_llvm_string_ref(u8"call_indirect.entry.ptr"))};
             return apply_llvm_jit_raw_entry_calling_conv(ir_builder.CreateCall(raw_entry_function_type,
                                                                                raw_entry_function_ptr,
                                                                                {context_address,
@@ -5701,40 +5851,67 @@ template <typename CreateValue>
 
     // Local bridge-call helper for dispatcher-only fallbacks.  Higher-level helpers above use the same host convention,
     // but the opcode include files need this compact lambda for memory/global cases.
-    auto const emit_runtime_bridge_call{[&](auto bridge_function,
-                                            ::llvm::FunctionType* bridge_function_type,
-                                            ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
+    auto const emit_runtime_bridge_call{[&]<auto bridge_function>(::llvm::FunctionType* bridge_function_type,
+                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
                                         {
                                             auto bridge_pointer{
-                                                get_llvm_runtime_bridge_function_pointer_value(ir_builder, bridge_function_type, bridge_function)};
+                                                get_llvm_runtime_bridge_function_symbol_value<bridge_function>(ir_builder, bridge_function_type)};
                                             if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
                                             return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
                                         }};
 
     // Select one of four scalar bridge functions based on the Wasm value type.  This keeps bridge signatures exact for
     // integer and floating-point globals/memory operations.
-    auto const emit_runtime_scalar_bridge_call{[&](runtime_operand_stack_value_type value_type,
-                                                   ::llvm::FunctionType* bridge_function_type,
-                                                   ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
-                                                   auto i32_bridge_function,
-                                                   auto i64_bridge_function,
-                                                   auto f32_bridge_function,
-                                                   auto f64_bridge_function) constexpr noexcept -> ::llvm::CallInst*
-                                               {
-                                                   switch(value_type)
-                                                   {
-                                                       case runtime_operand_stack_value_type::i32:
-                                                           return emit_runtime_bridge_call(i32_bridge_function, bridge_function_type, bridge_arguments);
-                                                       case runtime_operand_stack_value_type::i64:
-                                                           return emit_runtime_bridge_call(i64_bridge_function, bridge_function_type, bridge_arguments);
-                                                       case runtime_operand_stack_value_type::f32:
-                                                           return emit_runtime_bridge_call(f32_bridge_function, bridge_function_type, bridge_arguments);
-                                                       case runtime_operand_stack_value_type::f64:
-                                                           return emit_runtime_bridge_call(f64_bridge_function, bridge_function_type, bridge_arguments);
-                                                       [[unlikely]] default:
-                                                           return nullptr;
-                                                   }
-                                               }};
+    auto const emit_runtime_scalar_bridge_call{
+        [&]<auto i32_bridge_function, auto i64_bridge_function, auto f32_bridge_function, auto f64_bridge_function>(
+            runtime_operand_stack_value_type value_type,
+            ::llvm::FunctionType* bridge_function_type,
+            ::llvm::ArrayRef<::llvm::Value*> bridge_arguments) constexpr noexcept -> ::llvm::CallInst*
+        {
+            switch(value_type)
+            {
+                case runtime_operand_stack_value_type::i32:
+                    return emit_runtime_bridge_call.template operator()<i32_bridge_function>(bridge_function_type, bridge_arguments);
+                case runtime_operand_stack_value_type::i64:
+                    return emit_runtime_bridge_call.template operator()<i64_bridge_function>(bridge_function_type, bridge_arguments);
+                case runtime_operand_stack_value_type::f32:
+                    return emit_runtime_bridge_call.template operator()<f32_bridge_function>(bridge_function_type, bridge_arguments);
+                case runtime_operand_stack_value_type::f64:
+                    return emit_runtime_bridge_call.template operator()<f64_bridge_function>(bridge_function_type, bridge_arguments);
+                [[unlikely]] default:
+                    return nullptr;
+            }
+        }};
+
+    auto const emit_local_imported_memory_module_address{
+        [&]() constexpr noexcept -> ::llvm::Value*
+        {
+            if(memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+
+            auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+            if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+
+            auto const module_symbol_name{get_llvm_local_imported_memory_module_symbol_name(
+                *runtime_module_ptr,
+                static_cast<validation_module_traits_t::wasm_u32>(memory0_access_info.local_imported_memory_index))};
+            return get_llvm_external_host_object_address(ir_builder,
+                                                         reinterpret_cast<::std::uintptr_t>(memory0_access_info.local_imported_module_ptr),
+                                                         ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()});
+        }};
+
+    auto const emit_native_memory_object_address{[&]() constexpr noexcept -> ::llvm::Value*
+                                                 {
+                                                     if(memory0_access_info.memory_p == nullptr) [[unlikely]] { return nullptr; }
+
+                                                     auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+                                                     if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+
+                                                     auto const memory_symbol_name{get_llvm_native_memory_object_symbol_name(*runtime_module_ptr, 0u)};
+                                                     return get_llvm_external_host_object_address(
+                                                         ir_builder,
+                                                         reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p),
+                                                         ::uwvm2::utils::container::u8string_view{memory_symbol_name.data(), memory_symbol_name.size()});
+                                                 }};
 
     // Dispatcher-local local-imported global getter.  Some opcode case files use this directly instead of the standalone
     // helper when all required LLVM locals are already in scope.
@@ -5745,19 +5922,27 @@ template <typename CreateValue>
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             auto bridge_function_type{::llvm::FunctionType::get(llvm_global_type, {llvm_intptr_type, llvm_intptr_type}, false)};
+            auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+            if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+            auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(
+                *runtime_module_ptr,
+                static_cast<validation_module_traits_t::wasm_u32>(global_access_info.local_imported_global_index))};
+            auto module_address{
+                get_llvm_external_host_object_address(ir_builder,
+                                                      reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
+                                                      ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+            if(module_address == nullptr) [[unlikely]] { return nullptr; }
             auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr)),
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index)}
+                ::llvm::ArrayRef<::llvm::Value*>{module_address, ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index)}
             };
 
-            return emit_runtime_scalar_bridge_call(global_access_info.value_type,
-                                                   bridge_function_type,
-                                                   bridge_arguments,
-                                                   llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
-                                                   llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
-                                                   llvm_jit_local_imported_global_get_bridge<runtime_wasm_f32>,
-                                                   llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>);
+            return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f32>,
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>>(
+                global_access_info.value_type,
+                bridge_function_type,
+                bridge_arguments);
         }};
 
     // Dispatcher-local local-imported global setter matching the getter above.
@@ -5769,20 +5954,29 @@ template <typename CreateValue>
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             auto bridge_function_type{
                 ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, llvm_value_type}, false)};
+            auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
+            if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
+            auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(
+                *runtime_module_ptr,
+                static_cast<validation_module_traits_t::wasm_u32>(global_access_info.local_imported_global_index))};
+            auto module_address{
+                get_llvm_external_host_object_address(ir_builder,
+                                                      reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
+                                                      ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+            if(module_address == nullptr) [[unlikely]] { return nullptr; }
             auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr)),
+                ::llvm::ArrayRef<::llvm::Value*>{module_address,
                                                  ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
                                                  value}
             };
 
-            return emit_runtime_scalar_bridge_call(global_access_info.value_type,
-                                                   bridge_function_type,
-                                                   bridge_arguments,
-                                                   llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
-                                                   llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
-                                                   llvm_jit_local_imported_global_set_bridge<runtime_wasm_f32>,
-                                                   llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>);
+            return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f32>,
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>>(
+                global_access_info.value_type,
+                bridge_function_type,
+                bridge_arguments);
         }};
 
     // Clamp a Wasm memarg alignment exponent to the natural access size.  Wasm encodes alignment as log2 bytes, while
@@ -5870,7 +6064,9 @@ template <typename CreateValue>
             }
             else
             {
-                page_count = ir_builder.CreateUDiv(memory_length_load, ::llvm::ConstantInt::get(llvm_intptr_type, page_size_bytes), get_llvm_string_ref(u8"memory.page_count"));
+                page_count = ir_builder.CreateUDiv(memory_length_load,
+                                                   ::llvm::ConstantInt::get(llvm_intptr_type, page_size_bytes),
+                                                   get_llvm_string_ref(u8"memory.page_count"));
             }
             return ir_builder.CreateTrunc(page_count, llvm_i32_type);
         }};
@@ -6018,17 +6214,20 @@ template <typename CreateValue>
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             // The provider writes snapshot outputs through host bridge pointer arguments.  Entry-block allocas give LLVM
             // stable addresses for those out-parameters and make the following loads explicit in IR.
-            auto memory_begin_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.begin.addr.slot"))};
-            auto byte_length_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.byte_length.slot"))};
+            auto memory_begin_slot{
+                create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.begin.addr.slot"))};
+            auto byte_length_slot{
+                create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.byte_length.slot"))};
             if(memory_begin_slot == nullptr || byte_length_slot == nullptr) [[unlikely]] { return result; }
             auto bridge_function_type{::llvm::FunctionType::get(
                 ::llvm::Type::getInt1Ty(llvm_context),
                 {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type), get_llvm_pointer_type(llvm_intptr_type)},
                 false)};
-            auto snapshot_ok{emit_runtime_bridge_call(
-                llvm_jit_local_imported_memory_snapshot_bridge,
+            auto module_address{emit_local_imported_memory_module_address()};
+            if(module_address == nullptr) [[unlikely]] { return result; }
+            auto snapshot_ok{emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_snapshot_bridge>(
                 bridge_function_type,
-                {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.local_imported_module_ptr)),
+                {module_address,
                  ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
                  memory_begin_slot,
                  byte_length_slot})};
@@ -6069,19 +6268,29 @@ template <typename CreateValue>
                 switch(load_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call(signed_load ? llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, true>
-                                                                    : llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        if(signed_load)
+                        {
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, true>>(
+                                bridge_function_type,
+                                bridge_arguments);
+                        }
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 2uz:
-                        return emit_runtime_bridge_call(signed_load ? llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, true>
-                                                                    : llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        if(signed_load)
+                        {
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, true>>(
+                                bridge_function_type,
+                                bridge_arguments);
+                        }
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 4uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 4uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 4uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6091,24 +6300,39 @@ template <typename CreateValue>
                 switch(load_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call(signed_load ? llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, true>
-                                                                    : llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        if(signed_load)
+                        {
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, true>>(
+                                bridge_function_type,
+                                bridge_arguments);
+                        }
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 2uz:
-                        return emit_runtime_bridge_call(signed_load ? llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, true>
-                                                                    : llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        if(signed_load)
+                        {
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, true>>(
+                                bridge_function_type,
+                                bridge_arguments);
+                        }
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 4uz:
-                        return emit_runtime_bridge_call(signed_load ? llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, true>
-                                                                    : llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        if(signed_load)
+                        {
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, true>>(
+                                bridge_function_type,
+                                bridge_arguments);
+                        }
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 8uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 8uz, false>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 8uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6116,16 +6340,16 @@ template <typename CreateValue>
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f32>)
             {
                 if(load_bytes != 4uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call(llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f32, 4uz, false>,
-                                                bridge_function_type,
-                                                bridge_arguments);
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f32, 4uz, false>>(
+                    bridge_function_type,
+                    bridge_arguments);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(load_bytes != 8uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call(llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f64, 8uz, false>,
-                                                bridge_function_type,
-                                                bridge_arguments);
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f64, 8uz, false>>(
+                    bridge_function_type,
+                    bridge_arguments);
             }
             else
             {
@@ -6144,17 +6368,17 @@ template <typename CreateValue>
                 switch(store_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 1uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 1uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 2uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 2uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 2uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 4uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 4uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 4uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6164,21 +6388,21 @@ template <typename CreateValue>
                 switch(store_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 1uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 1uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 2uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 2uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 2uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 4uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 4uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 4uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     case 8uz:
-                        return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 8uz>,
-                                                        bridge_function_type,
-                                                        bridge_arguments);
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 8uz>>(
+                            bridge_function_type,
+                            bridge_arguments);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6186,12 +6410,14 @@ template <typename CreateValue>
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f32>)
             {
                 if(store_bytes != 4uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f32, 4uz>, bridge_function_type, bridge_arguments);
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f32, 4uz>>(bridge_function_type,
+                                                                                                                                        bridge_arguments);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(store_bytes != 8uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call(llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f64, 8uz>, bridge_function_type, bridge_arguments);
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f64, 8uz>>(bridge_function_type,
+                                                                                                                                        bridge_arguments);
             }
             else
             {
@@ -6218,9 +6444,10 @@ template <typename CreateValue>
                 ::llvm::FunctionType::get(llvm_result_type,
                                           {llvm_intptr_type, llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context), ::llvm::Type::getInt32Ty(llvm_context)},
                                           false)};
+            auto module_address{emit_local_imported_memory_module_address()};
+            if(module_address == nullptr) [[unlikely]] { return nullptr; }
             auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.local_imported_module_ptr)),
+                ::llvm::ArrayRef<::llvm::Value*>{module_address,
                                                  ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
                                                  ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
                                                  address_value}
@@ -6275,9 +6502,10 @@ template <typename CreateValue>
                 ::llvm::Type::getVoidTy(llvm_context),
                 {llvm_intptr_type, llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context), ::llvm::Type::getInt32Ty(llvm_context), llvm_value_type},
                 false)};
+            auto module_address{emit_local_imported_memory_module_address()};
+            if(module_address == nullptr) [[unlikely]] { return nullptr; }
             auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.local_imported_module_ptr)),
+                ::llvm::ArrayRef<::llvm::Value*>{module_address,
                                                  ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
                                                  ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
                                                  address_value, value}
@@ -6331,10 +6559,9 @@ template <typename CreateValue>
 
     // Emit a native-memory load bridge call for fallback paths.
     auto const emit_native_memory_load_bridge_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            ::llvm::Type* llvm_result_type,
-            ::llvm::Value* address_value,
-            auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
+        [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                  ::llvm::Type* llvm_result_type,
+                                  ::llvm::Value* address_value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6343,20 +6570,19 @@ template <typename CreateValue>
                 ::llvm::FunctionType::get(llvm_result_type,
                                           {llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context), ::llvm::Type::getInt32Ty(llvm_context)},
                                           false)};
-            return emit_runtime_bridge_call(bridge_function,
-                                            bridge_function_type,
-                                            {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p)),
-                                             ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
-                                             address_value});
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<bridge_function>(
+                bridge_function_type,
+                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value});
         }};
 
     // Emit a native-memory store bridge call for fallback paths.
     auto const emit_native_memory_store_bridge_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            ::llvm::Type* llvm_value_type,
-            ::llvm::Value* address_value,
-            ::llvm::Value* value,
-            auto bridge_function) constexpr noexcept -> ::llvm::CallInst*
+        [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                  ::llvm::Type* llvm_value_type,
+                                  ::llvm::Value* address_value,
+                                  ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_value_type == nullptr || address_value == nullptr || value == nullptr) [[unlikely]]
             {
@@ -6368,12 +6594,11 @@ template <typename CreateValue>
                 ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context),
                                           {llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context), ::llvm::Type::getInt32Ty(llvm_context), llvm_value_type},
                                           false)};
-            return emit_runtime_bridge_call(bridge_function,
-                                            bridge_function_type,
-                                            {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p)),
-                                             ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
-                                             address_value,
-                                             value});
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<bridge_function>(
+                bridge_function_type,
+                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value, value});
         }};
 
     // Emit a native-memory memory.size bridge call when direct length loads are unavailable.
@@ -6384,25 +6609,24 @@ template <typename CreateValue>
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             auto bridge_function_type{::llvm::FunctionType::get(::llvm::Type::getInt32Ty(llvm_context), {llvm_intptr_type}, false)};
-            return emit_runtime_bridge_call(llvm_jit_memory_size_bridge,
-                                            bridge_function_type,
-                                            {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p))});
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_size_bridge>(bridge_function_type, {memory_address});
         }};
 
     // Pick the correct load fallback path: native bridge for directly owned memory, provider bridge for local-imported
     // memory.
     auto const emit_memory_load_bridge_fallback_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            runtime_operand_stack_value_type result_type,
-            ::llvm::Type* llvm_result_type,
-            ::std::size_t load_bytes,
-            bool signed_load,
-            ::llvm::Value* address_value,
-            auto native_bridge_function) constexpr noexcept -> ::llvm::CallInst*
+        [&]<auto native_bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                         runtime_operand_stack_value_type result_type,
+                                         ::llvm::Type* llvm_result_type,
+                                         ::std::size_t load_bytes,
+                                         bool signed_load,
+                                         ::llvm::Value* address_value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p != nullptr)
             {
-                return emit_native_memory_load_bridge_call(static_offset, llvm_result_type, address_value, native_bridge_function);
+                return emit_native_memory_load_bridge_call.template operator()<native_bridge_function>(static_offset, llvm_result_type, address_value);
             }
             return emit_local_imported_memory_load_bridge_call(static_offset, result_type, llvm_result_type, load_bytes, signed_load, address_value);
         }};
@@ -6410,17 +6634,16 @@ template <typename CreateValue>
     // Pick the correct store fallback path: native bridge for directly owned memory, provider bridge for local-imported
     // memory.
     auto const emit_memory_store_bridge_fallback_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            runtime_operand_stack_value_type value_type,
-            ::llvm::Type* llvm_value_type,
-            ::std::size_t store_bytes,
-            ::llvm::Value* address_value,
-            ::llvm::Value* value,
-            auto native_bridge_function) constexpr noexcept -> ::llvm::CallInst*
+        [&]<auto native_bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                         runtime_operand_stack_value_type value_type,
+                                         ::llvm::Type* llvm_value_type,
+                                         ::std::size_t store_bytes,
+                                         ::llvm::Value* address_value,
+                                         ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p != nullptr)
             {
-                return emit_native_memory_store_bridge_call(static_offset, llvm_value_type, address_value, value, native_bridge_function);
+                return emit_native_memory_store_bridge_call.template operator()<native_bridge_function>(static_offset, llvm_value_type, address_value, value);
             }
             return emit_local_imported_memory_store_bridge_call(static_offset, value_type, llvm_value_type, store_bytes, address_value, value);
         }};
@@ -6666,20 +6889,29 @@ template <typename CreateValue>
 
             auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
             auto delta_is_zero{ir_builder.CreateICmpEQ(delta_value, ::llvm::ConstantInt::get(llvm_i32_type, 0u))};
-            auto grow_zero_block{
-                ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.zero") : get_llvm_string_ref(u8"memory.grow.zero"), current_function)};
-            auto grow_fail_block{
-                ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.fail") : get_llvm_string_ref(u8"memory.grow.fail"), current_function)};
-            auto grow_runtime_block{
-                ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.runtime") : get_llvm_string_ref(u8"memory.grow.runtime"), current_function)};
-            auto grow_merge_block{
-                ::llvm::BasicBlock::Create(llvm_context, local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.merge") : get_llvm_string_ref(u8"memory.grow.merge"), current_function)};
+            auto grow_zero_block{::llvm::BasicBlock::Create(llvm_context,
+                                                            local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.zero")
+                                                                                : get_llvm_string_ref(u8"memory.grow.zero"),
+                                                            current_function)};
+            auto grow_fail_block{::llvm::BasicBlock::Create(llvm_context,
+                                                            local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.fail")
+                                                                                : get_llvm_string_ref(u8"memory.grow.fail"),
+                                                            current_function)};
+            auto grow_runtime_block{::llvm::BasicBlock::Create(llvm_context,
+                                                               local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.runtime")
+                                                                                   : get_llvm_string_ref(u8"memory.grow.runtime"),
+                                                               current_function)};
+            auto grow_merge_block{::llvm::BasicBlock::Create(llvm_context,
+                                                             local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.merge")
+                                                                                 : get_llvm_string_ref(u8"memory.grow.merge"),
+                                                             current_function)};
             // Some callers may choose to skip a static fail pre-check.  In that case the non-zero edge jumps directly to
             // the runtime bridge, while the block structure stays uniform for the merge logic below.
             auto non_zero_target{definitely_fail == nullptr
                                      ? grow_runtime_block
                                      : ::llvm::BasicBlock::Create(llvm_context,
-                                                                  local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.nonzero") : get_llvm_string_ref(u8"memory.grow.nonzero"),
+                                                                  local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.nonzero")
+                                                                                      : get_llvm_string_ref(u8"memory.grow.nonzero"),
                                                                   current_function)};
 
             ir_builder.CreateCondBr(delta_is_zero, grow_zero_block, non_zero_target);
@@ -6704,7 +6936,10 @@ template <typename CreateValue>
             ir_builder.SetInsertPoint(grow_merge_block);
             // The PHI exactly mirrors Wasm's three observable outcomes: zero-delta returns the old/current page count,
             // pre-known limit failure returns -1, and runtime/provider growth returns its bridge result.
-            auto grow_result_phi{ir_builder.CreatePHI(llvm_i32_type, 3u, local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.result") : get_llvm_string_ref(u8"memory.grow.result"))};
+            auto grow_result_phi{ir_builder.CreatePHI(llvm_i32_type,
+                                                      3u,
+                                                      local_imported_path ? get_llvm_string_ref(u8"memory.grow.local_imported.result")
+                                                                          : get_llvm_string_ref(u8"memory.grow.result"))};
             grow_result_phi->addIncoming(current_page_count, grow_zero_block);
             grow_result_phi->addIncoming(::llvm::ConstantInt::getSigned(llvm_i32_type, -1), grow_fail_block);
             grow_result_phi->addIncoming(bridge_call, grow_runtime_block);
@@ -6758,10 +6993,11 @@ template <typename CreateValue>
                     ::llvm::FunctionType::get(::llvm::Type::getInt32Ty(llvm_context),
                                               {llvm_intptr_type, llvm_intptr_type, llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context)},
                                               false)};
-                return emit_runtime_bridge_call(
-                    llvm_jit_local_imported_memory_grow_bridge,
+                auto module_address{emit_local_imported_memory_module_address()};
+                if(module_address == nullptr) [[unlikely]] { return nullptr; }
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_grow_bridge>(
                     grow_bridge_function_type,
-                    {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.local_imported_module_ptr)),
+                    {module_address,
                      ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
                      ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.max_limit_memory_length),
                      delta_value});
@@ -6772,23 +7008,22 @@ template <typename CreateValue>
             auto bridge_function_type{::llvm::FunctionType::get(::llvm::Type::getInt32Ty(llvm_context),
                                                                 {llvm_intptr_type, llvm_intptr_type, ::llvm::Type::getInt32Ty(llvm_context)},
                                                                 false)};
-            return emit_runtime_bridge_call(llvm_jit_memory_grow_bridge,
-                                            bridge_function_type,
-                                            {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p)),
-                                             ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.max_limit_memory_length),
-                                             delta_value});
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_grow_bridge>(
+                bridge_function_type,
+                {memory_address, ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.max_limit_memory_length), delta_value});
         }};
 
     // Complete a Wasm memory load instruction after the opcode case provides static offset, alignment, result type, width,
     // signedness, and the native bridge function.
     auto const emit_memory_load_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            validation_module_traits_t::wasm_u32 memarg_align,
-            runtime_operand_stack_value_type result_type,
-            ::llvm::Type* llvm_result_type,
-            ::std::size_t load_bytes,
-            bool signed_load,
-            auto bridge_function) constexpr noexcept -> bool
+        [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                  validation_module_traits_t::wasm_u32 memarg_align,
+                                  runtime_operand_stack_value_type result_type,
+                                  ::llvm::Type* llvm_result_type,
+                                  ::std::size_t load_bytes,
+                                  bool signed_load) constexpr noexcept -> bool
         {
             if(!ensure_memory0_access_info() || llvm_result_type == nullptr || operand_stack.empty()) [[unlikely]] { return false; }
 
@@ -6811,8 +7046,8 @@ template <typename CreateValue>
                 }
             }
 
-            auto bridge_call{
-                emit_memory_load_bridge_fallback_call(static_offset, result_type, llvm_result_type, load_bytes, signed_load, address.value, bridge_function)};
+            auto bridge_call{emit_memory_load_bridge_fallback_call
+                                 .template operator()<bridge_function>(static_offset, result_type, llvm_result_type, load_bytes, signed_load, address.value)};
             if(bridge_call == nullptr) [[unlikely]] { return false; }
 
             push_operand(result_type, bridge_call);
@@ -6822,12 +7057,11 @@ template <typename CreateValue>
     // Complete a Wasm memory store instruction after the opcode case provides static offset, alignment, value type, width,
     // and the native bridge function.
     auto const emit_memory_store_call{
-        [&](validation_module_traits_t::wasm_u32 static_offset,
-            validation_module_traits_t::wasm_u32 memarg_align,
-            runtime_operand_stack_value_type value_type,
-            ::llvm::Type* llvm_value_type,
-            ::std::size_t store_bytes,
-            auto bridge_function) constexpr noexcept -> bool
+        [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
+                                  validation_module_traits_t::wasm_u32 memarg_align,
+                                  runtime_operand_stack_value_type value_type,
+                                  ::llvm::Type* llvm_value_type,
+                                  ::std::size_t store_bytes) constexpr noexcept -> bool
         {
             if(!ensure_memory0_access_info() || llvm_value_type == nullptr || operand_stack.size() < 2uz) [[unlikely]] { return false; }
 
@@ -6853,13 +7087,8 @@ template <typename CreateValue>
                 }
             }
 
-            return emit_memory_store_bridge_fallback_call(static_offset,
-                                                          value_type,
-                                                          llvm_value_type,
-                                                          store_bytes,
-                                                          address.value,
-                                                          value.value,
-                                                          bridge_function) != nullptr;
+            return emit_memory_store_bridge_fallback_call
+                       .template operator()<bridge_function>(static_offset, value_type, llvm_value_type, store_bytes, address.value, value.value) != nullptr;
         }};
 
     // Complete a Wasm memory.size instruction.

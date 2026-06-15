@@ -60,7 +60,6 @@
 # include <functional>
 # include <limits>
 # include <memory>
-# include <new>
 # include <type_traits>
 # include <utility>
 // macro
@@ -202,6 +201,7 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
 # include <uwvm2/runtime/llvm_jit_cache/impl.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
@@ -9023,6 +9023,243 @@ namespace uwvm2::runtime::lib
                 static_cast<llvm_jit_translate_details::validation_module_traits_t::wasm_u32>(func_index));
         }
 
+        template <typename ValueType>
+        [[nodiscard]] inline constexpr bool runtime_llvm_jit_cache_range_bytes(ValueType const* begin,
+                                                                               ValueType const* end,
+                                                                               ::std::byte const*& first,
+                                                                               ::std::size_t& size) noexcept
+        {
+            if(begin == end)
+            {
+                first = nullptr;
+                size = 0uz;
+                return true;
+            }
+            if(begin == nullptr || end == nullptr) [[unlikely]]
+            {
+                first = nullptr;
+                size = 0uz;
+                return false;
+            }
+
+            auto const begin_u{reinterpret_cast<::std::uintptr_t>(begin)};
+            auto const end_u{reinterpret_cast<::std::uintptr_t>(end)};
+            if(end_u < begin_u) [[unlikely]]
+            {
+                first = nullptr;
+                size = 0uz;
+                return false;
+            }
+
+            auto const diff{end_u - begin_u};
+            if((diff % sizeof(ValueType)) != 0uz) [[unlikely]]
+            {
+                first = nullptr;
+                size = 0uz;
+                return false;
+            }
+
+            first = reinterpret_cast<::std::byte const*>(begin);
+            size = static_cast<::std::size_t>(diff);
+            return true;
+        }
+
+        inline constexpr void runtime_llvm_jit_cache_sha_update(::fast_io::sha256_context& sha,
+                                                                ::std::byte const* first,
+                                                                ::std::size_t size) noexcept
+        {
+            if(first != nullptr && size != 0uz) { sha.update(first, first + size); }
+        }
+
+        template <::std::size_t N>
+        inline constexpr void runtime_llvm_jit_cache_sha_update_literal(::fast_io::sha256_context& sha, char8_t const (&literal)[N]) noexcept
+        {
+            static_assert(N != 0uz);
+            runtime_llvm_jit_cache_sha_update(sha, reinterpret_cast<::std::byte const*>(literal), N - 1uz);
+        }
+
+        template <typename ValueType>
+        inline constexpr void runtime_llvm_jit_cache_sha_update_le(::fast_io::sha256_context& sha, ValueType value) noexcept
+        {
+            auto const le{::fast_io::little_endian(value)};
+            runtime_llvm_jit_cache_sha_update(sha, reinterpret_cast<::std::byte const*>(::std::addressof(le)), sizeof(le));
+        }
+
+        inline constexpr void runtime_llvm_jit_cache_sha_update_u8string_view(::fast_io::sha256_context& sha,
+                                                                              ::uwvm2::utils::container::u8string_view view) noexcept
+        {
+            runtime_llvm_jit_cache_sha_update_literal(sha, u8"str");
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(view.size()));
+            runtime_llvm_jit_cache_sha_update(sha, reinterpret_cast<::std::byte const*>(view.data()), view.size());
+        }
+
+        template <::std::size_t ValidN, ::std::size_t InvalidN>
+        inline constexpr void runtime_llvm_jit_cache_sha_update_range_or_tag(::fast_io::sha256_context& sha,
+                                                                             char8_t const (&valid_tag)[ValidN],
+                                                                             char8_t const (&invalid_tag)[InvalidN],
+                                                                             ::std::byte const* first,
+                                                                             ::std::size_t size,
+                                                                             bool valid) noexcept
+        {
+            if(valid) { runtime_llvm_jit_cache_sha_update_literal(sha, valid_tag); }
+            else
+            {
+                runtime_llvm_jit_cache_sha_update_literal(sha, invalid_tag);
+            }
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(size));
+            if(valid) { runtime_llvm_jit_cache_sha_update(sha, first, size); }
+        }
+
+        template <typename FunctionType>
+        inline constexpr void runtime_llvm_jit_cache_sha_update_function_type(::fast_io::sha256_context& sha,
+                                                                              FunctionType const* function_type) noexcept
+        {
+            if(function_type == nullptr) [[unlikely]]
+            {
+                runtime_llvm_jit_cache_sha_update_literal(sha, u8"function-type-missing");
+                return;
+            }
+
+            ::std::byte const* first{};
+            ::std::size_t size{};
+            auto const parameter_valid{runtime_llvm_jit_cache_range_bytes(function_type->parameter.begin, function_type->parameter.end, first, size)};
+            runtime_llvm_jit_cache_sha_update_range_or_tag(sha, u8"param", u8"param-invalid", first, size, parameter_valid);
+
+            auto const result_valid{runtime_llvm_jit_cache_range_bytes(function_type->result.begin, function_type->result.end, first, size)};
+            runtime_llvm_jit_cache_sha_update_range_or_tag(sha, u8"result", u8"result-invalid", first, size, result_valid);
+        }
+
+        template <typename ImportType>
+        inline constexpr void runtime_llvm_jit_cache_sha_update_import_type(::fast_io::sha256_context& sha, ImportType const* import_type) noexcept
+        {
+            if(import_type == nullptr) [[unlikely]]
+            {
+                runtime_llvm_jit_cache_sha_update_literal(sha, u8"import-type-missing");
+                return;
+            }
+
+            runtime_llvm_jit_cache_sha_update_u8string_view(sha, import_type->module_name);
+            runtime_llvm_jit_cache_sha_update_u8string_view(sha, import_type->extern_name);
+            auto const import_tag{static_cast<::std::uint_least64_t>(import_type->imports.type)};
+            runtime_llvm_jit_cache_sha_update_le(sha, import_tag);
+            if(import_tag == 0u) { runtime_llvm_jit_cache_sha_update_function_type(sha, import_type->imports.storage.function); }
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+            runtime_llvm_jit_cache_sha256_hex(::fast_io::sha256_context& sha) noexcept
+        {
+            sha.do_final();
+            ::uwvm2::utils::container::array<::std::byte, ::uwvm2::runtime::llvm_jit_cache::cache_sha256_digest_size> digest{};
+            sha.digest_to_byte_ptr(digest.data());
+
+            ::uwvm2::utils::container::u8string out{};
+            out.reserve(digest.size() * 2uz);
+            ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
+            for(auto b: digest) { ::fast_io::io::print(ref, ::fast_io::mnp::hex<false, true>(::std::to_integer<::std::uint_least8_t>(b))); }
+            return out;
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+            runtime_llvm_jit_full_module_cache_fingerprint(runtime_module_storage_t const& runtime_module) noexcept
+        {
+            ::fast_io::sha256_context sha{};
+            runtime_llvm_jit_cache_sha_update_literal(sha, u8"uwvm2-llvm-jit-full-module-cache-fingerprint-v2");
+            runtime_llvm_jit_cache_sha_update_u8string_view(sha, runtime_module.module_name);
+
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.imported_function_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_function_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.imported_table_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_table_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.imported_memory_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_memory_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.imported_global_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_global_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_element_vec_storage.size()));
+            runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(runtime_module.local_defined_data_vec_storage.size()));
+
+            for(auto const& imported_func: runtime_module.imported_function_vec_storage)
+            {
+                runtime_llvm_jit_cache_sha_update_import_type(sha, imported_func.import_type_ptr);
+                runtime_llvm_jit_cache_sha_update_le(sha, static_cast<::std::uint_least64_t>(imported_func.link_kind));
+            }
+
+            for(auto const& local_func: runtime_module.local_defined_function_vec_storage)
+            {
+                runtime_llvm_jit_cache_sha_update_function_type(sha, local_func.function_type_ptr);
+                auto const wasm_code_ptr{local_func.wasm_code_ptr};
+                if(wasm_code_ptr == nullptr) [[unlikely]]
+                {
+                    runtime_llvm_jit_cache_sha_update_literal(sha, u8"code-missing");
+                    continue;
+                }
+
+                ::std::byte const* first{};
+                ::std::size_t size{};
+                auto const code_valid{runtime_llvm_jit_cache_range_bytes(wasm_code_ptr->body.code_begin, wasm_code_ptr->body.code_end, first, size)};
+                runtime_llvm_jit_cache_sha_update_range_or_tag(sha, u8"code", u8"code-invalid", first, size, code_valid);
+            }
+
+            return runtime_llvm_jit_cache_sha256_hex(sha);
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::runtime::llvm_jit_cache::cache_context
+            runtime_llvm_jit_parallel_object_cache_context(::uwvm2::runtime::llvm_jit_cache::cache_context const& base_context,
+                                                           ::std::size_t object_count,
+                                                           ::std::size_t object_index) noexcept
+        {
+            auto ctx{base_context};
+            auto key{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"parallel-object")};
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(key, u8"base-key", base_context.cache_key);
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
+                key, u8"parallel-object-count", static_cast<::std::uint_least64_t>(object_count));
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
+                key, u8"parallel-object-index", static_cast<::std::uint_least64_t>(object_index));
+            ctx.cache_key = ::std::move(key);
+            ctx.cache_key_is_complete = true;
+            return ctx;
+        }
+
+        [[nodiscard]] inline constexpr bool load_runtime_llvm_jit_parallel_object_cache(
+            ::uwvm2::runtime::llvm_jit_cache::cache_context const& base_context,
+            ::uwvm2::runtime::llvm_jit_cache::cache_policy const& cache_policy,
+            ::std::size_t object_count,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>& object_outputs) noexcept
+        {
+            if(!cache_policy.enable || object_count == 0uz) { return false; }
+
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> loaded_objects{};
+            loaded_objects.reserve(object_count);
+            for(::std::size_t object_index{}; object_index != object_count; ++object_index)
+            {
+                auto object_context{runtime_llvm_jit_parallel_object_cache_context(base_context, object_count, object_index)};
+                auto load{::uwvm2::runtime::llvm_jit_cache::load_object(object_context, cache_policy)};
+                if(load.status != ::uwvm2::runtime::llvm_jit_cache::cache_status::ok) { return false; }
+
+                loaded_objects.emplace_back(::uwvm2::utils::container::u8string_view{
+                    reinterpret_cast<char8_t const*>(load.object.cbegin()), load.object.size()});
+            }
+
+            object_outputs = ::std::move(loaded_objects);
+            return true;
+        }
+
+        inline constexpr void store_runtime_llvm_jit_parallel_object_cache(
+            ::uwvm2::runtime::llvm_jit_cache::cache_context const& base_context,
+            ::uwvm2::runtime::llvm_jit_cache::cache_policy const& cache_policy,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& object_outputs) noexcept
+        {
+            if(!cache_policy.enable) { return; }
+
+            auto const object_count{object_outputs.size()};
+            for(::std::size_t object_index{}; object_index != object_count; ++object_index)
+            {
+                auto object_context{runtime_llvm_jit_parallel_object_cache_context(base_context, object_count, object_index)};
+                auto const& object_output{object_outputs.index_unchecked(object_index)};
+                auto const first{reinterpret_cast<::std::byte const*>(object_output.cbegin())};
+                (void)::uwvm2::runtime::llvm_jit_cache::store_object_async(object_context, first, object_output.size(), cache_policy);
+            }
+        }
+
         inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept
         {
             // LLVM native target setup is process-global and not idempotent in all versions, so guard it behind local statics.
@@ -9367,6 +9604,30 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
+        inline constexpr void collect_runtime_llvm_jit_parallel_object_function_names(
+            ::llvm::Module& module,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>& function_names) noexcept
+        {
+            function_names.clear();
+            for(auto const& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                auto const name{function.getName()};
+                if(name.empty()) { continue; }
+                function_names.emplace_back(::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(name));
+            }
+        }
+
+        [[nodiscard]] inline constexpr ::std::size_t
+            runtime_llvm_jit_parallel_object_task_count(::std::size_t function_count, ::std::size_t extra_compile_threads) noexcept
+        {
+            if(extra_compile_threads == 0uz || function_count <= 1uz) { return 0uz; }
+
+            auto const effective_extra_threads{::uwvm2::utils::thread::clamp_extra_worker_count(function_count, extra_compile_threads)};
+            if(effective_extra_threads == 0uz) { return 0uz; }
+            return effective_extra_threads + 1uz;
+        }
+
         inline constexpr void expose_runtime_llvm_jit_partition_symbol(::llvm::GlobalValue& global_value) noexcept
         {
             // Partitioned objects must be able to resolve cross-object references while still hiding symbols from the host process.
@@ -9608,23 +9869,16 @@ namespace uwvm2::runtime::lib
 
             // Partitioning is function-name based: each task owns a slice of definitions and imports any cross-slice references.
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> function_names{};
-            for(auto const& function: module)
-            {
-                if(function.isDeclaration()) { continue; }
-                auto const name{function.getName()};
-                if(name.empty()) { continue; }
-                function_names.emplace_back(::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(name));
-            }
+            collect_runtime_llvm_jit_parallel_object_function_names(module, function_names);
             defined_function_count = function_names.size();
-            if(function_names.size() <= 1uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
+            auto const task_count{runtime_llvm_jit_parallel_object_task_count(function_names.size(), extra_compile_threads)};
+            if(task_count == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
 
-            auto const effective_extra_threads{::uwvm2::utils::thread::clamp_extra_worker_count(function_names.size(), extra_compile_threads)};
-            if(effective_extra_threads == 0uz) { return runtime_llvm_jit_parallel_object_emit_result::not_applicable; }
+            auto const effective_extra_threads{task_count - 1uz};
 
             ::uwvm2::utils::container::u8string source_bitcode{};
             if(!serialize_runtime_llvm_jit_module_bitcode(module, source_bitcode)) [[unlikely]] { return runtime_llvm_jit_parallel_object_emit_result::failed; }
 
-            auto const task_count{effective_extra_threads + 1uz};
             auto const functions_per_task{function_names.size() / task_count + static_cast<::std::size_t>(function_names.size() % task_count != 0uz)};
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> exposed_symbol_names{};
             collect_runtime_llvm_jit_partition_exposed_symbols(module, function_names, functions_per_task, exposed_symbol_names);
@@ -9888,52 +10142,124 @@ namespace uwvm2::runtime::lib
 
             merged_module->setTargetTriple(target_machine->getTargetTriple());
             merged_module->setDataLayout(target_machine->createDataLayout());
-            auto const optimize_start_time{llvm_jit_materialize_runtime_log_now()};
-            llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"",
-                                                  rec.module_name,
-                                                  u8"\" policy=",
-                                                  full_materialize_strategy.policy_name,
-                                                  u8" pipeline=",
-                                                  get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline),
-                                                  u8" codegen_opt=",
-                                                  get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level),
-                                                  u8" call_stack=",
-                                                  get_runtime_llvm_jit_call_stack_mode_name(),
-                                                  u8" unwind_backend=",
-                                                  runtime_llvm_jit_unwind_backend_name(),
-                                                  u8" unwind_check=",
-                                                  runtime_llvm_jit_unwind_check_requested()
-                                                      ? ::uwvm2::utils::container::u8string_view{u8"live"}
-                                                      : (runtime_llvm_jit_unwind_call_stack_requested() ? ::uwvm2::utils::container::u8string_view{u8"static"}
-                                                                                                        : ::uwvm2::utils::container::u8string_view{u8"off"}),
-                                                  u8" unwind_replace_frames=",
-                                                  runtime_llvm_jit_unwind_can_replace_instruction_frames() ? ::uwvm2::utils::container::u8string_view{u8"yes"}
-                                                                                                           : ::uwvm2::utils::container::u8string_view{u8"no"},
-                                                  u8" call_stack_frames=",
-                                                  runtime_llvm_jit_uses_instruction_call_stack_frames() ? u8"emit" : u8"omit");
-            if(!optimize_runtime_llvm_jit_module(*merged_module,
-                                                 *target_machine,
-                                                 full_materialize_strategy.pipeline,
-                                                 codegen_opt_level,
-                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
-                                                 rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized &&
-                                                     full_materialize_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)) [[unlikely]]
-            {
-                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                {
-                    llvm_jit_materialize_error(u8"LLVM JIT module optimization/verification failed for module=\"", rec.module_name, u8"\".");
-                }
-                return false;
-            }
-            llvm_jit_materialize_runtime_log_line(u8"optimize-end module=\"",
-                                                  rec.module_name,
-                                                  u8"\" time=",
-                                                  llvm_jit_materialize_runtime_log_now() - optimize_start_time);
+            auto llvm_jit_cache_key{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"full-module")};
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", rec.module_name);
+            auto full_module_wasm_hash{runtime_llvm_jit_full_module_cache_fingerprint(*runtime_module)};
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_key, u8"module-wasm-hash", full_module_wasm_hash);
+            auto llvm_jit_cache_codegen_policy{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"codegen-policy")};
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"cache-unit", u8"full");
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_codegen_policy, u8"pipeline", get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline));
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_codegen_policy, u8"codegen-opt-level", get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level));
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_codegen_policy, u8"policy", full_materialize_strategy.policy_name);
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_codegen_policy, u8"call-stack", get_runtime_llvm_jit_call_stack_mode_name());
+            auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
+                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
+                *target_machine)};
+            llvm_jit_cache_context.cache_key_is_complete = true;
+            auto const llvm_jit_cache_policy{::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
 
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> parallel_object_outputs{};
             ::std::size_t parallel_object_defined_function_count{};
             bool use_parallel_objects{};
             if(extra_materialize_threads != 0uz)
+            {
+                ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> parallel_function_names{};
+                collect_runtime_llvm_jit_parallel_object_function_names(*merged_module, parallel_function_names);
+                parallel_object_defined_function_count = parallel_function_names.size();
+                auto const parallel_object_task_count{
+                    runtime_llvm_jit_parallel_object_task_count(parallel_object_defined_function_count, extra_materialize_threads)};
+
+                if(load_runtime_llvm_jit_parallel_object_cache(llvm_jit_cache_context,
+                                                               llvm_jit_cache_policy,
+                                                               parallel_object_task_count,
+                                                               parallel_object_outputs))
+                {
+                    use_parallel_objects = true;
+                    ::std::size_t object_bytes{};
+                    for(auto const& object_output: parallel_object_outputs) { object_bytes += object_output.size(); }
+                    llvm_jit_materialize_runtime_log_line(u8"object-cache-hit module=\"",
+                                                          rec.module_name,
+                                                          u8"\" functions=",
+                                                          parallel_object_defined_function_count,
+                                                          u8" objects=",
+                                                          parallel_object_outputs.size(),
+                                                          u8" bytes=",
+                                                          object_bytes);
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                            u8"[info]  ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"LLVM JIT full cache hit for module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                            rec.module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                            u8"\n");
+                    }
+                }
+            }
+
+            if(use_parallel_objects)
+            {
+                llvm_jit_materialize_runtime_log_line(u8"optimize-skip module=\"", rec.module_name, u8"\" reason=object-cache-hit");
+            }
+            else
+            {
+                auto const optimize_start_time{llvm_jit_materialize_runtime_log_now()};
+                llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"",
+                                                      rec.module_name,
+                                                      u8"\" policy=",
+                                                      full_materialize_strategy.policy_name,
+                                                      u8" pipeline=",
+                                                      get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline),
+                                                      u8" codegen_opt=",
+                                                      get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level),
+                                                      u8" call_stack=",
+                                                      get_runtime_llvm_jit_call_stack_mode_name(),
+                                                      u8" unwind_backend=",
+                                                      runtime_llvm_jit_unwind_backend_name(),
+                                                      u8" unwind_check=",
+                                                      runtime_llvm_jit_unwind_check_requested()
+                                                          ? ::uwvm2::utils::container::u8string_view{u8"live"}
+                                                          : (runtime_llvm_jit_unwind_call_stack_requested() ? ::uwvm2::utils::container::u8string_view{u8"static"}
+                                                                                                            : ::uwvm2::utils::container::u8string_view{u8"off"}),
+                                                      u8" unwind_replace_frames=",
+                                                      runtime_llvm_jit_unwind_can_replace_instruction_frames() ? ::uwvm2::utils::container::u8string_view{u8"yes"}
+                                                                                                               : ::uwvm2::utils::container::u8string_view{u8"no"},
+                                                      u8" call_stack_frames=",
+                                                      runtime_llvm_jit_uses_instruction_call_stack_frames() ? u8"emit" : u8"omit");
+                if(!optimize_runtime_llvm_jit_module(*merged_module,
+                                                     *target_machine,
+                                                     full_materialize_strategy.pipeline,
+                                                     codegen_opt_level,
+                                                     !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
+                                                     rec.llvm_jit_compiled.llvm_jit_task_modules_pre_link_optimized &&
+                                                         full_materialize_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)) [[unlikely]]
+                {
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        llvm_jit_materialize_error(u8"LLVM JIT module optimization/verification failed for module=\"", rec.module_name, u8"\".");
+                    }
+                    return false;
+                }
+                llvm_jit_materialize_runtime_log_line(u8"optimize-end module=\"",
+                                                      rec.module_name,
+                                                      u8"\" time=",
+                                                      llvm_jit_materialize_runtime_log_now() - optimize_start_time);
+            }
+
+            if(extra_materialize_threads != 0uz && !use_parallel_objects)
             {
                 // Try a partitioned object-emission path for large modules. On failure, fall back to MCJIT's normal single-module
                 // emission rather than failing the entire materialization.
@@ -9954,6 +10280,7 @@ namespace uwvm2::runtime::lib
                     use_parallel_objects = true;
                     ::std::size_t object_bytes{};
                     for(auto const& object_output: parallel_object_outputs) { object_bytes += object_output.size(); }
+                    store_runtime_llvm_jit_parallel_object_cache(llvm_jit_cache_context, llvm_jit_cache_policy, parallel_object_outputs);
                     llvm_jit_materialize_runtime_log_line(u8"object-emit-end module=\"",
                                                           rec.module_name,
                                                           u8"\" functions=",
@@ -9981,21 +10308,6 @@ namespace uwvm2::runtime::lib
                                                           llvm_jit_materialize_runtime_log_now() - object_emit_start_time);
                 }
             }
-
-            auto const llvm_jit_cache_key{::uwvm2::utils::container::u8concat_uwvm(u8"full:", rec.module_name)};
-            auto const llvm_jit_cache_codegen_policy{
-                ::uwvm2::utils::container::u8concat_uwvm(u8"full;pipeline=",
-                                                         get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline),
-                                                         u8";codegen=",
-                                                         get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level),
-                                                         u8";policy=",
-                                                         full_materialize_strategy.policy_name,
-                                                         u8";call_stack=",
-                                                         get_runtime_llvm_jit_call_stack_mode_name())};
-            auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
-                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
-                ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
-                *target_machine)};
 
             ::llvm::ExecutionEngine* raw_engine{};
             if(use_parallel_objects)
@@ -10051,7 +10363,7 @@ namespace uwvm2::runtime::lib
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
-                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+                ::std::move(llvm_jit_cache_context), llvm_jit_cache_policy};
             if(!use_parallel_objects) { llvm_jit_engine->setObjectCache(::std::addressof(llvm_jit_object_cache)); }
             if(runtime_llvm_jit_unwind_call_stack_requested())
             {
@@ -12461,6 +12773,14 @@ namespace uwvm2::runtime::lib
                     rec.tiered_osr_request_counters.clear();
                 }
 # endif
+
+                if(::uwvm2::runtime::llvm_jit_cache::default_cache_policy().enable)
+                {
+                    // Cacheable lazy LLVM IR must not depend on whether another lazy function happened to be materialized
+                    // earlier in this process. Force dynamic target-table loads so identical local functions hash the same
+                    // across cold and warm cache runs.
+                    rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_targets_are_atomic = true;
+                }
 
                 rec.llvm_jit_lazy_direct_call_targets.clear();
                 rec.llvm_jit_lazy_direct_call_targets.resize(local_n);

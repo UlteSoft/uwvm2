@@ -19,13 +19,12 @@ case wasm1_code::i32_load:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i32,
-                              ::llvm::Type::getInt32Ty(llvm_context),
-                              4uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i32, 4uz>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i32, 4uz>>(offset,
+                                                                                                      align,
+                                                                                                      runtime_operand_stack_value_type::i32,
+                                                                                                      ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                      4uz,
+                                                                                                      false)) [[unlikely]]
     {
         return result;
     }
@@ -41,13 +40,12 @@ case wasm1_code::i64_load:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              8uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 8uz>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 8uz>>(offset,
+                                                                                                      align,
+                                                                                                      runtime_operand_stack_value_type::i64,
+                                                                                                      ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                      8uz,
+                                                                                                      false)) [[unlikely]]
     {
         return result;
     }
@@ -64,13 +62,12 @@ case wasm1_code::f32_load:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::f32,
-                              ::llvm::Type::getFloatTy(llvm_context),
-                              4uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_f32, 4uz>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_f32, 4uz>>(offset,
+                                                                                                      align,
+                                                                                                      runtime_operand_stack_value_type::f32,
+                                                                                                      ::llvm::Type::getFloatTy(llvm_context),
+                                                                                                      4uz,
+                                                                                                      false)) [[unlikely]]
     {
         return result;
     }
@@ -86,13 +83,12 @@ case wasm1_code::f64_load:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::f64,
-                              ::llvm::Type::getDoubleTy(llvm_context),
-                              8uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_f64, 8uz>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_f64, 8uz>>(offset,
+                                                                                                      align,
+                                                                                                      runtime_operand_stack_value_type::f64,
+                                                                                                      ::llvm::Type::getDoubleTy(llvm_context),
+                                                                                                      8uz,
+                                                                                                      false)) [[unlikely]]
     {
         return result;
     }
@@ -108,13 +104,12 @@ case wasm1_code::i32_load8_s:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i32,
-                              ::llvm::Type::getInt32Ty(llvm_context),
-                              1uz,
-                              true,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i32, 1uz, true>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i32, 1uz, true>>(offset,
+                                                                                                            align,
+                                                                                                            runtime_operand_stack_value_type::i32,
+                                                                                                            ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                            1uz,
+                                                                                                            true)) [[unlikely]]
     {
         return result;
     }
@@ -130,13 +125,12 @@ case wasm1_code::i32_load8_u:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i32,
-                              ::llvm::Type::getInt32Ty(llvm_context),
-                              1uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i32, 1uz, false>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i32, 1uz, false>>(offset,
+                                                                                                             align,
+                                                                                                             runtime_operand_stack_value_type::i32,
+                                                                                                             ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                             1uz,
+                                                                                                             false)) [[unlikely]]
     {
         return result;
     }
@@ -152,13 +146,12 @@ case wasm1_code::i32_load16_s:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i32,
-                              ::llvm::Type::getInt32Ty(llvm_context),
-                              2uz,
-                              true,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i32, 2uz, true>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i32, 2uz, true>>(offset,
+                                                                                                            align,
+                                                                                                            runtime_operand_stack_value_type::i32,
+                                                                                                            ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                            2uz,
+                                                                                                            true)) [[unlikely]]
     {
         return result;
     }
@@ -174,13 +167,12 @@ case wasm1_code::i32_load16_u:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i32,
-                              ::llvm::Type::getInt32Ty(llvm_context),
-                              2uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i32, 2uz, false>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i32, 2uz, false>>(offset,
+                                                                                                             align,
+                                                                                                             runtime_operand_stack_value_type::i32,
+                                                                                                             ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                             2uz,
+                                                                                                             false)) [[unlikely]]
     {
         return result;
     }
@@ -196,13 +188,12 @@ case wasm1_code::i64_load8_s:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              1uz,
-                              true,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 1uz, true>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 1uz, true>>(offset,
+                                                                                                            align,
+                                                                                                            runtime_operand_stack_value_type::i64,
+                                                                                                            ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                            1uz,
+                                                                                                            true)) [[unlikely]]
     {
         return result;
     }
@@ -218,13 +209,12 @@ case wasm1_code::i64_load8_u:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              1uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 1uz, false>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 1uz, false>>(offset,
+                                                                                                             align,
+                                                                                                             runtime_operand_stack_value_type::i64,
+                                                                                                             ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                             1uz,
+                                                                                                             false)) [[unlikely]]
     {
         return result;
     }
@@ -240,13 +230,12 @@ case wasm1_code::i64_load16_s:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              2uz,
-                              true,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 2uz, true>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 2uz, true>>(offset,
+                                                                                                            align,
+                                                                                                            runtime_operand_stack_value_type::i64,
+                                                                                                            ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                            2uz,
+                                                                                                            true)) [[unlikely]]
     {
         return result;
     }
@@ -262,13 +251,12 @@ case wasm1_code::i64_load16_u:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              2uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 2uz, false>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 2uz, false>>(offset,
+                                                                                                             align,
+                                                                                                             runtime_operand_stack_value_type::i64,
+                                                                                                             ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                             2uz,
+                                                                                                             false)) [[unlikely]]
     {
         return result;
     }
@@ -284,13 +272,12 @@ case wasm1_code::i64_load32_s:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              4uz,
-                              true,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 4uz, true>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 4uz, true>>(offset,
+                                                                                                            align,
+                                                                                                            runtime_operand_stack_value_type::i64,
+                                                                                                            ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                            4uz,
+                                                                                                            true)) [[unlikely]]
     {
         return result;
     }
@@ -306,13 +293,12 @@ case wasm1_code::i64_load32_u:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_load_call(offset,
-                              align,
-                              runtime_operand_stack_value_type::i64,
-                              ::llvm::Type::getInt64Ty(llvm_context),
-                              4uz,
-                              false,
-                              llvm_jit_memory_load_bridge<runtime_wasm_i64, 4uz, false>)) [[unlikely]]
+       !emit_memory_load_call.template operator()<llvm_jit_memory_load_bridge<runtime_wasm_i64, 4uz, false>>(offset,
+                                                                                                             align,
+                                                                                                             runtime_operand_stack_value_type::i64,
+                                                                                                             ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                             4uz,
+                                                                                                             false)) [[unlikely]]
     {
         return result;
     }
@@ -329,12 +315,11 @@ case wasm1_code::i32_store:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i32,
-                               ::llvm::Type::getInt32Ty(llvm_context),
-                               4uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i32, 4uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i32, 4uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i32,
+                                                                                                        ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                        4uz)) [[unlikely]]
     {
         return result;
     }
@@ -350,12 +335,11 @@ case wasm1_code::i64_store:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i64,
-                               ::llvm::Type::getInt64Ty(llvm_context),
-                               8uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i64, 8uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i64, 8uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i64,
+                                                                                                        ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                        8uz)) [[unlikely]]
     {
         return result;
     }
@@ -371,12 +355,11 @@ case wasm1_code::f32_store:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::f32,
-                               ::llvm::Type::getFloatTy(llvm_context),
-                               4uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_f32, 4uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_f32, 4uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::f32,
+                                                                                                        ::llvm::Type::getFloatTy(llvm_context),
+                                                                                                        4uz)) [[unlikely]]
     {
         return result;
     }
@@ -392,12 +375,11 @@ case wasm1_code::f64_store:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::f64,
-                               ::llvm::Type::getDoubleTy(llvm_context),
-                               8uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_f64, 8uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_f64, 8uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::f64,
+                                                                                                        ::llvm::Type::getDoubleTy(llvm_context),
+                                                                                                        8uz)) [[unlikely]]
     {
         return result;
     }
@@ -413,12 +395,11 @@ case wasm1_code::i32_store8:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i32,
-                               ::llvm::Type::getInt32Ty(llvm_context),
-                               1uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i32, 1uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i32, 1uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i32,
+                                                                                                        ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                        1uz)) [[unlikely]]
     {
         return result;
     }
@@ -434,12 +415,11 @@ case wasm1_code::i32_store16:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i32,
-                               ::llvm::Type::getInt32Ty(llvm_context),
-                               2uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i32, 2uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i32, 2uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i32,
+                                                                                                        ::llvm::Type::getInt32Ty(llvm_context),
+                                                                                                        2uz)) [[unlikely]]
     {
         return result;
     }
@@ -455,12 +435,11 @@ case wasm1_code::i64_store8:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i64,
-                               ::llvm::Type::getInt64Ty(llvm_context),
-                               1uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i64, 1uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i64, 1uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i64,
+                                                                                                        ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                        1uz)) [[unlikely]]
     {
         return result;
     }
@@ -476,12 +455,11 @@ case wasm1_code::i64_store16:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i64,
-                               ::llvm::Type::getInt64Ty(llvm_context),
-                               2uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i64, 2uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i64, 2uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i64,
+                                                                                                        ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                        2uz)) [[unlikely]]
     {
         return result;
     }
@@ -497,12 +475,11 @@ case wasm1_code::i64_store32:
     validation_module_traits_t::wasm_u32 align{};
     validation_module_traits_t::wasm_u32 offset{};
     if(!parse_wasm_leb128_immediate(code_curr, code_end, align) || !parse_wasm_leb128_immediate(code_curr, code_end, offset) ||
-       !emit_memory_store_call(offset,
-                               align,
-                               runtime_operand_stack_value_type::i64,
-                               ::llvm::Type::getInt64Ty(llvm_context),
-                               4uz,
-                               llvm_jit_memory_store_bridge<runtime_wasm_i64, 4uz>)) [[unlikely]]
+       !emit_memory_store_call.template operator()<llvm_jit_memory_store_bridge<runtime_wasm_i64, 4uz>>(offset,
+                                                                                                        align,
+                                                                                                        runtime_operand_stack_value_type::i64,
+                                                                                                        ::llvm::Type::getInt64Ty(llvm_context),
+                                                                                                        4uz)) [[unlikely]]
     {
         return result;
     }
