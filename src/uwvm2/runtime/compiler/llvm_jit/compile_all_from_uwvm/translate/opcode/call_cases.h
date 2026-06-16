@@ -1,3 +1,8 @@
+    // Direct and indirect call validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // Validation keeps callee signatures as ranges, but the current LLVM JIT call ABI is still MVP-oriented for 0/1 results.
+    // Multi-value calls, typed function references, and multi-table call_indirect must update this file and the emitter ABI
+    // paths together.
+
 case wasm1_code::call:
 {
     // call     func_index ...
@@ -104,7 +109,9 @@ case wasm1_code::call:
     // Consume parameters if present.
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
 
-    // Push results.
+    // Push results.  This preserves the full result range for future multi-value validation, but the current LLVM JIT
+    // emitter only lowers 0/1 result calls.  Enabling multi-value must extend call ABI/result-buffer lowering before
+    // allowing such functions to remain on the inline JIT path.
     if(result_count != 0uz)
     {
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
@@ -169,6 +176,9 @@ case wasm1_code::call_indirect:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    // WebAssembly 1.0/MVP treats this second immediate as the reserved zero for the default table.  The translator decodes
+    // it into a table-index-shaped field so reference-types/multi-table support has a natural hook; when that restriction
+    // is relaxed, keep table validation, table storage, and LLVM selected-table lowering aligned.
     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index;  // No initialization necessary
     auto const [table_next, table_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
                                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
@@ -249,6 +259,8 @@ case wasm1_code::call_indirect:
 
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
 
+    // Same result-range rule as direct call: validation can model future multi-value results, while the current LLVM JIT
+    // call lowering remains limited to the existing MVP-style ABI until explicitly extended.
     if(result_count != 0uz)
     {
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }

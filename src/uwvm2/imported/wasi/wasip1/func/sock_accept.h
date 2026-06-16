@@ -113,7 +113,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     struct wasi_addr_ip6_t
-    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n[16]; };
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n[16];
+    };
 
     inline constexpr ::std::size_t size_of_wasi_addr_ip6_t{16uz};
 
@@ -170,7 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                is_default_wasi_addr_data_layout();
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_accept(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_accept(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t fd_flags,

@@ -6115,7 +6115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                     requires (Opt.is_tail_call)
-                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_stacktop_spill1_then_f64_add_2localget_typed<Opt, SpilledT, Pos, Type...>; }
             };
 

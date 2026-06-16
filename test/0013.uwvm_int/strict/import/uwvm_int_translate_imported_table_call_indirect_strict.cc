@@ -24,7 +24,7 @@ namespace
     }
 
     // Minimal trivial-call bridge (same encoding contract as translate.h local-defined call fast path).
-    static void call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -156,10 +156,10 @@ namespace
     }
 
     // call_indirect bridge for tests: resolves imported table and dispatches via `call_bridge`.
-    static void call_indirect_bridge(::std::size_t /*wasm_module_id*/,
-                                     ::std::size_t type_index,
-                                     ::std::size_t table_index,
-                                     ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_indirect_bridge(::std::size_t /*wasm_module_id*/,
+                                                        ::std::size_t type_index,
+                                                        ::std::size_t table_index,
+                                                        ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(g_rt == nullptr || g_cm == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -306,13 +306,9 @@ namespace
 
     [[nodiscard]] int test_translate_imported_table_call_indirect() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +call_bridge;
-        optable::call_indirect_func = +call_indirect_bridge;
+        install_unexpected_traps();
+        optable::call_func = call_bridge;
+        optable::call_indirect_func = call_indirect_bridge;
 
         auto lib = build_lib_table_module();
         auto wasm = build_main_import_table_call_indirect_module();

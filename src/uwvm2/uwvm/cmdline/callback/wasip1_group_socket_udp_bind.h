@@ -57,7 +57,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
-    { return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_socket_udp_bind, para_curr, para_end, u8"socket-udp-bind"); }
+    {
+        return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_socket_udp_bind,
+                                                  para_curr,
+                                                  para_end,
+                                                  wasip1_module_details::target_action_t::socket_udp_bind);
+    }
 
 #  endif
 # endif

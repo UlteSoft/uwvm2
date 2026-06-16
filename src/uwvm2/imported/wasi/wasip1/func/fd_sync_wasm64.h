@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.fd_sync (wasm64 mirror)
     /// @details   __wasi_errno_t fd_sync_wasm64(__wasi_fd_t fd);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t fd_sync_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t fd_sync_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd) noexcept
     {

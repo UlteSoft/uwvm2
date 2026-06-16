@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        impl.cppm
+ * @brief       Primary C++20 module interface for UWVM diagnostic color policy helpers.
+ * @details     This module exports `uwvm2.uwvm_predefine.utils.ansies` and re-exports the `no_color` partition.  After
+ *              defining module-build macros, it includes the umbrella header so module and non-module builds share the
+ *              same color-control declarations.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-03-24

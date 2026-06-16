@@ -75,7 +75,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.environ_get
     /// @note      __wasi_errno_t environ_get(char **environ, char *environ_buf);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t environ_get(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t environ_get(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t environ_ptrsz,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t environ_buf_ptrsz) noexcept

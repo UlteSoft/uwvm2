@@ -1,5 +1,10 @@
+// Floating-point arithmetic and conversion opcodes rely on typed helpers to preserve WebAssembly
+// details such as NaN propagation, signed zero, trapping float-to-int conversions, and bit-exact
+// reinterpretation. The translator comments focus on why stack and combine state is handled here.
 case wasm1_code::f32_abs:
 {
+    // Simple unary f32 ops keep stack depth unchanged. When the operand is a pending local.get, a
+    // typed localget helper removes the otherwise redundant local load dispatch.
     validate_numeric_unary(u8"f32.abs", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::f32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -110,6 +115,8 @@ case wasm1_code::f32_sqrt:
 }
 case wasm1_code::f32_add:
 {
+    // f32 arithmetic participates in accumulator and local-update patterns, so pending local_gets
+    // are preserved long enough to choose store/tee-aware helpers when the next opcode allows it.
     validate_numeric_binary(u8"f32.add", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::f32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -173,6 +180,8 @@ case wasm1_code::f32_add:
 #endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+    // Accumulator patterns intentionally pause here: the following local.set/local.tee decides
+    // whether the fused helper should overwrite the accumulator or leave a stack result.
     if(conbine_pending.kind == conbine_pending_kind::f32_acc_add_floor_localget_wait_add)
     {
         conbine_pending.kind = conbine_pending_kind::f32_acc_add_floor_localget_set_acc;
@@ -1081,6 +1090,8 @@ case wasm1_code::f64_sqrt:
 }
 case wasm1_code::f64_add:
 {
+    // f64 arithmetic follows the same fusion policy as f32, but it uses its own stack-top range and
+    // helpers so that 64-bit payloads are never modeled as 32-bit cache entries.
     validate_numeric_binary(u8"f64.add", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::f64);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -2007,6 +2018,8 @@ case wasm1_code::i32_wrap_i64:
 }
 case wasm1_code::i32_trunc_f32_s:
 {
+    // Float-to-int truncation is not a plain cast: WebAssembly requires traps for NaN and
+    // out-of-range values, so the runtime helper owns the exact edge-case behavior.
     validate_numeric_unary(u8"i32.trunc_f32_s", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -2014,6 +2027,8 @@ case wasm1_code::i32_trunc_f32_s:
     if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
     {
         stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
+        // Emit the trapping conversion helper directly; doing this in the translator would either
+        // duplicate runtime edge-case code or risk host-specific floating behavior.
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_from_f32_trunc_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
         emit_imm_to(bytecode, conbine_pending.off1);
         stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32);
@@ -2163,6 +2178,8 @@ case wasm1_code::i32_trunc_f64_u:
 }
 case wasm1_code::i64_extend_i32_s:
 {
+    // Sign-extension changes value width and stack-top range. Keeping it explicit avoids treating
+    // the result as an i32 cached value after the helper has produced an i64.
     validate_numeric_unary(u8"i64.extend_i32_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -2681,6 +2698,8 @@ case wasm1_code::f64_promote_f32:
 }
 case wasm1_code::i32_reinterpret_f32:
 {
+    // Reinterpret operations are bitcasts, not numeric conversions. The helper must preserve all
+    // payload bits, including NaN encodings, while only changing the type view on the operand stack.
     validate_numeric_unary(u8"i32.reinterpret_f32", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 

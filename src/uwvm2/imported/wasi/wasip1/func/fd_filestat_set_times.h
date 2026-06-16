@@ -91,10 +91,11 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_io_observer const& dirfile,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
-                                                                      [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(
+        ::fast_io::dir_io_observer const& dirfile,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
     {
         [[maybe_unused]] auto const& file_fd{dirfile};
 
@@ -820,7 +821,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     /// @brief     WasiPreview1.fd_filestat_set_times
     /// @details   __wasi_errno_t fd_filestat_set_times(__wasi_fd_t fd, __wasi_timestamp_t atim, __wasi_timestamp_t mtim, __wasi_fstflags_t fstflags);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_times_base(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_times_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
@@ -1787,7 +1788,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_times(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_times(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,

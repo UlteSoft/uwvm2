@@ -49,6 +49,15 @@
 # endif
 #endif
 
+#if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
+    (defined(__GNUC__) || defined(__clang__))
+# define UWVM2TEST_WASM_ABI __attribute__((__sysv_abi__))
+#elif defined(__i386__) || defined(_M_IX86)
+# define UWVM2TEST_WASM_ABI UWVM_FASTCALL
+#else
+# define UWVM2TEST_WASM_ABI
+#endif
+
 namespace uwvm2test::uwvm_int_strict
 {
     using wasm_op = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
@@ -64,6 +73,29 @@ namespace uwvm2test::uwvm_int_strict
 
     using compiled_module_t = optable::uwvm_interpreter_full_function_symbol_t;
     using compiled_local_func_t = optable::local_func_storage_t;
+
+    inline void UWVM2TEST_WASM_ABI strict_trap_unexpected() noexcept
+    {
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI strict_terminate_call(::std::size_t, ::std::size_t, ::std::byte**) UWVM_THROWS
+    {
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI strict_terminate_call_indirect(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) UWVM_THROWS
+    {
+        ::fast_io::fast_terminate();
+    }
+
+    inline void install_unexpected_traps() noexcept
+    {
+        optable::unreachable_func = strict_trap_unexpected;
+        optable::trap_invalid_conversion_to_integer_func = strict_trap_unexpected;
+        optable::trap_integer_divide_by_zero_func = strict_trap_unexpected;
+        optable::trap_integer_overflow_func = strict_trap_unexpected;
+    }
 
     [[nodiscard]] constexpr ::std::uint8_t u8(wasm_op op) noexcept
     {

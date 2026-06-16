@@ -49,8 +49,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
     inline configured_preload_module_attribute_map_t configured_preload_module_attribute{};  // [global]
 
-    [[nodiscard]] inline auto find_configured_preload_module_attribute(::uwvm2::utils::container::u8string_view module_name) noexcept
-        -> ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t*
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t* find_configured_preload_module_attribute(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto it{configured_preload_module_attribute.find(module_name)}; it != configured_preload_module_attribute.end()) [[likely]]
         {
@@ -59,8 +59,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline auto find_configured_preload_module_attribute_const(::uwvm2::utils::container::u8string_view module_name) noexcept
-        -> ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t const*
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t const* find_configured_preload_module_attribute_const(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto const it{configured_preload_module_attribute.find(module_name)}; it != configured_preload_module_attribute.cend()) [[likely]]
         {
@@ -69,7 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t& upsert_configured_preload_module_attribute(
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t& upsert_configured_preload_module_attribute(
         ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         auto const [it, inserted]{configured_preload_module_attribute.try_emplace(::uwvm2::utils::container::u8string{module_name})};
@@ -77,7 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return it->second;
     }
 
-    [[nodiscard]] inline ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t resolve_preload_module_memory_attribute(
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t resolve_preload_module_memory_attribute(
         ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto const attribute{find_configured_preload_module_attribute_const(module_name)}; attribute != nullptr) [[likely]] { return *attribute; }
@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
     inline preload_capi_function_owner_map_t preload_capi_function_owner{};  // [global]
 
-    [[nodiscard]] inline preload_capi_function_owner_t const* find_preload_capi_function_owner(
+    [[nodiscard]] inline constexpr preload_capi_function_owner_t const* find_preload_capi_function_owner(
         ::uwvm2::uwvm::wasm::type::capi_function_t const* function) noexcept
     {
         if(function == nullptr) [[unlikely]] { return nullptr; }
@@ -112,7 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     }
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
-    inline void register_preloaded_dl_capi_functions(::std::size_t module_index) noexcept
+    inline constexpr void register_preloaded_dl_capi_functions(::std::size_t module_index) noexcept
     {
         if(module_index >= preloaded_dl.size()) [[unlikely]] { return; }
 
@@ -133,7 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 #endif
 
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-    inline void register_weak_symbol_capi_functions(::std::size_t module_index) noexcept
+    inline constexpr void register_weak_symbol_capi_functions(::std::size_t module_index) noexcept
     {
         if(module_index >= weak_symbol.size()) [[unlikely]] { return; }
 
@@ -153,8 +153,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     }
 #endif
 
-    [[nodiscard]] inline auto find_loaded_preload_module_memory_attribute(::uwvm2::uwvm::wasm::type::capi_function_t const* function) noexcept
-        -> ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t const*
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t const* find_loaded_preload_module_memory_attribute(
+        ::uwvm2::uwvm::wasm::type::capi_function_t const* function) noexcept
     {
         if(function == nullptr) [[unlikely]] { return nullptr; }
 

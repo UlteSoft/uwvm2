@@ -63,12 +63,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
-        [[nodiscard]] inline bool
+        [[nodiscard]] inline constexpr bool
             validate_wasip1_group_binding_for_loaded_module(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
                                                             ::uwvm2::utils::container::u8string_view module_name) noexcept
         {
             using namespace ::uwvm2::uwvm::imported::wasi::wasip1::storage;
 
+            // Command-line parsing rejects ordinary overlap between
+            // `--wasip1-single-create <module>` and
+            // `--wasip1-group-add-module <group> <module>`. Recheck after module
+            // loading because names may also come from preload-DL or weak-symbol
+            // metadata; if the same loaded module resolves to two different
+            // states, runtime cannot choose a policy safely.
             auto const anonymous_group_index{find_wasip1_anonymous_module_group_index(target_kind, module_name)};
             auto const named_group_index{find_named_wasip1_module_group_index(module_name)};
             if(anonymous_group_index == invalid_wasip1_group_index || named_group_index == invalid_wasip1_group_index ||
@@ -92,10 +98,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return false;
         }
 
-        [[nodiscard]] inline bool validate_loaded_wasip1_group_bindings() noexcept
+        [[nodiscard]] inline constexpr bool validate_loaded_wasip1_group_bindings() noexcept
         {
             using target_kind = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
 
+            // Validate every loaded module namespace that can make WASI calls.
+            // The same module name table is used later for target environment
+            // dispatch, so this is the last chance to report ambiguous bindings
+            // before runtime state is initialized.
             if(!::uwvm2::uwvm::wasm::storage::execute_wasm.module_name.empty())
             {
                 if(!validate_wasip1_group_binding_for_loaded_module(target_kind::main_wasm, ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name))
@@ -130,7 +140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
 #endif
 
-    inline int load_exec_wasm_module() noexcept
+    inline constexpr int load_exec_wasm_module() noexcept
     {
         // The wasm preload has been fully parsed
         // The dl preload has been fully registered
@@ -178,18 +188,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
     }
 
-    inline int load_local_modules() noexcept
+    inline constexpr int load_local_modules() noexcept
     {
         // preload abi
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+        // WASI local import handling has two separate questions:
+        //
+        // 1. Do we need initialized WASI environments? Yes if the global module
+        //    is enabled, host APIs are exposed, or any target override exists.
+        // 2. Do we need to load the built-in `wasi_snapshot_preview1` module?
+        //    Yes only if at least one loaded Wasm module can actually see that
+        //    import after target-local enable/disable overrides are applied.
         auto const need_wasip1_environment{::uwvm2::uwvm::wasm::storage::local_preload_wasip1 || ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api ||
                                            ::uwvm2::uwvm::imported::wasi::wasip1::storage::has_any_configured_wasip1_module_override()};
 
+        // Resolve import visibility exactly like the dependency checker and
+        // runtime linker. A target-local enable/disable setting takes priority
+        // over the global `--wasip1-global-disable` / default enabled state.
         auto const wasip1_import_visible_for_loaded_wasm{
             [](::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
-               ::uwvm2::utils::container::u8string_view module_name) noexcept -> bool
+               ::uwvm2::utils::container::u8string_view module_name) constexpr noexcept -> bool
             {
                 if(auto const state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(target_kind, module_name)};
                    state != nullptr && state->enabled_is_set) [[unlikely]]
@@ -199,6 +219,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
             }};
 
+        // If the global WASI import is disabled, still load the local imported
+        // module when a loaded executable/preload Wasm module has a target-local
+        // enable override. Without this pass, target enable could initialize an
+        // environment but still fail dependency resolution due to a missing
+        // local import provider.
         bool need_wasip1_local_imported_module{::uwvm2::uwvm::wasm::storage::local_preload_wasip1};
         if(!need_wasip1_local_imported_module)
         {
@@ -257,7 +282,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             for(auto& group_state: ::uwvm2::uwvm::imported::wasi::wasip1::storage::configured_wasip1_groups)
             {
-                if(!group_state.has_override()) [[unlikely]] { continue; }
+                // A configured WASI target must always receive an initialized
+                // environment, even when it only exists to bind a module to a
+                // single/group target and has no explicit overrides. Runtime
+                // dispatch switches imported WASI calls to the target env when
+                // a binding exists; leaving that env default-constructed would
+                // drop inherited argv/env/fd state such as the `--run` argv.
                 if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(group_state)) [[unlikely]]
                 {
                     return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
@@ -355,7 +385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
     }
 
-    inline int load_weak_symbol_modules() noexcept
+    inline constexpr int load_weak_symbol_modules() noexcept
     { return ::uwvm2::uwvm::run::load_weak_symbol_modules_details(::uwvm2::uwvm::wasm::storage::wasm_parameter); }
 
 }  // namespace uwvm2::uwvm::run

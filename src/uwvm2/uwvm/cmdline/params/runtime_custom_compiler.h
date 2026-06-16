@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_compiler{
         .name{u8"--runtime-custom-compiler"},
-        .describe{u8"Select the runtime compiler backend."},
+        .describe{u8"Select the runtime compiler backend; int defaults to auto lazy/full unless -Rcm is specified."},
         .usage{u8"["
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                u8"int"

@@ -5,6 +5,13 @@
  *************************************************************/
 
 /**
+ * @file        uwvm_color_pop_macro.h
+ * @brief       Restores UWVM diagnostic color macros saved by `uwvm_color_push_macro.h`.
+ * @details     This header is the required counterpart to `uwvm_color_push_macro.h`.  It pops the `UWVM_COLOR_*` macro
+ *              family in reverse definition order, restoring any definitions that were active before the push header was
+ *              included.  The reverse order keeps nested include scopes well-behaved and prevents UWVM's temporary color
+ *              macros from leaking into unrelated translation units.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-24
@@ -20,16 +27,11 @@
  *                                      *
  ****************************************/
 
-/// @brief      The following are the macros used by ansi escape sequences.
-/// @details    Use `pop_macro` to avoid side effects on existing macros. Please use `pop_macro` in conjunction.
-
 // #pragma once
 
 #ifdef UWVM
 
-///
-/// UTF-32
-///
+// Restore UTF-32 color macros first because they were pushed last.
 # pragma pop_macro("UWVM_COLOR_U32_RGB")
 # pragma pop_macro("UWVM_COLOR_U32_WHITE")
 # pragma pop_macro("UWVM_COLOR_U32_LT_CYAN")
@@ -51,9 +53,7 @@
 # pragma pop_macro("UWVM_COLOR_U32_RST_ALL_AND_SET_WHITE")
 # pragma pop_macro("UWVM_COLOR_U32_RST_ALL")
 
-///
-/// UTF-16
-///
+// Restore UTF-16 color macros.
 # pragma pop_macro("UWVM_COLOR_U16_RGB")
 # pragma pop_macro("UWVM_COLOR_U16_WHITE")
 # pragma pop_macro("UWVM_COLOR_U16_LT_CYAN")
@@ -75,9 +75,7 @@
 # pragma pop_macro("UWVM_COLOR_U16_RST_ALL_AND_SET_WHITE")
 # pragma pop_macro("UWVM_COLOR_U16_RST_ALL")
 
-///
-/// UTF-8
-///
+// Restore UTF-8 color macros.
 # pragma pop_macro("UWVM_COLOR_U8_RGB")
 # pragma pop_macro("UWVM_COLOR_U8_WHITE")
 # pragma pop_macro("UWVM_COLOR_U8_LT_CYAN")
@@ -99,9 +97,7 @@
 # pragma pop_macro("UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE")
 # pragma pop_macro("UWVM_COLOR_U8_RST_ALL")
 
-///
-/// WCHAR
-///
+// Restore wide-character color macros.
 # pragma pop_macro("UWVM_COLOR_W_RGB")
 # pragma pop_macro("UWVM_COLOR_W_WHITE")
 # pragma pop_macro("UWVM_COLOR_W_LT_CYAN")
@@ -123,9 +119,7 @@
 # pragma pop_macro("UWVM_COLOR_W_RST_ALL_AND_SET_WHITE")
 # pragma pop_macro("UWVM_COLOR_W_RST_ALL")
 
-///
-/// CHAR
-///
+// Restore narrow-character color macros last because they were pushed first.
 # pragma pop_macro("UWVM_COLOR_RGB")
 # pragma pop_macro("UWVM_COLOR_WHITE")
 # pragma pop_macro("UWVM_COLOR_LT_CYAN")

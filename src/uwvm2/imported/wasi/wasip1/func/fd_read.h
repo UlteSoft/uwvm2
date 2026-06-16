@@ -91,7 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_read
     /// @details   __wasi_errno_t __wasi_fd_read(__wasi_fd_t fd, const __wasi_iovec_t *iovs, __wasi_size_t iovs_len, __wasi_size_t *nread);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_read(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_read(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t iovs,

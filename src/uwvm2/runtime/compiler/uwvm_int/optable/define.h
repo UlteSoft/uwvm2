@@ -55,7 +55,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
     struct uwvm_interpreter_function_operands_t
-    { ::uwvm2::utils::container::vector<::std::byte> operands{}; };
+    {
+        ::uwvm2::utils::container::vector<::std::byte> operands{};
+    };
 
     struct local_func_storage_t
     {
@@ -372,28 +374,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>;
 
     /// @details Functions called when unreachable do not require the `noreturn` keyword, as some embedded plugin systems cannot utilize this option.
-    using unreachable_func_t = void (*)() noexcept;
+    /// @note These callbacks are invoked from interpreter opfuncs, so their function-pointer ABI must stay in lockstep with
+    ///       `uwvm_interpreter_opfunc_t`: Windows x86_64 GNU/Clang uses SysV, and all i686 targets use fastcall.
+    using unreachable_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)() noexcept;
+
+    using memory_out_of_bounds_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
 
     /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
     ///          the arguments and writes the return result back onto the operand stack.
-    using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
+    using interpreter_call_func_t =
+        void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
     /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
     ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
-    using interpreter_call_indirect_func_t =
-        void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
+    using interpreter_call_indirect_func_t = void(
+        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr)
+        UWVM_THROWS;
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     inline constexpr ::std::uintptr_t interpreter_tiered_loop_osr_disabled_state_address{::std::numeric_limits<::std::uintptr_t>::max()};
 
-    using interpreter_tiered_loop_osr_func_t = bool (*)(::std::size_t wasm_module_id,
-                                                        ::std::size_t func_index,
-                                                        ::std::size_t loop_wasm_code_offset,
-                                                        ::std::byte* result_buffer,
-                                                        ::std::size_t result_bytes,
-                                                        ::std::byte const* local_base,
-                                                        ::std::size_t local_bytes,
-                                                        ::std::uintptr_t* compile_state_address_ptr) noexcept;
+    using interpreter_tiered_loop_osr_func_t = bool(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id,
+                                                                                         ::std::size_t func_index,
+                                                                                         ::std::size_t loop_wasm_code_offset,
+                                                                                         ::std::byte* result_buffer,
+                                                                                         ::std::size_t result_bytes,
+                                                                                         ::std::byte const* local_base,
+                                                                                         ::std::size_t local_bytes,
+                                                                                         ::std::uintptr_t* compile_state_address_ptr) noexcept;
 
     struct interpreter_tiered_loop_osr_immediate_t
     {
@@ -415,28 +423,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::uint_least32_t request_countdown{};
     };
 
-    inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{
-        (::std::numeric_limits<::std::uint_least32_t>::max)()};
+    inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{(::std::numeric_limits<::std::uint_least32_t>::max)()};
+    // Large modules still need loop sampling so hot interpreter loops can be detected.
+    // CPython-like modules can have a huge eval loop in a 32KB+ function; tiered policy should
+    // let the execution thread report that hot loop to an urgent coordinator instead of relying
+    // on ordinary lazy demand compilation.  That model also leaves a clean upgrade path once
+    // WASI threads are available.
+    inline constexpr ::std::size_t interpreter_tiered_osr_poll_module_local_function_limit{8192uz};
+    inline constexpr ::std::size_t interpreter_tiered_large_loop_sentinel_function_size{32768uz};
 
-    [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t
-        interpreter_tiered_loop_osr_counter_policy_for_function_size(::std::size_t function_code_size) noexcept
+    [[nodiscard]] inline constexpr bool interpreter_tiered_osr_poll_enabled_for_module_local_function_count(::std::size_t local_function_count) noexcept
+    { return local_function_count < interpreter_tiered_osr_poll_module_local_function_limit; }
+
+    [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t interpreter_tiered_loop_osr_counter_policy_for_function_size(
+        ::std::size_t function_code_size) noexcept
     {
-        if(function_code_size >= 32768uz)
+        if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size)
         {
-            return {.initial_countdown = interpreter_tiered_osr_request_countdown_disabled,
-                    .reset_countdown = interpreter_tiered_osr_request_countdown_disabled,
-                    .request_countdown = interpreter_tiered_osr_request_countdown_disabled};
+            return {.initial_countdown = 256u, .reset_countdown = 256u, .request_countdown = 16u};
         }
-        if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 4096u}; }
-        if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 512u}; }
+        if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 512u}; }
+        if(function_code_size >= 1536uz) { return {.initial_countdown = 8u, .reset_countdown = 128u, .request_countdown = 256u}; }
+        if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 2048u}; }
         return {.initial_countdown = 1024u, .reset_countdown = 1024u, .request_countdown = 2048u};
     }
 
-    [[nodiscard]] inline constexpr ::std::uint_least32_t
-        interpreter_tiered_block_osr_request_countdown_for_function_size(::std::size_t function_code_size) noexcept
+    [[nodiscard]] inline constexpr bool interpreter_tiered_loop_osr_poll_should_emit(::std::size_t local_function_count,
+
+                                                                                     ::std::size_t function_code_size) noexcept
     {
+        if(function_code_size >= interpreter_tiered_large_loop_sentinel_function_size) { return true; }
+        if(!interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_function_count)) { return false; }
+        if(local_function_count < 128uz) { return function_code_size >= 1536uz; }
+        return true;
+    }
+
+    [[nodiscard]] inline constexpr ::std::uint_least32_t interpreter_tiered_block_osr_request_countdown_for_function_size(
+        ::std::size_t function_code_size) noexcept
+    {
+        // Do not request the current LLVM OSR path for very large functions.  They are sampled
+        // by the large-loop sentinel above, then need a dedicated urgent artifact strategy; the
+        // old "just compile the huge function here" policy regressed CPython eval workloads.
         if(function_code_size >= 32768uz) { return interpreter_tiered_osr_request_countdown_disabled; }
-        if(function_code_size >= 4096uz) { return 4096u; }
+        if(function_code_size >= 4096uz) { return 512u; }
         if(function_code_size >= 1024uz) { return 512u; }
         return 64u;
     }

@@ -122,6 +122,23 @@ function def_build(opt)
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()
+			for _, field in ipairs({
+				"linkdirs",
+				"frameworkdirs",
+				"frameworks",
+				"links",
+				"syslinks",
+				"ldflags",
+				"shflags"
+			}) do
+				for _, value in ipairs(llvm_jit_options[field] or {}) do
+					if field == "ldflags" or field == "shflags" then
+						target:add(field, value, { force = true })
+					else
+						target:add(field, value)
+					end
+				end
+			end
 			utility.add_linkflags_to_target(target, llvm_jit_options.native_codegen_linkflags, "links")
 		end)
 	end
@@ -323,6 +340,13 @@ end
 local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
 	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
 
+add_requires("openssl", {configs = {shared = false}})
+
+function uwvm_add_llvm_jit_cache_openssl()
+	add_defines("UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519")
+	add_packages("openssl")
+end
+
 target("uwvm")
 	set_kind("binary")
 	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
@@ -350,6 +374,8 @@ target("uwvm")
 
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
+
+	uwvm_add_llvm_jit_cache_openssl()
 
 	-- uwvm
 	add_defines("UWVM=2")
@@ -422,6 +448,8 @@ target("uwvm_runtime")
 
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
+
+	uwvm_add_llvm_jit_cache_openssl()
 
 	-- src
 	add_includedirs("src/")

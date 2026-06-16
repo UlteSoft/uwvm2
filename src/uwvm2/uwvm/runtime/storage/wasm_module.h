@@ -178,6 +178,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t context_address{};
         ::std::uint_least32_t encoded_type_id{};
+        ::std::uintptr_t typed_entry_address{};
     };
 
     struct llvm_jit_call_indirect_table_view_t
@@ -625,6 +626,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
     struct wasm_module_storage_t
     {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        // Borrowed from the global module-name table.  LLVM JIT uses this stable identity for IR symbol names so
+        // cache keys do not depend on runtime storage addresses.
+        ::uwvm2::utils::container::u8string_view module_name{};
+#endif
+
         // type
         // Exposes the binfmt1 type section for compiler-side validation (e.g. call_indirect: type_index -> signature).
         type_section_storage_t type_section_storage{};

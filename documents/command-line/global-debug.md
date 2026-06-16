@@ -55,7 +55,7 @@ Notes:
 - The default is `run`.
 - The value is strict and case-sensitive.
 - The option has an `is_exist` guard. Repeating it through any spelling is a duplicate-parameter error before callback behavior matters.
-- The mode does not itself supply a module path. Normal runs still need `--run <file>`.
+- The mode does not itself supply a module path. Normal runs need either `--run <file>` or an implicit trailing run tail.
 
 Examples:
 
@@ -75,6 +75,8 @@ Behavior:
 - No following token is parsed as a host option.
 - `-r` and `--` behave exactly like `--run`.
 
+When no explicit `--run`, `-r`, or `--` appears, a trailing suffix of plain unconsumed arguments is accepted as an implicit run tail after callbacks finish. The first token in that suffix is the Wasm path and the rest are guest argv entries. Use an explicit boundary when guest argv contains option-looking tokens that begin with `-`.
+
 The first token after `--run` is documented as `<file argv[0]:path>` because it both identifies the host Wasm file and becomes the natural guest argument root for the command line. WASI `argv[0]` can later be overridden with `--wasip1-*-set-argv0`, and the internal module name can be overridden with `--wasm-set-main-module-name`; those are separate concepts.
 
 Examples:
@@ -83,6 +85,7 @@ Examples:
 uwvm --run app.wasm
 uwvm -r app.wasm hello world
 uwvm --runtime-tiered -- app.wasm --guest-option
+uwvm --runtime-aot app.wasm hello world
 ```
 
 Host option placement:

@@ -42,6 +42,11 @@ namespace uwvm2test::uwvm_int_lazy
     using lazy_module_t = lazy::lazy_module_storage_t;
     using lazy_split_config_t = lazy::lazy_split_config;
     using lazy_compile_options_t = lazy::lazy_compile_options;
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    using backend_compile_option_t = lazy::compile_option;
+#else
+    using backend_compile_option_t = optable::compile_option;
+#endif
     using lazy_validation_mode_t = lazy::lazy_validation_mode;
     using lazy_compile_state_t = ::uwvm2::utils::thread::lazy_compile_state;
 
@@ -52,16 +57,44 @@ namespace uwvm2test::uwvm_int_lazy
     inline lazy_module_t const* g_call_indirect_lazy_module{};
     inline ::std::size_t g_call_indirect_module_id{};
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+# if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
+     (defined(__GNUC__) || defined(__clang__))
+#  define UWVM2TEST_INTERPRETER_ABI __attribute__((__sysv_abi__))
+# elif defined(__i386__) || defined(_M_IX86)
+#  define UWVM2TEST_INTERPRETER_ABI UWVM_FASTCALL
+# else
+#  define UWVM2TEST_INTERPRETER_ABI
+# endif
+
+    inline void UWVM2TEST_INTERPRETER_ABI terminate_trap_callback() noexcept
+    {
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_INTERPRETER_ABI terminate_call_callback(::std::size_t, ::std::size_t, ::std::byte**) noexcept
+    {
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_INTERPRETER_ABI
+        terminate_call_indirect_callback(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) noexcept
+    {
+        ::fast_io::fast_terminate();
+    }
+
+# undef UWVM2TEST_INTERPRETER_ABI
+#endif
+
     inline void configure_unexpected_traps() noexcept
     {
 #if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::unreachable_func = terminate_trap_callback;
+        optable::trap_invalid_conversion_to_integer_func = terminate_trap_callback;
+        optable::trap_integer_divide_by_zero_func = terminate_trap_callback;
+        optable::trap_integer_overflow_func = terminate_trap_callback;
+        optable::call_func = terminate_call_callback;
+        optable::call_indirect_func = terminate_call_indirect_callback;
 #endif
     }
 
@@ -300,7 +333,7 @@ namespace uwvm2test::uwvm_int_lazy
             g_call_indirect_runtime_module = nullptr;
             g_call_indirect_lazy_module = nullptr;
             g_call_indirect_module_id = 0uz;
-            optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+            optable::call_indirect_func = terminate_call_indirect_callback;
 #endif
         }
     };
@@ -342,8 +375,8 @@ namespace uwvm2test::uwvm_int_lazy
             g_call_indirect_runtime_module = nullptr;
             g_call_indirect_lazy_module = nullptr;
             g_call_indirect_module_id = 0uz;
-            optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-            optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+            optable::call_func = terminate_call_callback;
+            optable::call_indirect_func = terminate_call_indirect_callback;
 #endif
         }
     };
@@ -377,7 +410,7 @@ namespace uwvm2test::uwvm_int_lazy
     [[nodiscard]] inline lazy_module_t initialize_lazy_storage(runtime_module_t const& rt, lazy_split_config_t cfg)
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
-        optable::compile_option cop{};
+        backend_compile_option_t cop{};
         auto storage{lazy::initialize_lazy_module_storage(rt, cop, err, cfg)};
         if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
         return storage;
@@ -387,7 +420,7 @@ namespace uwvm2test::uwvm_int_lazy
                                                                   lazy_validation_mode_t mode,
                                                                   ::std::size_t module_id = 0uz) noexcept
     {
-        optable::compile_option cop{};
+        backend_compile_option_t cop{};
         cop.curr_wasm_id = module_id;
 
         lazy_compile_options_t options{};

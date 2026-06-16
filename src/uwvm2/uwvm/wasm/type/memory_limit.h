@@ -52,7 +52,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 
     struct module_memory_limit_section_details_wrapper_t
-    { module_memory_limit_t limits{}; };
+    {
+        module_memory_limit_t limits{};
+    };
 
     inline constexpr module_memory_limit_section_details_wrapper_t section_details(module_memory_limit_t limits) noexcept { return {limits}; }
 

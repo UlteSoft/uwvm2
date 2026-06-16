@@ -1,5 +1,11 @@
+// Variable opcode translation keeps the validated Wasm local/global model synchronized with the
+// interpreter bytecode model. Most of the code below exists to explain when a stack value can be
+// delayed, fused, or read directly from storage without violating Wasm's typed stack semantics.
 case wasm1_code::local_get:
 {
+    // `local.get` is both a semantic stack push and the most common seed for later fusions.
+    // We first validate the encoded local index exactly, then decide whether to emit now or keep a
+    // pending local reference that a following load/store/arithmetic opcode can consume directly.
     // local.get ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -48,6 +54,8 @@ case wasm1_code::local_get:
     }
 
     auto const curr_local_type{local_type_from_index(local_index)};
+    // Runtime local helpers address locals by byte offset inside the compiled frame, not by Wasm
+    // index. Resolve the offset once so every fusion emits the same frame address.
     auto const local_off{local_offset_from_index(local_index)};
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -1081,6 +1089,9 @@ case wasm1_code::local_get:
 }
 case wasm1_code::local_set:
 {
+    // `local.set` consumes a value and writes it to local storage. It is also the point where many
+    // pending expression patterns must be committed, because after the write the value no longer
+    // exists as a normal operand-stack result.
     // local.set ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -1133,6 +1144,8 @@ case wasm1_code::local_set:
     bool have_set_operand{};
     curr_operand_stack_value_type set_operand_type{};
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"local.set", 1uz); }
+    // Peek instead of pop during validation: the generic path and several fusions still need to
+    // consume the same value after choosing the final emission strategy.
     else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
         have_set_operand = true;
@@ -1148,6 +1161,8 @@ case wasm1_code::local_set:
         }
     }
 
+    // `local.tee` emits both a store and a logical push of the same value, so all fused helpers need
+    // the destination offset while preserving the operand-stack value model.
     auto const local_off{local_offset_from_index(local_index)};
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1799,6 +1814,9 @@ case wasm1_code::local_set:
 }
 case wasm1_code::local_tee:
 {
+    // `local.tee` is intentionally handled separately from `local.set`: it writes the local while
+    // preserving the value on the operand stack. That dual effect is why this case carries both
+    // store-fusion logic and stack-top push/branch-fusion bookkeeping.
     // local.tee ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -2506,6 +2524,8 @@ case wasm1_code::local_tee:
 }
 case wasm1_code::global_get:
 {
+    // Global access uses the Wasm index space directly, so imported and local-defined globals must
+    // be resolved through different storage vectors before selecting the typed runtime opfunc.
     // global.get ...
     // [  safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -2639,6 +2659,8 @@ case wasm1_code::global_get:
     operand_stack_push(curr_global_type);
     {
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        // Resolve the storage pointer only after index/type validation; emitted opfuncs are lean and
+        // assume this immediate already points at the correct global slot.
         wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
 
         if constexpr(stacktop_enabled)
@@ -2692,6 +2714,9 @@ case wasm1_code::global_get:
 }
 case wasm1_code::global_set:
 {
+    // `global.set` validates mutability and value type before emission because the runtime opfunc
+    // only receives a resolved storage pointer; publishing an unchecked pointer would make later
+    // type errors impossible to report as Wasm validation failures.
     // global.set ...
     // [  safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -2789,6 +2814,8 @@ case wasm1_code::global_set:
     // Translate: typed `global.set`.
     {
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        // The runtime setter receives a direct storage pointer, so mutability/type checks must be
+        // complete before this immediate is embedded in bytecode.
         wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
         switch(curr_global_type)
         {

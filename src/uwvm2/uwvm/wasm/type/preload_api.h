@@ -125,7 +125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 g_preload_host_api = api;
             }
 
-            [[nodiscard]] inline bool find_memory_descriptor(::std::size_t memory_index,
+            [[nodiscard]] inline constexpr bool find_memory_descriptor(::std::size_t memory_index,
                                                              uwvm_preload_memory_descriptor_t& out) noexcept
             {
                 if(g_preload_host_api == nullptr) { return false; }
@@ -144,7 +144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 return false;
             }
 
-            [[nodiscard]] inline bool range_is_valid(::std::uint_least64_t byte_length,
+            [[nodiscard]] inline constexpr bool range_is_valid(::std::uint_least64_t byte_length,
                                                      ::std::uint_least64_t offset,
                                                      ::std::size_t size) noexcept
             {
@@ -152,7 +152,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 return offset <= byte_length && size64 <= (byte_length - offset);
             }
 
-            [[nodiscard]] inline bool try_load_u32(uwvm_preload_memory_descriptor_t const& descriptor,
+            [[nodiscard]] inline constexpr bool try_load_u32(uwvm_preload_memory_descriptor_t const& descriptor,
                                                    ::std::uint_least64_t offset,
                                                    unsigned& value) noexcept
             {

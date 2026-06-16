@@ -1,3 +1,8 @@
+    // Branch opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // The current label model is intentionally MVP-shaped: block labels have empty/single-result arity and loop labels have
+    // no block parameters.  Multi-value/block-parameter support must replace the scalar shortcuts below with full type ranges
+    // and update br_table signature comparison plus LLVM branch/PHI lowering together.
+
 case wasm1_code::br:
 {
     // br     label_index ...
@@ -53,7 +58,9 @@ case wasm1_code::br:
 
     auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
 
-    // Label arity = label_types count. In MVP, we only support empty or single-value blocktypes.
+    // Label arity = label_types count.  WebAssembly 1.0/MVP validation only reaches arity 0 or 1 here because blocktypes
+    // are empty or single-result; future multi-value support must carry the complete result tuple instead of assuming one
+    // optional value.
     // IMPORTANT: for `loop`, label types are the loop *parameters* (the types at the beginning of the loop),
     // not the loop result types. MVP has no block parameters, so a loop label always has arity 0.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
@@ -151,7 +158,8 @@ case wasm1_code::br_if:
 
     auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
 
-    // Label arity = label_types count (MVP: 0 or 1).
+    // Label arity = label_types count.  WebAssembly 1.0/MVP only needs arity 0/1, but `br_if` must still preserve label
+    // arguments on the fallthrough path.  Multi-value/block-parameter support must keep the whole tuple live here.
     // IMPORTANT: for `loop`, label types are parameters (MVP: none), not result types.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
@@ -200,9 +208,9 @@ case wasm1_code::br_if:
 
         if(is_polymorphic && concrete_to_check != target_arity)
         {
-            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if`
-            // must still re-establish the fallthrough stack as if the label value
-            // had been popped for the branch and then pushed back.
+            // WebAssembly 1.0/MVP only permits 0/1 label arity. In polymorphic mode, `br_if` must still re-establish the
+            // fallthrough stack as if the label value had been popped for the branch and then pushed back.  When
+            // multi-value labels are enabled, this scalar push must become a tuple reconstruction.
             operand_stack_push(target_frame.result.begin[0]);
         }
     }
@@ -308,6 +316,8 @@ case wasm1_code::br_table:
 
     struct get_sig_result_t
     {
+        // WebAssembly 1.0/MVP br_table signatures can be summarized as arity plus one optional scalar type.  Multi-value
+        // support must store/compare the full label type sequence for every target instead of this scalar summary.
         ::std::size_t arity{};
         curr_operand_stack_value_type type{};
     };
@@ -520,7 +530,9 @@ case wasm1_code::return_:
 
     if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"return", return_arity); }
 
-    // Type-check the return values if present. For multi-value, values are validated from the top of the stack.
+    // Type-check the return values if present. Validation is already written as a range walk so future multi-value
+    // function results can be checked here; the LLVM JIT emitter still needs a matching multi-result ABI before such
+    // functions should keep inline JIT emission active.
     if(return_arity != 0uz)
     {
         auto const available_result_count{concrete_operand_count()};

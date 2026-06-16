@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_socket_tcp_connect,
                                                    para_curr,
                                                    para_end,
-                                                   u8"socket-tcp-connect");
+                                                   wasip1_module_details::target_action_t::socket_tcp_connect);
     }
 
 #  endif

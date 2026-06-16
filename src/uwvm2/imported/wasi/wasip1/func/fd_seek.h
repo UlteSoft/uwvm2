@@ -86,7 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_seek
     /// @details   __wasi_errno_t __wasi_fd_seek(__wasi_fd_t fd, __wasi_filedelta_t offset, __wasi_whence_t whence, __wasi_void_ptr_t new_offset);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_seek(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_seek(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::filedelta_t offset,

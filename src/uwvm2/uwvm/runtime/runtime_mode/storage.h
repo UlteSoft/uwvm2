@@ -65,13 +65,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     };
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    enum class runtime_llvm_jit_optimization_level_t : unsigned
+    enum class runtime_llvm_jit_policy_t : unsigned
     {
-        default_level,
+        debug,
+        default_policy,
+        fast_compile,
+        balanced,
+        max
+    };
+
+    enum class runtime_llvm_jit_lazy_policy_t : unsigned
+    {
+        auto_policy,
+        debug,
+        light,
+        balanced
+    };
+
+    enum class runtime_llvm_jit_full_policy_t : unsigned
+    {
+        auto_policy,
+        debug,
+        legacy_light,
+        passbuilder_o1,
+        passbuilder_o2,
+        passbuilder_o3
+    };
+
+    enum class runtime_llvm_jit_call_stack_t : unsigned
+    {
+        auto_policy,
+        instruction,
         none,
-        less,
-        mid,
-        aggressive
+        unwind,
+        unwind_uncheck
+    };
+
+    enum class runtime_llvm_jit_cache_path_mode_t : unsigned
+    {
+        default_path,
+        disabled,
+        custom_path
     };
 #endif
 
@@ -80,7 +114,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
     /// @brief   Whether the runtime mode is code interpreted.
-    /// @details lazy_compile + uwvm_interpreter_only
+    /// @details auto_compile + uwvm_interpreter_only
     inline bool is_runtime_mode_code_int_existed{};  // [global]
 #endif
 
@@ -140,15 +174,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief Whether the runtime LLVM JIT optimization level was explicitly configured.
-    inline bool runtime_llvm_jit_optimization_level_existed{};  // [global]
+    /// @brief Whether the high-level runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_policy_existed{};  // [global]
 
-    /// @brief Runtime LLVM JIT optimization level override.
-    /// @details `default_level` preserves each LLVM JIT policy's existing default.
-    inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{runtime_llvm_jit_optimization_level_t::default_level};  // [global]
+    /// @brief High-level LLVM JIT policy preset.
+    inline runtime_llvm_jit_policy_t global_runtime_llvm_jit_policy{runtime_llvm_jit_policy_t::default_policy};  // [global]
+
+    /// @brief Whether the lazy/tier-1 runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_lazy_policy_existed{};  // [global]
+
+    /// @brief Lazy/tier-1 LLVM JIT policy override.
+    inline runtime_llvm_jit_lazy_policy_t global_runtime_llvm_jit_lazy_policy{runtime_llvm_jit_lazy_policy_t::auto_policy};  // [global]
+
+    /// @brief Whether the full/tier-2 runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_full_policy_existed{};  // [global]
+
+    /// @brief Full/tier-2 LLVM JIT policy override.
+    inline runtime_llvm_jit_full_policy_t global_runtime_llvm_jit_full_policy{runtime_llvm_jit_full_policy_t::auto_policy};  // [global]
+
+    /// @brief Whether the runtime LLVM JIT call-stack tracking mode was explicitly configured.
+    inline bool runtime_llvm_jit_call_stack_existed{};  // [global]
+
+    /// @brief Runtime LLVM JIT call-stack tracking mode.
+    inline runtime_llvm_jit_call_stack_t global_runtime_llvm_jit_call_stack{runtime_llvm_jit_call_stack_t::auto_policy};  // [global]
 
     /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache signature generation is disabled by command line.
+    inline bool runtime_llvm_jit_cache_no_sign{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache signature verification is disabled by command line.
+    inline bool runtime_llvm_jit_cache_no_verify{};  // [global]
+
+    /// @brief Whether runtime LLVM JIT cache path mode was explicitly configured.
+    inline bool runtime_llvm_jit_cache_path_existed{};  // [global]
+
+    /// @brief Runtime LLVM JIT cache path mode.
+    inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{
+        runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
+
+    /// @brief Runtime LLVM JIT custom cache directory path.
+    inline ::uwvm2::utils::container::u8string global_runtime_llvm_jit_cache_path{};  // [global]
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)

@@ -54,6 +54,7 @@ uwvm --help wasi
 - `[a|b|c]` means the slot accepts one of the listed literal forms.
 - `[a|<int>]` means the slot accepts either a literal or a value parsed as the stated type.
 - `...` means all later guest tokens belong to `--run` and are not parsed as host options.
+- When `--run`, `-r`, or `--` is absent, trailing plain unconsumed arguments may form an implicit run tail.
 - `path` values are host-side paths and can have platform-specific behavior.
 - `str` values are raw command-line strings unless a command-specific rule validates them.
 - `size_t`, `ssize_t`, and `i32` are parsed strictly: the whole token must parse and fit the target type.

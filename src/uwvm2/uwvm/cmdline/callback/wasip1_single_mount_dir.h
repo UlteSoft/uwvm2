@@ -56,7 +56,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                             para_begin,
                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
-    { return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_mount_dir, para_curr, para_end, u8"mount-dir"); }
+    {
+        // Single-target mounts intentionally use the shared module-action path.
+        // The `mount-dir` action delegates to `apply_mount_dir_to_override`,
+        // which reuses the global mount callback after temporarily combining
+        // global mounts with the selected module's existing mounts. This keeps
+        // normalization, duplicate detection, ancestor/child overlap checks, and
+        // the two WASIp1 mount-path escape hatches consistent with global mounts.
+        return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_mount_dir,
+                                                   para_curr,
+                                                   para_end,
+                                                   wasip1_module_details::target_action_t::mount_dir);
+    }
 
 # endif
 #endif

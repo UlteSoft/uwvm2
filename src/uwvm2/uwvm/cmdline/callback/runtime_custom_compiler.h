@@ -166,6 +166,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         if(currp1_str == u8"int")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only;
+
+            // Keep `-Rcc int` aligned with `-Rint`: when no explicit `-Rcm` was given, let the interpreter auto policy
+            // pick lazy/full after Wasm sizes are known.  An explicit `-Rcm` before this point is already marked by the
+            // parser; an explicit `-Rcm` after this point will overwrite the default below.
+            if(!::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_mode_existed)
+            {
+                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile;
+            }
         }
         else
 # endif

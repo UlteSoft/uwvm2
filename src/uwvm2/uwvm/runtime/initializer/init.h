@@ -32,6 +32,9 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -81,6 +84,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+        // Runtime import resolution repeats the WASI Preview 1 visibility check
+        // used by the pre-runtime dependency pass. The dependency pass provides
+        // the user-facing error in normal executable mode, while this runtime
+        // guard keeps the linker defensive when runtime initialization is called
+        // after a non-standard module-table change or with unresolved imports
+        // intentionally preserved for diagnostics.
         [[nodiscard]] inline constexpr bool is_wasip1_import_visible_for_wasm_module(::uwvm2::utils::container::u8string_view consumer_module_name,
                                                                                      ::uwvm2::utils::container::u8string_view import_module_name) noexcept
         {
@@ -212,7 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         [[nodiscard]] inline constexpr bool linear_memory_byte_count_overflows(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
-        { return page_size_bytes != 0uz && page_count > (::std::numeric_limits<::std::size_t>::max)() / page_size_bytes; }
+        { return page_size_bytes != 0uz && page_count > ::std::numeric_limits<::std::size_t>::max() / page_size_bytes; }
 
         [[nodiscard]] inline constexpr ::std::size_t linear_memory_byte_count_unchecked(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
         { return page_count * page_size_bytes; }
@@ -464,8 +473,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             bool from_all{};
         };
 
-        [[nodiscard]] inline auto resolve_configured_local_defined_memory_limit(configured_runtime_memory_limits_t const* override_limits,
-                                                                                ::std::size_t local_memory_index) noexcept
+        [[nodiscard]] inline constexpr auto resolve_configured_local_defined_memory_limit(configured_runtime_memory_limits_t const* override_limits,
+                                                                                          ::std::size_t local_memory_index) noexcept
             -> resolved_configured_local_defined_memory_limit_t
         {
             if(override_limits == nullptr) [[likely]] { return {}; }
@@ -509,7 +518,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 u8"\"). ");
         }
 
-        inline void validate_configured_runtime_memory_limit_target_modules() noexcept
+        inline constexpr void validate_configured_runtime_memory_limit_target_modules() noexcept
         {
             for(auto const& [module_name, configured_limits]: ::uwvm2::uwvm::wasm::storage::configured_module_memory_limit)
             {
@@ -580,7 +589,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::fast_io::fast_terminate();
         }
 
-        inline void reset_configured_import_reset_match_counts() noexcept
+        inline constexpr void reset_configured_import_reset_match_counts() noexcept
         {
             for(auto& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -589,7 +598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void validate_configured_import_reset_target_modules() noexcept
+        inline constexpr void validate_configured_import_reset_target_modules() noexcept
         {
             for(auto const& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -604,7 +613,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void validate_configured_import_reset_matches() noexcept
+        inline constexpr void validate_configured_import_reset_matches() noexcept
         {
             for(auto const& [module_name, rules]: ::uwvm2::uwvm::wasm::storage::configured_module_import_reset)
             {
@@ -2330,9 +2339,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
-                                                                   ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
-                                                                   ::std::uint_least64_t& out) noexcept
+        inline constexpr void
+            try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
+                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
+                                                           ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz)
             {
@@ -2508,7 +2518,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 constexpr wasm_u32 wasm1_max_pages{static_cast<wasm_u32>(65536u)};
 
                 auto const validate_memory_limits{
-                    [&]<typename LimitsType>(LimitsType const& limits, ::uwvm2::utils::container::u8string_view kind, ::std::size_t index) noexcept
+                    [&]<typename LimitsType>(LimitsType const& limits, ::uwvm2::utils::container::u8string_view kind, ::std::size_t index) constexpr noexcept
                     {
                         if(limits.present_max && limits.max < limits.min) [[unlikely]]
                         {
@@ -4701,7 +4711,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 auto const print_import{
                     [&curr_module_name](::uwvm2::utils::container::u8string_view kind,
-                                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const* import_ptr) noexcept
+                                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const* import_ptr) constexpr noexcept
                     {
                         if(import_ptr == nullptr) [[unlikely]]
                         {
@@ -5539,6 +5549,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     details::current_initializing_module_name = module_name;
                     details::initialize_from_wasm_file(*mod.module_storage_ptr.wf, rt);
                     details::current_initializing_module_name = {};
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    rt.module_name = module_name;
+#endif
                     if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                     {
                         details::verbose_info(u8"initializer: Module \"",
@@ -5661,6 +5674,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
 #ifndef UWVM_MODULE
 // macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>

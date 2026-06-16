@@ -5,6 +5,17 @@
  *************************************************************/
 
 /**
+ * @file        uwvm_color_push_macro.h
+ * @brief       Pushes and defines UWVM diagnostic color macros for the current include scope.
+ * @details     This header creates the `UWVM_COLOR_*` macro family used by UWVM diagnostic formatting code.  It first
+ *              saves any existing macro definitions with `#pragma push_macro`, then defines color/reset macros for
+ *              narrow, wide, UTF-8, UTF-16, and UTF-32 string literal families.
+ *
+ *              On modern targets the macros expand to ANSI escape sequences from the generic `ansies` layer.  On old
+ *              Windows console targets they can select either ANSI escapes or Win32 text-attribute manipulators through
+ *              `log_win32_use_ansi_b`.  Include `uwvm_color_pop_macro.h` after the local use site to restore the caller's
+ *              original macro environment.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-24
@@ -20,17 +31,13 @@
  *                                      *
  ****************************************/
 
-/// @brief      The following are the macros used by ansi escape sequences.
-/// @details    Use `push_macro` to avoid side effects on existing macros. Please use `pop_macro` in conjunction.
-
 // #pragma once
 #ifdef UWVM
 
 # include <uwvm2/utils/ansies/ansi_push_macro.h>
 # include <uwvm2/utils/ansies/win32_text_attr_push_macro.h>
-///
-/// CHAR
-///
+
+// Narrow-character color macros.
 # pragma push_macro("UWVM_COLOR_RST_ALL")
 # undef UWVM_COLOR_RST_ALL
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -192,9 +199,7 @@
 #  define UWVM_COLOR_RGB(r, g, b) UWVM_AES_RGB(r, g, b)
 # endif
 
-///
-/// WCHAR
-///
+// Wide-character color macros.
 # pragma push_macro("UWVM_COLOR_W_RST_ALL")
 # undef UWVM_COLOR_W_RST_ALL
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -356,9 +361,7 @@
 #  define UWVM_COLOR_W_RGB(r, g, b) UWVM_AES_W_RGB(r, g, b)
 # endif
 
-///
-/// UTF-8
-///
+// UTF-8 color macros.
 # pragma push_macro("UWVM_COLOR_U8_RST_ALL")
 # undef UWVM_COLOR_U8_RST_ALL
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -522,9 +525,7 @@
 #  define UWVM_COLOR_U8_RGB(r, g, b) UWVM_AES_U8_RGB(r, g, b)
 # endif
 
-///
-/// UTF-16
-///
+// UTF-16 color macros.
 # pragma push_macro("UWVM_COLOR_U16_RST_ALL")
 # undef UWVM_COLOR_U16_RST_ALL
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -691,9 +692,7 @@
 #  define UWVM_COLOR_U16_RGB(r, g, b) UWVM_AES_U16_RGB(r, g, b)
 # endif
 
-///
-/// UTF-32
-///
+// UTF-32 color macros.
 # pragma push_macro("UWVM_COLOR_U32_RST_ALL")
 # undef UWVM_COLOR_U32_RST_ALL
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))

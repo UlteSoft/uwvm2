@@ -78,7 +78,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_prestat_dir_name
     /// @details   __wasi_errno_t __wasi_fd_prestat_dir_name(__wasi_fd_t fd, char* path, __wasi_size_t path_len);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_prestat_dir_name(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_prestat_dir_name(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t path,

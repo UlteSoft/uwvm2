@@ -115,9 +115,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
+        auto& delete_system_environment{::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_delete_system_environment};
+        if(delete_system_environment.find(env_name_sv) != delete_system_environment.cend()) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Duplicate ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                u8"<env>",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8": \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                env_name_sv,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\" was already deleted by an earlier global WASI Preview 1 delete-system-environment command.\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
+
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_delete_system_environment.emplace_back(env_name_sv);
+        delete_system_environment.emplace(env_name_sv);
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }

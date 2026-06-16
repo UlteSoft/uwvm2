@@ -114,7 +114,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::ansies
     inline constexpr text_attr& operator^= (text_attr& x, text_attr y) noexcept { return x = x ^ y; }
 
     struct win32_text_attr
-    { text_attr attr{}; };
+    {
+        text_attr attr{};
+    };
 
     template <::std::integral char_type, typename Stm>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, win32_text_attr>, Stm && stm, win32_text_attr attr) noexcept

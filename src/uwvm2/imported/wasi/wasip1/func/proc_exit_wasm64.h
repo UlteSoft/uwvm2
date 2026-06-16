@@ -83,8 +83,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.proc_exit
     /// @details   void proc_exit(__wasi_exitcode_t code);
 
-    inline void proc_exit_wasm64(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-                                 ::uwvm2::imported::wasi::wasip1::abi::exitcode_wasm64_t code) noexcept
+    inline constexpr void proc_exit_wasm64(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> &
+                                               env,
+                                           ::uwvm2::imported::wasi::wasip1::abi::exitcode_wasm64_t code) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 

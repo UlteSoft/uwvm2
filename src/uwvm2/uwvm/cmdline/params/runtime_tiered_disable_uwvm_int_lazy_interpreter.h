@@ -45,8 +45,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view runtime_tiered_disable_uwvm_int_lazy_interpreter_alias{
-            u8"-Rtiered-disable-t0"};
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_tiered_disable_uwvm_int_lazy_interpreter_alias{u8"-Rtiered-disable-t0"};
     }  // namespace details
 
 # if defined(__clang__)
@@ -56,9 +55,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_tiered_disable_uwvm_int_lazy_interpreter{
         .name{u8"--runtime-tiered-disable-uwvm-int-lazy-interpreter"},
         .describe{u8"Disable the Tier 0 uwvm-int lazy interpreter fallback in the tiered runtime."},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{
-            ::std::addressof(details::runtime_tiered_disable_uwvm_int_lazy_interpreter_alias),
-            1uz}},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_tiered_disable_uwvm_int_lazy_interpreter_alias), 1uz}},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_tiered_disable_uwvm_int_lazy_interpreter)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 # if defined(__clang__)

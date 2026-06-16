@@ -73,7 +73,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
         ::std::size_t memory_type_size{};
     };
 
-    inline constexpr void output_memory_error(memory_error_t const& memerr) noexcept
+    inline constexpr void output_memory_error(memory_error_t const& memerr, bool append_blank_line) noexcept
     {
 #ifdef UWVM
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -102,7 +102,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::addrvw(memerr.memory_length),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8" (allocated)\n\n",
+                            u8" (allocated)\n",
+                            ::fast_io::mnp::cond(append_blank_line, u8"\n", u8""),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
         ::fast_io::io::perr(::fast_io::u8err(),
@@ -118,11 +119,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             memerr.memory_type_size,
                             u8" (bytes) > ",
                             ::fast_io::mnp::addrvw(memerr.memory_length),
-                            u8" (allocated)\n\n");
+                            u8" (allocated)\n",
+                            ::fast_io::mnp::cond(append_blank_line, u8"\n", u8""));
 #endif
     }
 
-    UWVM_GNU_COLD [[noreturn]] inline void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
+    inline constexpr void output_memory_error(memory_error_t const& memerr) noexcept { output_memory_error(memerr, true); }
+
+    inline constexpr void output_memory_error_line(memory_error_t const& memerr) noexcept { output_memory_error(memerr, false); }
+
+    UWVM_GNU_COLD [[noreturn]] inline constexpr void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
     {
         output_memory_error(memerr);
         ::fast_io::fast_terminate();
@@ -133,9 +139,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
         ::std::size_t memory_idx{};
         ::std::uint_least64_t memory_offset{};
         ::std::uint_least64_t memory_length{};
+        ::std::uintptr_t instruction_address{};
+        ::std::uintptr_t frame_address{};
+        ::std::uintptr_t stack_pointer{};
     };
 
-    inline constexpr void output_mmap_memory_error(mmap_memory_error_t const& memerr) noexcept
+    inline constexpr void output_mmap_memory_error(mmap_memory_error_t const& memerr, bool append_blank_line) noexcept
     {
 #ifdef UWVM
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -156,7 +165,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::addrvw(memerr.memory_length),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8" (allocated)\n\n",
+                            u8" (allocated)\n",
+                            ::fast_io::mnp::cond(append_blank_line, u8"\n", u8""),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
         ::fast_io::io::perr(::fast_io::u8err(),
@@ -168,11 +178,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             ::fast_io::mnp::addrvw(memerr.memory_offset),
                             u8" (fault offset) >= ",
                             ::fast_io::mnp::addrvw(memerr.memory_length),
-                            u8" (allocated)\n\n");
+                            u8" (allocated)\n",
+                            ::fast_io::mnp::cond(append_blank_line, u8"\n", u8""));
 #endif
     }
 
-    [[noreturn]] inline void output_mmap_memory_error_and_terminate(mmap_memory_error_t const& memerr) noexcept
+    inline constexpr void output_mmap_memory_error(mmap_memory_error_t const& memerr) noexcept { output_mmap_memory_error(memerr, true); }
+
+    inline constexpr void output_mmap_memory_error_line(mmap_memory_error_t const& memerr) noexcept { output_mmap_memory_error(memerr, false); }
+
+    [[noreturn]] inline constexpr void output_mmap_memory_error_and_terminate(mmap_memory_error_t const& memerr) noexcept
     {
         output_mmap_memory_error(memerr);
         ::fast_io::fast_terminate();

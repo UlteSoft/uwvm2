@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return wasip1_group_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_group_delete_system_environment,
                                                   para_curr,
                                                   para_end,
-                                                  u8"delete-system-environment");
+                                                  wasip1_module_details::target_action_t::delete_system_environment);
     }
 
 # endif

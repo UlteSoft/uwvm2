@@ -501,6 +501,313 @@ struct exception_pointers
 
 using pvectored_exception_handler = ::std::int_least32_t(FAST_IO_WINSTDCALL *)(exception_pointers *) noexcept;
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+
+# if defined(__i386__) || defined(_M_IX86)
+struct win_i386_floating_save_area
+{
+	::std::uint32_t ControlWord;
+	::std::uint32_t StatusWord;
+	::std::uint32_t TagWord;
+	::std::uint32_t ErrorOffset;
+	::std::uint32_t ErrorSelector;
+	::std::uint32_t DataOffset;
+	::std::uint32_t DataSelector;
+	::std::uint8_t RegisterArea[80];
+	::std::uint32_t Spare0;
+};
+
+struct win_i386_context
+{
+	::std::uint32_t ContextFlags;
+	::std::uint32_t Dr0;
+	::std::uint32_t Dr1;
+	::std::uint32_t Dr2;
+	::std::uint32_t Dr3;
+	::std::uint32_t Dr6;
+	::std::uint32_t Dr7;
+	win_i386_floating_save_area FloatSave;
+	::std::uint32_t SegGs;
+	::std::uint32_t SegFs;
+	::std::uint32_t SegEs;
+	::std::uint32_t SegDs;
+	::std::uint32_t Edi;
+	::std::uint32_t Esi;
+	::std::uint32_t Ebx;
+	::std::uint32_t Edx;
+	::std::uint32_t Ecx;
+	::std::uint32_t Eax;
+	::std::uint32_t Ebp;
+	::std::uint32_t Eip;
+	::std::uint32_t SegCs;
+	::std::uint32_t EFlags;
+	::std::uint32_t Esp;
+	::std::uint32_t SegSs;
+	::std::uint8_t ExtendedRegisters[512];
+};
+# endif
+
+# if defined(__arm64ec__) || defined(_M_ARM64EC) || (defined(_WIN64) && (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)))
+struct alignas(16) win64_m128a
+{
+	::std::uint64_t Low;
+	::std::int64_t High;
+};
+
+struct win64_xmm_save_area32
+{
+	::std::uint16_t ControlWord;
+	::std::uint16_t StatusWord;
+	::std::uint8_t TagWord;
+	::std::uint8_t Reserved1;
+	::std::uint16_t ErrorOpcode;
+	::std::uint32_t ErrorOffset;
+	::std::uint16_t ErrorSelector;
+	::std::uint16_t Reserved2;
+	::std::uint32_t DataOffset;
+	::std::uint16_t DataSelector;
+	::std::uint16_t Reserved3;
+	::std::uint32_t MxCsr;
+	::std::uint32_t MxCsr_Mask;
+	win64_m128a FloatRegisters[8];
+	win64_m128a XmmRegisters[16];
+	::std::uint8_t Reserved4[96];
+};
+
+struct win64_xmm_registers
+{
+	win64_m128a Header[2];
+	win64_m128a Legacy[8];
+	win64_m128a Xmm0;
+	win64_m128a Xmm1;
+	win64_m128a Xmm2;
+	win64_m128a Xmm3;
+	win64_m128a Xmm4;
+	win64_m128a Xmm5;
+	win64_m128a Xmm6;
+	win64_m128a Xmm7;
+	win64_m128a Xmm8;
+	win64_m128a Xmm9;
+	win64_m128a Xmm10;
+	win64_m128a Xmm11;
+	win64_m128a Xmm12;
+	win64_m128a Xmm13;
+	win64_m128a Xmm14;
+	win64_m128a Xmm15;
+};
+
+struct alignas(16) win64_context
+{
+	::std::uint64_t P1Home;
+	::std::uint64_t P2Home;
+	::std::uint64_t P3Home;
+	::std::uint64_t P4Home;
+	::std::uint64_t P5Home;
+	::std::uint64_t P6Home;
+	::std::uint32_t ContextFlags;
+	::std::uint32_t MxCsr;
+	::std::uint16_t SegCs;
+	::std::uint16_t SegDs;
+	::std::uint16_t SegEs;
+	::std::uint16_t SegFs;
+	::std::uint16_t SegGs;
+	::std::uint16_t SegSs;
+	::std::uint32_t EFlags;
+	::std::uint64_t Dr0;
+	::std::uint64_t Dr1;
+	::std::uint64_t Dr2;
+	::std::uint64_t Dr3;
+	::std::uint64_t Dr6;
+	::std::uint64_t Dr7;
+	::std::uint64_t Rax;
+	::std::uint64_t Rcx;
+	::std::uint64_t Rdx;
+	::std::uint64_t Rbx;
+	::std::uint64_t Rsp;
+	::std::uint64_t Rbp;
+	::std::uint64_t Rsi;
+	::std::uint64_t Rdi;
+	::std::uint64_t R8;
+	::std::uint64_t R9;
+	::std::uint64_t R10;
+	::std::uint64_t R11;
+	::std::uint64_t R12;
+	::std::uint64_t R13;
+	::std::uint64_t R14;
+	::std::uint64_t R15;
+	::std::uint64_t Rip;
+	union
+	{
+		win64_xmm_save_area32 FltSave;
+		win64_xmm_save_area32 FloatSave;
+		win64_xmm_registers XmmRegisters;
+	};
+	win64_m128a VectorRegister[26];
+	::std::uint64_t VectorControl;
+	::std::uint64_t DebugControl;
+	::std::uint64_t LastBranchToRip;
+	::std::uint64_t LastBranchFromRip;
+	::std::uint64_t LastExceptionToRip;
+	::std::uint64_t LastExceptionFromRip;
+};
+
+struct win64_runtime_function
+{
+	::std::uint32_t BeginAddress;
+	::std::uint32_t EndAddress;
+	::std::uint32_t UnwindData;
+};
+# endif
+
+# if defined(__arm__) || defined(_M_ARM)
+struct win_arm_neon128
+{
+	::std::uint64_t Low;
+	::std::int64_t High;
+};
+
+struct alignas(8) win_arm_context
+{
+	::std::uint32_t ContextFlags;
+	::std::uint32_t R0;
+	::std::uint32_t R1;
+	::std::uint32_t R2;
+	::std::uint32_t R3;
+	::std::uint32_t R4;
+	::std::uint32_t R5;
+	::std::uint32_t R6;
+	::std::uint32_t R7;
+	::std::uint32_t R8;
+	::std::uint32_t R9;
+	::std::uint32_t R10;
+	::std::uint32_t R11;
+	::std::uint32_t R12;
+	::std::uint32_t Sp;
+	::std::uint32_t Lr;
+	::std::uint32_t Pc;
+	::std::uint32_t Cpsr;
+	::std::uint32_t Fpscr;
+	::std::uint32_t Padding;
+	union
+	{
+		win_arm_neon128 Q[16];
+		::std::uint64_t D[32];
+		::std::uint32_t S[32];
+	} Neon;
+	::std::uint32_t Bvr[8];
+	::std::uint32_t Bcr[8];
+	::std::uint32_t Wvr[1];
+	::std::uint32_t Wcr[1];
+	::std::uint32_t Padding2[2];
+};
+
+struct win_arm_runtime_function
+{
+	::std::uint32_t BeginAddress;
+	::std::uint32_t UnwindData;
+};
+# endif
+
+# if defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
+union win_arm64_neon128
+{
+	struct
+	{
+		::std::uint64_t Low;
+		::std::int64_t High;
+	} Integer;
+	double D[2];
+	float S[4];
+	::std::uint16_t H[8];
+	::std::uint8_t B[16];
+};
+
+struct alignas(16) win_arm64_context
+{
+	::std::uint32_t ContextFlags;
+	::std::uint32_t Cpsr;
+	::std::uint64_t X[31];
+	::std::uint64_t Sp;
+	::std::uint64_t Pc;
+	win_arm64_neon128 V[32];
+	::std::uint32_t Fpcr;
+	::std::uint32_t Fpsr;
+	::std::uint32_t Bcr[8];
+	::std::uint64_t Bvr[8];
+	::std::uint32_t Wcr[2];
+	::std::uint64_t Wvr[2];
+};
+
+struct win_arm64_runtime_function
+{
+	::std::uint32_t BeginAddress;
+	::std::uint32_t UnwindData;
+};
+# endif
+
+# if defined(__arm64ec__) || defined(_M_ARM64EC)
+using win_arm64ec_context = win64_context;
+# endif
+
+inline constexpr ::std::uint32_t win_unwind_flag_nhandler{};
+inline constexpr ::std::uint32_t win64_unwind_flag_nhandler{};
+
+# if defined(__i386__) || defined(_M_IX86)
+static_assert(sizeof(win_i386_floating_save_area) == 112);
+static_assert(sizeof(win_i386_context) == 716);
+# endif
+# if defined(__arm64ec__) || defined(_M_ARM64EC) || (defined(_WIN64) && (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)))
+static_assert(sizeof(win64_m128a) == 16);
+static_assert(alignof(win64_m128a) == 16);
+static_assert(sizeof(win64_xmm_save_area32) == 512);
+static_assert(sizeof(win64_xmm_registers) == 416);
+static_assert(sizeof(win64_context) == 1232);
+static_assert(alignof(win64_context) == 16);
+static_assert(sizeof(win64_runtime_function) == 12);
+# endif
+# if defined(__arm__) || defined(_M_ARM)
+static_assert(sizeof(win_arm_neon128) == 16);
+static_assert(sizeof(win_arm_context) == 416);
+static_assert(alignof(win_arm_context) == 8);
+static_assert(sizeof(win_arm_runtime_function) == 8);
+# endif
+# if defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
+static_assert(sizeof(win_arm64_neon128) == 16);
+static_assert(sizeof(win_arm64_context) == 912);
+static_assert(alignof(win_arm64_context) == 16);
+static_assert(sizeof(win_arm64_runtime_function) == 8);
+# endif
+
+# if defined(__arm64ec__) || defined(_M_ARM64EC)
+struct win64_nonvolatile_context_pointers;
+using win_current_context = win_arm64ec_context;
+using win_current_runtime_function = win64_runtime_function;
+using win_current_nonvolatile_context_pointers = win64_nonvolatile_context_pointers;
+using win_current_unwind_address = ::std::uint64_t;
+# elif defined(_WIN64) && (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64))
+struct win64_nonvolatile_context_pointers;
+using win_current_context = win64_context;
+using win_current_runtime_function = win64_runtime_function;
+using win_current_nonvolatile_context_pointers = win64_nonvolatile_context_pointers;
+using win_current_unwind_address = ::std::uint64_t;
+# elif defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64))
+struct win_arm64_nonvolatile_context_pointers;
+using win_current_context = win_arm64_context;
+using win_current_runtime_function = win_arm64_runtime_function;
+using win_current_nonvolatile_context_pointers = win_arm64_nonvolatile_context_pointers;
+using win_current_unwind_address = ::std::uintptr_t;
+# elif defined(__arm__) || defined(_M_ARM)
+struct win_arm_nonvolatile_context_pointers;
+using win_current_context = win_arm_context;
+using win_current_runtime_function = win_arm_runtime_function;
+using win_current_nonvolatile_context_pointers = win_arm_nonvolatile_context_pointers;
+using win_current_unwind_address = ::std::uint32_t;
+# elif defined(__i386__) || defined(_M_IX86)
+using win_current_context = win_i386_context;
+# endif
+
+#endif
+
 using address_family = ::std::uint_least16_t;
 
 inline constexpr ::std::size_t ss_maxsize{128u};

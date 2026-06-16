@@ -50,6 +50,7 @@ module;
 # include <llvm/Transforms/Scalar.h>
 # include <llvm/Transforms/Scalar/GVN.h>
 # include <llvm/Transforms/Utils.h>
+# include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
 #endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_cu_from_lazy_validator:translate;
@@ -59,6 +60,7 @@ import uwvm2.uwvm_predefine.io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.utils.hash;
 import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;

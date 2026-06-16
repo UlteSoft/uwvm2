@@ -76,7 +76,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
 # endif
 #elif CHAR_BIT > 8
     struct alignas(16uz) wasm_v128
-    { char c8x16[16]; };
+    {
+        char c8x16[16];
+    };
 #else
     union alignas(16uz) wasm_v128
     {

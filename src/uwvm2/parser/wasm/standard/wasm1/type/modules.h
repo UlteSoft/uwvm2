@@ -57,7 +57,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     /// @details    New feature
     /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.5.2
     struct local_function_type
-    { ::uwvm2::parser::wasm::standard::wasm1::type::function_type const* func_type{}; };
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::function_type const* func_type{};
+    };
 
     /// @brief      Functions
     /// @details    The funcs component of a module defines a vector of functions with the following structure.

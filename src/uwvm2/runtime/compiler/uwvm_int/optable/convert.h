@@ -172,7 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @note There's no need for `noreturn`; let the calling function handle it.
         /// @note `unreachable_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a safe
         ///       fallback.
-        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_invalid_conversion_to_integer() noexcept
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline constexpr void trap_invalid_conversion_to_integer() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func == nullptr) [[unlikely]]
             {
@@ -195,7 +195,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @note `trap_integer_overflow_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as
         /// a
         ///       safe fallback.
-        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_integer_overflow() noexcept
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline constexpr void trap_integer_overflow() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func == nullptr) [[unlikely]]
             {
@@ -264,7 +264,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // (These helpers may be inlined, but correctness must not rely on inlining.)
 
         template <typename IntOut, typename FloatIn>
-        UWVM_ALWAYS_INLINE inline IntOut trunc_float_to_int_s(FloatIn x) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr IntOut trunc_float_to_int_s(FloatIn x) noexcept
         {
             constexpr FloatIn min_v{static_cast<FloatIn>(::std::numeric_limits<IntOut>::min())};
             constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<IntOut>::max()) + 1.0L)};
@@ -281,7 +281,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename UIntOut, typename FloatIn>
-        UWVM_ALWAYS_INLINE inline UIntOut trunc_float_to_int_u(FloatIn x) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr UIntOut trunc_float_to_int_u(FloatIn x) noexcept
         {
             constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<UIntOut>::max()) + 1.0L)};
 

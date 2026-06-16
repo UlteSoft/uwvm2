@@ -70,7 +70,9 @@
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
     struct wasm_binfmt1_feature_parameter
-    { ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_parser_limit_t parser_limit{}; };
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_parser_limit_t parser_limit{};
+    };
 
     /// @brief wasm1 feature
     struct wasm1

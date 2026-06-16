@@ -40,7 +40,27 @@ namespace details
         ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
     };
 
-    [[nodiscard]] inline runtime_import_direct_defined_call_resolution_t
+    // Runtime initialization rejects import-alias cycles and unresolved chains.  A post-initialization function alias chain
+    // can therefore visit at most one imported-function record per runtime import before reaching a concrete target.  Derive
+    // the defensive walk bound from runtime storage instead of using a fixed cap, so large but valid module graphs are not
+    // excluded from direct-call lowering.
+    [[nodiscard]] inline constexpr ::std::size_t
+        get_runtime_imported_function_link_walk_bound(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module) noexcept
+    {
+        auto bound{runtime_module.imported_function_vec_storage.size()};
+        for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+        {
+            auto const& other_module{module_entry.second};
+            if(::std::addressof(other_module) == ::std::addressof(runtime_module)) { continue; }
+
+            auto const imported_function_count{other_module.imported_function_vec_storage.size()};
+            if(imported_function_count > ::std::numeric_limits<::std::size_t>::max() - bound) { return ::std::numeric_limits<::std::size_t>::max(); }
+            bound += imported_function_count;
+        }
+        return bound;
+    }
+
+    [[nodiscard]] inline constexpr runtime_import_direct_defined_call_resolution_t
         resolve_runtime_import_direct_defined_call(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
                                                    ::std::size_t import_func_index) noexcept
     {
@@ -56,9 +76,11 @@ namespace details
         auto const local_func_begin{runtime_module.local_defined_function_vec_storage.data()};
 
         imported_function_storage_t const* curr{::std::addressof(runtime_module.imported_function_vec_storage.index_unchecked(import_func_index))};
+        auto const max_link_walk_steps{get_runtime_imported_function_link_walk_bound(runtime_module)};
         for(::std::size_t steps{};; ++steps)
         {
-            if(steps > 8192uz || curr == nullptr) [[unlikely]] { return {}; }
+            // Exceeding the storage-derived bound means the chain is no longer the acyclic structure the initializer proved.
+            if(steps > max_link_walk_steps || curr == nullptr) [[unlikely]] { return {}; }
 
             switch(curr->link_kind)
             {
@@ -116,7 +138,7 @@ namespace details
         wasm_i32 imm2{};  // used by mul_add_const_i32
     };
 
-    [[nodiscard]] UWVM_ALWAYS_INLINE inline trivial_call_inline_match
+    [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr trivial_call_inline_match
         match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
     {
         using wasm1_code = ::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code;
@@ -127,7 +149,7 @@ namespace details
         auto curr{reinterpret_cast<::std::byte const*>(code_ptr->body.expr_begin)};
         auto const end{reinterpret_cast<::std::byte const*>(code_ptr->body.code_end)};
 
-        auto const read_op{[&](wasm1_code& out) noexcept -> bool
+        auto const read_op{[&](wasm1_code& out) constexpr noexcept -> bool
                            {
                                if(curr == end) { return false; }
                                ::std::memcpy(::std::addressof(out), curr, sizeof(out));
@@ -135,7 +157,7 @@ namespace details
                                return true;
                            }};
 
-        auto const read_u32_leb{[&](::std::uint32_t& out) noexcept -> bool
+        auto const read_u32_leb{[&](::std::uint32_t& out) constexpr noexcept -> bool
                                 {
                                     ::std::uint32_t v{};
                                     ::std::uint32_t shift{};
@@ -155,7 +177,7 @@ namespace details
                                     return false;
                                 }};
 
-        auto const read_i32_leb{[&](wasm_i32& out) noexcept -> bool
+        auto const read_i32_leb{[&](wasm_i32& out) constexpr noexcept -> bool
                                 {
                                     ::std::int32_t v{};
                                     ::std::uint32_t shift{};
@@ -187,29 +209,29 @@ namespace details
         // Notes:
         // - This is a common tiny PRNG step used in microbenchmarks and hash-like code.
         // - We match the exact canonical form (locals only, no extra ops) to avoid false positives.
-        auto const match_xorshift32_i32{[&]() noexcept -> bool
+        auto const match_xorshift32_i32{[&]() constexpr noexcept -> bool
                                         {
                                             auto const begin{curr};
-                                            auto fail{[&]() noexcept
+                                            auto fail{[&]() constexpr noexcept
                                                       {
                                                           curr = begin;
                                                           return false;
                                                       }};
 
-                                            auto expect_op{[&](wasm1_code expected) noexcept -> bool
+                                            auto expect_op{[&](wasm1_code expected) constexpr noexcept -> bool
                                                            {
                                                                wasm1_code op{};  // no init
                                                                if(!read_op(op) || op != expected) { return false; }
                                                                return true;
                                                            }};
-                                            auto expect_local0{[&](wasm1_code op_kind) noexcept -> bool
+                                            auto expect_local0{[&](wasm1_code op_kind) constexpr noexcept -> bool
                                                                {
                                                                    if(!expect_op(op_kind)) { return false; }
                                                                    ::std::uint32_t idx{};
                                                                    if(!read_u32_leb(idx) || idx != 0u) { return false; }
                                                                    return true;
                                                                }};
-                                            auto expect_i32_const{[&](wasm_i32 expected) noexcept -> bool
+                                            auto expect_i32_const{[&](wasm_i32 expected) constexpr noexcept -> bool
                                                                   {
                                                                       if(!expect_op(wasm1_code::i32_const)) { return false; }
                                                                       wasm_i32 imm{};  // no init

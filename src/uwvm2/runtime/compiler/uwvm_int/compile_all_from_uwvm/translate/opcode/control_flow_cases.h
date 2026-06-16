@@ -1,5 +1,10 @@
+// Structured control-flow opcodes maintain two views at once: Wasm validation state and emitted
+// interpreter labels. The extra comments explain why stack repair and stack-top canonicalization
+// happen around block boundaries instead of being deferred to the runtime branch helper.
 case wasm1_code::unreachable:
 {
+    // `unreachable` emits a trapping helper and then enters polymorphic validation state. From this
+    // point until the next control-flow merge, missing operands are tolerated by the Wasm rules.
     // unreachable ...
     // [   safe  ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -40,6 +45,8 @@ case wasm1_code::nop:
 }
 case wasm1_code::block:
 {
+    // A `block` creates a forward branch target whose label arity is its result type. We record the
+    // operand-stack base now so every later branch can repair the stack back to this boundary.
     // block  blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -118,9 +125,14 @@ case wasm1_code::block:
     }
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    // Large functions may enter tiered execution while looping. Emitting the poll at an outer
+    // block boundary keeps the runtime check rare enough for interpreter speed while still giving
+    // hot loops a deterministic OSR handoff point.
     if constexpr(CompileOption.enable_tiered_loop_osr_poll)
     {
-        if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+        auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
+        if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_poll_should_emit(local_func_count, function_code_size) &&
+           !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
         {
             auto const result_begin{curr_func_type.result.begin};
             auto const result_end{curr_func_type.result.end};
@@ -134,10 +146,8 @@ case wasm1_code::block:
                 {
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                    auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
                     auto const request_countdown{
-                        ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_block_osr_request_countdown_for_function_size(
-                            function_code_size)};
+                        ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_block_osr_request_countdown_for_function_size(function_code_size)};
                     if(request_countdown != ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
                     {
                         poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
@@ -148,9 +158,7 @@ case wasm1_code::block:
                                             .countdown = 8192u,
                                             .reset_countdown = 8192u,
                                             .request_countdown = request_countdown};
-                        emit_opfunc_to(
-                            bytecode,
-                            translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         emit_imm(poll_imm);
                     }
                 }
@@ -176,6 +184,8 @@ case wasm1_code::block:
 }
 case wasm1_code::loop:
 {
+    // A `loop` differs from `block`: its branch target is the loop header, and MVP loop labels take
+    // parameters rather than results. The translator therefore records both start and end labels.
     // loop   blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -253,129 +263,121 @@ case wasm1_code::loop:
         }
     }
 
-    control_flow_stack.push_back({.result = block_result,
-                                  .operand_stack_base = operand_stack.size(),
-                                  .type = block_type::loop,
-                                  .polymorphic_base = is_polymorphic,
-                                  .then_polymorphic_end = false,
-                                  .start_label_id =
-                                      [&]() constexpr UWVM_THROWS
-                                  {
-                                      auto const loop_start{new_label(false)};
-                                      if constexpr(stacktop_enabled)
-                                      {
-                                          if constexpr(strict_cf_entry_like_call)
-                                          {
-                                              if(!is_polymorphic)
-                                              {
-                                                  // Fallthrough into loop start: canonicalize before the re-entry label so
-                                                  // back-edges can jump directly to the label and see the canonical state.
-                                                  if(runtime_log_on) [[unlikely]]
-                                                  {
-                                                      ++runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count;
-                                                      if(runtime_log_emit_cf)
-                                                      {
-                                                          ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                               u8"[uwvm-int-translator] fn=",
-                                                                               function_index,
-                                                                               u8" ip=",
-                                                                               runtime_log_curr_ip,
-                                                                               u8" event=cf.loop_entry | action=canonicalize_edge_to_memory\n");
-                                                      }
-                                                  }
-                                                  stacktop_canonicalize_edge_to_memory(bytecode);
-                                              }
-                                              else
-                                              {
-                                                  // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
-                                                  stacktop_reset_currpos_to_begin();
-                                                  stacktop_memory_count = codegen_operand_stack.size();
-                                                  stacktop_cache_count = 0uz;
-                                                  stacktop_cache_i32_count = 0uz;
-                                                  stacktop_cache_i64_count = 0uz;
-                                                  stacktop_cache_f32_count = 0uz;
-                                                  stacktop_cache_f64_count = 0uz;
-                                              }
-                                          }
-                                      }
-                                      if constexpr(stacktop_enabled)
-                                      {
-                                          if constexpr(!strict_cf_entry_like_call)
-                                          {
-                                              // Fallthrough into loop start: canonicalize currpos to a deterministic begin slot
-                                              // using a pure-register transform (no operand-stack spill/fill).
-                                              if(runtime_log_on) [[unlikely]]
-                                              {
-                                                  ++runtime_log_stats.cf_loop_entry_transform_count;
-                                                  if(runtime_log_emit_cf)
-                                                  {
-                                                      ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                           u8"[uwvm-int-translator] fn=",
-                                                                           function_index,
-                                                                           u8" ip=",
-                                                                           runtime_log_curr_ip,
-                                                                           u8" event=cf.loop_entry | action=stacktop_transform_currpos_to_begin\n");
-                                                  }
-                                              }
-                                              stacktop_transform_currpos_to_begin(bytecode);
-                                          }
-                                      }
-                                      set_label_offset(loop_start, bytecode.size());
+    control_flow_stack.push_back(
+        {.result = block_result,
+         .operand_stack_base = operand_stack.size(),
+         .type = block_type::loop,
+         .polymorphic_base = is_polymorphic,
+         .then_polymorphic_end = false,
+         .start_label_id =
+             [&]() constexpr UWVM_THROWS
+         {
+             auto const loop_start{new_label(false)};
+             if constexpr(stacktop_enabled)
+             {
+                 if constexpr(strict_cf_entry_like_call)
+                 {
+                     if(!is_polymorphic)
+                     {
+                         // Fallthrough into loop start: canonicalize before the re-entry label so
+                         // back-edges can jump directly to the label and see the canonical state.
+                         if(runtime_log_on) [[unlikely]]
+                         {
+                             ++runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count;
+                             if(runtime_log_emit_cf)
+                             {
+                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                      u8"[uwvm-int-translator] fn=",
+                                                      function_index,
+                                                      u8" ip=",
+                                                      runtime_log_curr_ip,
+                                                      u8" event=cf.loop_entry | action=canonicalize_edge_to_memory\n");
+                             }
+                         }
+                         stacktop_canonicalize_edge_to_memory(bytecode);
+                     }
+                     else
+                     {
+                         // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
+                         stacktop_reset_currpos_to_begin();
+                         stacktop_memory_count = codegen_operand_stack.size();
+                         stacktop_cache_count = 0uz;
+                         stacktop_cache_i32_count = 0uz;
+                         stacktop_cache_i64_count = 0uz;
+                         stacktop_cache_f32_count = 0uz;
+                         stacktop_cache_f64_count = 0uz;
+                     }
+                 }
+             }
+             if constexpr(stacktop_enabled)
+             {
+                 if constexpr(!strict_cf_entry_like_call)
+                 {
+                     // Fallthrough into loop start: canonicalize currpos to a deterministic begin slot
+                     // using a pure-register transform (no operand-stack spill/fill).
+                     if(runtime_log_on) [[unlikely]]
+                     {
+                         ++runtime_log_stats.cf_loop_entry_transform_count;
+                         if(runtime_log_emit_cf)
+                         {
+                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                  u8"[uwvm-int-translator] fn=",
+                                                  function_index,
+                                                  u8" ip=",
+                                                  runtime_log_curr_ip,
+                                                  u8" event=cf.loop_entry | action=stacktop_transform_currpos_to_begin\n");
+                         }
+                     }
+                     stacktop_transform_currpos_to_begin(bytecode);
+                 }
+             }
+             set_label_offset(loop_start, bytecode.size());
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                                      if constexpr(CompileOption.enable_tiered_loop_osr_poll)
-                                      {
-                                          if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
-                                          {
-                                              auto const result_begin{curr_func_type.result.begin};
-                                              auto const result_end{curr_func_type.result.end};
-                                              auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-                                              if(result_count <= 1uz)
-                                              {
-                                                  ::std::size_t result_bytes{};
-                                                  if(result_count == 1uz)
-                                                  {
-                                                      result_bytes = operand_stack_valtype_size(result_begin[0]);
-                                                  }
+             if constexpr(CompileOption.enable_tiered_loop_osr_poll)
+             {
+                 auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
+                 if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_poll_should_emit(local_func_count, function_code_size) &&
+                    !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+                 {
+                     auto const result_begin{curr_func_type.result.begin};
+                     auto const result_end{curr_func_type.result.end};
+                     auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+                     if(result_count <= 1uz)
+                     {
+                         ::std::size_t result_bytes{};
+                         if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
 
-                                                  if(result_count == 0uz || result_bytes != 0uz)
-                                                  {
-                                                      namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                                                      using poll_imm_t =
-                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                                                      auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
-                                                      auto const poll_policy{
-                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::
-                                                              interpreter_tiered_loop_osr_counter_policy_for_function_size(function_code_size)};
-                                                      if(poll_policy.request_countdown !=
-                                                         ::uwvm2::runtime::compiler::uwvm_int::optable::
-                                                             interpreter_tiered_osr_request_countdown_disabled)
-                                                      {
-                                                          poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                                                              .func_index = function_index,
-                                                                              .loop_wasm_code_offset =
-                                                                                  static_cast<::std::size_t>(op_begin - code_begin),
-                                                                              .result_bytes = result_bytes,
-                                                                              .local_bytes =
-                                                                                  local_func_symbol.local_bytes_max - internal_temp_local_size,
-                                                                              .countdown = poll_policy.initial_countdown,
-                                                                              .reset_countdown = poll_policy.reset_countdown,
-                                                                              .request_countdown = poll_policy.request_countdown};
-                                                          emit_opfunc_to(
-                                                              bytecode,
-                                                              translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(
-                                                                  curr_stacktop, interpreter_tuple));
-                                                          emit_imm(poll_imm);
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      }
+                         if(result_count == 0uz || result_bytes != 0uz)
+                         {
+                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                             using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+                             auto const poll_policy{::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_counter_policy_for_function_size(
+                                 function_code_size)};
+                             if(poll_policy.request_countdown !=
+                                ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
+                             {
+                                 poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
+                                                     .func_index = function_index,
+                                                     .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
+                                                     .result_bytes = result_bytes,
+                                                     .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                                     .countdown = poll_policy.initial_countdown,
+                                                     .reset_countdown = poll_policy.reset_countdown,
+                                                     .request_countdown = poll_policy.request_countdown};
+                                 emit_opfunc_to(bytecode,
+                                                translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                 emit_imm(poll_imm);
+                             }
+                         }
+                     }
+                 }
+             }
 #endif
-                                      return loop_start;
-                                  }(),
-                                  .end_label_id = new_label(false),
-                                  .else_label_id = SIZE_MAX,
-                                  .wasm_code_curr_at_start_label = code_curr});
+             return loop_start;
+         }(),
+         .end_label_id = new_label(false),
+         .else_label_id = SIZE_MAX,
+         .wasm_code_curr_at_start_label = code_curr});
 
     // Stack-polymorphism is scoped to the current control frame only.
     // Entering a nested frame starts it in reachable mode for validation.
@@ -385,6 +387,8 @@ case wasm1_code::loop:
 }
 case wasm1_code::if_:
 {
+    // `if` consumes an i32 condition and splits execution into two stack-top states. The generated
+    // else thunk exists so both arms can enter their bodies with the same canonical cache contract.
     // if     blocktype ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -574,6 +578,8 @@ case wasm1_code::if_:
         }
     }
 
+    // Save the else-entry stack-top model separately from the then path. The conditional branch
+    // can jump into a thunk first, so the else body must restore the exact state expected there.
     auto else_entry_curr_stacktop{curr_stacktop};
     auto else_entry_memory_count{stacktop_memory_count};
     auto else_entry_cache_count{stacktop_cache_count};
@@ -624,6 +630,8 @@ case wasm1_code::if_:
 }
 case wasm1_code::else_:
 {
+    // At `else`, the then-arm must branch over the else body after validating its result values.
+    // The translator stores the then-end state so `end` can merge the reachable arm correctly.
     // else   ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -761,6 +769,8 @@ case wasm1_code::else_:
 }
 case wasm1_code::end:
 {
+    // `end` is a validation and label-resolution marker, not a runtime opcode by itself. This case
+    // validates the block result, materializes pending labels, and rebuilds the post-block stack.
     // end    ...
     // [safe] unsafe (could be the section_end)
     // ^^ code_curr
@@ -1013,7 +1023,7 @@ case wasm1_code::end:
         // Matching is hash-based and intentionally strict so it never triggers accidentally.
         if constexpr(CompileOption.is_tail_call)
         {
-            auto const fnv1a64{[](::std::byte const* p, ::std::size_t n) noexcept -> ::std::uint_least64_t
+            auto const fnv1a64{[](::std::byte const* p, ::std::size_t n) constexpr noexcept -> ::std::uint_least64_t
                                {
                                    ::std::uint_least64_t h{0xcbf29ce484222325ull};
                                    for(::std::size_t i{}; i != n; ++i)

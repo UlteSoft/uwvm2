@@ -57,7 +57,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
 
     /// @brief Wrapper for the value type
     struct value_type_section_details_wrapper_t
-    { value_type type{}; };
+    {
+        value_type type{};
+    };
 
     inline constexpr value_type_section_details_wrapper_t section_details(value_type type) noexcept { return {type}; }
 

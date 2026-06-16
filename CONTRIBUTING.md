@@ -75,6 +75,8 @@ Avoid fmt-based formatting in uwvm2. Prefer `fast_io` for formatting and output:
 
 If a hosted facade is necessary, build it atop `fast_io`, keep the API narrow, and document locale/allocation semantics.
 
+When writing text with `fast_io::io::print`/`println`/`perr`/`perrln`, or when building text with project concat helpers such as `u8concat_uwvm`, do not pass character literals like `u8','`, `u8'+'`, or `','` as text fragments. These may be formatted as integer values. Use string literals instead, such as `u8","`, `u8"+"`, or `","`.
+
 ### Concept-Oriented Programming (COP) in uwvm2
 - uwvm2 applies concept-oriented design (per Alexandr Savinov) using modern C++:
   - Separate concepts (interfaces/constraints) from implementations using C++ `concept` and module partitions.
@@ -87,6 +89,9 @@ If a hosted facade is necessary, build it atop `fast_io`, keep the API narrow, a
 - Style rules:
   - Prefer explicit, descriptive names. Avoid 1–2 character identifiers outside tight local scopes.
   - Minimize macros; prefer `constexpr`, templates, and inline functions.
+  - When a function definition is visible from a header or from an implementation file that may be included by another translation unit, mark it `inline` unless it is an intentional exported/translation-unit interface. This avoids accidental ODR violations when the same definition is seen by multiple consumers.
+  - Every explicitly `inline` function should also be `constexpr` when the C++ language permits it. In the C++26 baseline, `constexpr` is the preferred default for inline functions: the compiler decides whether a particular call is usable during constant evaluation, while ordinary runtime calls keep their normal behavior.
+  - Coroutine functions are the primary exception. A function whose body uses `co_await`, `co_yield`, or `co_return` cannot be `constexpr`, so coroutine task factories should remain `inline` without `constexpr`. Other declarations that the standard forbids from being `constexpr` (for example allocation/deallocation functions) are also exempt.
   - Keep functions short and cohesive; use early returns; handle errors and edge cases first.
   - Comments should explain "why", not restate code.
 
@@ -273,6 +278,11 @@ namespace A {
 
 ### Containers and strings
 - Prefer `::uwvm2::utils::container::string` instead of `::std::string` in core layers for deterministic behavior and portability.
+- For fixed byte spellings that must remain UTF-8/ASCII-stable, prefer `u8""`, `char8_t`, `::uwvm2::utils::container::u8string`, and
+  `::uwvm2::utils::container::u8string_view`. Ordinary narrow `""` literals are encoded in the execution character set and must not be used for
+  protocol names, Wasm opcode names, IR/symbol names, command names, diagnostics that are parsed, or other byte-sensitive text.
+- Keep ordinary narrow `""` only where the language, preprocessor, ABI, or third-party API requires it, such as `extern "C"`, `#include`,
+  pragma macro names, `static_assert` messages, raw `char` callback overrides, or APIs that explicitly take `std::string`/`char const*`.
 
 ### Integers and character types
 - Default to `::std::size_t` for sizes and indices.
@@ -356,6 +366,12 @@ Do not assume `<pthread.h>` availability on Windows (ABI variants: win32, posix,
 - Keep functions short and cohesive; use guard clauses and early returns.
 - Handle error and edge cases first.
 - Minimize macros; prefer `constexpr`, templates, and inline functions.
+
+### Inline and constexpr functions
+- Header-defined functions, functions in files included by module/default wiring, and other definitions that may be seen by more than one translation unit must be `inline` unless they are intentional ABI/interface definitions.
+- Prefer writing inline functions as `inline constexpr`. This keeps ODR behavior explicit while allowing compile-time use when a call path is valid for constant evaluation. C++26 relaxes many `constexpr` body restrictions, so the declaration should express the strongest useful property and let the compiler enforce constant-evaluation validity at the call site.
+- Do not mark coroutine functions `constexpr`. Any function body containing `co_await`, `co_yield`, or `co_return` is a coroutine, and coroutine functions are not valid `constexpr` functions. Leave coroutine task factories `inline` only.
+- For `.cpp` interface definitions, do not add `inline` just to follow the header rule. Prefer explicit linkage instead: `extern "C++"` for C++ interfaces and `extern "C"` for C ABI surfaces.
 
 ### Comments
 - Explain intent and invariants. Avoid restating obvious code.
@@ -456,6 +472,9 @@ inline void bad(::std::string const& s) {
 ### Character types are integers
 - Treat `char`, `wchar_t`, `char8_t`, `char16_t`, and `char32_t` as integers. Do not rely on stream behaviors or locale conversions.
 - Beware `int8_t*` printing via iostream, which may be treated as a C-string.
+- Do not assume ordinary narrow string or character literals have ASCII bytes. User-selected execution encodings can make `"abc"` and `'a'`
+  non-ASCII (for example on EBCDIC-like configurations). Use `u8""`/`char8_t` for UWVM-owned fixed byte text, and convert at API boundaries with
+  explicit helpers such as a may-alias `char8_t const*`/`char const*` bridge when a library such as LLVM exposes only `char`-based views.
 
 ### Avoid extended and maximal integer types
 - Avoid `__uint128_t` for general portability. Prefer two-limb implementations with `::std::uint_least64_t`.

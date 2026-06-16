@@ -76,7 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.clock_res_get_wasm64
     /// @details   __wasi_errno_t wasi_clock_res_get(__wasi_clockid_t clock_id, __wasi_timestamp_t* resolution);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t clock_res_get_wasm64(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t clock_res_get_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::clockid_wasm64_t clock_id,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t resolution_ptrsz) noexcept

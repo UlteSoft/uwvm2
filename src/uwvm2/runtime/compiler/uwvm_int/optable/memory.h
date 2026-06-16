@@ -40,6 +40,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 # include "define.h"
+# include "storage.h"
 # include "register_ring.h"
 #endif
 
@@ -220,7 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                               ::std::size_t& old_pages_out) noexcept
         {
             old_pages_out = static_cast<::std::size_t>(memory.get_page_size());
-            if(max_limit_memory_length == (::std::numeric_limits<::std::size_t>::max)()) { return false; }
+            if(max_limit_memory_length == ::std::numeric_limits<::std::size_t>::max()) { return false; }
 
             auto const limit_pages{max_limit_memory_length >> memory.custom_page_size_log2};
             return old_pages_out > limit_pages || delta_pages > (limit_pages - old_pages_out);
@@ -316,17 +317,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         }
 
-        UWVM_GNU_COLD [[noreturn]] inline void memory_oob_terminate(::std::size_t memory_idx,
-                                                                    ::std::uint_least64_t memory_static_offset,
-                                                                    memory_offset_t effective_offset,
-                                                                    ::std::size_t memory_length,
-                                                                    ::std::size_t wasm_bytes) noexcept
+        UWVM_GNU_COLD [[noreturn]] inline constexpr void memory_oob_terminate(::std::size_t memory_idx,
+                                                                              ::std::uint_least64_t memory_static_offset,
+                                                                              memory_offset_t effective_offset,
+                                                                              ::std::size_t memory_length,
+                                                                              ::std::size_t wasm_bytes) noexcept
         {
-            ::uwvm2::object::memory::error::output_memory_error_and_terminate({.memory_idx = memory_idx,
-                                                                               .memory_offset = effective_offset,
-                                                                               .memory_static_offset = memory_static_offset,
-                                                                               .memory_length = static_cast<::std::uint_least64_t>(memory_length),
-                                                                               .memory_type_size = wasm_bytes});
+            ::uwvm2::object::memory::error::memory_error_t const memerr{.memory_idx = memory_idx,
+                                                                        .memory_offset = effective_offset,
+                                                                        .memory_static_offset = memory_static_offset,
+                                                                        .memory_length = static_cast<::std::uint_least64_t>(memory_length),
+                                                                        .memory_type_size = wasm_bytes};
+            if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func == nullptr) [[unlikely]]
+            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func(memerr);
+            ::fast_io::fast_terminate();
         }
 
         template <typename MemoryT>
@@ -463,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline ::std::size_t load_memory_length_for_oob_unlocked(MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr ::std::size_t load_memory_length_for_oob_unlocked(MemoryT const& memory) noexcept
         {
             if constexpr(requires { memory.memory_length_p; })
             {
@@ -479,7 +490,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline auto lock_memory(MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr auto lock_memory(MemoryT const& memory) noexcept
         {
             // Only allocator-backed memories may relocate `memory_begin` during grow(), so only they need the memory_operation_guard.
             // mmap-backed memories keep a stable base address, so they are always lock-free on the hot path.
@@ -497,7 +508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // For multithread allocator-backed memories we still need to participate in the grow() relocation protocol, so provide explicit enter/exit helpers
         // (no RAII).
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline void enter_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void enter_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {
@@ -532,7 +543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
-        UWVM_ALWAYS_INLINE inline void exit_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void exit_memory_operation_memory_lock([[maybe_unused]] MemoryT const& memory) noexcept
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {
@@ -2692,7 +2703,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: supported for the i32 delta operand and i32 result when i32 stack-top caching is enabled.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][max_limit_memory_length:size_t][next_opfunc_ptr]`.
-    /// @note Growth may be strict or silent depending on `grow_strict` configuration; the Wasm result uses `-1` on failure for strict growth.
+    /// @note Growth may be strict or silent depending on `grow_strict` configuration. User-limit failures are reported to Wasm as `-1`. In the default
+    ///       fail-fast/silent policy, host allocation failure terminates the process silently; in strict mode, host allocation failure is also reported as
+    ///       the Wasm `-1` result.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_memory_grow(Type... type) UWVM_THROWS
@@ -2733,6 +2746,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
+            // Default policy: fail-fast/silent host allocation handling.
+            //
+            // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
+            // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
+            // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()`, and do not add an
+            // OOM callback to make host allocation failure observable; that changes the selected memory-growth policy.
+            //
+            // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
+            // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
+            // happen only on later guest writes, where the kernel can kill the process without a recoverable runtime
+            // error. The silent default intentionally matches that path. Strict mode is for systems that can report
+            // host allocation failure at grow time and should convert that failure to Wasm `-1`.
+            //
             // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
             // otherwise another grow may slip in between the caller-side precheck and the actual grow.
             if constexpr(native_memory_t::support_multi_thread)
@@ -3334,6 +3361,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
+            // Default policy: fail-fast/silent host allocation handling.
+            //
+            // A request that exceeds the configured Wasm/user limit must produce the Wasm `-1` result. Host allocation
+            // failure is different: in silent mode, `grow_silently()`/`try_grow_silently()` may terminate the process
+            // immediately with `fast_terminate()`. "Silent" means silent about the host allocation result, not silent
+            // about the Wasm/user limit check. Do not replace this branch with `grow_strictly()`, and do not add an
+            // OOM callback to make host allocation failure observable; that changes the selected memory-growth policy.
+            //
+            // On overcommit systems, especially common Linux configurations, allocation admission can succeed up to
+            // the architecture/user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may
+            // happen only on later guest writes, where the kernel can kill the process without a recoverable runtime
+            // error. The silent default intentionally matches that path. Strict mode is for systems that can report
+            // host allocation failure at grow time and should convert that failure to Wasm `-1`.
+            //
             // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
             // otherwise another grow may slip in between the caller-side precheck and the actual grow.
             if constexpr(native_memory_t::support_multi_thread)

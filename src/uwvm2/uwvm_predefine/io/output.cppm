@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        output.cppm
+ * @brief       C++20 module partition for UWVM diagnostic output routing.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:output` and includes `output.h` after setting the
+ *              module-build macros.  The exported declarations provide the process-wide `u8log_output` stream used by
+ *              UWVM diagnostics and verbose logging.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-16

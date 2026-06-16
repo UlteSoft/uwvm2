@@ -5,6 +5,12 @@
  *************************************************************/
 
 /**
+ * @file        impl.h
+ * @brief       Umbrella include for UWVM diagnostic color policy helpers.
+ * @details     This header aggregates the ANSI/color predefine utilities for non-module builds.  At present it exposes
+ *              the `NO_COLOR` detection and color-output control state from `no_color.h`; the paired macro headers are
+ *              included explicitly at use sites because their `push_macro`/`pop_macro` ordering must remain local.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-03-24

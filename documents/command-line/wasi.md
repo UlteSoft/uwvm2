@@ -43,6 +43,66 @@ Loaded modules are checked under these target kinds:
 
 One module name cannot be configured as both a single target and a member of a named group. The command-line callbacks prevent most conflicts immediately, and `run/loader.h` validates loaded module bindings again before initializing WASI environments.
 
+## WASI Preview 1 Groups And Plugin-Facing Host APIs
+
+UWVM2 treats WASI Preview 1 configuration as a target selection problem, not as one process-wide WASI table. Every loaded module resolves to exactly one WASI target:
+
+- The global default target, when no override is configured.
+- An anonymous single-module target created with `--wasip1-single-create <module>`.
+- A named shared target created with `--wasip1-group-create <group>` and populated with `--wasip1-group-add-module <group> <module>`.
+
+A target owns the effective WASI Preview 1 capability policy for the modules that resolve to it. That policy includes WASI import visibility, plugin-facing host API exposure, inherited and explicit environment variables, argv construction, directory preopens, socket preopens, fd limits, UTF-8 checking, and trace routing. Target environments are initialized from global defaults plus target-specific overrides, so a group can share common global mounts while adding private mounts, sockets, or environment variables for only the modules in that group.
+
+Named groups are the shared form of this model. All module names bound to the same group use the same target configuration and the same initialized WASI environment for UWVM2's WASI host calls. A group can contain any loaded target kind recognized by the runtime:
+
+- `main_wasm`
+- `preload_wasm`
+- `preloaded_dl`
+- `weak_symbol`
+
+This is intentionally different from a model where each plugin receives an unrelated store-local WASI context. In UWVM2, a Wasm preload module and a native preload plugin can be bound to the same named group so both use the same group-level WASI capability policy.
+
+The plugin-facing WASI Preview 1 host API follows the same target lookup:
+
+- The API table is hidden by default.
+- `--wasip1-global-expose-host-api` exposes it globally by default.
+- `--wasip1-single-expose-host-api <module>` exposes it for one single-module target.
+- `--wasip1-group-expose-host-api <group>` exposes it for one named group.
+- The matching `hide-host-api` commands can explicitly hide it for a target when that target is configured.
+
+When UWVM2 calls a native preload-DL or weak-symbol plugin function, the runtime records the owning plugin module and selects the WASI environment for that owner before plugin-facing WASI calls are dispatched. If that owner is bound to a named group, plugin-facing WASI calls made during that UWVM2 preload invocation use the group's environment. Calls made by native code outside UWVM2's preload invocation context are native host behavior and should not be relied on for group selection. For native preload-DL and weak-symbol plugins, place target-level `expose-host-api` or `hide-host-api` configuration before registering/loading the target plugin so the loader installs the intended table. The global expose command also refreshes already loaded native preload-DL and weak-symbol modules when those features are compiled.
+
+This target model is a VM feature, not a proof that no other runtime can emulate a similar policy in an embedding application. Embedders for other runtimes can manually create multiple stores, linkers, or WASI contexts. UWVM2's documented behavior is that this selection is available as a first-class command-line model across the main Wasm module, preloaded Wasm modules, native preload dynamic libraries, and weak-symbol modules.
+
+Native dynamic libraries are not WebAssembly sandboxes. A native `.so`, `.dll`, or `.dylib` can execute host code outside WASI unless the operating system or deployment environment applies an additional sandbox. WASI grouping controls which UWVM2 WASI host API table and WASI environment the plugin receives; it does not by itself confine arbitrary native code.
+
+Example: keep the application modules on the global default target, while binding a crypto Wasm module and a native acceleration plugin to a private `crypto` group:
+
+```bash
+uwvm \
+  --wasm-set-main-module-name main \
+  --wasip1-global-mount-dir /app ./app \
+  --wasip1-group-create crypto \
+  --wasip1-group-add-module crypto crypto \
+  --wasip1-group-add-module crypto crypto_accelerate \
+  --wasip1-group-enable crypto \
+  --wasip1-group-expose-host-api crypto \
+  --wasip1-group-mount-dir crypto /crypto ./crypto-data \
+  --wasip1-group-set-fd-limit crypto 64 \
+  --wasm-preload-library utility.wasm utility \
+  --wasm-preload-library crypto.wasm crypto \
+  --wasm-register-dl ./crypto_accelerate.so crypto_accelerate \
+  --run main.wasm
+```
+
+In this example:
+
+- `main.wasm`, named as `main`, and `utility.wasm`, named as `utility`, use the global default WASI target because neither name is bound to a single target or a named group.
+- `crypto.wasm`, named as `crypto`, and `crypto_accelerate.so`, named as `crypto_accelerate`, both resolve to the `crypto` group.
+- The global target sees the `/app` preopen.
+- The `crypto` group sees the global target's inherited configuration plus its own `/crypto` preopen and fd limit.
+- The plugin-facing WASI Preview 1 host API is exposed to the `crypto` group, not to every preload module by default.
+
 ## Core WASI Command
 
 | Command | Alias | Arguments | Repeatability | Behavior |
@@ -62,16 +122,33 @@ For WASI mount paths, this flag changes command-line validation from "valid UTF-
 | `--wasip1-global-disable` | `--wasip1-disable`, `-I1disable` | None | Once | Disable the global-default built-in WASI Preview 1 module unless a target override re-enables it. |
 | `--wasip1-global-set-fd-limit` | `--wasip1-set-fd-limit`, `-I1fdlim` | `<limit:size_t>` | Once | Set the default WASI fd limit. `0` maps to the maximum WASI fd value. |
 | `--wasip1-global-mount-dir` | `--wasip1-mount-dir`, `-I1dir` | `<wasi dir:str> <system dir:path>` | Repeatable | Mount a host directory into the default WASI preopen set. |
+| `--wasip1-disable-mount-path-normalization` | `-I1nomntnorm` | None | Once | Store raw WASI mount guest paths instead of normalized paths. |
+| `--wasip1-allow-overlapping-mount-paths` | `-I1allowoverlap` | None | Once | Allow duplicate or overlapping WASI mount guest paths. |
 | `--wasip1-global-set-argv0` | `--wasip1-set-argv0`, `-I1argv0` | `<argv0:str>` | Once | Override global-default WASI `argv[0]`. |
+| `--wasip1-global-force-args` | `--wasip1-force-args`, `-I1fargs` | `<num:size_t> [arg:str]...` | Once, conflicts with global set-argv0 | Replace the complete global-default WASI argv vector. `num` may be `0`. |
 | `--wasip1-global-noinherit-system-environment` | `--wasip1-noinherit-system-environment`, `-I1nosysenv` | None | Once | Start the global-default WASI environment without inheriting host environment variables. |
-| `--wasip1-global-delete-system-environment` | `--wasip1-delete-system-environment`, `-I1delsysenv` | `<env:str>` | Repeatable | Remove one inherited host environment variable by name. |
-| `--wasip1-global-add-environment` | `--wasip1-add-environment`, `-I1addenv` | `<env:str> <value:str>` | Repeatable | Add or replace one WASI environment variable. |
+| `--wasip1-global-delete-system-environment` | `--wasip1-delete-system-environment`, `-I1delsysenv` | `<env:str>` | Repeatable, no duplicate name | Remove one inherited host environment variable by name. Repeating the same name is rejected. |
+| `--wasip1-global-add-or-replace-environment` | `--wasip1-add-or-replace-environment`, `-I1addrepenv` | `<env:str> <value:str>` | Repeatable | Add or replace one WASI environment variable. Repeating the same name is allowed; the last value wins. |
 | `--wasip1-global-socket-tcp-listen` | `--wasip1-socket-tcp-listen`, `-I1tcplisten` | `<fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable | Create a default TCP listening socket. |
 | `--wasip1-global-socket-tcp-connect` | `--wasip1-socket-tcp-connect`, `-I1tcpcon` | `<fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable | Create a default connected TCP client socket. |
 | `--wasip1-global-socket-udp-bind` | `--wasip1-socket-udp-bind`, `-I1udpbind` | `<fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable | Create a default bound UDP socket. |
 | `--wasip1-global-socket-udp-connect` | `--wasip1-socket-udp-connect`, `-I1udpcon` | `<fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable | Create a default connected UDP socket. |
 
 The socket aliases above are available only when socket support is compiled. The exact alias strings come from the socket parameter headers; use `uwvm --help wasi` on the built binary if you need the authoritative compiled list.
+
+Mount guest paths are normalized by default before they are stored and before overlap checks run. Normalization collapses repeated slashes, removes `.` path components, resolves `..` within the preopen root, and removes trailing slashes except for `/`; a relative path that normalizes to empty becomes `.`.
+
+`--wasip1-disable-mount-path-normalization` changes storage only: the raw guest path is stored in the preopen table. If overlapping mount paths are still disallowed, uwvm still normalizes paths internally for the conflict check. `--wasip1-allow-overlapping-mount-paths` skips duplicate and ancestor/child conflict rejection. When both switches are set, mount path normalization is skipped entirely.
+
+### Mount Path Safety Notes
+
+These two switches are compatibility escape hatches. Use them only when the guest runtime and the preopen layout are intentionally relying on raw WASI capability behavior rather than a POSIX-like mount namespace.
+
+Disabling mount path normalization can make different spellings of the same logical guest path remain distinct in the preopen table. Examples include `/lib`, `//lib///`, `/./lib`, and `/a/../lib`. POSIX-like guest runtimes such as wasi-libc commonly normalize application paths before matching preopens, so storing raw unnormalized preopen names can make a path fail to match the preopen the user expected, or match a different normalized shape than the command line appears to describe.
+
+Allowing overlapping mount paths can break POSIX path equivalence for guests that expose `open`/`openat` style APIs. For example, mounting one host directory at `/` and another at `/lib` can make `open("/lib/file")` resolve through the `/lib` preopen while `openat(open("/"), "lib/file")` resolves through the real `lib` subdirectory inside the `/` preopen. This follows WASI's independent directory-capability model, but it is surprising for POSIX-like code and can give the false impression that a more specific preopen masks or replaces a subtree of its parent.
+
+Using both switches together disables the two protections at once: raw unnormalized names are stored, and duplicate or ancestor/child relationships are not rejected. This may be appropriate for low-level WASI tests, but it is risky for general POSIX-like workloads. The ambiguity is documented in [Wasmtime issue #13544](https://github.com/bytecodealliance/wasmtime/issues/13544); uwvm rejects normalized overlaps by default to make this behavior explicit.
 
 ## Single Target Command Table
 
@@ -90,9 +167,10 @@ All single commands require a module name. The module name must be non-empty and
 | `--wasip1-single-disable-utf8-check` | `-I1Su8relax` | `<module:str>` | Once per target with enable conflict | Disable runtime WASI UTF-8 checks for that module. |
 | `--wasip1-single-trace` | `-I1Strace` | `<module:str> <none|out|err|file <file:path>>` | Once per target | Route that module's WASI trace output. A bare path is also accepted as file output. |
 | `--wasip1-single-set-argv0` | `-I1Sargv0` | `<module:str> <argv0:str>` | Once per target | Override WASI `argv[0]` for that module. |
+| `--wasip1-single-force-args` | `-I1Sfargs` | `<module:str> <num:size_t> [arg:str]...` | Once per target, conflicts with target set-argv0 | Replace the complete WASI argv vector for that module. `num` may be `0`. |
 | `--wasip1-single-set-fd-limit` | `-I1Sfdlim` | `<module:str> <limit:size_t>` | Once per target | Override the fd limit for that module. |
-| `--wasip1-single-add-environment` | `-I1Saddenv` | `<module:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for that module. |
-| `--wasip1-single-delete-system-environment` | `-I1Sdelsysenv` | `<module:str> <env:str>` | Repeatable | Delete one inherited variable for that module. |
+| `--wasip1-single-add-or-replace-environment` | `-I1Saddrepenv` | `<module:str> <env:str> <value:str>` | Repeatable | Add or replace one variable for that module. Repeating the same name is allowed; the last value wins. |
+| `--wasip1-single-delete-system-environment` | `-I1Sdelsysenv` | `<module:str> <env:str>` | Repeatable, no duplicate name inside target | Delete one inherited variable for that module. Repeating the same name is rejected. |
 | `--wasip1-single-mount-dir` | `-I1Sdir` | `<module:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one module-specific directory mount. |
 | `--wasip1-single-socket-tcp-listen` | `-I1Stcplisten` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one TCP listening socket for the target. |
 | `--wasip1-single-socket-tcp-connect` | `-I1Stcpcon` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected TCP socket for the target. |
@@ -119,9 +197,10 @@ Group names must be non-empty. Unlike module names, group names are not validate
 | `--wasip1-group-disable-utf8-check` | `-I1Gu8relax` | `<group:str>` | Once per group with enable conflict | Disable runtime WASI UTF-8 checks for the group. |
 | `--wasip1-group-trace` | `-I1Gtrace` | `<group:str> <none|out|err|file <file:path>>` | Once per group | Route the group's WASI trace output. A bare path is also accepted as file output. |
 | `--wasip1-group-set-argv0` | `-I1Gargv0` | `<group:str> <argv0:str>` | Once per group | Override WASI `argv[0]` for the group. |
+| `--wasip1-group-force-args` | `-I1Gfargs` | `<group:str> <num:size_t> [arg:str]...` | Once per group, conflicts with group set-argv0 | Replace the complete WASI argv vector for the group. `num` may be `0`. |
 | `--wasip1-group-set-fd-limit` | `-I1Gfdlim` | `<group:str> <limit:size_t>` | Once per group | Override the fd limit for the group. |
-| `--wasip1-group-add-environment` | `-I1Gaddenv` | `<group:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for the group. |
-| `--wasip1-group-delete-system-environment` | `-I1Gdelsysenv` | `<group:str> <env:str>` | Repeatable | Delete one inherited variable for the group. |
+| `--wasip1-group-add-or-replace-environment` | `-I1Gaddrepenv` | `<group:str> <env:str> <value:str>` | Repeatable | Add or replace one variable for the group. Repeating the same name is allowed; the last value wins. |
+| `--wasip1-group-delete-system-environment` | `-I1Gdelsysenv` | `<group:str> <env:str>` | Repeatable, no duplicate name inside group | Delete one inherited variable for the group. Repeating the same name is rejected. |
 | `--wasip1-group-mount-dir` | `-I1Gdir` | `<group:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one group-specific directory mount. |
 | `--wasip1-group-socket-tcp-listen` | `-I1Gtcplisten` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one TCP listening socket for the group. |
 | `--wasip1-group-socket-tcp-connect` | `-I1Gtcpcon` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected TCP socket for the group. |
@@ -199,6 +278,7 @@ For one target, these pairs are mutually exclusive and cannot be repeated:
 Other single-assignment actions:
 
 - `set-argv0` can be set once per target.
+- `force-args` can be set once per target and conflicts with `set-argv0`.
 - `set-fd-limit` can be set once per target.
 - `trace` can be set once per target, even if the second trace setting is identical.
 
@@ -206,11 +286,10 @@ Environment action rules inside one target:
 
 - Environment names must be non-empty.
 - Environment names must not contain `=`.
-- `add-environment NAME VALUE` conflicts with `delete-system-environment NAME` in the same target.
-- `delete-system-environment NAME` conflicts with a later `add-environment NAME VALUE` in the same target.
-- Repeating `add-environment NAME VALUE` with the same value is accepted by the callback.
-- Repeating `add-environment NAME OTHER_VALUE` with a different value is rejected.
-- Repeating `delete-system-environment NAME` is accepted by the callback and has the same final effect.
+- `add-or-replace-environment NAME VALUE` conflicts with `delete-system-environment NAME` in the same target.
+- `delete-system-environment NAME` conflicts with a later `add-or-replace-environment NAME VALUE` in the same target.
+- Repeating `add-or-replace-environment NAME VALUE` is accepted. If the value differs, the later value replaces the earlier one.
+- Repeating `delete-system-environment NAME` is rejected.
 
 Socket action rules inside one target:
 
@@ -233,23 +312,22 @@ Global environment initialization order:
 Target environment initialization starts from the global command-line settings, then combines target settings:
 
 - Target noinherit/inherit overrides the global inheritance mode when explicitly set.
-- Global delete list and target delete list are concatenated.
-- Global add list and target add list are concatenated.
-- Target `argv0` replaces global `argv0` when explicitly set.
+- Global delete names and target delete names are merged.
+- Global add-or-replace entries and target add-or-replace entries are merged; target values replace global values for the same name.
 - Target mounts are appended after global mounts.
 - Target sockets are appended after global sockets.
 
-Because add rules are applied in list order and replace existing keys, target `add-environment` can override a global `add-environment` for the same variable. Target delete rules can remove inherited host variables, but they cannot remove a global add rule for the same name because all add rules run after all delete rules. Target callbacks reject conflicting add/delete pairs inside one target, but they do not reject a target action that interacts with global defaults.
+Because add-or-replace entries run after delete handling, target `add-or-replace-environment` can override a global `add-or-replace-environment` for the same variable. Target delete rules can remove inherited host variables, but they cannot remove a global add-or-replace rule for the same name because all add-or-replace rules run after all delete rules. Target callbacks reject conflicting add/delete pairs inside one target, but they do not reject a target action that interacts with global defaults.
 
 Examples:
 
 ```bash
 uwvm \
   --wasip1-global-noinherit-system-environment \
-  --wasip1-global-add-environment MODE global \
+  --wasip1-global-add-or-replace-environment MODE global \
   --wasip1-single-create app \
   --wasip1-single-inherit-system-environment app \
-  --wasip1-single-add-environment MODE app \
+  --wasip1-single-add-or-replace-environment MODE app \
   --run app.wasm
 ```
 
@@ -258,22 +336,41 @@ For module `app`, host environment inheritance is re-enabled and `MODE=app` wins
 ```bash
 uwvm \
   --wasip1-global-delete-system-environment SECRET \
-  --wasip1-global-add-environment SECRET public \
+  --wasip1-global-add-or-replace-environment SECRET public \
   --run app.wasm
 ```
 
 The final WASI environment contains `SECRET=public` because add/replace is applied after delete.
 
-## `argv[0]` Semantics
+## argv Semantics
 
-By default, WASI argv is derived from `--run`:
+`--run` defines the default WASI argv vector:
 
 - The Wasm path selected by `--run` participates in the guest argument list.
 - Remaining tokens after `--run` become guest argv entries.
 
-When a non-empty `wasip1_argv0_storage` is set, initialization inserts it as the first WASI argument and skips the original `--run` path entry. Target `set-argv0` overrides the global value for that target.
+If a target has no argv override, it uses that default vector. This default vector is not the same thing as the global target's argv configuration: `--wasip1-global-force-args` changes only the global-default target and does not change what single/group targets inherit as their default argv.
 
-An empty string can be passed through the shell as `<argv0>`, and the callback will store it. During initialization, however, the argv code checks for a non-empty custom argv0; an empty global or target value therefore behaves like no custom `argv[0]`.
+`set-argv0` is a first-argument replacement for one target. For example:
+
+```bash
+uwvm --wasip1-single-create app \
+  --wasip1-single-set-argv0 app testhh \
+  --wasm-set-main-module-name app \
+  --run app.wasm arg0
+```
+
+For module `app`, the final WASI argv is `["testhh", "arg0"]`.
+
+`force-args` is a complete argv replacement for one target. It ignores both the `--run` Wasm path and the trailing `--run` arguments for that target. The first operand is a `size_t` count, followed by exactly that many argument strings, so `0` is a valid empty argv vector and arguments that look like uwvm options can still be passed unambiguously:
+
+```bash
+uwvm --wasip1-global-force-args 3 tool --literal -x --run app.wasm ignored
+```
+
+For the global-default target, the final WASI argv is `["tool", "--literal", "-x"]`.
+
+For the same target, `force-args` and `set-argv0` are mutually exclusive. This applies separately to the global-default target, each single target, and each named group.
 
 Use `--wasm-set-main-module-name` for internal module naming. Use WASI `set-argv0` only for the guest-visible argument vector.
 
@@ -493,11 +590,11 @@ For one target environment:
 4. Copy or override fd limit from global.
 5. Copy global sockets, then append target sockets.
 6. Combine global and target environment delete/add rules.
-7. Use target `argv0` when set; otherwise use global `argv0`.
+7. Use target `force-args` when set; otherwise use the default `--run` argv, with target `set-argv0` replacing the first argument when set.
 8. Copy global mounts, then append target mounts.
 9. Run the normal environment initialization flow to produce argv/env/fd state.
 
-This means a target inherits global mounts, sockets, environment variables, trace, fd limit, and UTF-8 behavior unless that target explicitly overrides the relevant field. It also means target mounts and sockets are additive rather than replacements.
+This means a target inherits global mounts, sockets, environment variables, trace, fd limit, and UTF-8 behavior unless that target explicitly overrides the relevant field. Argv is intentionally target-local: single/group targets use the `--run` default argv unless they set their own `set-argv0` or `force-args`. Target mounts and sockets are additive rather than replacements.
 
 ## Ordering Notes
 
@@ -542,7 +639,7 @@ Global sandbox with mounted data:
 ```bash
 uwvm \
   --wasip1-global-noinherit-system-environment \
-  --wasip1-global-add-environment PATH /bin \
+  --wasip1-global-add-or-replace-environment PATH /bin \
   --wasip1-global-mount-dir /data ./data \
   --run app.wasm
 ```

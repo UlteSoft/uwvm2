@@ -55,6 +55,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
      * This header provides opfunc variants that treat a `local.get` as a virtual operand source and
      * directly consume the local slot at the first real use site (typically a binary op).
      *
+     * Translation strategy:
+     * - The translator still validates the original Wasm stack effects. A pending `local.get` is visible
+     *   to the validation/type stack exactly as if it had been emitted normally.
+     * - Runtime emission is rearranged: when the next consumer accepts a local-backed RHS, the standalone
+     *   provider opfunc is suppressed and the consumer opfunc reads `local_base + offset` directly.
+     * - This makes `local.get rhs; binop` an operand-source rearrangement rather than a general-purpose
+     *   superinstruction: the value is produced at the use site, so the operand stack and stack-top ring do
+     *   not observe the transient RHS push/pop.
+     *
+     * Interaction with the conbine state machine:
+     * - Delay-local intentionally shares the `conbine_pending` lane. This keeps provider delay, flush, and
+     *   bytecode-order safety centralized in the translator.
+     * - If a larger adjacent-op conbine pattern owns the same window, that pattern may consume or extend the
+     *   pending state first. If no legal consumer accepts the delayed local, the translator flushes it back to
+     *   an ordinary `local.get` before crossing an unsafe opcode boundary.
+     * - Consumer variants must preserve the observable order of the expanded sequence, including integer
+     *   traps, floating-point behavior, local.set/local.tee ordering, and branch-fusion priority.
+     *
      * This is different from adjacent "combine" patterns (e.g. `local.get; local.get; i32.add`) because:
      * - No stack height change is materialized for the `local.get`.
      * - The fused opfunc performs the operation in-place on the current stack-top value and leaves

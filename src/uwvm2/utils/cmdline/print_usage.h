@@ -48,7 +48,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
     namespace details
     {
         struct usage_printer
-        { ::uwvm2::utils::cmdline::parameter const* para{}; };
+        {
+            ::uwvm2::utils::cmdline::parameter const* para{};
+        };
 
         /// @brief Print the usage
         /// @details Currently only char8_t is supported

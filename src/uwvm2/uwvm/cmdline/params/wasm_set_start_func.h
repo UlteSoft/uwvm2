@@ -46,7 +46,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_MODULE)
         extern "C++"
 #else
-        inline
+        inline constexpr
 #endif
             void wasm_set_start_func_pretreatment(char8_t const* const*&,
                                                   char8_t const* const*,

@@ -87,7 +87,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.proc_raise
     /// @details   void proc_raise(__wasi_signal_t code);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise_impl(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise_impl(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
     {
@@ -123,7 +123,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
     }
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
     {

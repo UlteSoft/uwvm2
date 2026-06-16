@@ -43,7 +43,7 @@
 #ifdef UWVM_SUPPORT_INSTALL_PATH
 UWVM_MODULE_EXPORT namespace uwvm2::utils::install_path
 {
-    inline ::fast_io::install_path get_module_install_path_noexcept() noexcept
+    inline constexpr ::fast_io::install_path get_module_install_path_noexcept() noexcept
     {
         ::fast_io::install_path ret{};
 # ifdef UWVM_CPP_EXCEPTIONS

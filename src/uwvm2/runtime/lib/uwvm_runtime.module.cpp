@@ -28,7 +28,6 @@
 #include <cstring>
 #include <functional>
 #include <limits>
-#include <new>
 #include <type_traits>
 #include <utility>
 // macro
@@ -59,6 +58,7 @@
 # include <llvm/Transforms/Scalar.h>
 # include <llvm/Transforms/Scalar/GVN.h>
 # include <llvm/Transforms/Utils.h>
+# include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
 #endif
 
 import fast_io;

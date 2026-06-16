@@ -57,7 +57,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
 {
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline bool validate_all_wasm_code_for_module(
+    inline constexpr bool validate_all_wasm_code_for_module(
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
         [[maybe_unused]] ::uwvm2::utils::container::u8cstring_view file_name,
         [[maybe_unused]] ::uwvm2::utils::container::u8string_view module_name) noexcept

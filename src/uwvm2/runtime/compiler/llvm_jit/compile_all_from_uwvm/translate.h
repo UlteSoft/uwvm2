@@ -26,8 +26,10 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
+# include <mutex>
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -41,15 +43,19 @@
 #  include <llvm/IR/BasicBlock.h>
 #  include <llvm/IR/CallingConv.h>
 #  include <llvm/IR/Constants.h>
+#  include <llvm/IR/DIBuilder.h>
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
+#  include <llvm/IR/InlineAsm.h>
+#  include <llvm/IR/Intrinsics.h>
 #  include <llvm/IR/LLVMContext.h>
+#  include <llvm/IR/Metadata.h>
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/Type.h>
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
-#  include <llvm/Support/raw_ostream.h>
+#  include <llvm/Support/DynamicLibrary.h>
 # endif
 // import
 # include <fast_io.h>
@@ -85,7 +91,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         runtime_invariant_failure
     };
 
-    extern "C++" [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
+    extern "C++"
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+# endif
+        UWVM_NOINLINE void llvm_jit_runtime_trap(llvm_jit_trap_kind,
+                                                 [[maybe_unused]] ::std::uintptr_t frame_address,
+                                                 [[maybe_unused]] ::std::uintptr_t stack_pointer
+                                                 ) noexcept;
+
+    extern "C++"
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
+        [[clang::disable_tail_calls]]
+# endif
+        UWVM_NOINLINE void llvm_jit_memory_out_of_bounds_trap(::std::size_t memory_idx,
+                                                              ::std::uint_least64_t memory_static_offset,
+                                                              ::std::uint_least64_t memory_offset,
+                                                              ::std::uint_least32_t offset_65_bit,
+                                                              ::std::uint_least64_t memory_length,
+                                                              ::std::size_t memory_type_size,
+                                                              [[maybe_unused]] ::std::uintptr_t frame_address,
+                                                              [[maybe_unused]] ::std::uintptr_t stack_pointer
+                                                              ) noexcept;
 
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 

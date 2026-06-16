@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t environ_sizes_get(__wasi_size_t* environ_count, __wasi_size_t* environ_buf_size);
     /// @note      This function only writes sizes; callers must provide valid memory offsets.
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t environ_sizes_get(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t environ_sizes_get(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t environ_count_ptrsz,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t environ_buf_size_ptrsz) noexcept

@@ -6,9 +6,11 @@
 
 /**
  * @file        io_device.cppm
- * @brief       Set up the lowest-level implementation of uwvm.
- *              Use the C API in the minimal C host environment and the user-space lowest-level API in other environments.
- *              Automatically add file-form buffers to out and in.
+ * @brief       C++20 module partition for the UWVM I/O standard-device compatibility surface.
+ * @details     This partition exports `uwvm2.uwvm_predefine.io:io_device` and includes `io_device.h` after setting the
+ *              module-build macros.  The partition is retained for compatibility with the existing predefine module
+ *              layout; current diagnostic streams are documented in the `output` and `runtime_log` partitions.
+ *
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-03-21

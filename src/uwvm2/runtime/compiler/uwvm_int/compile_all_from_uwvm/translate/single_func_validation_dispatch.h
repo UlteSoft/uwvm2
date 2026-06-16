@@ -1,10 +1,15 @@
 ﻿// block type
 using value_type_enum = curr_operand_stack_value_type;
+// This include fragment drives validation and bytecode emission for one function body. It is kept in
+// the caller's scope so opcode case files can share the same code cursor, validation stacks, runtime
+// storage references, and emission helpers without packaging them into a large mutable context object.
 static constexpr value_type_enum i32_result_arr[1u]{value_type_enum::i32};
 static constexpr value_type_enum i64_result_arr[1u]{value_type_enum::i64};
 static constexpr value_type_enum f32_result_arr[1u]{value_type_enum::f32};
 static constexpr value_type_enum f64_result_arr[1u]{value_type_enum::f64};
 
+// The function itself is modeled as the outermost control frame. This lets `return` share the same
+// stack-shape repair machinery as structured branches to a block end.
 auto const func_end_label_id{new_label(false)};
 
 // function block (label/result type is the function result)
@@ -24,6 +29,9 @@ auto code_curr{code_begin};
 
 using wasm_value_type_u = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
+// Numeric validators advance the Wasm cursor, enforce typed-stack rules, and update the abstract
+// operand stack before opcode-specific emission runs. Keeping this shared avoids subtly different
+// validation behavior between integer, float, and conversion opcode files.
 auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view op_name,
                                       curr_operand_stack_value_type expected_operand_type,
                                       curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
@@ -65,6 +73,8 @@ auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view o
                                       operand_stack_push(result_type);
                                   }};
 
+// Binary numeric validation pops RHS first because that is the physical top of the Wasm operand
+// stack; error reporting still names the opcode and expected homogeneous operand type.
 auto const validate_numeric_binary{
     [&](::uwvm2::utils::container::u8string_view op_name,
         curr_operand_stack_value_type expected_operand_type,
@@ -113,6 +123,9 @@ auto const validate_numeric_binary{
         operand_stack_push(result_type);
     }};
 
+// Memory load validation returns only the static offset. Alignment, memory existence, address type,
+// and result stack effect are fully checked here so memory opcode cases can focus on choosing the
+// fastest helper/fusion form.
 auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_name,
                                  wasm_u32 const max_align,
                                  curr_operand_stack_value_type const result_type) constexpr UWVM_THROWS -> wasm_u32
@@ -214,6 +227,8 @@ auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_nam
                                  return offset;
                              }};
 
+// Store validation consumes value then address, matching Wasm stack order. The emitted helper later
+// receives the static offset, but all typed-stack and memory-index errors are reported here.
 auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_name,
                                   wasm_u32 const max_align,
                                   curr_operand_stack_value_type const expected_value_type) constexpr UWVM_THROWS -> wasm_u32
@@ -344,6 +359,9 @@ struct resolved_memory0_t
 
 resolved_memory0_t resolved_memory0{};
 
+// Memory resolution is lazy because many functions never touch memory. Once a memory opcode appears,
+// cache the resolved native pointer and effective max limit so every following memory helper can use
+// compact immediates instead of rewalking import chains.
 auto const ensure_memory0_resolved{
     [&]() constexpr UWVM_THROWS
     {
@@ -504,6 +522,8 @@ auto const ensure_memory0_resolved{
         }
     }};
 
+// Global helpers emit direct storage pointers. This resolver follows imported-global forwarding
+// chains once at translation time so runtime global get/set opfuncs stay simple and branch-free.
 auto const resolve_global_storage_ptr{[&](wasm_u32 global_index) constexpr UWVM_THROWS -> wasm_global_storage_t*
                                       {
                                           using imported_global_storage_t = ::uwvm2::uwvm::runtime::storage::imported_global_storage_t;
@@ -573,6 +593,9 @@ auto const resolve_global_storage_ptr{[&](wasm_u32 global_index) constexpr UWVM_
 using wasm1_code = ::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+// `br_if` fusion state records a compare/eqz site that may be patched only if the immediately next
+// opcode is `br_if`. This keeps speculative branch fusion local and prevents stale comparisons from
+// crossing unrelated side effects.
 enum class br_if_fuse_kind : unsigned
 {
     none,
@@ -633,6 +656,9 @@ enum class br_if_fuse_kind : unsigned
 # endif
 };
 
+// Pending combine state is a tiny single-pass peephole machine. It delays emission only for patterns
+// whose next opcode can prove a cheaper helper is correct; unsupported continuations are flushed by
+// the dispatch loop before normal opcode handling.
 enum class conbine_pending_kind : unsigned
 {
     none,
@@ -833,6 +859,9 @@ enum class conbine_brif_cmp_kind : unsigned
     i64_ge_u,
 };
 
+// The payload is intentionally broad because different patterns reuse the same pending state object:
+// offsets name compiled-frame locals, immediates preserve parsed constants, and `vt` guards typed
+// helper selection.
 struct conbine_pending_t
 {
     conbine_pending_kind kind{conbine_pending_kind::none};
@@ -2616,6 +2645,38 @@ auto const flush_conbine_pending{
         }
     }};
 
+/*
+ * Pending-fusion continuation policy.
+ *
+ * `conbine_pending` is the translator's single short-range provider-delay lane. It is used both by
+ * ordinary adjacent-op conbine patterns and by delay-local. This predicate is deliberately a safety
+ * gate, not the final pattern selector:
+ *
+ * - Returning true means the current opcode is still inside a known, bytecode-contiguous window that
+ *   some later case may consume, specialize, or intentionally flush.
+ * - Returning false forces `flush_conbine_pending()` before the opcode is translated, materializing the
+ *   delayed provider sequence in its original bytecode order.
+ *
+ * Delay-local policy:
+ *
+ * - A pending `local_get` may be continued into selected arithmetic, conversion, memory, or branch
+ *   consumers. Those consumers can then emit `*_localget_rhs`/local-slot variants instead of emitting a
+ *   standalone `local.get` opfunc.
+ * - The validation stack has already seen the normal Wasm push/pop effects. The rearrangement is only in
+ *   the emitted runtime bytecode: the local-backed RHS is read at the consumer and the transient RHS stack
+ *   slot is never materialized in the operand-stack cache/ring.
+ *
+ * Conflict handling with conbine:
+ *
+ * - Larger or more constrained conbine windows are allowed to take priority when they produce a better
+ *   semantic unit, for example local+const address forms, update-local skeletons, memory-side fusions, or
+ *   branch fusions.
+ * - If a delay-local consumer would hide an opcode that another fusion must see, the consumer case can
+ *   explicitly flush or decline its variant. Examples include preserving `local.tee + br_if` and
+ *   `i32.and + br_if` branch fusions.
+ * - Byref/loop mode keeps a narrower continuation set because only a subset of consumers has explicit
+ *   byref implementations; unsupported windows are flushed instead of being kept speculatively.
+ */
 [[maybe_unused]] auto const conbine_can_continue{
     [&](wasm1_code op) constexpr noexcept -> bool
     {
@@ -3493,6 +3554,8 @@ auto const flush_conbine_pending{
     }};
 #endif
 
+// Per-op logging snapshots both bytecode deltas and abstract stack/cache state. It is noisy by
+// design and therefore gated behind `runtime_log_emit_wasm_ops`.
 auto const runtime_log_wasm_op_state{[&]([[maybe_unused]] ::uwvm2::utils::container::u8string_view phase,
                                          [[maybe_unused]] wasm1_code op,
                                          [[maybe_unused]] ::std::byte const* wasm_ip,
@@ -3716,6 +3779,8 @@ auto const runtime_log_wasm_op_state{[&]([[maybe_unused]] ::uwvm2::utils::contai
 
 bool finished_current_func{};
 
+// Main validation/translation loop. Each iteration consumes exactly one Wasm opcode plus its
+// immediates and delegates semantic handling to the opcode include fragments below.
 for(;;)
 {
     if(code_curr == code_end) [[unlikely]]
@@ -3761,6 +3826,9 @@ for(;;)
     }
 
     // Conbine state machine: flush pending ops unless the current opcode can continue the fusion.
+    // Global pending-fusion entry gate. Unknown or unsupported continuations are flushed here before
+    // the current opcode is translated, so delay-local and adjacent conbine patterns never cross an
+    // opcode boundary that could change observable order or hide a higher-priority consumer.
     if(conbine_pending.kind != conbine_pending_kind::none && !conbine_can_continue(curr_opbase)) [[unlikely]] { flush_conbine_pending(); }
 #endif
 
@@ -3778,6 +3846,8 @@ for(;;)
         runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
     }
 
+    // The opcode fragments are included inside the switch so they can share the helper lambdas above
+    // while still keeping each opcode family in a separate file.
     switch(curr_opbase)
     {
 #include "opcode/control_flow_cases.h"

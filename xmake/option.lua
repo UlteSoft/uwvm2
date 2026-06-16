@@ -238,9 +238,11 @@ option("debug-int", function()
     set_description
     (
         "select debug int backend",
-        "default = true"
+        "default = false",
+        "    false: keep the unimplemented debug interpreter backend disabled.",
+        "    true: enable debug interpreter command-line surface for implementation work only."
     )
-    set_default(true)
+    set_default(false)
 end)
 
 option("enable-uwvm-int-combine-ops", function()

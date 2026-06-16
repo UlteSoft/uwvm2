@@ -28,7 +28,7 @@
 /// @brief This file defines those header files that can only be imported once in push_macro.h
 #include "push_macros_include_header_pragma_once.h"
 
-/// @brief std and windows.h macro
+/// @brief std and platform macro
 
 #pragma push_macro("erase")
 #undef erase

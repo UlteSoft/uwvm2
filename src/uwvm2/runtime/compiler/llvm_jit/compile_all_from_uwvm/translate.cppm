@@ -25,8 +25,10 @@ module;
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
+# include <mutex>
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -48,7 +50,6 @@ module;
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
-#  include <llvm/Support/raw_ostream.h>
 # endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm:translate;

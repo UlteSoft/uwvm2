@@ -690,6 +690,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             return true;
         }
 
+        /// @brief      Grow memory in the default fail-fast/silent policy.
+        /// @details    "Silent" means silent with respect to the host allocation result. A request that exceeds the configured Wasm limit must be rejected by
+        ///             the caller as a Wasm `-1` result before this function is entered. Once this function is used, a host allocation/commit/protection
+        ///             failure is handled by immediate `fast_terminate()`, not by returning an error to the Wasm program.
+        /// @note       On overcommit systems, especially common Linux configurations, virtual memory admission can keep succeeding up to the architecture or
+        ///             user-VA limit (for example, about 128 TiB on common x86-64 layouts). The real OOM may occur only when guest code later writes to the
+        ///             admitted pages, at which point the kernel can kill the process without giving the runtime a recoverable error. This is why the default
+        ///             policy is silent/fail-fast. Do not replace this path with `grow_strictly()` merely to make host allocation failure observable.
         inline constexpr void grow_silently(::std::size_t page_grow_size,
                                             ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
         {
@@ -698,8 +706,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         /// @brief      Grow the memory (non-silent).
         /// @return     true if the grow succeeds; false if the grow exceeds the limit or the platform refuses to commit/protect more pages.
-        /// @note       On overcommit-enabled systems, a successful grow does not guarantee future writes will not be OOM-killed; this API only reports the
-        ///             platform's immediate response to the commit/protection step.
+        /// @details    Strict growth is selected only when the strict flag is enabled. In this policy, host allocation/commit/protection failure is converted
+        ///             into the Wasm `memory.grow` failure result (`-1`) and execution may continue. This is mainly meaningful on systems without overcommit,
+        ///             where the host can report allocation failure at grow time. On overcommit systems, a successful strict grow still cannot protect the
+        ///             process from a later kernel OOM kill on actual guest writes.
         /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
         inline constexpr bool grow_strictly(::std::size_t page_grow_size,
                                             ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),

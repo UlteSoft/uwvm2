@@ -1,3 +1,7 @@
+    // Parametric and variable opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
+    // The value tags used here are MVP scalar numeric tags.  Typed select, reference types, or wider proposal value spaces must
+    // extend the stack value model and the matching LLVM lowering before these cases are reused for those opcodes.
+
 case wasm1_code::drop:
 {
     // drop   ...
@@ -53,6 +57,9 @@ case wasm1_code::select:
     //        ^^ code_curr
 
     // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
+    // WebAssembly 1.0/MVP `select` is untyped and only reaches the scalar numeric value tags represented by value_type.
+    // The typed-select proposal adds an immediate result type and reference-type values; when enabling it, add immediate
+    // decoding, extend operand tags, and update `try_emit_runtime_local_func_llvm_jit_select` together.
     // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
 
     if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }

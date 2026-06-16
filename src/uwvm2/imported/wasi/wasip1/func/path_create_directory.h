@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.path_create_directory
     /// @details   __wasi_errno_t path_create_directory(__wasi_fd_t fd, const char *path, size_t path_len);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t path_create_directory(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_create_directory(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t path_ptrsz,

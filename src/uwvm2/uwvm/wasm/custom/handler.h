@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom
         bool is_imported_c{};
     };
 
-    inline void handle_binfmtver1_custom_section(
+    inline constexpr void handle_binfmtver1_custom_section(
         ::uwvm2::uwvm::wasm::type::wasm_file_t & wasm_file,
         ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view, handlefunc_t> const& custom_handler) noexcept
     {

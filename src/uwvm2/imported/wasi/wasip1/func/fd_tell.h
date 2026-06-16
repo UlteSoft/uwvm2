@@ -86,7 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_tell
     /// @details   __wasi_errno_t __wasi_fd_tell(__wasi_fd_t fd, __wasi_void_ptr_t offset);
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_tell(
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_tell(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t tell_ptrsz) noexcept

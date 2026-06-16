@@ -963,6 +963,9 @@ namespace uwvm2::uwvm::wasm::type
     {
 #if defined(UWVM_IMPORT_WASI_WASIP1)
         bool expose_host_api{::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
+# if defined(UWVM_USE_THREAD_LOCAL)
+        // Keep the TLS build on the direct thread_local variables. The accessor
+        // path below is only for non-TLS compatibility builds.
         if(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_target_is_set)
         {
             if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
@@ -973,6 +976,18 @@ namespace uwvm2::uwvm::wasm::type
                 expose_host_api = override_state->expose_host_api;
             }
         }
+# else
+        if(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_target_is_set_ref())
+        {
+            if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+                   ::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_target_kind_ref(),
+                   ::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_target_module_name_ref())};
+               override_state != nullptr && override_state->expose_host_api_is_set) [[unlikely]]
+            {
+                expose_host_api = override_state->expose_host_api;
+            }
+        }
+# endif
 
         if(!expose_host_api) [[unlikely]] { return nullptr; }
 

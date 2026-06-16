@@ -1,5 +1,10 @@
+// Memory opcode translation separates Wasm validation from runtime address execution. Each case
+// validates memarg alignment/offset and memory-0 availability first, then emits a typed opfunc that
+// can trust those invariants and focus on bounds checking plus the actual load/store.
 case wasm1_code::i32_load:
 {
+    // Validate the static memarg before touching combine state; malformed immediates must be
+    // reported at the opcode site even if a preceding `local.get` could otherwise be fused away.
     wasm_u32 const offset{validate_mem_load(u8"i32.load", 2u, wasm_value_type_u::i32)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -144,12 +149,16 @@ case wasm1_code::i32_load:
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_load_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
+    // Emit the resolved memory pointer as an immediate so the hot helper avoids a module lookup on
+    // every load dispatch.
     emit_imm_to(bytecode, resolved_memory0.memory_p);
     emit_imm_to(bytecode, offset);
     break;
 }
 case wasm1_code::i64_load:
 {
+    // 64-bit loads still consume an i32 address in Wasm MVP, but produce an i64 stack value.
+    // The stack-top bookkeeping below reflects that cross-type pop/push transition explicitly.
     wasm_u32 const offset{validate_mem_load(u8"i64.load", 3u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -230,6 +239,8 @@ case wasm1_code::i64_load:
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_load_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
+    // Emit memory0 and the static offset as immediates so the generic i64 load helper only consumes
+    // the dynamic address from the operand stack.
     emit_imm_to(bytecode, resolved_memory0.memory_p);
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
@@ -324,6 +335,8 @@ case wasm1_code::f32_load:
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_load_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
+    // Emit memory0 and the static offset as immediates; the f32 load helper consumes only the
+    // dynamic i32 address from the stack.
     emit_imm_to(bytecode, resolved_memory0.memory_p);
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
@@ -417,6 +430,8 @@ case wasm1_code::f64_load:
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_load_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
+    // Emit memory0 and the static offset as immediates; the f64 load helper consumes only the
+    // dynamic i32 address from the stack.
     emit_imm_to(bytecode, resolved_memory0.memory_p);
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
@@ -820,6 +835,8 @@ case wasm1_code::i64_load32_u:
 }
 case wasm1_code::i32_store:
 {
+    // Stores consume address and value. Fusion is valuable here because common Wasm emits both as
+    // locals, and skipping two stack materializations reduces dispatch and memory traffic.
     wasm_u32 const offset{validate_mem_store(u8"i32.store", 2u, wasm_value_type_u::i32)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -905,8 +922,11 @@ case wasm1_code::i32_store:
 #endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
+    // Stores also receive memory0 as an immediate; the helper then only needs address/value operands
+    // plus the static offset to perform bounds checking and the write.
     emit_imm_to(bytecode, resolved_memory0.memory_p);
     emit_imm_to(bytecode, offset);
+    // All stores consume exactly address and value and do not push a result.
     stacktop_after_pop_n_if_reachable(bytecode, 2uz);
     break;
 }
@@ -1262,6 +1282,8 @@ case wasm1_code::i64_store32:
 }
 case wasm1_code::memory_size:
 {
+    // `memory.size` has no dynamic operands, so after validating the reserved memidx it only needs
+    // to publish the current page count as one i32 result.
     // memory.size memidx ...
     // [ safe    ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -1339,6 +1361,9 @@ case wasm1_code::memory_size:
 }
 case wasm1_code::memory_grow:
 {
+    // `memory.grow` consumes the requested page delta and returns the previous page count or -1.
+    // The maximum limit is emitted as an immediate so the runtime helper can enforce module limits
+    // without re-reading compile-time metadata.
     // memory.grow memidx ...
     // [ safe    ] unsafe (could be the section_end)
     // ^^ code_curr
