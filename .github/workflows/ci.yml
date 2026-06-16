@@ -419,7 +419,7 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "sudo pkg install -y llvm21 gmake unzip"
+            bash -c "sudo pkg install -y llvm21 gmake unzip libunwind"
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
