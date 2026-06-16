@@ -86,28 +86,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             return sha256_hex_for_path(bytes);
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view cache_status_name(cache_status status) noexcept
-        {
-            switch(status)
-            {
-                case cache_status::ok: return u8"ok";
-                case cache_status::disabled: return u8"disabled";
-                case cache_status::io_error: return u8"io-error";
-                case cache_status::malformed: return u8"malformed";
-                case cache_status::invalid_magic: return u8"invalid-magic";
-                case cache_status::unsupported_version: return u8"unsupported-version";
-                case cache_status::isa_mismatch: return u8"isa-mismatch";
-                case cache_status::context_mismatch: return u8"context-mismatch";
-                case cache_status::signature_missing: return u8"signature-missing";
-                case cache_status::signature_mismatch: return u8"signature-mismatch";
-                case cache_status::unsupported_signature: return u8"unsupported-signature";
-                case cache_status::unsupported_compression: return u8"unsupported-compression";
-                case cache_status::decompression_failed: return u8"decompression-failed";
-                case cache_status::size_limit_exceeded: return u8"size-limit-exceeded";
-            }
-            return u8"unknown";
-        }
-
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view module_identifier_view(llvm::Module const& module) noexcept
         {
             auto const& identifier{module.getModuleIdentifier()};
@@ -204,9 +182,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             auto const buffer{object.getBuffer()};
             auto const first{reinterpret_cast<::std::byte const*>(buffer.data())};
-            auto const status{store_object_async(ctx, first, buffer.size(), policy)};
+            auto const status{store_object_async(ctx, first, buffer.size(), policy, module_name, true)};
             details::runtime_log_line(
-                u8"object-cache-store module=\"", module_name, u8"\" status=", details::cache_status_name(status), u8" bytes=", buffer.size());
+                u8"object-cache-store-enqueue module=\"", module_name, u8"\" status=", cache_status_name(status), u8" bytes=", buffer.size());
         }
 
         [[nodiscard]] inline constexpr ::std::unique_ptr<::llvm::MemoryBuffer> getObject(::llvm::Module const* module) UWVM_THROWS override

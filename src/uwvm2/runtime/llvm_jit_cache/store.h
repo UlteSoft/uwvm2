@@ -458,6 +458,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
         }
 
+        inline constexpr void warn_cache_write_failed([[maybe_unused]] ::uwvm2::utils::container::u8string const& cache_dir,
+                                                      [[maybe_unused]] ::fast_io::error e) noexcept
+        {
+#if defined(UWVM)
+            if(!::uwvm2::uwvm::io::show_runtime_warning) { return; }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"[warn]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Failed to write LLVM JIT cache object \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                cache_dir,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". error: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                e,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8" (runtime)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            if(::uwvm2::uwvm::io::runtime_warning_fatal) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+#endif
+        }
+
         inline constexpr void try_make_directory_at(::fast_io::dir_file& parent,
                                                     ::uwvm2::utils::container::u8string const& component,
                                                     ::uwvm2::utils::container::u8string const& display_path) noexcept
@@ -618,8 +658,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 return cache_status::ok;
             }
 #ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
+                warn_cache_write_failed(ctx.cache_dir, e);
                 return cache_status::io_error;
             }
 #endif
@@ -698,8 +739,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 return cache_status::ok;
             }
 #ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
+                static_cast<void>(e);
                 return cache_status::io_error;
             }
 #endif
@@ -754,7 +796,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             cache_context ctx{};
             ::uwvm2::utils::container::vector<::std::byte> blob{};
+            ::uwvm2::utils::container::u8string log_module{};
+            ::std::size_t object_bytes{};
+            ::std::size_t object_index{};
+            ::std::size_t object_count{};
+            bool log_completion{};
+            bool log_parallel_object{};
         };
+
+        template <typename... Args>
+        inline constexpr void runtime_cache_log_line(Args&&... args) noexcept
+        {
+#if defined(UWVM)
+            if(!::uwvm2::uwvm::io::enable_runtime_log) { return; }
+
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-cache] ", ::std::forward<Args>(args)...);
+#else
+            ((void)args, ...);
+#endif
+        }
+
+        inline constexpr void log_cache_store_completion(cache_store_request const& request, cache_status status) noexcept
+        {
+            if(!request.log_completion) { return; }
+            if(request.log_parallel_object)
+            {
+                runtime_cache_log_line(u8"object-cache-store-complete module=\"",
+                                       request.log_module,
+                                       u8"\" status=",
+                                       cache_status_name(status),
+                                       u8" bytes=",
+                                       request.object_bytes,
+                                       u8" object_index=",
+                                       request.object_index,
+                                       u8" object_count=",
+                                       request.object_count);
+                return;
+            }
+
+            runtime_cache_log_line(u8"object-cache-store-complete module=\"",
+                                   request.log_module,
+                                   u8"\" status=",
+                                   cache_status_name(status),
+                                   u8" bytes=",
+                                   request.object_bytes);
+        }
 
         struct async_cache_store_worker
         {
@@ -792,7 +878,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                         ++this->active_requests;
                     }
 
-                    (void)write_cache_blob_atomic(request.ctx, request.blob);
+                    auto const status{write_cache_blob_atomic(request.ctx, request.blob)};
+                    log_cache_store_completion(request, status);
 
                     {
                         ::std::lock_guard lock{this->mutex};
@@ -847,7 +934,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 }
 #endif
 
-                if(run_synchronously) { return write_cache_blob_atomic(request.ctx, request.blob); }
+                if(run_synchronously)
+                {
+                    auto const status{write_cache_blob_atomic(request.ctx, request.blob)};
+                    log_cache_store_completion(request, status);
+                    return status;
+                }
 
                 return cache_status::io_error;
             }
@@ -880,12 +972,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr cache_status store_object_async(cache_context const& ctx,
                                                                    ::std::byte const* object,
                                                                    ::std::size_t size,
-                                                                   cache_policy const& policy) noexcept
+                                                                   cache_policy const& policy,
+                                                                   ::uwvm2::utils::container::u8string_view log_module = {},
+                                                                   bool log_completion = false,
+                                                                   ::std::size_t object_index = 0uz,
+                                                                   ::std::size_t object_count = 0uz) noexcept
     {
         if(!policy.enable) { return cache_status::disabled; }
 
         details::cache_store_request request{};
         request.ctx = ctx;
+        request.object_bytes = size;
+        request.object_index = object_index;
+        request.object_count = object_count;
+        request.log_completion = log_completion;
+        request.log_parallel_object = object_count != 0uz;
+        if(log_completion)
+        {
+            request.log_module.reserve(log_module.size());
+            ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(request.log_module)};
+            ::fast_io::io::print(ref, log_module);
+        }
         if(auto const status{details::build_cache_blob(ctx, object, size, policy, request.blob)}; status != cache_status::ok) [[unlikely]] { return status; }
 
         return details::async_cache_store_worker_instance().enqueue(::std::move(request));

@@ -9246,6 +9246,7 @@ namespace uwvm2::runtime::lib
         inline constexpr void store_runtime_llvm_jit_parallel_object_cache(
             ::uwvm2::runtime::llvm_jit_cache::cache_context const& base_context,
             ::uwvm2::runtime::llvm_jit_cache::cache_policy const& cache_policy,
+            ::uwvm2::utils::container::u8string_view module_name,
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& object_outputs) noexcept
         {
             if(!cache_policy.enable) { return; }
@@ -9256,28 +9257,51 @@ namespace uwvm2::runtime::lib
                 auto object_context{runtime_llvm_jit_parallel_object_cache_context(base_context, object_count, object_index)};
                 auto const& object_output{object_outputs.index_unchecked(object_index)};
                 auto const first{reinterpret_cast<::std::byte const*>(object_output.cbegin())};
-                (void)::uwvm2::runtime::llvm_jit_cache::store_object_async(object_context, first, object_output.size(), cache_policy);
+                auto const status{::uwvm2::runtime::llvm_jit_cache::store_object_async(
+                    object_context, first, object_output.size(), cache_policy, module_name, true, object_index, object_count)};
+                ::uwvm2::runtime::llvm_jit_cache::details::runtime_cache_log_line(u8"object-cache-store-enqueue module=\"",
+                                                                                  module_name,
+                                                                                  u8"\" status=",
+                                                                                  ::uwvm2::runtime::llvm_jit_cache::cache_status_name(status),
+                                                                                  u8" bytes=",
+                                                                                  object_output.size(),
+                                                                                  u8" object_index=",
+                                                                                  object_index,
+                                                                                  u8" object_count=",
+                                                                                  object_count);
             }
         }
 
         inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept
         {
-            // LLVM native target setup is process-global and not idempotent in all versions, so guard it behind local statics.
-            static bool initialized{};
-            static bool success{};
+            // LLVM native target setup is process-global and not idempotent in all versions; lazy/full materialization can race.
+            static ::std::atomic_bool initialized{};
+            static ::std::atomic_bool success{};
+            static ::std::atomic_flag init_lock = ATOMIC_FLAG_INIT;
 
-            if(initialized) { return success; }
+            if(initialized.load(::std::memory_order_acquire)) { return success.load(::std::memory_order_acquire); }
 
-            initialized = true;
-            auto& pass_registry{*::llvm::PassRegistry::getPassRegistry()};
-            ::llvm::initializeCore(pass_registry);
-            ::llvm::initializeTransformUtils(pass_registry);
-            ::llvm::initializeScalarOpts(pass_registry);
-            ::llvm::initializeInstCombine(pass_registry);
-            ::llvm::initializeAnalysis(pass_registry);
-            ::llvm::initializeTarget(pass_registry);
-            success = !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
-            return success;
+            while(init_lock.test_and_set(::std::memory_order_acquire))
+            {
+                if(initialized.load(::std::memory_order_acquire)) { return success.load(::std::memory_order_acquire); }
+                ::uwvm2::utils::thread::lazy_compile_thread_yield();
+            }
+
+            if(!initialized.load(::std::memory_order_relaxed))
+            {
+                auto& pass_registry{*::llvm::PassRegistry::getPassRegistry()};
+                ::llvm::initializeCore(pass_registry);
+                ::llvm::initializeTransformUtils(pass_registry);
+                ::llvm::initializeScalarOpts(pass_registry);
+                ::llvm::initializeInstCombine(pass_registry);
+                ::llvm::initializeAnalysis(pass_registry);
+                ::llvm::initializeTarget(pass_registry);
+                success.store(!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter(), ::std::memory_order_release);
+                initialized.store(true, ::std::memory_order_release);
+            }
+
+            init_lock.clear(::std::memory_order_release);
+            return success.load(::std::memory_order_acquire);
         }
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>
@@ -10280,7 +10304,8 @@ namespace uwvm2::runtime::lib
                     use_parallel_objects = true;
                     ::std::size_t object_bytes{};
                     for(auto const& object_output: parallel_object_outputs) { object_bytes += object_output.size(); }
-                    store_runtime_llvm_jit_parallel_object_cache(llvm_jit_cache_context, llvm_jit_cache_policy, parallel_object_outputs);
+                    store_runtime_llvm_jit_parallel_object_cache(
+                        llvm_jit_cache_context, llvm_jit_cache_policy, rec.module_name, parallel_object_outputs);
                     llvm_jit_materialize_runtime_log_line(u8"object-emit-end module=\"",
                                                           rec.module_name,
                                                           u8"\" functions=",

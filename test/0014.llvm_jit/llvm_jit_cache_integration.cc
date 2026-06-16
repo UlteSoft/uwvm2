@@ -766,6 +766,12 @@ namespace
             ::std::cerr << "blocked regular-file cache path unexpectedly produced a cache hit\n";
             return false;
         }
+        if(!output_contains(artifact_dir, "cache_path_blocked_second", "object-cache-store-complete") ||
+           !output_contains(artifact_dir, "cache_path_blocked_second", "status=io-error"))
+        {
+            ::std::cerr << "blocked regular-file cache path did not report the real async write failure\n";
+            return false;
+        }
         if(!::std::filesystem::is_regular_file(blocked_cache))
         {
             ::std::cerr << "blocked cache path was modified instead of remaining a regular file\n";

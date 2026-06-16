@@ -65,6 +65,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         size_limit_exceeded
     };
 
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view cache_status_name(cache_status status) noexcept
+    {
+        switch(status)
+        {
+            case cache_status::ok: return u8"ok";
+            case cache_status::disabled: return u8"disabled";
+            case cache_status::io_error: return u8"io-error";
+            case cache_status::malformed: return u8"malformed";
+            case cache_status::invalid_magic: return u8"invalid-magic";
+            case cache_status::unsupported_version: return u8"unsupported-version";
+            case cache_status::isa_mismatch: return u8"isa-mismatch";
+            case cache_status::context_mismatch: return u8"context-mismatch";
+            case cache_status::signature_missing: return u8"signature-missing";
+            case cache_status::signature_mismatch: return u8"signature-mismatch";
+            case cache_status::unsupported_signature: return u8"unsupported-signature";
+            case cache_status::unsupported_compression: return u8"unsupported-compression";
+            case cache_status::decompression_failed: return u8"decompression-failed";
+            case cache_status::size_limit_exceeded: return u8"size-limit-exceeded";
+        }
+        return u8"unknown";
+    }
+
     enum class compression_kind : ::std::uint_least32_t
     {
         none = 0u,
