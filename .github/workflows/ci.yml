@@ -423,7 +423,7 @@ jobs:
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none --syslinks=unwind"
+            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none --linkdirs=/usr/local/lib --syslinks=unwind"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
