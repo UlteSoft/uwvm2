@@ -26,6 +26,69 @@ namespace
         0x00u, 0x41u, 0x00u, 0x28u, 0x02u, 0x00u, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u,
         0x0bu, 0x0bu};
 
+    inline constexpr ::std::array<unsigned char, 138uz> numeric_types_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x08u, 0x01u, 0x00u, 0x0au, 0x73u, 0x01u,
+        0x71u, 0x04u, 0x01u, 0x7fu, 0x01u, 0x7eu, 0x01u, 0x7du, 0x01u, 0x7cu, 0x41u, 0x28u,
+        0x41u, 0x02u, 0x6au, 0x21u, 0x00u, 0x20u, 0x00u, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u,
+        0x00u, 0x0bu, 0x42u, 0x80u, 0xc8u, 0xafu, 0xa0u, 0x25u, 0x42u, 0xeau, 0x01u, 0x7cu,
+        0x21u, 0x01u, 0x20u, 0x01u, 0x42u, 0xeau, 0xc9u, 0xafu, 0xa0u, 0x25u, 0x52u, 0x04u,
+        0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0x3fu, 0x43u, 0x00u, 0x00u, 0x10u,
+        0x40u, 0x92u, 0x21u, 0x02u, 0x20u, 0x02u, 0x43u, 0x00u, 0x00u, 0x70u, 0x40u, 0x5cu,
+        0x04u, 0x40u, 0x00u, 0x0bu, 0x44u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x22u,
+        0x40u, 0x44u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0xe0u, 0x3fu, 0xa2u, 0x21u,
+        0x03u, 0x20u, 0x03u, 0x44u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x12u, 0x40u,
+        0x62u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 130uz> memory_table_global_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x08u, 0x02u, 0x60u,
+        0x00u, 0x01u, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x04u, 0x03u, 0x00u, 0x00u, 0x01u,
+        0x04u, 0x04u, 0x01u, 0x70u, 0x00u, 0x02u, 0x05u, 0x03u, 0x01u, 0x00u, 0x01u, 0x06u,
+        0x06u, 0x01u, 0x7fu, 0x01u, 0x41u, 0x03u, 0x0bu, 0x08u, 0x01u, 0x02u, 0x09u, 0x08u,
+        0x01u, 0x00u, 0x41u, 0x00u, 0x0bu, 0x02u, 0x00u, 0x01u, 0x0au, 0x3cu, 0x03u, 0x04u,
+        0x00u, 0x41u, 0x0bu, 0x0bu, 0x07u, 0x00u, 0x23u, 0x00u, 0x41u, 0x04u, 0x6au, 0x0bu,
+        0x2du, 0x00u, 0x41u, 0x00u, 0x41u, 0x07u, 0x36u, 0x02u, 0x00u, 0x41u, 0x00u, 0x28u,
+        0x02u, 0x00u, 0x41u, 0x07u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x41u, 0x01u, 0x11u,
+        0x00u, 0x00u, 0x41u, 0x07u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x41u, 0x08u, 0x28u,
+        0x02u, 0x00u, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu, 0x0bu, 0x0au,
+        0x01u, 0x00u, 0x41u, 0x08u, 0x0bu, 0x04u, 0x2au, 0x00u, 0x00u, 0x00u};
+
+    inline constexpr ::std::array<unsigned char, 71uz> control_flow_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x08u, 0x01u, 0x00u, 0x0au, 0x30u, 0x01u,
+        0x2eu, 0x01u, 0x01u, 0x7fu, 0x41u, 0x00u, 0x21u, 0x00u, 0x02u, 0x40u, 0x03u, 0x40u,
+        0x20u, 0x00u, 0x41u, 0x10u, 0x4fu, 0x0du, 0x01u, 0x20u, 0x00u, 0x41u, 0x01u, 0x6au,
+        0x21u, 0x00u, 0x0cu, 0x00u, 0x0bu, 0x0bu, 0x20u, 0x00u, 0x41u, 0x10u, 0x47u, 0x04u,
+        0x40u, 0x00u, 0x0bu, 0x41u, 0x02u, 0x0eu, 0x01u, 0x00u, 0x00u, 0x00u, 0x0bu};
+
+    struct wasm_fixture_def
+    {
+        ::std::string_view label{};
+        ::std::string_view file_name{};
+        unsigned char const* data{};
+        ::std::size_t size{};
+    };
+
+    struct wasm_fixture_file
+    {
+        ::std::string label{};
+        ::std::filesystem::path path{};
+    };
+
+    template <::std::size_t size>
+    [[nodiscard]] constexpr wasm_fixture_def make_wasm_fixture_def(::std::string_view label,
+                                                                    ::std::string_view file_name,
+                                                                    ::std::array<unsigned char, size> const& bytes) noexcept
+    {
+        return {.label = label, .file_name = file_name, .data = bytes.data(), .size = bytes.size()};
+    }
+
+    inline constexpr ::std::array wasm_fixture_defs{
+        make_wasm_fixture_def("nontrivial_start", "nontrivial_start.wasm", nontrivial_start_wasm),
+        make_wasm_fixture_def("numeric_types", "numeric types.wasm", numeric_types_wasm),
+        make_wasm_fixture_def("memory_table_global", "memory;table;global.wasm", memory_table_global_wasm),
+        make_wasm_fixture_def("control_flow", "control-flow.wasm", control_flow_wasm)};
+
     struct cache_file_state
     {
         ::std::string relative_path{};
@@ -145,7 +208,7 @@ namespace
         }
     }
 
-    [[nodiscard]] bool write_fixture(::std::filesystem::path const& wasm_path)
+    [[nodiscard]] bool write_fixture(::std::filesystem::path const& wasm_path, unsigned char const* data, ::std::size_t size)
     {
         ::std::error_code ec{};
         ::std::filesystem::create_directories(wasm_path.parent_path(), ec);
@@ -162,12 +225,29 @@ namespace
             return false;
         }
 
-        output.write(reinterpret_cast<char const*>(nontrivial_start_wasm.data()),
-                     static_cast<::std::streamsize>(nontrivial_start_wasm.size()));
+        output.write(reinterpret_cast<char const*>(data), static_cast<::std::streamsize>(size));
         if(!output)
         {
             ::std::cerr << "failed to write fixture output: " << wasm_path << '\n';
             return false;
+        }
+
+        return true;
+    }
+
+    [[nodiscard]] bool write_fixture(::std::filesystem::path const& wasm_path, wasm_fixture_def const& fixture)
+    { return write_fixture(wasm_path, fixture.data, fixture.size); }
+
+    [[nodiscard]] bool write_cache_fixtures(::std::filesystem::path const& artifact_dir, ::std::vector<wasm_fixture_file>& fixtures)
+    {
+        fixtures.clear();
+        fixtures.reserve(wasm_fixture_defs.size());
+
+        for(auto const& fixture: wasm_fixture_defs)
+        {
+            auto const wasm_path{artifact_dir / fixture.file_name};
+            if(!write_fixture(wasm_path, fixture)) { return false; }
+            fixtures.push_back({::std::string{fixture.label}, wasm_path});
         }
 
         return true;
@@ -342,17 +422,27 @@ namespace
         for(auto const& file: snapshot) { ::std::cerr << "  " << file.relative_path << " size=" << file.size << '\n'; }
     }
 
-    [[nodiscard]] bool run_uwvm(::std::filesystem::path const& uwvm_path,
-                                ::std::filesystem::path const& artifact_dir,
-                                ::std::filesystem::path const& wasm_path,
-                                ::std::string_view runtime_args,
-                                ::std::string_view cache_args,
-                                ::std::string_view label)
+    [[nodiscard]] bool run_uwvm_from(::std::filesystem::path const& uwvm_path,
+                                     ::std::filesystem::path const& artifact_dir,
+                                     ::std::filesystem::path const& wasm_path,
+                                     ::std::string_view runtime_args,
+                                     ::std::string_view cache_args,
+                                     ::std::string_view label,
+                                     ::std::filesystem::path const& current_dir)
     {
         auto const output_path{artifact_dir / (::std::string{label} + ".out")};
         auto command{quote_argument(uwvm_path) + " " + ::std::string{runtime_args}};
         if(!cache_args.empty()) { command += " " + ::std::string{cache_args}; }
         command += " --run " + quote_argument(wasm_path) + " > " + quote_argument(output_path) + " 2>&1";
+
+        if(!current_dir.empty())
+        {
+#ifdef _WIN32
+            command = "cd /d " + quote_argument(current_dir) + " && " + command;
+#else
+            command = "cd " + quote_argument(current_dir) + " && " + command;
+#endif
+        }
 
         ::std::cout << "[llvm_jit_cache] " << command << '\n';
         auto const status{run_system_command(command)};
@@ -364,21 +454,37 @@ namespace
         return false;
     }
 
-    [[nodiscard]] bool run_cached_mode_twice(::std::filesystem::path const& uwvm_path,
-                                             ::std::filesystem::path const& artifact_dir,
-                                             ::std::filesystem::path const& wasm_path,
-                                             ::std::filesystem::path const& cache_dir,
-                                             ::std::string_view runtime_args,
-                                             ::std::string_view label)
+    [[nodiscard]] bool run_uwvm(::std::filesystem::path const& uwvm_path,
+                                ::std::filesystem::path const& artifact_dir,
+                                ::std::filesystem::path const& wasm_path,
+                                ::std::string_view runtime_args,
+                                ::std::string_view cache_args,
+                                ::std::string_view label)
     {
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
+        return run_uwvm_from(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, label, {});
+    }
 
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+    [[nodiscard]] bool run_cached_mode_twice_with_cache_arg(::std::filesystem::path const& uwvm_path,
+                                                            ::std::filesystem::path const& artifact_dir,
+                                                            ::std::filesystem::path const& wasm_path,
+                                                            ::std::filesystem::path const& cache_arg_path,
+                                                            ::std::filesystem::path const& cache_snapshot_dir,
+                                                            ::std::string_view runtime_args,
+                                                            ::std::string_view label,
+                                                            ::std::filesystem::path const& current_dir)
+    {
+        ::std::filesystem::remove_all(cache_snapshot_dir);
+        ::std::filesystem::create_directories(cache_snapshot_dir);
+
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_arg_path)};
         auto runtime_args_with_log{::std::string{runtime_args} + " -Rclog out"};
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args_with_log, cache_args, ::std::string{label} + "_first")) { return false; }
+        if(!run_uwvm_from(
+               uwvm_path, artifact_dir, wasm_path, runtime_args_with_log, cache_args, ::std::string{label} + "_first", current_dir))
+        {
+            return false;
+        }
 
-        auto const first{snapshot_cache(cache_dir)};
+        auto const first{snapshot_cache(cache_snapshot_dir)};
         if(first.empty())
         {
             ::std::cerr << "expected non-empty cache for " << label << '\n';
@@ -387,7 +493,7 @@ namespace
 
         ::std::this_thread::sleep_for(::std::chrono::milliseconds{1200});
         auto const second_label{::std::string{label} + "_second"};
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args_with_log, cache_args, second_label)) { return false; }
+        if(!run_uwvm_from(uwvm_path, artifact_dir, wasm_path, runtime_args_with_log, cache_args, second_label, current_dir)) { return false; }
 
         ::std::string second_output{};
         if(!read_text_file(artifact_dir / (second_label + ".out"), second_output))
@@ -401,7 +507,7 @@ namespace
             return false;
         }
 
-        auto const second{snapshot_cache(cache_dir)};
+        auto const second{snapshot_cache(cache_snapshot_dir)};
         if(first != second)
         {
             ::std::cerr << "cache was rewritten instead of reused for " << label << "\nfirst:\n";
@@ -412,6 +518,16 @@ namespace
         }
 
         return true;
+    }
+
+    [[nodiscard]] bool run_cached_mode_twice(::std::filesystem::path const& uwvm_path,
+                                             ::std::filesystem::path const& artifact_dir,
+                                             ::std::filesystem::path const& wasm_path,
+                                             ::std::filesystem::path const& cache_dir,
+                                             ::std::string_view runtime_args,
+                                             ::std::string_view label)
+    {
+        return run_cached_mode_twice_with_cache_arg(uwvm_path, artifact_dir, wasm_path, cache_dir, cache_dir, runtime_args, label, {});
     }
 
     [[nodiscard]] bool expect_rewrite_after_cache_mutation(::std::filesystem::path const& uwvm_path,
@@ -583,6 +699,79 @@ namespace
                                              ::std::filesystem::path const& artifact_dir,
                                              ::std::filesystem::path const& wasm_path)
     {
+        auto const custom_absolute_cache{artifact_dir / "cache path variants" / "abs space;semi" / "inner"};
+        if(!run_cached_mode_twice(
+               uwvm_path, artifact_dir, wasm_path, custom_absolute_cache, "-Rjit", "cache_path_absolute_space_semi"))
+        {
+            return false;
+        }
+
+        auto const trailing_base{artifact_dir / "cache-trailing-separator"};
+        auto trailing_arg{trailing_base.string()};
+        if(trailing_arg.empty() || trailing_arg.back() != ::std::filesystem::path::preferred_separator)
+        {
+            trailing_arg.push_back(::std::filesystem::path::preferred_separator);
+        }
+        if(!run_cached_mode_twice_with_cache_arg(uwvm_path,
+                                                 artifact_dir,
+                                                 wasm_path,
+                                                 ::std::filesystem::path{trailing_arg},
+                                                 trailing_base,
+                                                 "-Rjit",
+                                                 "cache_path_trailing_separator",
+                                                 {}))
+        {
+            return false;
+        }
+
+        auto const relative_cwd{artifact_dir / "relative-cache-cwd"};
+        auto const relative_arg{::std::filesystem::path{"relative cache;semi"} / "nested"};
+        auto const relative_cache{relative_cwd / relative_arg};
+        if(!run_cached_mode_twice_with_cache_arg(
+               uwvm_path, artifact_dir, wasm_path, relative_arg, relative_cache, "-Rjit", "cache_path_relative_space_semi", relative_cwd))
+        {
+            return false;
+        }
+
+        auto const empty_path_cwd{artifact_dir / "empty-cache-path-cwd"};
+        if(!run_cached_mode_twice_with_cache_arg(uwvm_path,
+                                                 artifact_dir,
+                                                 wasm_path,
+                                                 {},
+                                                 empty_path_cwd,
+                                                 "-Rjit",
+                                                 "cache_path_empty_uses_cwd",
+                                                 empty_path_cwd))
+        {
+            return false;
+        }
+
+        auto const blocked_cache{artifact_dir / "cache-path-blocked-file"};
+        ::std::filesystem::remove_all(blocked_cache);
+        {
+            ::std::ofstream blocked_file(blocked_cache, ::std::ios::binary | ::std::ios::trunc);
+            blocked_file << "not a directory";
+        }
+        auto const blocked_cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(blocked_cache)};
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", blocked_cache_args, "cache_path_blocked_first"))
+        {
+            return false;
+        }
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", blocked_cache_args, "cache_path_blocked_second"))
+        {
+            return false;
+        }
+        if(output_contains(artifact_dir, "cache_path_blocked_second", "object-cache-hit"))
+        {
+            ::std::cerr << "blocked regular-file cache path unexpectedly produced a cache hit\n";
+            return false;
+        }
+        if(!::std::filesystem::is_regular_file(blocked_cache))
+        {
+            ::std::cerr << "blocked cache path was modified instead of remaining a regular file\n";
+            return false;
+        }
+
         auto const disabled_cache{artifact_dir / "cache-disabled"};
         auto const disabled_env{artifact_dir / "env-disabled"};
         ::std::filesystem::remove_all(disabled_cache);
@@ -711,6 +900,36 @@ namespace
         return true;
     }
 
+    struct cache_runtime_mode
+    {
+        ::std::string_view label{};
+        ::std::string_view args{};
+    };
+
+    inline constexpr ::std::array cache_runtime_modes{
+        cache_runtime_mode{"lazy", "-Rjit"},
+        cache_runtime_mode{"lazy_verify", "-Rcm lazy+verification -Rcc jit"},
+        cache_runtime_mode{"full", "-Rcm full -Rcc jit"},
+        cache_runtime_mode{"aot", "-Raot"},
+        cache_runtime_mode{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0"}};
+
+    [[nodiscard]] bool test_wasm_cache_matrix(::std::filesystem::path const& uwvm_path,
+                                              ::std::filesystem::path const& artifact_dir,
+                                              ::std::vector<wasm_fixture_file> const& fixtures)
+    {
+        for(auto const& fixture: fixtures)
+        {
+            for(auto const& mode: cache_runtime_modes)
+            {
+                auto const label{::std::string{"matrix_"} + fixture.label + "_" + ::std::string{mode.label}};
+                auto const cache_dir{artifact_dir / ("cache-" + label)};
+                if(!run_cached_mode_twice(uwvm_path, artifact_dir, fixture.path, cache_dir, mode.args, label)) { return false; }
+            }
+        }
+
+        return true;
+    }
+
     [[nodiscard]] bool test_default_tiered_smoke(::std::filesystem::path const& uwvm_path,
                                                  ::std::filesystem::path const& artifact_dir,
                                                  ::std::filesystem::path const& wasm_path)
@@ -817,27 +1036,18 @@ int main(int argc, char** argv)
     auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit_cache"};
     ::std::filesystem::remove_all(artifact_dir);
     ::std::filesystem::create_directories(artifact_dir);
-    auto const wasm_path{artifact_dir / "nontrivial_start.wasm"};
-    if(!write_fixture(wasm_path)) { return 1; }
+    ::std::vector<wasm_fixture_file> fixtures{};
+    if(!write_cache_fixtures(artifact_dir, fixtures)) { return 1; }
+    if(fixtures.empty())
+    {
+        ::std::cerr << "no wasm cache fixtures were written\n";
+        return 1;
+    }
+    auto const& wasm_path{fixtures.front().path};
 
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
-    if(!run_cached_mode_twice(uwvm_path, artifact_dir, wasm_path, artifact_dir / "cache-lazy", "-Rjit", "lazy")) { return 1; }
-    if(!run_cached_mode_twice(uwvm_path, artifact_dir, wasm_path, artifact_dir / "cache-lazy-verify", "-Rcm lazy+verification -Rcc jit", "lazy_verify"))
-    {
-        return 1;
-    }
-    if(!run_cached_mode_twice(uwvm_path, artifact_dir, wasm_path, artifact_dir / "cache-full", "-Rcm full -Rcc jit", "full")) { return 1; }
-    if(!run_cached_mode_twice(uwvm_path, artifact_dir, wasm_path, artifact_dir / "cache-aot", "-Raot", "aot")) { return 1; }
+    if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }
     if(!test_default_tiered_smoke(uwvm_path, artifact_dir, wasm_path)) { return 1; }
-    if(!run_cached_mode_twice(uwvm_path,
-                              artifact_dir,
-                              wasm_path,
-                              artifact_dir / "cache-tiered-no-t0",
-                              "-Rtiered -Rtiered-disable-t0",
-                              "tiered_no_t0"))
-    {
-        return 1;
-    }
     if(!test_signed_cache_integrity(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_cache_fuzz_recovery(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_shared_cache_key_isolation(uwvm_path, artifact_dir, wasm_path)) { return 1; }
