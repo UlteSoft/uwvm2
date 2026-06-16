@@ -7935,6 +7935,9 @@ namespace uwvm2::runtime::lib
             // before execution so ordinary Wasm calls use typed native-entry fast paths while unrelated cold functions stay lazy.
             // Tiered/no-T0 enters LLVM lazy code directly from the host too, so it needs the same preparation even though normal
             // tiered execution should keep using T0/OSR and must not be forced into eager JIT materialization.
+# if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            static_cast<void>(allow_tiered);
+# endif
             if(!runtime_llvm_jit_unwind_call_stack_requested() || !g_runtime.lazy_compile_active) { return true; }
             auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
             auto const llvm_jit_lazy_backend{runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only};
