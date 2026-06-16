@@ -100,6 +100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const digest{sha256_bytes(bytes.cbegin(), bytes.cend())};
             ::uwvm2::utils::container::u8string out{};
             out.reserve(::uwvm2::runtime::llvm_jit_cache::cache_sha256_digest_size * 2uz);
+            // Hex keeps cache file names portable across filesystems and shell tools.
             for(auto b: digest) { append_hex_byte(out, b); }
             return out;
         }
@@ -120,6 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::uwvm2::utils::container::vector<::std::byte> message{};
             message.reserve(header.size() + isa_metadata_size + context_metadata_size + payload_size);
+            // The signature covers header, metadata, and payload, but not the signature field itself to avoid self-reference.
             append_bytes_n(message, header.cbegin(), header.size());
             append_bytes_n(message, isa_metadata, isa_metadata_size);
             append_bytes_n(message, context_metadata, context_metadata_size);
@@ -152,6 +154,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #if defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
             if(!ctx.has_signature_seed) { return false; }
             auto const message{ed25519_signature_message(header, isa_metadata, context_metadata, payload)};
+            // The deterministic seed gives a lightweight local identity; it is for cache integrity, not third-party trust.
             auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
             auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
             if(private_key == nullptr) { return false; }
@@ -195,6 +198,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(!ctx.has_signature_seed || signature == nullptr) { return false; }
             auto const message{ed25519_signature_message_parts(
                 header, isa_metadata, isa_metadata_size, context_metadata, context_metadata_size, payload, payload_size)};
+            // Verification reconstructs the public key from the same local identity so no external key store is required.
             auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
             auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
             if(private_key == nullptr) { return false; }
@@ -265,6 +269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const last{path.back_unchecked()};
             if(!cache_path_separator(last))
             {
+                // Forward slash is accepted by both POSIX and Win32 path APIs, so one separator keeps generated paths stable.
                 ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
                 ::fast_io::io::print(ref, u8"/");
             }
@@ -310,6 +315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             if(path.empty())
             {
+                // Empty cache roots intentionally mean the current working directory for embedding/test scenarios.
                 return {
                     ::fast_io::dir_file{u8".", ::fast_io::open_mode::follow},
                     0uz,
@@ -320,6 +326,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #if defined(_WIN32) && !defined(__CYGWIN__)
             if(path.size() >= 2uz && cache_path_separator(path.index_unchecked(0uz)) && cache_path_separator(path.index_unchecked(1uz)))
             {
+                // UNC paths must open the server/share root atomically before walking the remaining components.
                 ::std::size_t pos{2uz};
                 while(pos != path.size() && cache_path_separator(path.index_unchecked(pos))) { ++pos; }
                 while(pos != path.size() && !cache_path_separator(path.index_unchecked(pos))) { ++pos; }
@@ -336,6 +343,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             if(path.size() >= 3uz && path.index_unchecked(1uz) == u8':' && cache_path_separator(path.index_unchecked(2uz)))
             {
+                // Drive-root paths such as C:/ need a distinct root handle before mkdirat-style traversal.
                 auto root{cache_path_piece(path, 0uz, 3uz)};
                 ::std::size_t pos{3uz};
                 while(pos != path.size() && cache_path_separator(path.index_unchecked(pos))) { ++pos; }
@@ -348,6 +356,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             if(path.size() >= 2uz && path.index_unchecked(1uz) == u8':')
             {
+                // Drive-relative paths are preserved because Windows distinguishes C:foo from C:/foo.
                 auto root{cache_path_piece(path, 0uz, 2uz)};
                 return {
                     ::fast_io::dir_file{root, ::fast_io::open_mode::follow},
@@ -359,6 +368,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             if(cache_path_separator(path.index_unchecked(0uz)))
             {
+                // Absolute POSIX-style paths start traversal from the filesystem root.
                 auto root{cache_path_piece(path, 0uz, 1uz)};
                 ::std::size_t pos{1uz};
                 while(pos != path.size() && cache_path_separator(path.index_unchecked(pos))) { ++pos; }
@@ -370,6 +380,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             }
 
             return {
+                // Relative paths are resolved from the process working directory for predictable local caches.
                 ::fast_io::dir_file{u8".", ::fast_io::open_mode::follow},
                 0uz,
                 {}
@@ -379,6 +390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr bool mkdir_error_is_file_exists(::fast_io::error e) noexcept
         {
 #if defined(_WIN32) && !defined(__CYGWIN__)
+            // Different fast_io backends report "already exists" through different OS error domains.
             // windows
             switch(e.domain)
             {
@@ -422,6 +434,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                          [[maybe_unused]] ::fast_io::error e) noexcept
         {
 #if defined(UWVM)
+            // Cache directory creation is a performance feature; warn instead of aborting unless warnings are fatal.
             if(!::uwvm2::uwvm::io::show_runtime_warning) { return; }
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -458,6 +471,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
         }
 
+        inline constexpr void warn_cache_write_failed([[maybe_unused]] ::uwvm2::utils::container::u8string const& cache_dir,
+                                                      [[maybe_unused]] ::fast_io::error e) noexcept
+        {
+#if defined(UWVM)
+            // A failed cache write must not fail compilation, but it should be visible during runtime diagnostics.
+            if(!::uwvm2::uwvm::io::show_runtime_warning) { return; }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"[warn]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Failed to write LLVM JIT cache object \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                cache_dir,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". error: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                e,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8" (runtime)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            if(::uwvm2::uwvm::io::runtime_warning_fatal) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+#endif
+        }
+
         inline constexpr void try_make_directory_at(::fast_io::dir_file& parent,
                                                     ::uwvm2::utils::container::u8string const& component,
                                                     ::uwvm2::utils::container::u8string const& display_path) noexcept
@@ -468,11 +522,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             try
 #endif
             {
+                // Creating components relative to an open directory avoids rebuilding and reparsing the whole path.
                 ::fast_io::native_mkdirat(::fast_io::at(parent), component);
             }
 #ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error e)
             {
+                // Concurrent compilers may create the same shard directory; that race is benign.
                 if(mkdir_error_is_file_exists(e)) [[likely]] { return; }
                 warn_make_directory_failed(display_path, e);
             }
@@ -486,6 +542,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             component.reserve(dir.size());
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(component)};
 
+            // Walk one path component at a time so directory creation works for absolute, UNC, and relative roots alike.
             for(::std::size_t i{cursor.next}; i != dir.size();)
             {
                 while(i != dir.size() && cache_path_separator(dir.index_unchecked(i))) { ++i; }
@@ -513,6 +570,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto context{make_context_metadata(ctx)};
             ::uwvm2::utils::container::vector<::std::byte> bytes{};
             bytes.reserve(ctx.cache_key.size() + isa.size() + context.size() + 48uz);
+            // The path key includes metadata as well as the logical key to avoid opening obviously incompatible blobs.
             append_key_value(bytes, u8"format", u8"uwvm-ljc-path-key-v1");
             append_key_value(bytes, u8"cache-key", ctx.cache_key);
             append_key_value(bytes, u8"isa", isa);
@@ -540,6 +598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::uwvm2::utils::container::u8string out{};
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
+            // Two hex digits create 256 shards, enough to keep large cache directories from becoming linear scans.
             ::fast_io::io::print(ref, key_hash.subview_unchecked(0uz, 2uz));
             return out;
         }
@@ -581,6 +640,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const ticks{static_cast<::std::uint_least64_t>(::std::chrono::steady_clock::now().time_since_epoch().count())};
             auto const address{static_cast<::std::uint_least64_t>(reinterpret_cast<::std::uintptr_t>(::std::addressof(cache_atomic_write_counter)))};
             auto const pid{cache_process_id()};
+            // Mixing time, process, and address space data makes temporary names unique across parallel compiler processes.
             return ticks ^ (address << 1u) ^ (pid << 32u) ^ pid;
         }
 
@@ -592,6 +652,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto temp_name{file_name};
             temp_name.reserve(temp_name.size() + 64uz);
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(temp_name)};
+            // A per-process counter prevents collisions between multiple asynchronous writes of the same cache object.
             ::fast_io::io::print(ref, u8".wip-atomic-write-", ::fast_io::mnp::hex<false, true>(nonce), u8"-", counter);
             return temp_name;
         }
@@ -608,18 +669,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 auto const temp_name{cache_atomic_temp_file_name(file_name)};
 
                 {
+                    // Exclusive temp creation avoids clobbering another process's in-flight write.
                     ::fast_io::u8obuf_file file{::fast_io::at(cache_dir),
                                                 temp_name,
                                                 ::fast_io::open_mode::out | ::fast_io::open_mode::creat | ::fast_io::open_mode::excl};
                     ::fast_io::operations::write_all_bytes(file, blob.cbegin(), blob.cend());
                 }
 
+                // Rename publishes the complete blob atomically, so readers never observe a partially written object.
                 ::fast_io::native_renameat(::fast_io::at(cache_dir), temp_name, ::fast_io::at(cache_dir), file_name);
                 return cache_status::ok;
             }
 #ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
+                warn_cache_write_failed(ctx.cache_dir, e);
                 return cache_status::io_error;
             }
 #endif
@@ -631,6 +695,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                        cache_policy const& policy,
                                                        ::uwvm2::utils::container::vector<::std::byte>& blob) noexcept
         {
+            // A non-null object pointer is required only when there are bytes to read.
             if(object == nullptr && size != 0uz) [[unlikely]] { return cache_status::malformed; }
             if(size > policy.max_object_bytes) [[unlikely]] { return cache_status::size_limit_exceeded; }
 
@@ -642,6 +707,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 auto compression{policy.compression};
                 switch(policy.compression)
                 {
+                    // The uncompressed path is preserved for small or already-compressed object files.
                     case compression_kind::none:
                         payload.reserve(size);
                         if(size != 0uz) { append_bytes(payload, object, object + size); }
@@ -653,6 +719,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
                 if(compression != compression_kind::none && payload.size() >= size)
                 {
+                    // Storing larger compressed output only slows loads, so fall back to raw bytes when compression loses.
                     compression = compression_kind::none;
                     payload = {};
                     payload.reserve(size);
@@ -663,6 +730,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 auto context_metadata{make_context_metadata(ctx)};
 
                 cache_fixed_header header{};
+                // Header sizes are filled after compression and metadata construction so they match the final byte layout exactly.
                 ::std::copy(cache_magic, cache_magic + 8uz, header.magic);
                 header.version = cache_format_version;
                 header.fixed_header_size = static_cast<::std::uint_least32_t>(cache_fixed_header_size);
@@ -679,6 +747,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 ::uwvm2::utils::container::vector<::std::byte> signature{};
                 if(policy.generate_signature)
                 {
+                    // Signing happens after the header is serialized because all size and codec fields must be authenticated.
                     if(!cache_ed25519_identity_signature_available) { return cache_status::unsupported_signature; }
                     signature.reserve(cache_ed25519_signature_size);
                     if(!ed25519_identity_sign(ctx, header_bytes, isa_metadata, context_metadata, payload, signature))
@@ -690,6 +759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
                 blob = {};
                 blob.reserve(header_bytes.size() + isa_metadata.size() + context_metadata.size() + signature.size() + payload.size());
+                // The physical order matches parse_cache_blob, which allows zero-copy views into loaded files.
                 append_bytes(blob, header_bytes.cbegin(), header_bytes.cend());
                 append_bytes(blob, isa_metadata.cbegin(), isa_metadata.cend());
                 append_bytes(blob, context_metadata.cbegin(), context_metadata.cend());
@@ -698,8 +768,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 return cache_status::ok;
             }
 #ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
+                static_cast<void>(e);
                 return cache_status::io_error;
             }
 #endif
@@ -707,6 +778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         [[nodiscard]] inline constexpr bool valid_signature_shape(cache_blob_view const& view) noexcept
         {
+            // Shape validation separates malformed files from policy decisions like "verification required".
             if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::none)) { return view.header.signature_size == 0u; }
             if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::ed25519_identity))
             {
@@ -719,16 +791,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_name(cache_context const& ctx) noexcept
     { return details::cache_file_name_from_hash(details::cache_key_hash(ctx)); }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_path(cache_context const& ctx) noexcept
-    {
-        auto path{ctx.cache_dir};
-        details::append_path_separator_if_needed(path);
-        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
-        auto const key_hash{details::cache_key_hash(ctx)};
-        auto const shard{details::cache_key_shard(key_hash)};
-        ::fast_io::io::print(ref, u8"objects");
-        details::append_path_separator_if_needed(path);
-        ::fast_io::io::print(ref, shard);
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_path(cache_context const& ctx) noexcept
+        {
+            auto path{ctx.cache_dir};
+            details::append_path_separator_if_needed(path);
+            ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
+            auto const key_hash{details::cache_key_hash(ctx)};
+            auto const shard{details::cache_key_shard(key_hash)};
+            // Public path construction mirrors the storage layout for diagnostics and tests.
+            ::fast_io::io::print(ref, u8"objects");
+            details::append_path_separator_if_needed(path);
+            ::fast_io::io::print(ref, shard);
         details::append_path_separator_if_needed(path);
         auto const name{details::cache_file_name_from_hash(key_hash)};
         ::fast_io::io::print(ref, name);
@@ -739,13 +812,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                              ::std::byte const* object,
                                                              ::std::size_t size,
                                                              cache_policy const& policy) noexcept
-    {
-        if(!policy.enable) { return cache_status::disabled; }
+        {
+            if(!policy.enable) { return cache_status::disabled; }
 
-        ::uwvm2::utils::container::vector<::std::byte> blob{};
-        if(auto const status{details::build_cache_blob(ctx, object, size, policy, blob)}; status != cache_status::ok) [[unlikely]] { return status; }
+            ::uwvm2::utils::container::vector<::std::byte> blob{};
+            // Blob construction is separated from file publication so write failures cannot leave half-valid cache state.
+            if(auto const status{details::build_cache_blob(ctx, object, size, policy, blob)}; status != cache_status::ok) [[unlikely]] { return status; }
 
-        return details::write_cache_blob_atomic(ctx, blob);
+            return details::write_cache_blob_atomic(ctx, blob);
     }
 
     namespace details
@@ -754,7 +828,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             cache_context ctx{};
             ::uwvm2::utils::container::vector<::std::byte> blob{};
+            ::uwvm2::utils::container::u8string log_module{};
+            ::std::size_t object_bytes{};
+            ::std::size_t object_index{};
+            ::std::size_t object_count{};
+            bool log_completion{};
+            bool log_parallel_object{};
         };
+
+        template <typename... Args>
+        inline constexpr void runtime_cache_log_line(Args&&... args) noexcept
+        {
+#if defined(UWVM)
+            // Runtime logs are optional because cache activity is useful for profiling but noisy for normal execution.
+            if(!::uwvm2::uwvm::io::enable_runtime_log) { return; }
+
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-cache] ", ::std::forward<Args>(args)...);
+#else
+            ((void)args, ...);
+#endif
+        }
+
+        inline constexpr void log_cache_store_completion(cache_store_request const& request, cache_status status) noexcept
+        {
+            if(!request.log_completion) { return; }
+            if(request.log_parallel_object)
+            {
+                runtime_cache_log_line(u8"object-cache-store-complete module=\"",
+                                       request.log_module,
+                                       u8"\" status=",
+                                       cache_status_name(status),
+                                       u8" bytes=",
+                                       request.object_bytes,
+                                       u8" object_index=",
+                                       request.object_index,
+                                       u8" object_count=",
+                                       request.object_count);
+                return;
+            }
+
+            runtime_cache_log_line(u8"object-cache-store-complete module=\"",
+                                   request.log_module,
+                                   u8"\" status=",
+                                   cache_status_name(status),
+                                   u8" bytes=",
+                                   request.object_bytes);
+        }
 
         struct async_cache_store_worker
         {
@@ -774,6 +893,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             inline constexpr void run() noexcept
             {
+                // A single background writer keeps JIT threads from blocking on disk while preserving simple ordering.
                 for(;;)
                 {
                     cache_store_request request{};
@@ -783,6 +903,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                         this->condition.wait(lock, [this]() noexcept { return this->stop_requested || !this->requests.empty(); });
                         if(this->requests.empty())
                         {
+                            // Stop is honored only after queued requests are drained so accepted writes are not lost.
                             if(this->stop_requested) { break; }
                             continue;
                         }
@@ -792,9 +913,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                         ++this->active_requests;
                     }
 
-                    (void)write_cache_blob_atomic(request.ctx, request.blob);
+                    auto const status{write_cache_blob_atomic(request.ctx, request.blob)};
+                    log_cache_store_completion(request, status);
 
                     {
+                        // active_requests lets flush() wait for both queued and currently-writing objects.
                         ::std::lock_guard lock{this->mutex};
                         --this->active_requests;
                     }
@@ -810,6 +933,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 try
 #endif
                 {
+                    // The worker is lazy so programs that never store an object do not pay for a thread.
                     this->worker = ::std::thread{[this]() noexcept { this->run(); }};
                     this->worker_started = true;
                     return true;
@@ -835,6 +959,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                     else if(!this->start_locked()) { run_synchronously = true; }
                     else
                     {
+                        // Ownership of the complete blob moves to the queue so the caller can return immediately.
                         this->requests.push_back(::std::move(request));
                         this->condition.notify_one();
                         return cache_status::ok;
@@ -847,7 +972,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 }
 #endif
 
-                if(run_synchronously) { return write_cache_blob_atomic(request.ctx, request.blob); }
+                if(run_synchronously)
+                {
+                    // Synchronous fallback preserves cache correctness when the worker cannot be started or is shutting down.
+                    auto const status{write_cache_blob_atomic(request.ctx, request.blob)};
+                    log_cache_store_completion(request, status);
+                    return status;
+                }
 
                 return cache_status::io_error;
             }
@@ -855,6 +986,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             inline constexpr void flush() noexcept
             {
                 ::std::unique_lock lock{this->mutex};
+                // Tests and shutdown paths need a deterministic point where all accepted writes are durable or failed.
                 this->condition.wait(lock, [this]() noexcept { return this->requests.empty() && this->active_requests == 0uz; });
             }
 
@@ -880,12 +1012,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr cache_status store_object_async(cache_context const& ctx,
                                                                    ::std::byte const* object,
                                                                    ::std::size_t size,
-                                                                   cache_policy const& policy) noexcept
+                                                                   cache_policy const& policy,
+                                                                   ::uwvm2::utils::container::u8string_view log_module = {},
+                                                                   bool log_completion = false,
+                                                                   ::std::size_t object_index = 0uz,
+                                                                   ::std::size_t object_count = 0uz) noexcept
     {
         if(!policy.enable) { return cache_status::disabled; }
 
         details::cache_store_request request{};
         request.ctx = ctx;
+        request.object_bytes = size;
+        request.object_index = object_index;
+        request.object_count = object_count;
+        request.log_completion = log_completion;
+        request.log_parallel_object = object_count != 0uz;
+        if(log_completion)
+        {
+            request.log_module.reserve(log_module.size());
+            // The module name must be copied because the async request can outlive LLVM's callback frame.
+            ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(request.log_module)};
+            ::fast_io::io::print(ref, log_module);
+        }
         if(auto const status{details::build_cache_blob(ctx, object, size, policy, request.blob)}; status != cache_status::ok) [[unlikely]] { return status; }
 
         return details::async_cache_store_worker_instance().enqueue(::std::move(request));
@@ -910,6 +1058,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const key_hash{details::cache_key_hash(ctx)};
             auto cache_dir{details::open_cache_object_dir(ctx, key_hash, false)};
             auto const file_name{details::cache_file_name_from_hash(key_hash)};
+            // Loading through a file loader lets later validation use pointer views without copying the whole blob first.
             ::fast_io::native_file_loader file{::fast_io::at(cache_dir), file_name, ::fast_io::open_mode::in | ::fast_io::open_mode::follow};
             auto const first{reinterpret_cast<::std::byte const*>(file.cbegin())};
             auto const last{reinterpret_cast<::std::byte const*>(file.cend())};
@@ -929,6 +1078,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             if(view.header.uncompressed_size > static_cast<::std::uint_least64_t>(policy.max_object_bytes))
             {
+                // The size limit is enforced before decompression to bound memory use for untrusted cache files.
                 result.status = cache_status::size_limit_exceeded;
                 return result;
             }
@@ -936,6 +1086,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto expected_isa{make_isa_metadata(ctx)};
             if(!metadata_equal(view.isa_metadata, view.header.isa_metadata_size, expected_isa))
             {
+                // ISA mismatch is a normal cache miss: object code is not portable across target/CPU differences.
                 result.status = cache_status::isa_mismatch;
                 return result;
             }
@@ -944,6 +1095,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto expected_context{make_context_metadata(ctx)};
             if(!metadata_equal(view.context_metadata, view.header.context_metadata_size, expected_context))
             {
+                // Context mismatch rejects objects built with a different LLVM, ABI, policy, or logical cache key.
                 result.status = cache_status::context_mismatch;
                 return result;
             }
@@ -959,6 +1111,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             {
                 if(view.header.signature == static_cast<::std::uint_least32_t>(signature_kind::none))
                 {
+                    // Unsigned native code is rejected by default because the cache directory is outside the compiler binary.
                     result.status = cache_status::signature_missing;
                     return result;
                 }
@@ -978,6 +1131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 auto const context_size{static_cast<::std::size_t>(view.header.context_metadata_size)};
                 auto const payload_size{static_cast<::std::size_t>(view.header.payload_size)};
 
+                // Verify before decompression so malformed compressed data is not processed unless it is signed for this context.
                 if(!details::ed25519_identity_verify(
                        ctx, header_bytes, view.isa_metadata, isa_size, view.context_metadata, context_size, view.signature, view.payload, payload_size))
                 {
@@ -991,6 +1145,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const payload_size{static_cast<::std::size_t>(view.header.payload_size)};
             if(!decompress_payload(compression, view.payload, payload_size, uncompressed_size, result.object))
             {
+                // The object buffer is cleared on decode failure so callers cannot accidentally consume partial output.
                 result.status = cache_status::decompression_failed;
                 result.object = {};
                 return result;

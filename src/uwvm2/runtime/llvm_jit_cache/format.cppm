@@ -48,4 +48,5 @@ import uwvm2.utils.container;
 # define UWVM_MODULE_EXPORT export
 #endif
 
+// The module unit includes the same header body so modular and non-modular builds share one cache-format contract.
 #include "format.h"

@@ -56,4 +56,5 @@ import :compress;
 # define UWVM_MODULE_EXPORT export
 #endif
 
+// Store logic is shared through the header so the module cannot diverge from traditional include builds.
 #include "store.h"

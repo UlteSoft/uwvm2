@@ -23,6 +23,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+// The umbrella header preserves the public include surface for projects that do not consume C++20 modules.
 # include "format.h"
 # include "compress.h"
 # include "environment.h"

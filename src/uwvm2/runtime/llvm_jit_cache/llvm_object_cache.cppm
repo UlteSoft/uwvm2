@@ -64,6 +64,7 @@ import :store;
 # define UWVM_MODULE_EXPORT export
 #endif
 
+// The LLVM ObjectCache adapter is included from the header to keep callback behavior identical across build modes.
 #include "llvm_object_cache.h"
 
 #if defined(UWVM)
