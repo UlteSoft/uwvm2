@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_cache_path{
         .name{u8"--runtime-llvm-jit-cache-path"},
-        .describe{u8"Select the runtime LLVM JIT cache directory mode."},
+        .describe{u8"Select the runtime LLVM JIT cache directory mode or disable it."},
         .usage{u8"[disable|default|path <path>]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_cache_path_alias), 1uz}},
         .handle{::std::addressof(details::runtime_llvm_jit_cache_path_callback)},
