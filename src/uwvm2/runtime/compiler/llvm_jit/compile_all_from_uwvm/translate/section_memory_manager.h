@@ -31,6 +31,7 @@
 # include <memory>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <llvm/Config/llvm-config.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
@@ -50,6 +51,14 @@ extern "C" void __deregister_frame(void const*);
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH 1
 #else
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH 0
+#endif
+
+#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC")
+#undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 22
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC 1
+#else
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC 0
 #endif
 
 #pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME")
@@ -123,7 +132,11 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     {
     public:
         inline constexpr runtime_llvm_jit_section_memory_manager() noexcept :
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC
             ::llvm::SectionMemoryManager(nullptr, UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH != 0)
+# else
+            ::llvm::SectionMemoryManager(nullptr)
+# endif
         {
         }
 
@@ -260,4 +273,5 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 }  // namespace uwvm2::runtime::compiler::llvm_jit::details
 
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME")
+#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH")
