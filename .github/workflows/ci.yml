@@ -419,7 +419,7 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "sudo pkg install -y llvm21 gmake"
+            bash -c "sudo pkg install -y llvm21 gmake unzip"
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
@@ -432,7 +432,7 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "sudo pkg install -y gcc16-devel gmake"
+            bash -c "sudo pkg install -y gcc16-devel gmake unzip"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
             bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --march=none --static=none"
