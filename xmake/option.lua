@@ -458,9 +458,9 @@ end)
 option("enable-test-backend-fuzzer", function()
     set_description
     (
-        "Register the shell-driven 0016 backend differential fuzzer target.",
+        "Register the shell-driven 0015 backend differential fuzzer target.",
         "default = false",
-        [[    true: register test/0016.backend_fuzzer backend fuzzer target.]],
+        [[    true: register test/0015.backend_fuzzer backend fuzzer target.]],
         [[    false: skip registering the backend fuzzer target.]]
     )
     set_default(false)
