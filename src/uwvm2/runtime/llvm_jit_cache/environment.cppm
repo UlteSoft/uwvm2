@@ -58,4 +58,5 @@ import :format;
 # define UWVM_MODULE_EXPORT export
 #endif
 
+// The implementation stays in the header because these helpers are constexpr-heavy and reused by non-module builds.
 #include "environment.h"

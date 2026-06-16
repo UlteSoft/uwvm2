@@ -66,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::u8string out{};
             if(!ref.empty())
             {
+                // LLVM identifiers are byte strings; copying them to UTF-8 storage keeps logging/cache APIs uniform.
                 ::uwvm2::utils::container::u8string_ref_uwvm out_ref{::std::addressof(out)};
                 ::fast_io::io::print(out_ref, ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(ref.data()), ref.size()});
             }
@@ -76,6 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::std::string bitcode{};
             ::llvm::raw_string_ostream os{bitcode};
+            // Bitcode hashing keys the cache by module contents, not by unstable names or source file paths.
             ::llvm::WriteBitcodeToFile(module, os);
             os.flush();
 
@@ -96,6 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         inline constexpr void runtime_log_line(Args&&... args) noexcept
         {
 # if defined(UWVM)
+            // Cache logging is kept behind the runtime flag because ObjectCache callbacks can be frequent.
             if(!::uwvm2::uwvm::io::enable_runtime_log) { return; }
 
             ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-cache] ", ::std::forward<Args>(args)...);
@@ -113,10 +116,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) const UWVM_THROWS
         {
             auto ctx{base_context};
+            // Some callers already provide a fully qualified cache key, so avoid expensive bitcode hashing in that path.
             if(ctx.cache_key_is_complete) { return ctx; }
 
             auto key{details::make_cache_key(u8"llvm-module-object")};
             details::append_cache_key_value(key, u8"base-key", ctx.cache_key);
+            // The module hash is appended after the base key to let embedders partition cache namespaces explicitly.
             auto bitcode_hash{details::module_bitcode_hash(module)};
             details::append_cache_key_value(key, u8"bitcode-hash", bitcode_hash);
             ctx.cache_key = ::std::move(key);
@@ -127,6 +132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
 # if defined(UWVM)
             static ::std::atomic_bool warned{}; // [global]
+            // Unsigned cache hits can repeat for every module, so one warning is enough to explain the policy rejection.
             if(warned.exchange(true, ::std::memory_order_relaxed)) { return; }
 
             if(!::uwvm2::uwvm::io::show_runtime_warning) { return; }
@@ -174,6 +180,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(module == nullptr) [[unlikely]] { return; }
             auto ctx{make_module_context(*module)};
             auto const module_name{details::module_identifier_view(*module)};
+            // LLVM may call this after a previous process populated the cache; skip redundant writes when the blob is valid.
             if(load_object(ctx, policy).status == cache_status::ok)
             {
                 details::runtime_log_line(u8"object-cache-store-skip module=\"", module_name, u8"\" reason=object-cache-hit");
@@ -182,6 +189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             auto const buffer{object.getBuffer()};
             auto const first{reinterpret_cast<::std::byte const*>(buffer.data())};
+            // Store asynchronously because object emission is on the JIT compile path and disk latency should not block it.
             auto const status{store_object_async(ctx, first, buffer.size(), policy, module_name, true)};
             details::runtime_log_line(
                 u8"object-cache-store-enqueue module=\"", module_name, u8"\" status=", cache_status_name(status), u8" bytes=", buffer.size());
@@ -193,6 +201,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto load{load_object(make_module_context(*module), policy)};
             if(load.status != cache_status::ok)
             {
+                // A miss returns nullptr so LLVM falls back to compiling the module normally.
                 if(load.status == cache_status::signature_missing) [[unlikely]] { warn_signature_missing_once(); }
                 return {};
             }
@@ -203,6 +212,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                       u8" signature_verified=",
                                       load.signature_verified ? u8"1" : u8"0");
             auto const first{reinterpret_cast<char const*>(load.object.data())};
+            // LLVM owns the returned MemoryBuffer, so copy from the temporary vector into a stable buffer.
             return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2-llvm-jit-cache");
         }
     };

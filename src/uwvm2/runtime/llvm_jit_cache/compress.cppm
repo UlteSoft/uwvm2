@@ -43,4 +43,5 @@ import :format;
 # define UWVM_MODULE_EXPORT export
 #endif
 
+// Including the header here exports the same deterministic codecs that header-only consumers use.
 #include "compress.h"

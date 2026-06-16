@@ -44,16 +44,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
     namespace details
     {
+        // The LZSS shape is intentionally small and deterministic because cache compression should be cheap during JIT compilation.
         inline constexpr ::std::size_t lzss_window_size{4096uz};
         inline constexpr ::std::size_t lzss_min_match{3uz};
         inline constexpr ::std::size_t lzss_max_match{18uz};
         inline constexpr ::std::size_t lzss_hash_size{65536uz};
+        // Native-LZ uses a wider offset and LZ4-like sequence layout for better object-file compression without an external dependency.
         inline constexpr ::std::size_t native_lz_hash_size{65536uz};
         inline constexpr ::std::size_t native_lz_min_match{4uz};
         inline constexpr ::std::size_t native_lz_max_offset{65535uz};
 
         [[nodiscard]] inline constexpr ::std::uint_least16_t lzss_hash3(::std::byte const* ptr) noexcept
         {
+            // A 3-byte hash is enough for the minimum match and keeps the compressor single-pass.
             auto const b0{::std::to_integer<::std::uint_least32_t>(ptr[0])};
             auto const b1{::std::to_integer<::std::uint_least32_t>(ptr[1])};
             auto const b2{::std::to_integer<::std::uint_least32_t>(ptr[2])};
@@ -65,6 +68,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                 ::std::size_t offset,
                                                 ::std::size_t length) noexcept
         {
+            // The 16-bit token stores a 12-bit backward distance and a 4-bit length delta to cap decoder work.
             auto const token{static_cast<::std::uint_least16_t>(((length - lzss_min_match) << 12uz) | (offset - 1uz))};
             out.push_back(static_cast<::std::byte>(token & 0xffu));
             out.push_back(static_cast<::std::byte>((token >> 8u) & 0xffu));
@@ -72,6 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         [[nodiscard]] inline constexpr ::std::uint_least32_t native_lz_read_u32(::std::byte const* ptr) noexcept
         {
+            // Manual little-endian loading avoids alignment requirements on object bytes.
             return static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[0])) |
                    (static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[1])) << 8u) |
                    (static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[2])) << 16u) |
@@ -81,11 +86,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr ::std::uint_least16_t native_lz_hash4(::std::byte const* ptr) noexcept
         {
             auto const v{native_lz_read_u32(ptr)};
+            // Knuth-style multiplicative hashing spreads common instruction/object patterns across the table.
             return static_cast<::std::uint_least16_t>((v * 2654435761u) >> 16u);
         }
 
         inline constexpr void append_native_lz_length(::uwvm2::utils::container::vector<::std::byte>& out, ::std::size_t len) noexcept
         {
+            // Chained 255-byte extensions mirror LZ4, making long literals/matches compact without fixed-size fields.
             while(len >= 255uz)
             {
                 out.push_back(static_cast<::std::byte>(255u));
@@ -103,6 +110,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             auto const literal_token{::std::min(literal_size, 15uz)};
             auto const match_token{has_match ? ::std::min(match_size - native_lz_min_match, 15uz) : 0uz};
+            // A single token records the short literal and match lengths so common sequences cost one control byte.
             out.push_back(static_cast<::std::byte>((literal_token << 4uz) | match_token));
 
             if(literal_size >= 15uz) { append_native_lz_length(out, literal_size - 15uz); }
@@ -110,6 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
             if(has_match)
             {
+                // Offsets are little-endian because the cache format must be independent of host alignment and endian.
                 out.push_back(static_cast<::std::byte>(offset & 0xffuz));
                 out.push_back(static_cast<::std::byte>((offset >> 8uz) & 0xffuz));
                 auto const encoded_match_size{match_size - native_lz_min_match};
@@ -125,6 +134,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             {
                 if(first == last) [[unlikely]] { return false; }
                 auto const v{::std::to_integer<::std::size_t>(*first++)};
+                // Length fields are attacker-controlled on load, so overflow turns into a decode failure.
                 if(len > (::std::numeric_limits<::std::size_t>::max)() - v) [[unlikely]] { return false; }
                 len += v;
                 if(v != 255uz) { return true; }
@@ -138,6 +148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::vector<::std::byte> out{};
         if(size == 0uz) { return out; }
 
+        // Reserve a slight expansion budget because incompressible data may still emit flags and literals.
         out.reserve(size + (size / 8uz) + 16uz);
 
         constexpr auto npos{(::std::numeric_limits<::std::size_t>::max)()};
@@ -161,6 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 {
                     auto const h{details::lzss_hash3(first + pos)};
                     auto const prev{table.index_unchecked(h)};
+                    // Keeping only the most recent position bounds memory and favors small offsets that decode cheaply.
                     table.index_unchecked(h) = pos;
 
                     if(prev != npos && prev < pos)
@@ -185,6 +197,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                     flags = static_cast<::std::uint_least8_t>(flags | (1u << bit));
                     details::append_lzss_token(out, best_offset, best_len);
 
+                    // Hash positions inside the match so the next search remains useful after the jump.
                     for(::std::size_t k{1uz}; k != best_len && pos + k + details::lzss_min_match <= size; ++k)
                     {
                         table.index_unchecked(details::lzss_hash3(first + pos + k)) = pos + k;
@@ -212,6 +225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         out = {};
         out.reserve(expected_size);
 
+        // The loop stops at the declared uncompressed size so truncated or overlong payloads are rejected exactly.
         while(out.size() != expected_size)
         {
             if(first == last) [[unlikely]] { return false; }
@@ -229,6 +243,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                     auto const token{static_cast<::std::uint_least16_t>(lo | (hi << 8u))};
                     auto const length{static_cast<::std::size_t>((token >> 12u) + details::lzss_min_match)};
                     auto const offset{static_cast<::std::size_t>((token & 0x0fffu) + 1u)};
+                    // Back references must point into already-produced bytes to avoid reading uninitialized output.
                     if(offset == 0uz || offset > out.size()) [[unlikely]] { return false; }
                     if(length > expected_size - out.size()) [[unlikely]] { return false; }
 
@@ -254,6 +269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::vector<::std::byte> out{};
         if(size == 0uz) { return out; }
 
+        // Native-LZ is optimized for fast cache writes: one hash lookup per position and no entropy coding.
         out.reserve(size + (size / 255uz) + 16uz);
 
         constexpr auto npos{(::std::numeric_limits<::std::size_t>::max)()};
@@ -275,9 +291,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 ::std::size_t match_size{details::native_lz_min_match};
                 while(pos + match_size != size && first[prev + match_size] == first[pos + match_size]) { ++match_size; }
 
+                // The anchor separates pending literals from the match so the decoder can replay the same byte stream.
                 details::append_native_lz_sequence(out, first + anchor, pos - anchor, pos - prev, match_size, true);
 
                 auto const match_end{pos + match_size};
+                // Populate skipped positions to keep later matches available after consuming a long run.
                 for(auto p{pos + 1uz}; p + details::native_lz_min_match <= match_end; ++p)
                 {
                     table.index_unchecked(details::native_lz_hash4(first + p)) = p;
@@ -304,6 +322,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         out = {};
         out.reserve(expected_size);
 
+        // Decoding validates every length before copying so malformed cache files cannot overrun the output budget.
         while(out.size() != expected_size)
         {
             if(first == last) [[unlikely]] { return false; }
@@ -320,12 +339,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             details::append_bytes(out, first, first + literal_size);
             first += literal_size;
 
+            // A literal-only terminal sequence is valid only if it consumes the entire compressed payload.
             if(out.size() == expected_size) { return first == last; }
 
             if(static_cast<::std::size_t>(last - first) < 2uz) [[unlikely]] { return false; }
             auto const offset{static_cast<::std::size_t>(::std::to_integer<unsigned>(first[0])) |
                               (static_cast<::std::size_t>(::std::to_integer<unsigned>(first[1])) << 8uz)};
             first += 2uz;
+            // Matches copy from the existing output buffer, so offset zero and forward references are invalid.
             if(offset == 0uz || offset > out.size()) [[unlikely]] { return false; }
 
             auto match_size{details::native_lz_min_match + (token & 0x0fuz)};
@@ -353,6 +374,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         switch(kind)
         {
             case compression_kind::none:
+                // Uncompressed payloads still verify their size so the caller never receives trailing bytes as object data.
                 if(compressed_size != expected_size) [[unlikely]] { return false; }
                 out = {};
                 out.reserve(expected_size);

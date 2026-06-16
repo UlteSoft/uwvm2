@@ -23,6 +23,7 @@
 module;
 
 export module uwvm2.runtime.llvm_jit_cache;
+// Re-exporting partitions keeps callers on one stable module name while implementation details stay split by concern.
 export import :format;
 export import :compress;
 export import :environment;

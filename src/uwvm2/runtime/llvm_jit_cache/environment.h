@@ -62,6 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         namespace posix
         {
 #if !(defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__))
+            // The direct libc symbol keeps environment lookup available inside the header-only/module-shared implementation.
 # if defined(__DARWIN_C_LEVEL) || defined(__DJGPP__)
             extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
 # else
@@ -74,6 +75,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::uwvm2::utils::container::u8string out{};
             if(str == nullptr) { return out; }
+            // Cache paths and metadata are normalized to UTF-8 because the on-disk format is byte-stable across platforms.
             auto const len{::std::strlen(str)};
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
             ::fast_io::io::print(ref, ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(str), len});
@@ -84,6 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             ::uwvm2::utils::container::u8string out{};
             if(first == nullptr || first == last) { return out; }
+            // Windows environment data is UTF-16, so converting here avoids code-page-dependent cache paths.
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
             ::fast_io::io::print(ref, ::fast_io::mnp::code_cvt(::fast_io::mnp::strvw(first, last)));
             return out;
@@ -112,6 +115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         inline constexpr void seed_sha256_update(::fast_io::sha256_context& sha, ::std::byte const* first, ::std::byte const* last) noexcept
         {
+            // Empty ranges are skipped so optional identity fields do not require sentinel bytes.
             if(first != last) { sha.update(first, last); }
         }
 
@@ -138,6 +142,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             static_assert(N != 0uz);
             static_assert((N - 1uz) * sizeof(char16_t) <= static_cast<::std::size_t>(UINT_LEAST16_MAX));
 
+            // Querying the process environment directly keeps Unicode values lossless and avoids narrow Win32 fallbacks.
             auto const curr_peb{::fast_io::win32::nt::nt_get_current_peb()};
             if(curr_peb == nullptr || curr_peb->ProcessParameters == nullptr) { return {}; }
 
@@ -156,6 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto status{::fast_io::win32::nt::RtlQueryEnvironmentVariable_U(env, ::std::addressof(env_us), ::std::addressof(out_us))};
             if(status == status_success)
             {
+                // Most cache path variables fit the stack buffer, keeping startup allocation-free on the common path.
                 auto const out_len{out_us.Length / sizeof(char16_t)};
                 return u8string_from_u16(small_buffer.cbegin(), small_buffer.cbegin() + out_len);
             }
@@ -240,6 +246,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # if defined(LLVM_VERSION_STRING)
+            // LLVM is part of the cache context because backend updates can change object layout without IR changes.
             return u8string_from_cstr(LLVM_VERSION_STRING);
 # elif defined(LLVM_VERSION_MAJOR) && defined(LLVM_VERSION_MINOR) && defined(LLVM_VERSION_PATCH)
             ::uwvm2::utils::container::u8string out{};
@@ -282,11 +289,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
 #if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
 # ifndef _WIN32_WINDOWS
+        // Prefer per-user cache locations so executable cache objects are not shared between unrelated accounts.
         if(auto out{details::cache_directory_from_env(u"LOCALAPPDATA", u8"/UlteSoft/uwvm2/cache/llvm-jit")}; !out.empty()) { return out; }
         if(auto out{details::cache_directory_from_env(u"USERPROFILE", u8"/AppData/Local/UlteSoft/uwvm2/cache/llvm-jit")}; !out.empty()) { return out; }
+        // Temporary directories are fallbacks because they may be cleaned aggressively by the OS.
         if(auto out{details::cache_directory_from_env(u"TEMP", u8"/uwvm2/llvm-jit")}; !out.empty()) { return out; }
         if(auto out{details::cache_directory_from_env(u"TMP", u8"/uwvm2/llvm-jit")}; !out.empty()) { return out; }
 # else
+        // Legacy Windows builds use the narrow API path but keep the same per-user preference order.
         if(auto out{details::cache_directory_from_env("LOCALAPPDATA", u8"/UlteSoft/uwvm2/cache/llvm-jit")}; !out.empty()) { return out; }
         if(auto out{details::cache_directory_from_env("USERPROFILE", u8"/AppData/Local/UlteSoft/uwvm2/cache/llvm-jit")}; !out.empty()) { return out; }
         if(auto out{details::cache_directory_from_env("TEMP", u8"/uwvm2/llvm-jit")}; !out.empty()) { return out; }
@@ -294,18 +304,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 # endif
         return ::uwvm2::utils::container::u8string{u8".uwvm2-llvm-jit-cache"};
 #elif defined(__APPLE__) && defined(__MACH__)
+        // macOS convention keeps large generated artifacts under Library/Caches instead of the project tree.
         if(auto out{details::cache_directory_from_env("HOME", u8"/Library/Caches/uwvm2/llvm-jit")}; !out.empty()) { return out; }
         if(auto out{details::cache_directory_from_env("TMPDIR", u8"/uwvm2/llvm-jit")}; !out.empty()) { return out; }
         return ::uwvm2::utils::container::u8string{u8"/tmp/uwvm2/llvm-jit"};
 #else
         if(auto out{details::environment_variable("XDG_CACHE_HOME")}; !out.empty())
         {
+            // XDG_CACHE_HOME is the first choice on Unix-like systems because it is explicitly for regenerable data.
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
             ::fast_io::io::print(ref, u8"/uwvm2/llvm-jit");
             return out;
         }
         if(auto out{details::environment_variable("HOME")}; !out.empty())
         {
+            // HOME/.cache mirrors the XDG default when the environment variable is absent.
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(out)};
             ::fast_io::io::print(ref, u8"/.cache/uwvm2/llvm-jit");
             return out;
@@ -319,6 +332,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         using cache_path_mode_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_path_mode_t;
+        // Runtime configuration wins over platform defaults so sandboxed embedders can pick an isolated directory.
         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode == cache_path_mode_t::custom_path)
         {
             return ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path;
@@ -330,6 +344,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string collect_target_triple() noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        // The triple gates object reuse because relocation model, calling convention, and object format depend on it.
         auto triple{::llvm::sys::getDefaultTargetTriple()};
         return details::u8string_from_chars(triple.data(), triple.size());
 #else
@@ -348,6 +363,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string collect_cpu_name() noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        // The CPU name captures backend tuning choices that may not be represented by feature strings alone.
         auto cpu{::llvm::sys::getHostCPUName()};
         return details::u8string_from_chars(cpu.data(), cpu.size());
 #else
@@ -377,6 +393,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::fast_io::io::print(item_ref, enabled ? u8"+" : u8"-", feature_name);
             storage.push_back(::std::move(item));
         }
+        // LLVM exposes features through a map, so sorting makes the fingerprint deterministic across library builds.
         ::std::sort(storage.begin(), storage.end());
 
         ::uwvm2::utils::container::u8string out{};
@@ -405,6 +422,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         auto out{details::make_cache_key(u8"codegen-policy")};
+        // Optimization policy is hashed because different policies can emit different native code for the same module.
         details::append_cache_key_value(out, u8"backend", u8"llvm-jit");
         details::append_cache_key_value(out,
                                         u8"policy",
@@ -420,6 +438,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string uwvm_runtime_abi_fingerprint() noexcept
     {
         auto out{details::make_cache_key(u8"uwvm-runtime-abi")};
+        // The schema version separates intentional ABI-fingerprint changes from ordinary project version changes.
         details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v2");
 #if defined(UWVM_VERSION_X)
         details::append_cache_key_value_u64(out, u8"version-x", static_cast<::std::uint_least64_t>(UWVM_VERSION_X));
@@ -447,6 +466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         details::append_cache_key_value(out, u8"git-commit", u8"unknown");
 #endif
 #if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
+        // Dirty builds include timestamp material because the same commit id no longer identifies the runtime binary.
         details::append_cache_key_value(out, u8"git-dirty", u8"1");
         auto const build_date{details::u8string_from_cstr(__DATE__)};
         auto const build_time{details::u8string_from_cstr(__TIME__)};
@@ -471,9 +491,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::fast_io::sha256_context sha{};
         details::seed_sha256_update_literal(sha, u8"uwvm2-llvm-jit-cache-ed25519-seed-v1");
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
+        // The user id prevents one local account from producing cache signatures accepted as another account.
         details::seed_sha256_update_literal(sha, u8"posix-user");
         details::seed_sha256_update_le(sha, static_cast<::std::uint_least64_t>(::getuid()));
 #elif defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
+        // The Windows user name is the available per-user identity for the deterministic cache signature seed.
         details::seed_sha256_update_literal(sha, u8"win32-user");
 # ifndef _WIN32_WINDOWS
         details::seed_sha256_update(sha, details::win32_environment_variable(u"USERNAME"));
@@ -483,6 +505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::seed_sha256_update_literal(sha, u8"unknown-user");
 #endif
+        // The seed includes the same compatibility inputs as the object key so signatures cannot be replayed across contexts.
         details::seed_sha256_update_literal(sha, u8"target");
         details::seed_sha256_update(sha, ctx.target_triple);
         details::seed_sha256_update_literal(sha, u8"cpu");
@@ -502,11 +525,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         cache_policy policy{};
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        // Policy mirrors runtime flags so the cache can be disabled or relaxed without changing call-site code.
         policy.enable = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode !=
                         ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_path_mode_t::disabled;
         policy.generate_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_sign;
         policy.verify_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_verify;
 #endif
+        // If signing support is missing, disabling the whole cache is safer than silently accepting unsigned native code.
         if(policy.enable && (policy.generate_signature || policy.verify_signature) && !cache_ed25519_identity_signature_available) { policy.enable = false; }
         return policy;
     }
@@ -516,6 +541,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         cache_context ctx{};
         ctx.cache_dir = configured_cache_directory();
+        // The caller's key is copied into owned storage because contexts can outlive the original module strings.
         ::uwvm2::utils::container::u8string_ref_uwvm cache_key_ref{::std::addressof(ctx.cache_key)};
         ::fast_io::io::print(cache_key_ref, cache_key);
         ctx.target_triple = collect_target_triple();
@@ -530,6 +556,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
         ctx.signature_seed = collect_signature_seed(ctx);
+        // A generated seed is marked explicitly so store/load code can fail closed if future constructors omit it.
         ctx.has_signature_seed = true;
         return ctx;
     }
@@ -541,6 +568,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         cache_context ctx{};
         ctx.cache_dir = configured_cache_directory();
+        // TargetMachine-derived fields match the actual backend instance rather than the host default guess.
         ::uwvm2::utils::container::u8string_ref_uwvm cache_key_ref{::std::addressof(ctx.cache_key)};
         ::fast_io::io::print(cache_key_ref, cache_key);
         ctx.target_triple = collect_target_triple(target_machine);
@@ -555,6 +583,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
         ctx.signature_seed = collect_signature_seed(ctx);
+        // The signature seed is recomputed after TargetMachine fields so cross-target JITs do not share identities.
         ctx.has_signature_seed = true;
         return ctx;
     }
