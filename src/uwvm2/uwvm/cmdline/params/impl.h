@@ -65,6 +65,10 @@
 # include "runtime_jit.h"
 # include "runtime_aot.h"
 # include "runtime_tiered.h"
+# include "runtime_uwvm_int_disable_loop_unwind.h"
+# include "runtime_uwvm_int_disable_opcode_conbination.h"
+# include "runtime_uwvm_int_disable_delay_local.h"
+# include "runtime_uwvm_int_loop_unwind_max_size.h"
 # include "runtime_tiered_disable_uwvm_int_lazy_interpreter.h"
 # include "runtime_tiered_disable_llvm_full_jit.h"
 

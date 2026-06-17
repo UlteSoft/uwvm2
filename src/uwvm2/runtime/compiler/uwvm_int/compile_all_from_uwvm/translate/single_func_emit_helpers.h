@@ -1,4 +1,14 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
+bool const runtime_uwvm_int_opcode_conbination_enabled{!::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_opcode_conbination};
+bool const runtime_uwvm_int_delay_local_enabled{runtime_uwvm_int_opcode_conbination_enabled &&
+                                                !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_delay_local};
+[[maybe_unused]] bool const runtime_uwvm_int_loop_unwind_enabled{
+#if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
+    !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_loop_unwind
+#else
+    false
+#endif
+};
 // This include fragment is expanded inside one local-function translation frame. The lambdas below
 // deliberately capture parser state, bytecode buffers, label tables, and stack-top state by reference
 // so opcode case files can emit compact bytecode without passing a large context object through every
@@ -26,6 +36,14 @@ struct runtime_log_stats_t
     ::std::uint_least64_t cf_br_if_count{};
     ::std::uint_least64_t cf_loop_entry_transform_count{};
     ::std::uint_least64_t cf_loop_entry_canonicalize_to_mem_count{};
+    ::std::uint_least64_t loop_unwind_candidate_count{};
+    ::std::uint_least64_t loop_unwind_applied_count{};
+    ::std::uint_least64_t loop_unwind_rejected_count{};
+    ::std::uint_least64_t loop_unwind_full_count{};
+    ::std::uint_least64_t loop_unwind_partial_count{};
+    ::std::uint_least64_t loop_unwind_replayed_body_count{};
+    ::std::uint_least64_t loop_unwind_replayed_wasm_bytes{};
+    ::std::uint_least64_t loop_unwind_replayed_bytecode_bytes{};
     ::std::uint_least64_t stacktop_spill1_count{};
     ::std::uint_least64_t stacktop_spillN_count{};
     ::std::uint_least64_t stacktop_fill1_count{};
@@ -1857,6 +1875,94 @@ auto const stacktop_flush_all_to_operand_stack{[&](bytecode_vec_t& dst) constexp
         curr_stacktop.v128_stack_top_curr_pos = stacktop_v128_enabled ? CompileOption.v128_stack_top_begin_pos : SIZE_MAX;
     }};
 
+[[maybe_unused]] auto const stacktop_currpos_is_begin{[&]() constexpr noexcept -> bool
+                                                      {
+                                                          if constexpr(!stacktop_enabled) { return true; }
+                                                          if constexpr(stacktop_i32_enabled)
+                                                          {
+                                                              if(curr_stacktop.i32_stack_top_curr_pos != CompileOption.i32_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_i64_enabled)
+                                                          {
+                                                              if(curr_stacktop.i64_stack_top_curr_pos != CompileOption.i64_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_f32_enabled)
+                                                          {
+                                                              if(curr_stacktop.f32_stack_top_curr_pos != CompileOption.f32_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_f64_enabled)
+                                                          {
+                                                              if(curr_stacktop.f64_stack_top_curr_pos != CompileOption.f64_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_v128_enabled)
+                                                          {
+                                                              if(curr_stacktop.v128_stack_top_curr_pos != CompileOption.v128_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          return true;
+                                                      }};
+
+[[maybe_unused]] auto const loop_unwind_gcd_size{[](::std::size_t a, ::std::size_t b) constexpr noexcept -> ::std::size_t
+                                                 {
+                                                     while(b != 0uz)
+                                                     {
+                                                         auto const r{a % b};
+                                                         a = b;
+                                                         b = r;
+                                                     }
+                                                     return a;
+                                                 }};
+
+[[maybe_unused]] auto const loop_unwind_lcm_size{[&](::std::size_t a, ::std::size_t b) constexpr noexcept -> ::std::size_t
+                                                 {
+                                                     if(a == 0uz || b == 0uz) { return 0uz; }
+                                                     auto const g{loop_unwind_gcd_size(a, b)};
+                                                     auto const div{a / g};
+                                                     if(div > (::std::numeric_limits<::std::size_t>::max() / b))
+                                                     {
+                                                         return ::std::numeric_limits<::std::size_t>::max();
+                                                     }
+                                                     return div * b;
+                                                 }};
+
+[[maybe_unused]] auto const loop_unwind_currpos_period{
+    [&]() constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return 1uz; }
+        ::std::size_t period{1uz};
+
+        auto const add_range{[&](bool enabled, ::std::size_t begin_pos, ::std::size_t end_pos, ::std::size_t currpos) constexpr noexcept
+                             {
+                                 if(!enabled || currpos == SIZE_MAX || end_pos <= begin_pos) { return; }
+                                 auto const ring_size{end_pos - begin_pos};
+                                 auto const delta{(currpos + ring_size - begin_pos) % ring_size};
+                                 if(delta == 0uz) { return; }
+                                 auto const range_period{ring_size / loop_unwind_gcd_size(ring_size, delta)};
+                                 period = loop_unwind_lcm_size(period, range_period);
+                             }};
+
+        add_range(stacktop_i32_enabled, CompileOption.i32_stack_top_begin_pos, CompileOption.i32_stack_top_end_pos, curr_stacktop.i32_stack_top_curr_pos);
+        add_range(stacktop_i64_enabled, CompileOption.i64_stack_top_begin_pos, CompileOption.i64_stack_top_end_pos, curr_stacktop.i64_stack_top_curr_pos);
+        add_range(stacktop_f32_enabled, CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos, curr_stacktop.f32_stack_top_curr_pos);
+        add_range(stacktop_f64_enabled, CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos, curr_stacktop.f64_stack_top_curr_pos);
+        add_range(stacktop_v128_enabled, CompileOption.v128_stack_top_begin_pos, CompileOption.v128_stack_top_end_pos, curr_stacktop.v128_stack_top_curr_pos);
+        return period;
+    }};
+
 [[maybe_unused]] auto const stacktop_transform_currpos_to_begin{
     [&](bytecode_vec_t& dst) constexpr UWVM_THROWS
     {
@@ -3020,6 +3126,12 @@ auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_
         {
             if(!is_polymorphic && stacktop_cache_count != 0uz)
             {
+                if(stacktop_currpos_is_begin())
+                {
+                    emit_br_to(dst, label_id, dst_is_thunk);
+                    return;
+                }
+
                 if(runtime_log_on) [[unlikely]]
                 {
                     ++runtime_log_stats.cf_br_transform_count;

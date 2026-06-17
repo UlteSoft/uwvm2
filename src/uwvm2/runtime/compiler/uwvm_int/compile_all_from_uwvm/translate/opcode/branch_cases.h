@@ -96,7 +96,7 @@
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
             // Extra-heavy: mega-fuse the full `test7`-style i32 sum loop into a single opfunc that keeps
             // `i/sum` in registers and performs at most one bounds check per slot.
-            if(target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+            if(runtime_uwvm_int_opcode_conbination_enabled && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 bool match_ok{true};
@@ -221,7 +221,7 @@
             }
 
             // Extra-heavy: mega-fuse `micro/loop_i64.wasm` hot loop into one opfunc dispatch.
-            if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+            if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -366,7 +366,7 @@
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/round_f64_dense.wasm` hot loop into one opfunc dispatch.
-                if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -529,7 +529,7 @@
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/loop_f64.wasm` hot loop into one opfunc dispatch.
-                if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -665,7 +665,7 @@
             // Extra-heavy: mega-fuse `test10` hot affine inv-square f32 loop.
             if constexpr(CompileOption.is_tail_call)
             {
-                if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     bool match_ok{true};
@@ -817,6 +817,179 @@
 
             if(!fused_extra_heavy_loop_run)
             {
+#if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
+                if(target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.loop_unwind_candidate_count; }
+
+                    auto const loop_body_begin{target_frame.wasm_code_curr_at_start_label};
+                    auto const loop_body_end{op_begin};
+                    auto const body_wasm_bytes{
+                        loop_body_end > loop_body_begin ? static_cast<::std::size_t>(loop_body_end - loop_body_begin) : 0uz};
+
+                    auto const log_loop_unwind_reject{
+                        [&](::uwvm2::utils::container::u8string_view reason,
+                            ::std::size_t period,
+                            ::std::size_t unroll_count) constexpr noexcept
+                        {
+                            if(runtime_log_on) [[unlikely]]
+                            {
+                                ++runtime_log_stats.loop_unwind_rejected_count;
+                                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                     u8"[uwvm-int-translator] fn=",
+                                                     function_index,
+                                                     u8" ip=",
+                                                     static_cast<::std::size_t>(op_begin - code_begin),
+                                                     u8" event=loop.unwind | action=reject reason=",
+                                                     reason,
+                                                     u8" body_wasm_bytes=",
+                                                     body_wasm_bytes,
+                                                     u8" period=",
+                                                     period,
+                                                     u8" unroll=",
+                                                     unroll_count,
+                                                     u8" max_size=",
+                                                     ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_uwvm_int_loop_unwind_max_size,
+                                                     u8" stacktop{mem=",
+                                                     stacktop_memory_count,
+                                                     u8",cache=",
+                                                     stacktop_cache_count,
+                                                     u8"} currpos{i32=",
+                                                     curr_stacktop.i32_stack_top_curr_pos,
+                                                     u8",i64=",
+                                                     curr_stacktop.i64_stack_top_curr_pos,
+                                                     u8",f32=",
+                                                     curr_stacktop.f32_stack_top_curr_pos,
+                                                     u8",f64=",
+                                                     curr_stacktop.f64_stack_top_curr_pos,
+                                                     u8",v128=",
+                                                     curr_stacktop.v128_stack_top_curr_pos,
+                                                     u8"}\n");
+                            }
+                        }};
+
+                    if(!runtime_uwvm_int_loop_unwind_enabled) [[unlikely]]
+                    {
+                        log_loop_unwind_reject(u8"runtime_disabled", 0uz, 0uz);
+                    }
+                    else if(is_polymorphic) [[unlikely]]
+                    {
+                        log_loop_unwind_reject(u8"polymorphic", 0uz, 0uz);
+                    }
+                    else if(body_wasm_bytes == 0uz) [[unlikely]]
+                    {
+                        log_loop_unwind_reject(u8"empty_body", 0uz, 0uz);
+                    }
+                    else if constexpr(!(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported))
+                    {
+                        log_loop_unwind_reject(u8"unsupported_stacktop", 0uz, 0uz);
+                    }
+                    else if(stacktop_cache_count == 0uz)
+                    {
+                        log_loop_unwind_reject(u8"empty_cache", 0uz, 0uz);
+                    }
+                    else
+                    {
+                        auto const period{loop_unwind_currpos_period()};
+                        if(period <= 1uz)
+                        {
+                            log_loop_unwind_reject(u8"period_one", period, 1uz);
+                        }
+                        else
+                        {
+                            constexpr ::std::size_t max_loop_unwind_unroll_count{9uz};
+                            auto const max_size{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_uwvm_int_loop_unwind_max_size};
+                            auto size_limited_count{max_size / body_wasm_bytes};
+                            if(size_limited_count > max_loop_unwind_unroll_count) { size_limited_count = max_loop_unwind_unroll_count; }
+
+                            auto unroll_count{period < size_limited_count ? period : size_limited_count};
+                            if(unroll_count < 2uz)
+                            {
+                                log_loop_unwind_reject(u8"size_limit", period, unroll_count);
+                            }
+                            else
+                            {
+                                if(runtime_log_on) [[unlikely]]
+                                {
+                                    ++runtime_log_stats.loop_unwind_applied_count;
+                                    if(unroll_count == period) { ++runtime_log_stats.loop_unwind_full_count; }
+                                    else
+                                    {
+                                        ++runtime_log_stats.loop_unwind_partial_count;
+                                    }
+                                    ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                         u8"[uwvm-int-translator] fn=",
+                                                         function_index,
+                                                         u8" ip=",
+                                                         static_cast<::std::size_t>(op_begin - code_begin),
+                                                         u8" event=loop.unwind | action=apply body_wasm_bytes=",
+                                                         body_wasm_bytes,
+                                                         u8" period=",
+                                                         period,
+                                                         u8" unroll=",
+                                                         unroll_count,
+                                                         u8" full=",
+                                                         (unroll_count == period),
+                                                         u8" max_size=",
+                                                         max_size,
+                                                         u8" bytecode_before=",
+                                                         bytecode.size(),
+                                                         u8" stacktop{mem=",
+                                                         stacktop_memory_count,
+                                                         u8",cache=",
+                                                         stacktop_cache_count,
+                                                         u8"} currpos{i32=",
+                                                         curr_stacktop.i32_stack_top_curr_pos,
+                                                         u8",i64=",
+                                                         curr_stacktop.i64_stack_top_curr_pos,
+                                                         u8",f32=",
+                                                         curr_stacktop.f32_stack_top_curr_pos,
+                                                         u8",f64=",
+                                                         curr_stacktop.f64_stack_top_curr_pos,
+                                                         u8",v128=",
+                                                         curr_stacktop.v128_stack_top_curr_pos,
+                                                         u8"}\n");
+                                }
+
+                                auto const bytecode_before_loop_unwind{bytecode.size()};
+                                replay_loop_body(loop_body_begin, loop_body_end, unroll_count - 1uz);
+
+                                if(runtime_log_on) [[unlikely]]
+                                {
+                                    ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                         u8"[uwvm-int-translator] fn=",
+                                                         function_index,
+                                                         u8" ip=",
+                                                         static_cast<::std::size_t>(op_begin - code_begin),
+                                                         u8" event=loop.unwind | action=applied bytecode_after=",
+                                                         bytecode.size(),
+                                                         u8" bytecode_added=",
+                                                         bytecode.size() - bytecode_before_loop_unwind,
+                                                         u8" currpos_begin=",
+                                                         stacktop_currpos_is_begin(),
+                                                         u8" stacktop{mem=",
+                                                         stacktop_memory_count,
+                                                         u8",cache=",
+                                                         stacktop_cache_count,
+                                                         u8"} currpos{i32=",
+                                                         curr_stacktop.i32_stack_top_curr_pos,
+                                                         u8",i64=",
+                                                         curr_stacktop.i64_stack_top_curr_pos,
+                                                         u8",f32=",
+                                                         curr_stacktop.f32_stack_top_curr_pos,
+                                                         u8",f64=",
+                                                         curr_stacktop.f64_stack_top_curr_pos,
+                                                         u8",v128=",
+                                                         curr_stacktop.v128_stack_top_curr_pos,
+                                                         u8"}\n");
+                                }
+                            }
+                        }
+                    }
+                }
+#endif
+
                 if constexpr(stacktop_enabled)
                 {
                     if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(bytecode); }
@@ -2370,8 +2543,8 @@ case wasm1_code::br_if:
         // This removes huge threaded-interpreter dispatch overhead from the tight arithmetic loops.
         if constexpr(CompileOption.is_tail_call)
         {
-            if(!need_repair && target_arity == 0uz && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-               target_base == 0uz && target_frame.wasm_code_curr_at_start_label != nullptr)
+            if(runtime_uwvm_int_opcode_conbination_enabled && !need_repair && target_arity == 0uz && target_frame.type == block_type::loop &&
+               label_index_uz == 0uz && curr_size == target_base && target_base == 0uz && target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 bool fused_extra_heavy_loop_run{};
 

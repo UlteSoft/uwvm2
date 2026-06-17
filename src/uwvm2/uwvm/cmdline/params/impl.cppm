@@ -65,6 +65,10 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_aot;
 export import :runtime_tiered;
+export import :runtime_uwvm_int_disable_loop_unwind;
+export import :runtime_uwvm_int_disable_opcode_conbination;
+export import :runtime_uwvm_int_disable_delay_local;
+export import :runtime_uwvm_int_loop_unwind_max_size;
 export import :runtime_tiered_disable_uwvm_int_lazy_interpreter;
 export import :runtime_tiered_disable_llvm_full_jit;
 

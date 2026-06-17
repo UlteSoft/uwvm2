@@ -3,11 +3,12 @@
 set_project("uwvm")
 
 -- Version
-set_version("2.0.2")
+set_version("2.0.3")
 add_defines("UWVM_VERSION_X=2")
 add_defines("UWVM_VERSION_Y=0")
-add_defines("UWVM_VERSION_Z=2")
+add_defines("UWVM_VERSION_Z=3")
 add_defines("UWVM_VERSION_S=0")
+add_defines("UWVM_VERSION_DEV")
 
 set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd",
 	"openbsd", "macosx", "iphoneos", "watchos", "wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3",
@@ -184,6 +185,11 @@ function def_build(opt)
 		if delay_local_mode == "heavy" then
 			add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY")
 		end
+	end
+
+	local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
+	if enable_uwvm_int_loop_unwind then
+		add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")
 	end
 
 	local use_thread_local = get_config("use-thread-local")

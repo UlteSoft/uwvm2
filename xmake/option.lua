@@ -270,6 +270,17 @@ option("enable-uwvm-int-delay-local", function()
     set_values("none", "soft", "heavy")
 end)
 
+option("enable-uwvm-int-loop-unwind", function()
+    set_description
+    (
+        "Enable loop-unwind translation for uwvm-int.",
+        "default = true",
+        "    false: compile out loop-unwind code to reduce tiny-environment code size.",
+        "    true: enable loop-unwind translation, still controllable at runtime."
+    )
+    set_default(true)
+end)
+
 option("detailed-debug-check", function()
     set_description
     (

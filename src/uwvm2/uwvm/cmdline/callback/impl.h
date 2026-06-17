@@ -60,6 +60,7 @@
 # include "runtime_jit.h"
 # include "runtime_aot.h"
 # include "runtime_tiered.h"
+# include "runtime_uwvm_int_loop_unwind_max_size.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"
