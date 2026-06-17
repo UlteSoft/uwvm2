@@ -282,7 +282,7 @@ def main() -> int:
         "-DUWVM_TEST=2",
         "-DUWVM_VERSION_X=2",
         "-DUWVM_VERSION_Y=0",
-        "-DUWVM_VERSION_Z=2",
+        "-DUWVM_VERSION_Z=3",
         "-DUWVM_VERSION_S=0",
         "-DUWVM_USE_UWVM_INT",
         "-DUWVM_USE_LLVM_JIT",
