@@ -4,7 +4,7 @@
   <h1>UlteSoft WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
-    <img src="https://img.shields.io/badge/V2.0.2.0-1f6feb?style=for-the-badge" alt="V2.0.2.0"/>
+    <img src="https://img.shields.io/badge/V2.0.3.0-1f6feb?style=for-the-badge" alt="V2.0.3.0"/>
   </p>
 </div>
 
@@ -76,7 +76,7 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 
 ## Releases
 * [Dev](https://github.com/UlteSoft/uwvm2/tree/master): branch `master`
-* [Beta V2.0.2.0](https://github.com/UlteSoft/uwvm2/tree/V2.0.2.0): branch `V2.0.2.0`
+* [Beta V2.0.3.0](https://github.com/UlteSoft/uwvm2/tree/V2.0.3.0): branch `V2.0.3.0`
 
 ## Support / Donations
 
