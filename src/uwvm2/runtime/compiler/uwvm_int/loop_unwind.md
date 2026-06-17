@@ -142,11 +142,12 @@ The default max-size budget is 4096 Wasm body bytes. The runtime aliases are:
 Related runtime controls for isolating measurements:
 
 ```text
---runtime-uwvm-int-disable-opcode-conbination
+--runtime-uwvm-int-set-opcode-conbination-level disable
 --runtime-uwvm-int-disable-delay-local
 ```
 
-The first option keeps the existing public spelling `conbination`. In design text,
+The first option keeps the existing public spelling `conbination`; the level
+selector is only present when opcode conbination is compiled in. In design text,
 this document uses the standard spelling "combination" unless it refers to an
 actual command-line option, source file, or symbol.
 

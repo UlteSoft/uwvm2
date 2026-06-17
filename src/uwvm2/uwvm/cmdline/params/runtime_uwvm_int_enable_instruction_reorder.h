@@ -15,7 +15,7 @@
  *  _   _ __        ____     __ __  __  *
  * | | | |\ \      / /\ \   / /|  \/  | *
  * | | | | \ \ /\ / /  \ \ / / | |\/| | *
- * | |_| |  \ V  V /    \ V /  | |  | | *
+ * | |_| |  \ V  V /    \ V / | |  | | *
  *  \___/    \_/\_/      \_/   |_|  |_| *
  *                                      *
  ****************************************/
@@ -45,18 +45,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view runtime_uwvm_int_disable_opcode_conbination_alias{u8"-Rint-no-op-conbine"};
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_uwvm_int_enable_instruction_reorder_alias{u8"-Rint-reorder"};
     }  // namespace details
 
 # if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wbraced-scalar-init"
 # endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_uwvm_int_disable_opcode_conbination{
-        .name{u8"--runtime-uwvm-int-disable-opcode-conbination"},
-        .describe{u8"Disable uwvm-int opcode conbination peepholes."},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_uwvm_int_disable_opcode_conbination_alias), 1uz}},
-        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_opcode_conbination)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_uwvm_int_enable_instruction_reorder{
+        .name{u8"--runtime-uwvm-int-enable-instruction-reorder"},
+        .describe{u8"Enable experimental uwvm-int register-ring-aware instruction reorder."},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_uwvm_int_enable_instruction_reorder_alias), 1uz}},
+        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_enable_instruction_reorder)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 # if defined(__clang__)
 #  pragma clang diagnostic pop

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
+ * @date        2026-06-17
  * @copyright   APL-2.0 License
  */
 
@@ -20,24 +20,36 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <type_traits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+
+export module uwvm2.runtime.compiler.uwvm_int.optable:instruction_reorder;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.debug;
+import uwvm2.parser.wasm.standard.wasm1;
+import uwvm2.object;
+import :define;
+import :register_ring;
+import :numeric;
 
 #ifndef UWVM_MODULE
-# include "define.h"
-# include "storage.h"
-# include "call.h"
-# include "compare.h"
-# include "constop.h"
-# include "control.h"
-# include "convert.h"
-# include "lazy.h"
-# include "memory.h"
-# include "numeric.h"
-# include "stack.h"
-# include "variable.h"
-# include "conbine.h"
-# include "delay_local.h"
-# include "instruction_reorder.h"
-# include "conbine_heavy.h"
-# include "combine_extra_heavy.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "instruction_reorder.h"

@@ -60,6 +60,7 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_aot;
 export import :runtime_tiered;
+export import :runtime_uwvm_int_set_opcode_conbination_level;
 export import :runtime_uwvm_int_loop_unwind_max_size;
 
 // wasi

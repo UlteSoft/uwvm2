@@ -1347,6 +1347,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Off\n");
 # endif
 
+# if defined(UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER)
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Instruction Reorder: Available (runtime default off)\n");
+# else
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Instruction Reorder: Off\n");
+# endif
+
 # if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
             ::fast_io::io::perr(u8log_output_ul,
                                 u8"    - Loop Unwind: On (default max wasm bytes ",

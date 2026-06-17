@@ -1,7 +1,31 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
-bool const runtime_uwvm_int_opcode_conbination_enabled{!::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_opcode_conbination};
-bool const runtime_uwvm_int_delay_local_enabled{runtime_uwvm_int_opcode_conbination_enabled &&
-                                                !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_delay_local};
+using runtime_uwvm_int_opcode_conbination_level_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_opcode_conbination_level_t;
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+[[maybe_unused]] auto const runtime_uwvm_int_opcode_conbination_level{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_uwvm_int_opcode_conbination_level};
+#else
+[[maybe_unused]] constexpr auto runtime_uwvm_int_opcode_conbination_level{runtime_uwvm_int_opcode_conbination_level_t::disable};
+#endif
+[[maybe_unused]] auto const runtime_uwvm_int_opcode_conbination_level_at_least{
+    [](runtime_uwvm_int_opcode_conbination_level_t curr, runtime_uwvm_int_opcode_conbination_level_t required) constexpr noexcept -> bool
+    {
+        return static_cast<unsigned>(curr) >= static_cast<unsigned>(required);
+    }};
+bool const runtime_uwvm_int_opcode_conbination_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::soft)};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_soft_enabled{runtime_uwvm_int_opcode_conbination_enabled};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_heavy_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::heavy)};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_extra_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::extra)};
+[[maybe_unused]] bool const runtime_uwvm_int_delay_local_enabled{runtime_uwvm_int_opcode_conbination_enabled &&
+                                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_delay_local};
+[[maybe_unused]] bool const runtime_uwvm_int_instruction_reorder_enabled{
+#if defined(UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER)
+    ::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_enable_instruction_reorder
+#else
+    false
+#endif
+};
 [[maybe_unused]] bool const runtime_uwvm_int_loop_unwind_enabled{
 #if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
     !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_loop_unwind
@@ -18,7 +42,7 @@ constexpr bool runtime_log_emit_opfuncs{false};
 constexpr bool runtime_log_emit_cf{false};
 constexpr bool runtime_log_emit_wasm_ops{false};
 constexpr bool runtime_log_emit_stacktop{false};
-constexpr bool runtime_log_emit_conbine{false};
+[[maybe_unused]] constexpr bool runtime_log_emit_conbine{false};
 constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t
@@ -46,7 +70,14 @@ struct runtime_log_stats_t
     ::std::uint_least64_t loop_unwind_replayed_bytecode_bytes{};
     ::std::uint_least64_t instr_reorder_candidate_count{};
     ::std::uint_least64_t instr_reorder_applied_count{};
-    ::std::uint_least64_t instr_reorder_local_add_count{};
+    ::std::uint_least64_t instr_reorder_local_preload_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_set_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_tee_count{};
+    ::std::uint_least64_t instr_reorder_expr_fold_count{};
+    ::std::uint_least64_t instr_reorder_expr_local_set_count{};
+    ::std::uint_least64_t instr_reorder_expr_local_tee_count{};
+    ::std::uint_least64_t instr_reorder_expr_step_count{};
     ::std::uint_least64_t instr_reorder_local_read_count{};
     ::std::uint_least64_t stacktop_spill1_count{};
     ::std::uint_least64_t stacktop_spillN_count{};
@@ -2021,6 +2052,76 @@ auto const stacktop_prepare_push1_if_reachable{[&](bytecode_vec_t& dst, curr_ope
                                                        stacktop_prepare_push1_typed(dst, vt);
                                                    }
                                                }};
+
+[[maybe_unused]] auto const stacktop_prepare_push_n_same_vt_if_reachable{
+    [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt, ::std::size_t n) constexpr UWVM_THROWS
+    {
+        if constexpr(!stacktop_enabled) { return; }
+        else
+        {
+            if(is_polymorphic || n == 0uz) { return; }
+            if(!stacktop_enabled_for_vt(vt)) { return; }
+
+            ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
+            ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
+            ::std::size_t const ring_size{end_pos - begin_pos};
+
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            if(ring_size == 0uz || n > ring_size) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+            if(ring_size == 0uz || n > ring_size) [[unlikely]] { return; }
+
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+            {
+                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                     u8"[uwvm-int-translator] fn=",
+                                     function_index,
+                                     u8" event=stacktop.prepare_pushN(begin) | vt=",
+                                     runtime_log_vt_name(vt),
+                                     u8" n=",
+                                     n,
+                                     u8" begin=",
+                                     begin_pos,
+                                     u8" end=",
+                                     end_pos,
+                                     u8" range_cache=",
+                                     stacktop_cache_count_for_range(begin_pos, end_pos),
+                                     u8" stacktop{mem=",
+                                     stacktop_memory_count,
+                                     u8",cache=",
+                                     stacktop_cache_count,
+                                     u8"}\n");
+            }
+
+            ::std::size_t spill_cnt{};
+            while(stacktop_cache_count_for_range(begin_pos, end_pos) + n > ring_size)
+            {
+                stacktop_spill_one_deepest_to(dst, 1uz);
+                ++spill_cnt;
+            }
+
+            stacktop_assert_invariants();
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+            {
+                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                     u8"[uwvm-int-translator] fn=",
+                                     function_index,
+                                     u8" event=stacktop.prepare_pushN(end) | vt=",
+                                     runtime_log_vt_name(vt),
+                                     u8" n=",
+                                     n,
+                                     u8" spills=",
+                                     spill_cnt,
+                                     u8" range_cache=",
+                                     stacktop_cache_count_for_range(begin_pos, end_pos),
+                                     u8" stacktop{mem=",
+                                     stacktop_memory_count,
+                                     u8",cache=",
+                                     stacktop_cache_count,
+                                     u8"}\n");
+            }
+        }
+    }};
 
 [[maybe_unused]] auto const stacktop_commit_push1_if_reachable{[&](curr_operand_stack_value_type vt) constexpr noexcept
                                                                {

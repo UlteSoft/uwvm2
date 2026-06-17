@@ -521,97 +521,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::push_operand_byref<CompileOption>(acc, typeref...);
     }
 
-    /// @brief Fuses a rescheduled integer `local.get` add-reduction into one opfunc dispatch.
-    /// @details
-    /// - Used by the translator for left-fold integer chains that were proved reorderable.
-    /// - Immediates: `uint8_t local_count`, followed by `local_count` x `local_offset_t`.
-    /// - The reduction folds from the last local back to the first, matching the stack shape after
-    ///   the translator groups the local producers before the adds.
-    template <uwvm_interpreter_translate_option_t CompileOption,
-              typename IntT,
-              typename UIntT,
-              ::std::size_t LocalCount,
-              ::std::size_t curr_stack_top,
-              uwvm_int_stack_top_type... Type>
-        requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_int_add_reduce_nlocalget(Type... type) UWVM_THROWS
-    {
-        static_assert(LocalCount >= 3uz);
-        static_assert(LocalCount <= 8uz);
-        static_assert(sizeof...(Type) >= 3uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
-
-        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
-
-        [[maybe_unused]] auto const local_count{conbine_details::read_imm<::std::uint8_t>(type...[0])};
-
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(local_count != LocalCount) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-
-        conbine_details::local_offset_t offs[LocalCount]{};  // init
-        for(::std::size_t i{}; i != LocalCount; ++i) { offs[i] = conbine_details::read_imm<conbine_details::local_offset_t>(type...[0]); }
-
-        IntT acc{conbine_details::load_local<IntT>(type...[2u], offs[LocalCount - 1uz])};
-        for(::std::size_t i{LocalCount - 1uz}; i-- != 0uz;)
-        {
-            acc = numeric_details::eval_int_binop<numeric_details::int_binop::add, IntT, UIntT>(
-                conbine_details::load_local<IntT>(type...[2u], offs[i]),
-                acc);
-        }
-
-        conbine_details::push_operand<CompileOption, IntT, curr_stack_top>(acc, type...);
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-    }
-
-    /// @brief Byref variant of @ref uwvmint_int_add_reduce_nlocalget.
-    template <uwvm_interpreter_translate_option_t CompileOption,
-              typename IntT,
-              typename UIntT,
-              ::std::size_t LocalCount,
-              uwvm_int_stack_top_type... TypeRef>
-        requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_int_add_reduce_nlocalget(TypeRef&... typeref) UWVM_THROWS
-    {
-        static_assert(LocalCount >= 3uz);
-        static_assert(LocalCount <= 8uz);
-        static_assert(sizeof...(TypeRef) >= 3uz);
-        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
-        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
-
-        typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
-
-        [[maybe_unused]] auto const local_count{conbine_details::read_imm<::std::uint8_t>(typeref...[0])};
-
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(local_count != LocalCount) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-
-        conbine_details::local_offset_t offs[LocalCount]{};  // init
-        for(::std::size_t i{}; i != LocalCount; ++i) { offs[i] = conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0]); }
-
-        IntT acc{conbine_details::load_local<IntT>(typeref...[2u], offs[LocalCount - 1uz])};
-        for(::std::size_t i{LocalCount - 1uz}; i-- != 0uz;)
-        {
-            acc = numeric_details::eval_int_binop<numeric_details::int_binop::add, IntT, UIntT>(
-                conbine_details::load_local<IntT>(typeref...[2u], offs[i]),
-                acc);
-        }
-
-        conbine_details::push_operand_byref<CompileOption>(acc, typeref...);
-    }
-
     /// @brief Fuses `local.get` x12 + `f64.add` x11 into one opfunc dispatch (tail-call).
     /// @details
     /// - Canonical source sequence:
@@ -5740,34 +5649,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_i64_add_reduce_8localget<Opt, Type...>; }
             };
 
-            template <::std::size_t LocalCount>
-            struct i32_add_reduce_nlocalget_op
-            {
-                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-                {
-                    return uwvmint_int_add_reduce_nlocalget<Opt, conbine_details::wasm_i32, conbine_details::wasm_u32, LocalCount, Pos, Type...>;
-                }
-
-                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
-                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
-                { return uwvmint_int_add_reduce_nlocalget<Opt, conbine_details::wasm_i32, conbine_details::wasm_u32, LocalCount, Type...>; }
-            };
-
-            template <::std::size_t LocalCount>
-            struct i64_add_reduce_nlocalget_op
-            {
-                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-                {
-                    return uwvmint_int_add_reduce_nlocalget<Opt, conbine_details::wasm_i64, conbine_details::wasm_u64, LocalCount, Pos, Type...>;
-                }
-
-                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
-                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
-                { return uwvmint_int_add_reduce_nlocalget<Opt, conbine_details::wasm_i64, conbine_details::wasm_u64, LocalCount, Type...>; }
-            };
-
             struct f64_add_reduce_12localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -7573,70 +7454,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_i64_add_reduce_8localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                    ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i64_add_reduce_8localget_fptr<CompileOption, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
-            requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i32_add_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
-        {
-            static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
-            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
-                                                                    CompileOption.i32_stack_top_begin_pos,
-                                                                    CompileOption.i32_stack_top_end_pos,
-                                                                    details::i32_add_reduce_nlocalget_op<LocalCount>,
-                                                                    Type...>(curr.i32_stack_top_curr_pos);
-        }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
-            requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_i32_add_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                   ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_i32_add_reduce_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_i32_add_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        {
-            static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
-            return details::i32_add_reduce_nlocalget_op<LocalCount>::template fptr_byref<CompileOption, Type...>();
-        }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_i32_add_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                   ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_i32_add_reduce_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
-            requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_add_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
-        {
-            static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
-            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
-                                                                    CompileOption.i64_stack_top_begin_pos,
-                                                                    CompileOption.i64_stack_top_end_pos,
-                                                                    details::i64_add_reduce_nlocalget_op<LocalCount>,
-                                                                    Type...>(curr.i64_stack_top_curr_pos);
-        }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
-            requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_i64_add_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                   ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_i64_add_reduce_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_i64_add_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        {
-            static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
-            return details::i64_add_reduce_nlocalget_op<LocalCount>::template fptr_byref<CompileOption, Type...>();
-        }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_i64_add_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                   ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_i64_add_reduce_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)

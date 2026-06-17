@@ -187,6 +187,11 @@ function def_build(opt)
 		end
 	end
 
+	local enable_uwvm_int_instruction_reorder = get_config("enable-uwvm-int-instruction-reorder")
+	if enable_uwvm_int_instruction_reorder then
+		add_defines("UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER")
+	end
+
 	local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
 	if enable_uwvm_int_loop_unwind then
 		add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")

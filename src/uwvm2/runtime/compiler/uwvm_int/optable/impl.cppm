@@ -40,6 +40,7 @@ export import :stack;
 export import :variable;
 export import :conbine;
 export import :delay_local;
+export import :instruction_reorder;
 export import :conbine_heavy;
 export import :combine_extra_heavy;
 

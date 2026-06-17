@@ -2645,6 +2645,57 @@ auto const flush_conbine_pending{
         }
     }};
 
+[[maybe_unused]] auto const runtime_uwvm_int_conbine_pending_level{
+    [](conbine_pending_kind kind) constexpr noexcept -> runtime_uwvm_int_opcode_conbination_level_t
+    {
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+        switch(kind)
+        {
+            case conbine_pending_kind::for_i32_inc_after_tee: [[fallthrough]];
+            case conbine_pending_kind::for_i32_inc_after_end_const: [[fallthrough]];
+            case conbine_pending_kind::for_i32_inc_after_cmp: [[fallthrough]];
+            case conbine_pending_kind::for_ptr_inc_after_tee: [[fallthrough]];
+            case conbine_pending_kind::for_ptr_inc_after_pend_get: [[fallthrough]];
+            case conbine_pending_kind::for_ptr_inc_after_cmp:
+            {
+                return runtime_uwvm_int_opcode_conbination_level_t::extra;
+            }
+            default: break;
+        }
+#  endif
+        auto const kind_u{static_cast<unsigned>(kind)};
+        if(kind_u >= static_cast<unsigned>(conbine_pending_kind::local_get_const_f32) &&
+           kind_u <= static_cast<unsigned>(conbine_pending_kind::u16_copy_scaled_index_after_load))
+        {
+            return runtime_uwvm_int_opcode_conbination_level_t::heavy;
+        }
+# endif
+        return kind == conbine_pending_kind::none ? runtime_uwvm_int_opcode_conbination_level_t::disable
+                                                  : runtime_uwvm_int_opcode_conbination_level_t::soft;
+    }};
+
+[[maybe_unused]] auto const runtime_uwvm_int_conbine_pending_allowed{
+    [&](conbine_pending_kind kind) constexpr noexcept -> bool
+    {
+        return runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level,
+                                                                  runtime_uwvm_int_conbine_pending_level(kind));
+    }};
+
+[[maybe_unused]] auto const runtime_uwvm_int_br_if_fuse_allowed{
+    [&](br_if_fuse_kind kind) constexpr noexcept -> bool
+    {
+        if(kind == br_if_fuse_kind::none) { return true; }
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+        auto const kind_u{static_cast<unsigned>(kind)};
+        if(kind_u >= static_cast<unsigned>(br_if_fuse_kind::f32_eq) && kind_u <= static_cast<unsigned>(br_if_fuse_kind::f64_lt_eqz))
+        {
+            return runtime_uwvm_int_opcode_conbination_heavy_enabled;
+        }
+# endif
+        return runtime_uwvm_int_opcode_conbination_enabled;
+    }};
+
 /*
  * Pending-fusion continuation policy.
  *
@@ -2680,6 +2731,9 @@ auto const flush_conbine_pending{
 [[maybe_unused]] auto const conbine_can_continue{
     [&](wasm1_code op) constexpr noexcept -> bool
     {
+        if(!runtime_uwvm_int_opcode_conbination_enabled) [[unlikely]] { return conbine_pending.kind == conbine_pending_kind::none; }
+        if(!runtime_uwvm_int_conbine_pending_allowed(conbine_pending.kind)) [[unlikely]] { return false; }
+
         if constexpr(!CompileOption.is_tail_call)
         {
             // Byref/loop interpreter mode: keep the non-tailcall combine subset narrow, but still allow
@@ -2693,8 +2747,8 @@ auto const flush_conbine_pending{
                 case conbine_pending_kind::none: return true;
                 case conbine_pending_kind::local_get:
                     if(conbine_pending.vt == curr_operand_stack_value_type::i32 &&
-                       (op == wasm1_code::i32_const || op == wasm1_code::i32_load || op == wasm1_code::i64_load || op == wasm1_code::f32_load ||
-                        op == wasm1_code::f64_load))
+                       (op == wasm1_code::i32_const || op == wasm1_code::i32_load || op == wasm1_code::i64_load ||
+                        (runtime_uwvm_int_opcode_conbination_heavy_enabled && (op == wasm1_code::f32_load || op == wasm1_code::f64_load))))
                     {
                         return true;
                     }
@@ -2703,12 +2757,24 @@ auto const flush_conbine_pending{
                     if(op == wasm1_code::i32_add) { return true; }
                     break;
                 case conbine_pending_kind::local_get_const_i32_add:
-                    if(op == wasm1_code::local_get || op == wasm1_code::i32_load || op == wasm1_code::f32_load || op == wasm1_code::f64_load) { return true; }
+                    if(op == wasm1_code::local_get || op == wasm1_code::i32_load ||
+                       (runtime_uwvm_int_opcode_conbination_heavy_enabled && (op == wasm1_code::f32_load || op == wasm1_code::f64_load)))
+                    {
+                        return true;
+                    }
                     break;
                 case conbine_pending_kind::local_get_const_i32_add_localget:
                     if(conbine_pending.vt == curr_operand_stack_value_type::i32 && op == wasm1_code::i32_store) { return true; }
-                    if(conbine_pending.vt == curr_operand_stack_value_type::f32 && op == wasm1_code::f32_store) { return true; }
-                    if(conbine_pending.vt == curr_operand_stack_value_type::f64 && op == wasm1_code::f64_store) { return true; }
+                    if(runtime_uwvm_int_opcode_conbination_heavy_enabled && conbine_pending.vt == curr_operand_stack_value_type::f32 &&
+                       op == wasm1_code::f32_store)
+                    {
+                        return true;
+                    }
+                    if(runtime_uwvm_int_opcode_conbination_heavy_enabled && conbine_pending.vt == curr_operand_stack_value_type::f64 &&
+                       op == wasm1_code::f64_store)
+                    {
+                        return true;
+                    }
                     break;
                 default: break;
             }
@@ -2790,9 +2856,11 @@ auto const flush_conbine_pending{
                                 op == wasm1_code::i32_rem_u))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                           || op == wasm1_code::i32_clz || op == wasm1_code::i32_ctz || op == wasm1_code::i32_popcnt || op == wasm1_code::f32_convert_i32_s ||
-                           op == wasm1_code::f32_convert_i32_u || op == wasm1_code::f64_convert_i32_s || op == wasm1_code::f64_convert_i32_u ||
-                           op == wasm1_code::i64_extend_i32_s || op == wasm1_code::i64_extend_i32_u
+                           || (runtime_uwvm_int_opcode_conbination_heavy_enabled &&
+                               (op == wasm1_code::i32_clz || op == wasm1_code::i32_ctz || op == wasm1_code::i32_popcnt ||
+                                op == wasm1_code::f32_convert_i32_s || op == wasm1_code::f32_convert_i32_u ||
+                                op == wasm1_code::f64_convert_i32_s || op == wasm1_code::f64_convert_i32_u ||
+                                op == wasm1_code::i64_extend_i32_s || op == wasm1_code::i64_extend_i32_u))
 # endif
                         ;
                 }
@@ -2810,7 +2878,8 @@ auto const flush_conbine_pending{
                                 op == wasm1_code::i64_rem_u))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                           || op == wasm1_code::i64_clz || op == wasm1_code::i64_ctz || op == wasm1_code::i64_popcnt
+                           || (runtime_uwvm_int_opcode_conbination_heavy_enabled &&
+                               (op == wasm1_code::i64_clz || op == wasm1_code::i64_ctz || op == wasm1_code::i64_popcnt))
 # endif
                         ;
                 }
@@ -2827,6 +2896,7 @@ auto const flush_conbine_pending{
                     }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                    if(!runtime_uwvm_int_opcode_conbination_heavy_enabled) { return false; }
                     if(op == wasm1_code::f32_eq || op == wasm1_code::f32_ne || op == wasm1_code::f32_lt || op == wasm1_code::f32_gt ||
                        op == wasm1_code::f32_le || op == wasm1_code::f32_ge)
                     {
@@ -2869,6 +2939,7 @@ auto const flush_conbine_pending{
                     }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                    if(!runtime_uwvm_int_opcode_conbination_heavy_enabled) { return false; }
                     if(op == wasm1_code::f64_eq || op == wasm1_code::f64_ne || op == wasm1_code::f64_lt || op == wasm1_code::f64_gt ||
                        op == wasm1_code::f64_le || op == wasm1_code::f64_ge)
                     {
@@ -2906,7 +2977,7 @@ auto const flush_conbine_pending{
                 // so we can form 3-local fusions such as:
                 // - `select(local.get a,b,cond)`
                 // - `mac(acc + x*y -> acc)`
-                if(op == wasm1_code::local_get) { return true; }
+                if(op == wasm1_code::local_get) { return runtime_uwvm_int_opcode_conbination_heavy_enabled; }
 
                 if(conbine_pending.vt == curr_operand_stack_value_type::i32)
                 {
@@ -2967,6 +3038,7 @@ auto const flush_conbine_pending{
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                 if(conbine_pending.vt == curr_operand_stack_value_type::f32)
                 {
+                    if(!runtime_uwvm_int_opcode_conbination_heavy_enabled) { return false; }
                     switch(op)
                     {
                         case wasm1_code::f32_add: [[fallthrough]];
@@ -2987,6 +3059,7 @@ auto const flush_conbine_pending{
                 }
                 if(conbine_pending.vt == curr_operand_stack_value_type::f64)
                 {
+                    if(!runtime_uwvm_int_opcode_conbination_heavy_enabled) { return false; }
                     switch(op)
                     {
                         case wasm1_code::f64_add: [[fallthrough]];
@@ -3004,7 +3077,7 @@ auto const flush_conbine_pending{
                         }
                     }
                 }
-                if(op == wasm1_code::local_get) { return true; }
+                if(op == wasm1_code::local_get) { return runtime_uwvm_int_opcode_conbination_heavy_enabled; }
 # endif
                 return false;
             }
@@ -3018,7 +3091,7 @@ auto const flush_conbine_pending{
             {
                 return op == wasm1_code::i32_mul || op == wasm1_code::i32_shl
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                       || op == wasm1_code::i32_rotl
+                       || (runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::i32_rotl)
 # endif
                     ;
             }
@@ -3201,11 +3274,12 @@ auto const flush_conbine_pending{
                     case wasm1_code::i32_store: [[fallthrough]];
                     case wasm1_code::i32_store8: [[fallthrough]];
                     case wasm1_code::i32_store16:
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                    case wasm1_code::i32_rotl: [[fallthrough]];
-                    case wasm1_code::i32_rotr:
-# endif
                         return true;
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                    case wasm1_code::i32_rotl:
+                    case wasm1_code::i32_rotr:
+                        return runtime_uwvm_int_opcode_conbination_heavy_enabled;
+# endif
                     [[unlikely]] default:
                         return false;
                 }
@@ -3214,23 +3288,32 @@ auto const flush_conbine_pending{
             {
                 switch(op)
                 {
-                    case wasm1_code::local_get: [[fallthrough]];
+                    case wasm1_code::local_get:
+                        [[fallthrough]];
                     case wasm1_code::i32_load:
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                    case wasm1_code::f32_load: [[fallthrough]];
-                    case wasm1_code::f64_load:
-# endif
+                    {
                         return true;
+                    }
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                    case wasm1_code::f32_load:
+                        [[fallthrough]];
+                    case wasm1_code::f64_load:
+                    {
+                        return runtime_uwvm_int_opcode_conbination_heavy_enabled;
+                    }
+# endif
                     [[unlikely]] default:
+                    {
                         return false;
+                    }
                 }
             }
             case conbine_pending_kind::local_get_const_i32_add_localget:
             {
                 if(conbine_pending.vt == curr_operand_stack_value_type::i32) { return op == wasm1_code::i32_store; }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                if(conbine_pending.vt == curr_operand_stack_value_type::f32) { return op == wasm1_code::f32_store; }
-                if(conbine_pending.vt == curr_operand_stack_value_type::f64) { return op == wasm1_code::f64_store; }
+                if(conbine_pending.vt == curr_operand_stack_value_type::f32) { return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f32_store; }
+                if(conbine_pending.vt == curr_operand_stack_value_type::f64) { return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f64_store; }
 # endif
                 return false;
             }
@@ -3831,7 +3914,8 @@ auto const translate_one_opcode{
         else
         {
             // Combine state: only fuse if the next opcode is immediately `br_if`.
-            if(br_if_fuse.kind != br_if_fuse_kind::none && curr_opbase != wasm1_code::br_if) [[unlikely]]
+            if(br_if_fuse.kind != br_if_fuse_kind::none &&
+               (!runtime_uwvm_int_br_if_fuse_allowed(br_if_fuse.kind) || curr_opbase != wasm1_code::br_if)) [[unlikely]]
             {
                 br_if_fuse.kind = br_if_fuse_kind::none;
                 br_if_fuse.site = SIZE_MAX;

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
+ * @date        2026-06-17
  * @copyright   APL-2.0 License
  */
 
@@ -15,29 +15,32 @@
  *  _   _ __        ____     __ __  __  *
  * | | | |\ \      / /\ \   / /|  \/  | *
  * | | | | \ \ /\ / /  \ \ / / | |\/| | *
- * | |_| |  \ V  V /    \ V /  | |  | | *
+ * | |_| |  \ V  V /    \ V / | |  | | *
  *  \___/    \_/\_/      \_/   |_|  |_| *
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
+
+export module uwvm2.uwvm.cmdline.params:runtime_uwvm_int_enable_instruction_reorder;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.cmdline;
+import uwvm2.uwvm.runtime.runtime_mode;
 
 #ifndef UWVM_MODULE
-# include "define.h"
-# include "storage.h"
-# include "call.h"
-# include "compare.h"
-# include "constop.h"
-# include "control.h"
-# include "convert.h"
-# include "lazy.h"
-# include "memory.h"
-# include "numeric.h"
-# include "stack.h"
-# include "variable.h"
-# include "conbine.h"
-# include "delay_local.h"
-# include "instruction_reorder.h"
-# include "conbine_heavy.h"
-# include "combine_extra_heavy.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "runtime_uwvm_int_enable_instruction_reorder.h"

@@ -85,8 +85,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_loop_unwind),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_opcode_conbination),
+#  if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_set_opcode_conbination_level),
+#  endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_delay_local),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_enable_instruction_reorder),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_loop_unwind_max_size),
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)

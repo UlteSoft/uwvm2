@@ -96,7 +96,7 @@
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
             // Extra-heavy: mega-fuse the full `test7`-style i32 sum loop into a single opfunc that keeps
             // `i/sum` in registers and performs at most one bounds check per slot.
-            if(runtime_uwvm_int_opcode_conbination_enabled && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+            if(runtime_uwvm_int_opcode_conbination_extra_enabled && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 bool match_ok{true};
@@ -221,7 +221,7 @@
             }
 
             // Extra-heavy: mega-fuse `micro/loop_i64.wasm` hot loop into one opfunc dispatch.
-            if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+            if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -366,7 +366,7 @@
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/round_f64_dense.wasm` hot loop into one opfunc dispatch.
-                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -529,7 +529,7 @@
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/loop_f64.wasm` hot loop into one opfunc dispatch.
-                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -665,7 +665,7 @@
             // Extra-heavy: mega-fuse `test10` hot affine inv-square f32 loop.
             if constexpr(CompileOption.is_tail_call)
             {
-                if(runtime_uwvm_int_opcode_conbination_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     bool match_ok{true};
@@ -2546,7 +2546,7 @@ case wasm1_code::br_if:
         // This removes huge threaded-interpreter dispatch overhead from the tight arithmetic loops.
         if constexpr(CompileOption.is_tail_call)
         {
-            if(runtime_uwvm_int_opcode_conbination_enabled && !need_repair && target_arity == 0uz && target_frame.type == block_type::loop &&
+            if(runtime_uwvm_int_opcode_conbination_extra_enabled && !need_repair && target_arity == 0uz && target_frame.type == block_type::loop &&
                label_index_uz == 0uz && curr_size == target_base && target_base == 0uz && target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 bool fused_extra_heavy_loop_run{};
