@@ -9327,6 +9327,14 @@ namespace uwvm2::runtime::lib
             return mattrs;
         }
 
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_jit_host_cpu_name() noexcept
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            return ::uwvm2::utils::container::u8string{llvm_jit_translate_details::get_uwvm_u8string_view(host_cpu_name)};
+        }
+
         inline constexpr void
             append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& attr_storage,
                                                        ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs) noexcept
@@ -9336,6 +9344,40 @@ namespace uwvm2::runtime::lib
             attr_refs.clear();
             attr_refs.reserve(attr_storage.size());
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
+        }
+
+        inline constexpr void apply_runtime_llvm_jit_native_target_function_attrs(
+            ::llvm::Module& module,
+            ::uwvm2::utils::container::u8string const& target_cpu_name,
+            ::uwvm2::utils::container::u8string const& tune_cpu_name,
+            ::llvm::TargetMachine const& target_machine) noexcept
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            auto const target_features{target_machine.getTargetFeatureString()};
+            auto const target_cpu_ref{llvm_jit_translate_details::get_llvm_string_ref(target_cpu_name)};
+            auto const tune_cpu_ref{llvm_jit_translate_details::get_llvm_string_ref(tune_cpu_name)};
+            auto const target_features_ref{llvm_jit_translate_details::get_llvm_string_ref(target_features)};
+
+            for(auto& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                if(!target_cpu_ref.empty()) { function.addFnAttr(llvm_jit_translate_details::get_llvm_string_ref(u8"target-cpu"), target_cpu_ref); }
+                if(!tune_cpu_ref.empty()) { function.addFnAttr(llvm_jit_translate_details::get_llvm_string_ref(u8"tune-cpu"), tune_cpu_ref); }
+                if(!target_features_ref.empty())
+                {
+                    function.addFnAttr(llvm_jit_translate_details::get_llvm_string_ref(u8"target-features"), target_features_ref);
+                }
+            }
+        }
+
+        inline constexpr void append_runtime_llvm_jit_native_target_codegen_policy(
+            ::uwvm2::utils::container::u8string& policy,
+            ::uwvm2::utils::container::u8string const& target_cpu_name,
+            ::uwvm2::utils::container::u8string const& tune_cpu_name) noexcept
+        {
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(policy, u8"target-cpu", target_cpu_name);
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(policy, u8"tune-cpu", tune_cpu_name);
         }
 
         enum class runtime_llvm_jit_full_pipeline_kind : unsigned
@@ -9557,6 +9599,7 @@ namespace uwvm2::runtime::lib
         {
             // Shared context for pre-link optimization of per-task LLVM modules before they are linked into the full module.
             ::uwvm2::utils::container::u8string host_cpu_name{};
+            ::uwvm2::utils::container::u8string host_tune_cpu_name{};
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> host_target_attribute_storage{};
             ::llvm::CodeGenOptLevel codegen_opt_level{};
             ::std::atomic_size_t optimized_task_modules{};
@@ -9576,6 +9619,8 @@ namespace uwvm2::runtime::lib
 
             module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple());
             module_storage.llvm_module->setDataLayout(target_machine->createDataLayout());
+            apply_runtime_llvm_jit_native_target_function_attrs(
+                *module_storage.llvm_module, context->host_cpu_name, context->host_tune_cpu_name, *target_machine);
             run_runtime_llvm_jit_legacy_light_function_pipeline(*module_storage.llvm_module, *target_machine);
             context->optimized_task_modules.fetch_add(1uz, ::std::memory_order_relaxed);
             return true;
@@ -9777,6 +9822,7 @@ namespace uwvm2::runtime::lib
             ::std::size_t end,
             bool owns_global_definitions,
             ::uwvm2::utils::container::u8string const& host_cpu_name,
+            ::uwvm2::utils::container::u8string const& host_tune_cpu_name,
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
             ::llvm::CodeGenOptLevel codegen_opt_level,
             bool verify_llvm_jit_ir,
@@ -9850,6 +9896,7 @@ namespace uwvm2::runtime::lib
 
                 module->setTargetTriple(target_machine->getTargetTriple());
                 module->setDataLayout(target_machine->createDataLayout());
+                apply_runtime_llvm_jit_native_target_function_attrs(*module, host_cpu_name, host_tune_cpu_name, *target_machine);
                 if(verify_llvm_jit_ir && ::llvm::verifyModule(*module)) [[unlikely]]
                 {
                     failure_state.failed.store(true, ::std::memory_order_release);
@@ -9882,6 +9929,7 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr runtime_llvm_jit_parallel_object_emit_result
             emit_runtime_llvm_jit_objects_parallel(::llvm::Module& module,
                                                    ::uwvm2::utils::container::u8string const& host_cpu_name,
+                                                   ::uwvm2::utils::container::u8string const& host_tune_cpu_name,
                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
                                                    ::llvm::CodeGenOptLevel codegen_opt_level,
                                                    bool verify_llvm_jit_ir,
@@ -9927,6 +9975,7 @@ namespace uwvm2::runtime::lib
                                                                           end,
                                                                           task_index == 0uz,
                                                                           host_cpu_name,
+                                                                          host_tune_cpu_name,
                                                                           host_target_attribute_storage,
                                                                           codegen_opt_level,
                                                                           verify_llvm_jit_ir,
@@ -10141,7 +10190,10 @@ namespace uwvm2::runtime::lib
                 return false;
             }
 
-            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+
+            auto const host_cpu_name{get_llvm_jit_host_cpu_name()};
+            auto const host_tune_cpu_name{host_cpu_name};
             auto const host_target_attribute_storage{get_llvm_jit_host_target_attribute_storage()};
             ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
             append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
@@ -10154,7 +10206,10 @@ namespace uwvm2::runtime::lib
             // The target machine drives both optimization cost modeling and final object emission, so set module triple/layout before
             // running any optimization pipeline.
             ::llvm::EngineBuilder target_builder{};
-            target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(codegen_opt_level).setMCPU(host_cpu_name).setMAttrs(host_target_attributes);
+            target_builder.setEngineKind(::llvm::EngineKind::JIT)
+                .setOptLevel(codegen_opt_level)
+                .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
+                .setMAttrs(host_target_attributes);
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
             if(target_machine == nullptr) [[unlikely]]
@@ -10169,6 +10224,7 @@ namespace uwvm2::runtime::lib
 
             merged_module->setTargetTriple(target_machine->getTargetTriple());
             merged_module->setDataLayout(target_machine->createDataLayout());
+            apply_runtime_llvm_jit_native_target_function_attrs(*merged_module, host_cpu_name, host_tune_cpu_name, *target_machine);
             auto llvm_jit_cache_key{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"full-module")};
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", rec.module_name);
             auto full_module_wasm_hash{runtime_llvm_jit_full_module_cache_fingerprint(*runtime_module)};
@@ -10184,6 +10240,7 @@ namespace uwvm2::runtime::lib
                 llvm_jit_cache_codegen_policy, u8"policy", full_materialize_strategy.policy_name);
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
                 llvm_jit_cache_codegen_policy, u8"call-stack", get_runtime_llvm_jit_call_stack_mode_name());
+            append_runtime_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, host_cpu_name, host_tune_cpu_name);
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
@@ -10294,8 +10351,8 @@ namespace uwvm2::runtime::lib
                 llvm_jit_materialize_runtime_log_line(u8"object-emit-start module=\"", rec.module_name, u8"\" extra_threads=", extra_materialize_threads);
                 auto const object_emit_result{emit_runtime_llvm_jit_objects_parallel(
                     *merged_module,
-                    ::uwvm2::utils::container::u8string{
-                        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(host_cpu_name)},
+                    host_cpu_name,
+                    host_tune_cpu_name,
                     host_target_attribute_storage,
                     codegen_opt_level,
                     !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction,
@@ -10356,7 +10413,7 @@ namespace uwvm2::runtime::lib
                 raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
                                  .setEngineKind(::llvm::EngineKind::JIT)
                                  .setOptLevel(codegen_opt_level)
-                                 .setMCPU(host_cpu_name)
+                                 .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                                  .setMAttrs(host_target_attributes)
                                  .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
                                      ::uwvm2::utils::container::make_delete_owned<
@@ -10370,7 +10427,7 @@ namespace uwvm2::runtime::lib
                 raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
                                  .setEngineKind(::llvm::EngineKind::JIT)
                                  .setOptLevel(codegen_opt_level)
-                                 .setMCPU(host_cpu_name)
+                                 .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                                  .setMAttrs(host_target_attributes)
                                  .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
                                      ::uwvm2::utils::container::make_delete_owned<
@@ -11774,9 +11831,9 @@ namespace uwvm2::runtime::lib
                             if(full_translation_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light &&
                                ensure_llvm_jit_native_target_initialized())
                             {
-                                auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                                legacy_light_task_preopt_context.host_cpu_name = ::uwvm2::utils::container::u8string{
-                                    ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(host_cpu_name)};
+                                auto const host_cpu_name{get_llvm_jit_host_cpu_name()};
+                                legacy_light_task_preopt_context.host_cpu_name = host_cpu_name;
+                                legacy_light_task_preopt_context.host_tune_cpu_name = host_cpu_name;
                                 legacy_light_task_preopt_context.host_target_attribute_storage = get_llvm_jit_host_target_attribute_storage();
                                 legacy_light_task_preopt_context.codegen_opt_level = full_translation_strategy.codegen_opt_level;
                                 llvm_jit_opt.llvm_jit_task_module_pre_link_callback =

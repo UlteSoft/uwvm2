@@ -426,6 +426,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             // Host CPU name as returned by LLVM, stored to keep StringRef inputs alive.
             ::uwvm2::utils::container::u8string cpu_name{};
 
+            // Host CPU used for backend scheduling/tuning.  JIT code runs only on this machine, so tune natively too.
+            ::uwvm2::utils::container::u8string tune_cpu_name{};
+
             // Host feature attributes such as "+sse2" or "-avx512f", also stored for stable StringRef lifetimes.
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> feature_storage{};
         };
@@ -584,15 +587,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             return mattrs;
         }
 
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_jit_host_cpu_name() noexcept
+        {
+            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            return ::uwvm2::utils::container::u8string{all_details::get_uwvm_u8string_view(host_cpu_name)};
+        }
+
         // Returns the process-wide native target configuration used for lazy MCJIT materialization.
         [[nodiscard]] inline constexpr llvm_jit_native_target_config const& get_llvm_jit_native_target_config() noexcept
         {
-            static llvm_jit_native_target_config config{.cpu_name =
-                                                            []() constexpr noexcept
-                                                        {
-                                                            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                                                            return ::uwvm2::utils::container::u8string{all_details::get_uwvm_u8string_view(host_cpu_name)};
-                                                        }(),
+            static llvm_jit_native_target_config config{.cpu_name = get_llvm_jit_host_cpu_name(),
+                                                        .tune_cpu_name = get_llvm_jit_host_cpu_name(),
                                                         .feature_storage = get_llvm_jit_host_target_attribute_storage()};  // [global]
             return config;
         }
@@ -605,6 +610,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             attr_refs.clear();
             attr_refs.reserve(attr_storage.size());
             for(auto const& attr: attr_storage) { attr_refs.push_back(all_details::get_llvm_string_ref(attr)); }
+        }
+
+        inline constexpr void apply_llvm_jit_native_target_function_attrs(::llvm::Module& module,
+                                                                          llvm_jit_native_target_config const& target_config,
+                                                                          ::llvm::TargetMachine const& target_machine) noexcept
+        {
+            auto const target_features{target_machine.getTargetFeatureString()};
+            auto const target_cpu_ref{all_details::get_llvm_string_ref(target_config.cpu_name)};
+            auto const tune_cpu_ref{all_details::get_llvm_string_ref(target_config.tune_cpu_name)};
+            auto const target_features_ref{all_details::get_llvm_string_ref(target_features)};
+
+            for(auto& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                if(!target_cpu_ref.empty()) { function.addFnAttr(all_details::get_llvm_string_ref(u8"target-cpu"), target_cpu_ref); }
+                if(!tune_cpu_ref.empty()) { function.addFnAttr(all_details::get_llvm_string_ref(u8"tune-cpu"), tune_cpu_ref); }
+                if(!target_features_ref.empty()) { function.addFnAttr(all_details::get_llvm_string_ref(u8"target-features"), target_features_ref); }
+            }
+        }
+
+        inline constexpr void append_llvm_jit_native_target_codegen_policy(::uwvm2::utils::container::u8string& policy,
+                                                                           llvm_jit_native_target_config const& target_config) noexcept
+        {
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(policy, u8"target-cpu", target_config.cpu_name);
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(policy, u8"tune-cpu", target_config.tune_cpu_name);
         }
 
         // Advances over one Wasm instruction while scanning for direct `call` opcodes.  Structured control opcodes need
@@ -780,6 +810,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
+            apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
                 [[unlikely]]
             {
@@ -804,6 +835,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     llvm_jit_cache_codegen_policy, u8"codegen-opt-level", static_cast<::std::uint_least64_t>(options.codegen_opt_level));
                 ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
                     llvm_jit_cache_codegen_policy, u8"validation-mode", lazy_validation_mode_name(options.validation_mode));
+                append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
@@ -933,6 +965,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
+            apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
                 [[unlikely]]
             {
@@ -985,6 +1018,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     llvm_jit_cache_codegen_policy, u8"codegen-opt-level", static_cast<::std::uint_least64_t>(options.codegen_opt_level));
                 ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
                     llvm_jit_cache_codegen_policy, u8"validation-mode", lazy_validation_mode_name(options.validation_mode));
+                append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
