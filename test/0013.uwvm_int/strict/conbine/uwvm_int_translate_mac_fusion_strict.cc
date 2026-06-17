@@ -226,13 +226,9 @@ namespace
             ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_dup, ::fast_io::u8err());
         }
 
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        ::uwvm2test::uwvm_int_strict::install_unexpected_traps();
+        optable::call_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call;
+        optable::call_indirect_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call_indirect;
 
         auto wasm = build_mac_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_mac_fusion");

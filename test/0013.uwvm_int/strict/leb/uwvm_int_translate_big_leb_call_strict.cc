@@ -16,7 +16,7 @@ namespace
         ::std::memcpy(p, ::std::addressof(v), sizeof(v));
     }
 
-    static void call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         using kind_t = optable::trivial_defined_call_kind;
         using info_t = optable::compiled_defined_call_info;
@@ -141,13 +141,9 @@ namespace
 
     [[nodiscard]] int test_translate_big_leb_call() noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
+        ::uwvm2test::uwvm_int_strict::install_unexpected_traps();
         optable::call_func = +call_bridge;
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::call_indirect_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call_indirect;
 
         auto wasm = build_big_leb_call_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_big_leb_call");

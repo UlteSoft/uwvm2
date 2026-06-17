@@ -134,7 +134,15 @@ namespace
     };
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
-    { return ::std::string{"\""} + path.string() + "\""; }
+    {
+        auto text{path.string()};
+#ifdef _WIN32
+        auto trailing_backslashes{0uz};
+        for(auto it{text.rbegin()}; it != text.rend() && *it == '\\'; ++it) { ++trailing_backslashes; }
+        text.append(trailing_backslashes, '\\');
+#endif
+        return ::std::string{"\""} + text + "\"";
+    }
 
     [[nodiscard]] int run_system_command(::std::string const& command)
     {

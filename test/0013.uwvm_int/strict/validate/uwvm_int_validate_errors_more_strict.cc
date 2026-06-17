@@ -1206,13 +1206,9 @@ namespace
 
     [[nodiscard]] int test_validate_errors_more()
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        ::uwvm2test::uwvm_int_strict::install_unexpected_traps();
+        optable::call_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call;
+        optable::call_indirect_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call_indirect;
 
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_missing_end_module(), u8"uwvm2test_validate_missing_end", errc::missing_end, 1uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_trailing_code_after_end_module(), u8"uwvm2test_validate_trailing", errc::trailing_code_after_end) == 0);
