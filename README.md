@@ -4,7 +4,7 @@
   <h1>UlteSoft WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
-    <img src="https://img.shields.io/badge/V2.0.3.0-1f6feb?style=for-the-badge" alt="V2.0.3.0"/>
+    <img src="https://img.shields.io/badge/V2.0.3.0-ffffff?style=for-the-badge" alt="V2.0.3.0"/>
   </p>
 </div>
 
