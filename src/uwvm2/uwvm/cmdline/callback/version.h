@@ -1346,6 +1346,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # else
             ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Off\n");
 # endif
+
+# if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
+            ::fast_io::io::perr(u8log_output_ul,
+                                u8"    - Loop Unwind: On (default max wasm bytes ",
+                                ::uwvm2::uwvm::runtime::runtime_mode::default_runtime_uwvm_int_loop_unwind_max_size,
+                                u8")\n");
+# else
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Loop Unwind: Off\n");
+# endif
         }
 #endif
         // LLVM JIT

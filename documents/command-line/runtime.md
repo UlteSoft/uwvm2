@@ -20,6 +20,10 @@ Source focus:
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
 | `--runtime-aot` | `-Raot` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: full compilation with LLVM JIT. |
 | `--runtime-compiler-log` | `-Rclog` | `[out|err|file <file:path>]` | Once | Runtime backend support | Route runtime compiler logs. |
+| `--runtime-uwvm-int-disable-loop-unwind` | `-Rint-no-loop-unwind` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Disable uwvm-int loop-unwind translation at runtime. |
+| `--runtime-uwvm-int-disable-opcode-conbination` | `-Rint-no-op-conbine` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Disable uwvm-int opcode conbination peepholes at runtime. |
+| `--runtime-uwvm-int-disable-delay-local` | `-Rint-no-delay-local` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Disable uwvm-int delay-local peepholes at runtime. |
+| `--runtime-uwvm-int-loop-unwind-max-size` | `-Rint-loop-unwind-size` | `<bytes:size_t>` | Once | `UWVM_RUNTIME_UWVM_INTERPRETER` | Set the per-loop Wasm body byte budget used by loop-unwind decisions. |
 | `--runtime-llvm-jit-policy` | `-Rllvm-policy` | `[debug|default|fast-compile|balanced|max]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the high-level LLVM JIT strategy policy. |
 | `--runtime-llvm-jit-lazy-policy` | `-Rllvm-lazy-policy` | `[auto|debug|light|balanced]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the lazy/tier-1 LLVM JIT strategy. |
 | `--runtime-llvm-jit-full-policy` | `-Rllvm-full-policy` | `[auto|debug|legacy-light|pb-o1|pb-o2|pb-o3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the full/tier-2 LLVM JIT strategy. |

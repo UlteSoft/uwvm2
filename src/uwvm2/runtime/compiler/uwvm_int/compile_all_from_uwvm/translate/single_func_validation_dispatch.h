@@ -2780,13 +2780,14 @@ auto const flush_conbine_pending{
                            (CompileOption.is_tail_call && (op == wasm1_code::i32_load8_s || op == wasm1_code::i32_load8_u || op == wasm1_code::i32_load16_s ||
                                                            op == wasm1_code::i32_load16_u))
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
-                           || op == wasm1_code::i32_add || op == wasm1_code::i32_xor
+                           || (runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::i32_add || op == wasm1_code::i32_xor))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
-                           || op == wasm1_code::i32_sub || op == wasm1_code::i32_mul || op == wasm1_code::i32_and || op == wasm1_code::i32_or ||
-                           op == wasm1_code::i32_shl || op == wasm1_code::i32_shr_s || op == wasm1_code::i32_shr_u || op == wasm1_code::i32_rotl ||
-                           op == wasm1_code::i32_rotr || op == wasm1_code::i32_div_s || op == wasm1_code::i32_div_u || op == wasm1_code::i32_rem_s ||
-                           op == wasm1_code::i32_rem_u
+                           || (runtime_uwvm_int_delay_local_enabled &&
+                               (op == wasm1_code::i32_sub || op == wasm1_code::i32_mul || op == wasm1_code::i32_and || op == wasm1_code::i32_or ||
+                                op == wasm1_code::i32_shl || op == wasm1_code::i32_shr_s || op == wasm1_code::i32_shr_u || op == wasm1_code::i32_rotl ||
+                                op == wasm1_code::i32_rotr || op == wasm1_code::i32_div_s || op == wasm1_code::i32_div_u || op == wasm1_code::i32_rem_s ||
+                                op == wasm1_code::i32_rem_u))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                            || op == wasm1_code::i32_clz || op == wasm1_code::i32_ctz || op == wasm1_code::i32_popcnt || op == wasm1_code::f32_convert_i32_s ||
@@ -2799,13 +2800,14 @@ auto const flush_conbine_pending{
                 {
                     return op == wasm1_code::i64_const || op == wasm1_code::i64_eqz
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
-                           || op == wasm1_code::i64_add || op == wasm1_code::i64_xor
+                           || (runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::i64_add || op == wasm1_code::i64_xor))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
-                           || op == wasm1_code::i64_sub || op == wasm1_code::i64_mul || op == wasm1_code::i64_and || op == wasm1_code::i64_or ||
-                           op == wasm1_code::i64_shl || op == wasm1_code::i64_shr_s || op == wasm1_code::i64_shr_u || op == wasm1_code::i64_rotl ||
-                           op == wasm1_code::i64_rotr || op == wasm1_code::i64_div_s || op == wasm1_code::i64_div_u || op == wasm1_code::i64_rem_s ||
-                           op == wasm1_code::i64_rem_u
+                           || (runtime_uwvm_int_delay_local_enabled &&
+                               (op == wasm1_code::i64_sub || op == wasm1_code::i64_mul || op == wasm1_code::i64_and || op == wasm1_code::i64_or ||
+                                op == wasm1_code::i64_shl || op == wasm1_code::i64_shr_s || op == wasm1_code::i64_shr_u || op == wasm1_code::i64_rotl ||
+                                op == wasm1_code::i64_rotr || op == wasm1_code::i64_div_s || op == wasm1_code::i64_div_u || op == wasm1_code::i64_rem_s ||
+                                op == wasm1_code::i64_rem_u))
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                            || op == wasm1_code::i64_clz || op == wasm1_code::i64_ctz || op == wasm1_code::i64_popcnt
@@ -2815,11 +2817,11 @@ auto const flush_conbine_pending{
                 if(conbine_pending.vt == curr_operand_stack_value_type::f32)
                 {
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
-                    if(op == wasm1_code::f32_add || op == wasm1_code::f32_mul) { return true; }
+                    if(runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::f32_add || op == wasm1_code::f32_mul)) { return true; }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
-                    if(op == wasm1_code::f32_sub || op == wasm1_code::f32_div || op == wasm1_code::f32_min || op == wasm1_code::f32_max ||
-                       op == wasm1_code::f32_copysign)
+                    if(runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::f32_sub || op == wasm1_code::f32_div || op == wasm1_code::f32_min ||
+                                                                op == wasm1_code::f32_max || op == wasm1_code::f32_copysign))
                     {
                         return true;
                     }
@@ -2857,11 +2859,11 @@ auto const flush_conbine_pending{
                 if(conbine_pending.vt == curr_operand_stack_value_type::f64)
                 {
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
-                    if(op == wasm1_code::f64_add || op == wasm1_code::f64_mul) { return true; }
+                    if(runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::f64_add || op == wasm1_code::f64_mul)) { return true; }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
-                    if(op == wasm1_code::f64_sub || op == wasm1_code::f64_div || op == wasm1_code::f64_min || op == wasm1_code::f64_max ||
-                       op == wasm1_code::f64_copysign)
+                    if(runtime_uwvm_int_delay_local_enabled && (op == wasm1_code::f64_sub || op == wasm1_code::f64_div || op == wasm1_code::f64_min ||
+                                                                op == wasm1_code::f64_max || op == wasm1_code::f64_copysign))
                     {
                         return true;
                     }
@@ -3779,77 +3781,144 @@ auto const runtime_log_wasm_op_state{[&]([[maybe_unused]] ::uwvm2::utils::contai
 
 bool finished_current_func{};
 
-// Main validation/translation loop. Each iteration consumes exactly one Wasm opcode plus its
-// immediates and delegates semantic handling to the opcode include fragments below.
-for(;;)
-{
-    if(code_curr == code_end) [[unlikely]]
+auto const translate_one_opcode{
+    [&](auto const& translate_one_opcode_self) constexpr UWVM_THROWS -> void
     {
-        // [... ] | (end)
-        // [safe] | unsafe (could be the section_end)
-        //          ^^ code_curr
+        if(code_curr == code_end) [[unlikely]]
+        {
+            // [... ] | (end)
+            // [safe] | unsafe (could be the section_end)
+            //          ^^ code_curr
 
-        // Validation completes when the end is reached, so this condition can never be met. If it were met, it would indicate a missing end.
+            // Validation completes when the end is reached, so this condition can never be met. If it were met, it would indicate a missing end.
 
-        err.err_curr = code_curr;
-        err.err_code = code_validation_error_code::missing_end;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
+            err.err_curr = code_curr;
+            err.err_code = code_validation_error_code::missing_end;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
 
-    // opbase ...
-    // [safe] unsafe (could be the section_end)
-    // ^^ code_curr
+        // opbase ...
+        // [safe] unsafe (could be the section_end)
+        // ^^ code_curr
 
-    auto const op_begin{code_curr};
+        auto const op_begin{code_curr};
 
-    wasm1_code curr_opbase;  // no initialize necessary
-    ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
-    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
-    {
-        runtime_log_curr_ip = static_cast<::std::size_t>(op_begin - code_begin);
-        ++runtime_log_stats.wasm_op_count;
-    }
+        wasm1_code curr_opbase;  // no initialize necessary
+        ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
+        if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
+        {
+            runtime_log_curr_ip = static_cast<::std::size_t>(op_begin - code_begin);
+            ++runtime_log_stats.wasm_op_count;
+        }
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-    stacktop_dbg_last_op = curr_opbase;
-    stacktop_dbg_last_ip = static_cast<::std::size_t>(op_begin - code_begin);
+        stacktop_dbg_last_op = curr_opbase;
+        stacktop_dbg_last_ip = static_cast<::std::size_t>(op_begin - code_begin);
 #endif
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-    // Combine state: only fuse if the next opcode is immediately `br_if`.
-    if(br_if_fuse.kind != br_if_fuse_kind::none && curr_opbase != wasm1_code::br_if) [[unlikely]]
-    {
-        br_if_fuse.kind = br_if_fuse_kind::none;
-        br_if_fuse.site = SIZE_MAX;
-        br_if_fuse.end = SIZE_MAX;
-        br_if_fuse.stacktop_currpos_at_site = {};
-    }
+        if(!runtime_uwvm_int_opcode_conbination_enabled) [[unlikely]]
+        {
+            if(br_if_fuse.kind != br_if_fuse_kind::none)
+            {
+                br_if_fuse.kind = br_if_fuse_kind::none;
+                br_if_fuse.site = SIZE_MAX;
+                br_if_fuse.end = SIZE_MAX;
+                br_if_fuse.stacktop_currpos_at_site = {};
+            }
+            if(conbine_pending.kind != conbine_pending_kind::none) { flush_conbine_pending(); }
+        }
+        else
+        {
+            // Combine state: only fuse if the next opcode is immediately `br_if`.
+            if(br_if_fuse.kind != br_if_fuse_kind::none && curr_opbase != wasm1_code::br_if) [[unlikely]]
+            {
+                br_if_fuse.kind = br_if_fuse_kind::none;
+                br_if_fuse.site = SIZE_MAX;
+                br_if_fuse.end = SIZE_MAX;
+                br_if_fuse.stacktop_currpos_at_site = {};
+            }
 
-    // Conbine state machine: flush pending ops unless the current opcode can continue the fusion.
-    // Global pending-fusion entry gate. Unknown or unsupported continuations are flushed here before
-    // the current opcode is translated, so delay-local and adjacent conbine patterns never cross an
-    // opcode boundary that could change observable order or hide a higher-priority consumer.
-    if(conbine_pending.kind != conbine_pending_kind::none && !conbine_can_continue(curr_opbase)) [[unlikely]] { flush_conbine_pending(); }
+            // Conbine state machine: flush pending ops unless the current opcode can continue the fusion.
+            // Global pending-fusion entry gate. Unknown or unsupported continuations are flushed here before
+            // the current opcode is translated, so delay-local and adjacent conbine patterns never cross an
+            // opcode boundary that could change observable order or hide a higher-priority consumer.
+            if(conbine_pending.kind != conbine_pending_kind::none && !conbine_can_continue(curr_opbase)) [[unlikely]] { flush_conbine_pending(); }
+        }
 #endif
 
-    ::std::size_t bytecode_before{};
-    ::std::size_t thunks_before{};
-    ::std::uint_least64_t opfunc_main_before{};
-    ::std::uint_least64_t opfunc_thunk_before{};
+        ::std::size_t bytecode_before{};
+        ::std::size_t thunks_before{};
+        ::std::uint_least64_t opfunc_main_before{};
+        ::std::uint_least64_t opfunc_thunk_before{};
 
-    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
-    {
-        bytecode_before = bytecode.size();
-        thunks_before = thunks.size();
-        opfunc_main_before = runtime_log_stats.opfunc_main_count;
-        opfunc_thunk_before = runtime_log_stats.opfunc_thunk_count;
-        runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
-    }
+        if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
+        {
+            bytecode_before = bytecode.size();
+            thunks_before = thunks.size();
+            opfunc_main_before = runtime_log_stats.opfunc_main_count;
+            opfunc_thunk_before = runtime_log_stats.opfunc_thunk_count;
+            runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+        }
 
-    // The opcode fragments are included inside the switch so they can share the helper lambdas above
-    // while still keeping each opcode family in a separate file.
-    switch(curr_opbase)
-    {
+        [[maybe_unused]] auto const replay_loop_body{
+            [&](::std::byte const* replay_begin, ::std::byte const* replay_end, ::std::size_t replay_count) constexpr UWVM_THROWS -> void
+            {
+                auto const saved_code_curr{code_curr};
+                auto const body_wasm_bytes{static_cast<::std::size_t>(replay_end - replay_begin)};
+
+                for(::std::size_t i{}; i != replay_count; ++i)
+                {
+                    auto const bytecode_before_replay{bytecode.size()};
+                    code_curr = replay_begin;
+
+                    while(code_curr != replay_end)
+                    {
+                        if(code_curr > replay_end) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+
+                        translate_one_opcode_self(translate_one_opcode_self);
+
+                        if(finished_current_func || code_curr > replay_end) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                    if(br_if_fuse.kind != br_if_fuse_kind::none) [[unlikely]]
+                    {
+                        br_if_fuse.kind = br_if_fuse_kind::none;
+                        br_if_fuse.site = SIZE_MAX;
+                        br_if_fuse.end = SIZE_MAX;
+                        br_if_fuse.stacktop_currpos_at_site = {};
+                    }
+                    if(conbine_pending.kind != conbine_pending_kind::none) [[unlikely]] { flush_conbine_pending(); }
+#endif
+
+                    if(runtime_log_on) [[unlikely]]
+                    {
+                        ++runtime_log_stats.loop_unwind_replayed_body_count;
+                        runtime_log_stats.loop_unwind_replayed_wasm_bytes += body_wasm_bytes;
+                        runtime_log_stats.loop_unwind_replayed_bytecode_bytes += bytecode.size() - bytecode_before_replay;
+                    }
+                }
+
+                code_curr = saved_code_curr;
+            }};
+
+        // The opcode fragments are included inside the switch so they can share the helper lambdas above
+        // while still keeping each opcode family in a separate file.
+        switch(curr_opbase)
+        {
 #include "opcode/control_flow_cases.h"
 #include "opcode/branch_cases.h"
 #include "opcode/call_cases.h"
@@ -3858,20 +3927,26 @@ for(;;)
 #include "opcode/const_compare_cases.h"
 #include "opcode/int_numeric_cases.h"
 #include "opcode/float_numeric_convert_cases.h"
-        [[unlikely]] default:
-        {
-            err.err_curr = code_curr;
-            err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
-            err.err_code = code_validation_error_code::illegal_opbase;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            [[unlikely]] default:
+            {
+                err.err_curr = code_curr;
+                err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
+                err.err_code = code_validation_error_code::illegal_opbase;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
-    }
 
-    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
-    {
-        runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
-    }
+        if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
+        {
+            runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+        }
+    }};
 
+// Main validation/translation loop. Each iteration consumes exactly one Wasm opcode plus its
+// immediates and delegates semantic handling to the opcode include fragments above.
+for(;;)
+{
+    translate_one_opcode(translate_one_opcode);
     if(finished_current_func) { break; }
 }
 }

@@ -187,6 +187,11 @@ function def_build(opt)
 		end
 	end
 
+	local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
+	if enable_uwvm_int_loop_unwind then
+		add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")
+	end
+
 	local use_thread_local = get_config("use-thread-local")
 	if use_thread_local then
 		add_defines("UWVM_USE_THREAD_LOCAL")

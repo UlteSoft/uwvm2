@@ -173,6 +173,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details Interpreted either as `functions per task` or `cumulative wasm code-body bytes per task` depending on the selected policy.
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+    inline constexpr ::std::size_t default_runtime_uwvm_int_loop_unwind_max_size{4096uz};
+
+    /// @brief Whether uwvm-int loop unwind is disabled at runtime.
+    inline bool runtime_uwvm_int_disable_loop_unwind{};  // [global]
+
+    /// @brief Whether uwvm-int opcode conbination peepholes are disabled at runtime.
+    inline bool runtime_uwvm_int_disable_opcode_conbination{};  // [global]
+
+    /// @brief Whether uwvm-int delay-local peepholes are disabled at runtime.
+    inline bool runtime_uwvm_int_disable_delay_local{};  // [global]
+
+    /// @brief Whether the uwvm-int loop unwind byte-size limit was explicitly configured.
+    inline bool runtime_uwvm_int_loop_unwind_max_size_existed{};  // [global]
+
+    /// @brief Maximum Wasm body bytes considered for one loop-unwind decision.
+    inline ::std::size_t global_runtime_uwvm_int_loop_unwind_max_size{default_runtime_uwvm_int_loop_unwind_max_size};  // [global]
+#endif
+
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     /// @brief Whether the high-level runtime LLVM JIT policy was explicitly configured.
     inline bool runtime_llvm_jit_policy_existed{};  // [global]
