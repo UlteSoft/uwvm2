@@ -34,6 +34,8 @@ This document summarizes both (1) the architecture and (2) the optimization work
   - Spill/fill and transform operations between canonical operand stack memory and the cached stack-top segment.
 - **Loop-unwind policy**: `loop_unwind.md`
   - Whitepaper for the register-ring loop re-entry optimization, including WebAssembly loop-label semantics, minimum recovery period, safety invariants, limits, and measurement interpretation.
+- **Instruction-reschedule policy**: `instruction_reorder.md`
+  - Design note for the bounded integer add-reduction rescheduler that turns LLVM-style shallow local folds into register-ring-friendly fused dispatch.
 
 ### 2.2 Execution model (direct-threaded stream)
 u2 executes a pointer stream:
@@ -96,6 +98,17 @@ u2’s `delay_local` provides analogous consumer variants:
 Build knobs (see the analysis note for empirical motivation):
 - `--enable-uwvm-int-combine-ops={none,soft,heavy,extra}`
 - `--enable-uwvm-int-delay-local={none,soft,heavy}`
+
+### 5.3 Instruction rescheduling: bounded local add-reduction
+LLVM-generated MVP WebAssembly often expresses arithmetic as shallow local-heavy left folds:
+
+```text
+local.get a; local.get b; i32.add; local.get c; i32.add; ...
+```
+
+In heavy combine mode, u2 can reschedule the pure integer subset into one fused add-reduction opfunc. The current pass is deliberately narrow: it accepts only same-typed `i32.add`/`i64.add` chains made from `local.get` producers, because integer addition is modulo arithmetic and the window contains no trap or side-effect boundary.
+
+See `instruction_reorder.md` for the legality model, emitted bytecode shape, and runtime log fields.
 
 ## 6. Leaf hot-path discipline (tail-threaded correctness and performance)
 
@@ -163,6 +176,7 @@ The main engineering takeaway from these measurements is methodological: when tw
 - Adjacent fusion: `optable/conbine.h`, `optable/conbine_heavy.h`, `optable/combine_extra_heavy.h`
 - Delay-local fused opfuncs: `optable/delay_local.h`
 - Loop-unwind design note: `loop_unwind.md`
+- Instruction-reschedule design note: `instruction_reorder.md`
 - Numeric ops and trap wrappers: `optable/numeric.h`
 - Memory ops (generality and fast paths): `optable/memory.h`
 - Per-target translate options (ABI sizing): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)

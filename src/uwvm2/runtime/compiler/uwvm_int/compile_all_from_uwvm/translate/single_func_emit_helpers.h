@@ -44,6 +44,10 @@ struct runtime_log_stats_t
     ::std::uint_least64_t loop_unwind_replayed_body_count{};
     ::std::uint_least64_t loop_unwind_replayed_wasm_bytes{};
     ::std::uint_least64_t loop_unwind_replayed_bytecode_bytes{};
+    ::std::uint_least64_t instr_reorder_candidate_count{};
+    ::std::uint_least64_t instr_reorder_applied_count{};
+    ::std::uint_least64_t instr_reorder_local_add_count{};
+    ::std::uint_least64_t instr_reorder_local_read_count{};
     ::std::uint_least64_t stacktop_spill1_count{};
     ::std::uint_least64_t stacktop_spillN_count{};
     ::std::uint_least64_t stacktop_fill1_count{};

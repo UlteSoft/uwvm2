@@ -188,6 +188,133 @@ case wasm1_code::local_get:
 #endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+    // Instruction reschedule: turn a shallow LLVM-style left fold
+    // `local.get a; local.get b; i*.add; local.get c; i*.add; ...`
+    // into a register-ring-friendly group:
+    // `local.get a; local.get b; local.get c; ...; i*.add; i*.add; ...`.
+    //
+    // This is intentionally limited to i32/i64 addition. Wasm integer addition is modulo 2^N and
+    // associative under that arithmetic, while floating-point addition is not. The window contains
+    // only local.get and add, so it crosses no trap, memory, global, call, or control-flow boundary.
+    if(runtime_uwvm_int_opcode_conbination_enabled && !is_polymorphic && conbine_pending.kind == conbine_pending_kind::none &&
+       (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64))
+    {
+        auto const try_reschedule_left_add_chain{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t max_reschedule_local_count{8uz};
+                ::uwvm2::utils::container::array<local_offset_t, max_reschedule_local_count> offs{};
+                offs[0] = local_off;
+
+                wasm1_code const add_op{curr_local_type == curr_operand_stack_value_type::i32 ? wasm1_code::i32_add : wasm1_code::i64_add};
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t local_count{1uz};
+
+                while(local_count < max_reschedule_local_count)
+                {
+                    if(scan == code_end) { break; }
+
+                    wasm1_code op{};  // init
+                    ::std::memcpy(::std::addressof(op), scan, sizeof(op));
+                    if(op != wasm1_code::local_get) { break; }
+
+                    wasm_u32 next_local_index{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [next_local_index_next, next_local_index_err]{
+                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                       local_type_from_index(next_local_index) != curr_local_type)
+                    {
+                        break;
+                    }
+
+                    auto const after_local_get{reinterpret_cast<::std::byte const*>(next_local_index_next)};
+                    if(after_local_get == code_end) { break; }
+
+                    wasm1_code next_op{};  // init
+                    ::std::memcpy(::std::addressof(next_op), after_local_get, sizeof(next_op));
+                    if(next_op != add_op) { break; }
+
+                    offs[local_count] = local_offset_from_index(next_local_index);
+                    scan = after_local_get + 1u;
+                    ++local_count;
+                }
+
+                if(local_count < 3uz) { return false; }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    ++runtime_log_stats.instr_reorder_local_add_count;
+                    runtime_log_stats.instr_reorder_local_read_count += local_count;
+                }
+
+                // Net Wasm stack effect of the consumed chain is one pushed integer value.
+                operand_stack_push(curr_local_type);
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    for(::std::size_t i{}; i != local_count; ++i)
+                    {
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_reduce{
+                    [&]<::std::size_t LocalCount>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_add_reduce_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop, interpreter_tuple));
+                        }
+                        else
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_add_reduce_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop, interpreter_tuple));
+                        }
+                    }};
+
+                switch(local_count)
+                {
+                    case 3uz: emit_reduce.template operator()<3uz>(); break;
+                    case 4uz: emit_reduce.template operator()<4uz>(); break;
+                    case 5uz: emit_reduce.template operator()<5uz>(); break;
+                    case 6uz: emit_reduce.template operator()<6uz>(); break;
+                    case 7uz: emit_reduce.template operator()<7uz>(); break;
+                    case 8uz: emit_reduce.template operator()<8uz>(); break;
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(local_count));
+                for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
+                stacktop_commit_push1_typed_if_reachable(curr_local_type);
+
+                code_curr = scan;
+                return true;
+            }};
+
+        if(try_reschedule_left_add_chain()) { break; }
+    }
+#endif
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
     // Heavy combine: collapse the hot chain
     // `local.get src; f{32,64}.const mul; f{32,64}.mul; f{32,64}.const add; f{32,64}.add; local.set src`
     // into one opfunc dispatch (net stack effect 0).
