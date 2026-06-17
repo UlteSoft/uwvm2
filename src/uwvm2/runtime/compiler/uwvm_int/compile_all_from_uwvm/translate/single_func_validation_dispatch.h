@@ -3861,6 +3861,8 @@ auto const translate_one_opcode{
             runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
         }
 
+        // Re-emit Wasm instead of copying emitted u2 bytecode: opfunc pointers are
+        // specialized by the current register-ring positions. See loop_unwind.md.
         [[maybe_unused]] auto const replay_loop_body{
             [&](::std::byte const* replay_begin, ::std::byte const* replay_end, ::std::size_t replay_count) constexpr UWVM_THROWS -> void
             {

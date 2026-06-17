@@ -818,6 +818,9 @@
             if(!fused_extra_heavy_loop_run)
             {
 #if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
+                // Loop-unwind amortizes register-ring re-entry repair for simple final loop backedges.
+                // It is not a general dispatch-reduction unroller; empty-cache MVP loops should reject.
+                // See src/uwvm2/runtime/compiler/uwvm_int/loop_unwind.md.
                 if(target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
                    target_frame.wasm_code_curr_at_start_label != nullptr)
                 {

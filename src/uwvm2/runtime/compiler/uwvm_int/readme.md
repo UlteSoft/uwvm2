@@ -32,6 +32,8 @@ This document summarizes both (1) the architecture and (2) the optimization work
   - Dispatch targets for arithmetic/control/memory/calls plus fused patterns.
 - **Register-ring cache**: `optable/register_ring.h`
   - Spill/fill and transform operations between canonical operand stack memory and the cached stack-top segment.
+- **Loop-unwind policy**: `loop_unwind.md`
+  - Whitepaper for the register-ring loop re-entry optimization, including WebAssembly loop-label semantics, minimum recovery period, safety invariants, limits, and measurement interpretation.
 
 ### 2.2 Execution model (direct-threaded stream)
 u2 executes a pointer stream:
@@ -160,6 +162,7 @@ The main engineering takeaway from these measurements is methodological: when tw
 - Stack-top cache ring, spill/fill, transforms: `optable/register_ring.h`
 - Adjacent fusion: `optable/conbine.h`, `optable/conbine_heavy.h`, `optable/combine_extra_heavy.h`
 - Delay-local fused opfuncs: `optable/delay_local.h`
+- Loop-unwind design note: `loop_unwind.md`
 - Numeric ops and trap wrappers: `optable/numeric.h`
 - Memory ops (generality and fast paths): `optable/memory.h`
 - Per-target translate options (ABI sizing): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)

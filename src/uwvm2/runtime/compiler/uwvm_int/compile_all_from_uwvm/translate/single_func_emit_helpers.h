@@ -1939,6 +1939,9 @@ auto const stacktop_flush_all_to_operand_stack{[&](bytecode_vec_t& dst) constexp
                                                      return div * b;
                                                  }};
 
+// Loop-unwind uses the minimum recovery period for each enabled register ring:
+// ring_size / gcd(ring_size, delta). The global period is the lcm across ranges.
+// See src/uwvm2/runtime/compiler/uwvm_int/loop_unwind.md.
 [[maybe_unused]] auto const loop_unwind_currpos_period{
     [&]() constexpr noexcept -> ::std::size_t
     {
