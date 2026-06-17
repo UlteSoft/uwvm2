@@ -3,14 +3,14 @@
   <br/>
   <h1>UlteSoft WebAssembly Virtual Machine 2</h1>
   <p>
-    <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
-    <img src="https://img.shields.io/badge/V2.0.2.0-1f6feb?style=for-the-badge" alt="V2.0.2.0"/>
+    <img src="https://img.shields.io/badge/Release-orange?style=for-the-badge" alt="Release"/>
+    <img src="https://img.shields.io/badge/V2.0.2.1-orange?style=for-the-badge" alt="V2.0.2.1"/>
   </p>
 </div>
 
 <div style="text-align:center">
     <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI">
-        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=master" alt="github-ci" />
+        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=V2.0.2" alt="github-ci" />
     </a>
     <a href="LICENSE.md">
         <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" , alt="License" />
@@ -75,8 +75,7 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 * Other platforms: See [how-to-build](documents/how-to-build)
 
 ## Releases
-* [Dev](https://github.com/UlteSoft/uwvm2/tree/master): branch `master`
-* [Beta V2.0.2.0](https://github.com/UlteSoft/uwvm2/tree/V2.0.2.0): branch `V2.0.2.0`
+* [Release V2.0.2.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.2): branch `V2.0.2`
 
 ## Support / Donations
 
