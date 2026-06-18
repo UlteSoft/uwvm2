@@ -79,6 +79,8 @@ struct runtime_log_stats_t
     ::std::uint_least64_t instr_reorder_expr_local_tee_count{};
     ::std::uint_least64_t instr_reorder_const_binop_local_set_count{};
     ::std::uint_least64_t instr_reorder_const_binop_local_tee_count{};
+    ::std::uint_least64_t instr_reorder_ring_slot_reject_count{};
+    ::std::uint_least64_t instr_reorder_ring_slot_used_count{};
     ::std::uint_least64_t instr_reorder_expr_step_count{};
     ::std::uint_least64_t instr_reorder_local_read_count{};
     ::std::uint_least64_t stacktop_spill1_count{};
@@ -741,7 +743,45 @@ auto const stacktop_cache_count_for_range{
         return sum;
     }};
 
-// Reconcile per-type cache counters from the codegen type stack.
+[[maybe_unused]] auto const stacktop_ring_size_for_vt{
+    [&](curr_operand_stack_value_type vt) constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return SIZE_MAX; }
+        else
+        {
+            if(!stacktop_enabled_for_vt(vt)) { return 0uz; }
+            auto const begin_pos{stacktop_range_begin_pos(vt)};
+            auto const end_pos{stacktop_range_end_pos(vt)};
+            return end_pos > begin_pos ? (end_pos - begin_pos) : 0uz;
+        }
+    }};
+
+[[maybe_unused]] auto const stacktop_free_slot_count_for_vt{
+    [&](curr_operand_stack_value_type vt) constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return SIZE_MAX; }
+        else
+        {
+            auto const ring_size{stacktop_ring_size_for_vt(vt)};
+            if(ring_size == 0uz) { return 0uz; }
+            auto const begin_pos{stacktop_range_begin_pos(vt)};
+            auto const end_pos{stacktop_range_end_pos(vt)};
+            auto const used{stacktop_cache_count_for_range(begin_pos, end_pos)};
+            return used < ring_size ? (ring_size - used) : 0uz;
+        }
+    }};
+
+[[maybe_unused]] auto const stacktop_has_push_slots_without_spill{
+    [&](curr_operand_stack_value_type vt, ::std::size_t need) constexpr noexcept -> bool
+    {
+        if constexpr(!stacktop_enabled) { return true; }
+        else
+        {
+            return stacktop_free_slot_count_for_vt(vt) >= need;
+        }
+    }};
+
+	// Reconcile per-type cache counters from the codegen type stack.
 // This protects against missing/incorrect per-type updates on ops that only retype the top value
 // (e.g., reinterpret/extend) while keeping stack depth unchanged.
 [[maybe_unused]] auto const stacktop_rebuild_cache_type_counts_from_codegen{[&]() constexpr noexcept

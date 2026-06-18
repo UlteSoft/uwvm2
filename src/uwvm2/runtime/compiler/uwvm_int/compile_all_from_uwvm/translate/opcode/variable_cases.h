@@ -389,6 +389,12 @@ case wasm1_code::local_get:
                     if(after_tee == wasm1_code::br_if) { return false; }
                 }
 
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
                 auto const local_size{operand_stack_valtype_size(curr_local_type)};
                 if(local_size != 0uz)
                 {
@@ -405,6 +411,7 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_local_reduce_set_count; }
                     else { ++runtime_log_stats.instr_reorder_local_reduce_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     runtime_log_stats.instr_reorder_local_read_count += local_count;
                 }
 
@@ -596,6 +603,12 @@ case wasm1_code::local_get:
                     if(after_tee == wasm1_code::br_if) { return false; }
                 }
 
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
                 auto const local_size{operand_stack_valtype_size(curr_local_type)};
                 if(local_size != 0uz)
                 {
@@ -609,6 +622,7 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_const_binop_local_set_count; }
                     else { ++runtime_log_stats.instr_reorder_const_binop_local_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     ++runtime_log_stats.instr_reorder_expr_step_count;
                     ++runtime_log_stats.instr_reorder_local_read_count;
                 }
@@ -811,6 +825,12 @@ case wasm1_code::local_get:
                     if(after_tee == wasm1_code::br_if) { return false; }
                 }
 
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
                 auto const dst_off{local_offset_from_index(dst_local_index)};
 
                 auto const local_size{operand_stack_valtype_size(curr_local_type)};
@@ -832,6 +852,7 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_expr_local_set_count; }
                     else { ++runtime_log_stats.instr_reorder_expr_local_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     runtime_log_stats.instr_reorder_expr_step_count += step_count;
                     runtime_log_stats.instr_reorder_local_read_count += local_read_count;
                 }
@@ -1294,17 +1315,21 @@ case wasm1_code::local_get:
                 {
                     if(!stacktop_enabled_for_vt(curr_local_type)) { return false; }
 
-                    auto const begin_pos{stacktop_range_begin_pos(curr_local_type)};
-                    auto const end_pos{stacktop_range_end_pos(curr_local_type)};
-                    if(end_pos <= begin_pos) { return false; }
-                    auto const ring_size{end_pos - begin_pos};
-                    // The preload threshold is exactly one full register ring for the current
+                    auto const ring_size{stacktop_ring_size_for_vt(curr_local_type)};
+                    // The preload limit is the active physical register-ring size for the current
                     // architecture/CompileOption. If a future ABI exposes a larger ring than this
                     // generated opfunc family supports, do not silently treat the fixed template
                     // limit as "full ring"; leave the window to ordinary local handling instead.
                     if(ring_size < 2uz || ring_size > max_supported_preload_ring_size) { return false; }
-                    local_limit = ring_size;
-                    local_min = ring_size;
+                    auto const free_slots{stacktop_free_slot_count_for_vt(curr_local_type)};
+                    if(free_slots < 2uz)
+                    {
+                        if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                        return false;
+                    }
+                    local_limit = free_slots < ring_size ? free_slots : ring_size;
+                    local_min = local_limit;
+                    if(local_limit == ring_size && ring_size > 3uz) { local_min = ring_size - 1uz; }
                 }
                 else
                 {
@@ -1348,6 +1373,7 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_applied_count;
                     ++runtime_log_stats.instr_reorder_local_preload_count;
                     runtime_log_stats.instr_reorder_local_read_count += local_count;
+                    runtime_log_stats.instr_reorder_ring_slot_used_count += local_count;
                 }
 
                 for(::std::size_t i{}; i != local_count; ++i) { operand_stack_push(curr_local_type); }

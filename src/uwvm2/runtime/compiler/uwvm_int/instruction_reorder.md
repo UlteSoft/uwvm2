@@ -8,9 +8,9 @@ This layer is deliberately **off by default**. It is closer to a small register-
 
 Instruction reorder is not part of `conbine`. Adjacent opcode combination emits superinstructions for already-adjacent Wasm patterns. Instruction reorder first proves that a side-effect-free expression window can be legally regrouped, then emits an optable entry that represents the recompiled window. The implementation therefore lives in `optable/instruction_reorder.h`.
 
-The current implementation is intentionally conservative. It does not run a global optimizer and it does not reorder arbitrary WebAssembly instructions. It has four bounded forms:
+The current implementation is intentionally conservative. It does not run a global optimizer and it does not reorder arbitrary WebAssembly instructions. It has five bounded forms:
 
-- full-register-ring `local.get` preload;
+- register-ring free-slot `local.get` preload;
 - same-op integer local reduction;
 - one-step constant integer local update;
 - mixed local/constant integer expression fold;
@@ -96,6 +96,13 @@ dedicated compile-time-binop opfunc for the one-step case. It is used only when 
 from `src`; same-local updates remain owned by ordinary update-local combination, which has the
 smaller established runtime shape for induction-variable updates.
 
+The short `local.tee` variant is also register-ring-slot aware. It is emitted only when the active
+stack-top range has at least one free slot for the result value type. The range size is read from the
+current `CompileOption`, so AAPCS64's five integer argument-register slots and any future ABI layout
+use the same policy without a hard-coded architecture constant. If the ring is full, the translator
+leaves the window to the normal path rather than converting a small dispatch saving into an immediate
+spill.
+
 ## 1. Motivation
 
 u2's register ring is most effective when several live operand-stack values stay in ABI argument registers across adjacent opfuncs. LLVM-generated MVP WebAssembly often uses locals aggressively and keeps the operand stack shallow. A common shape is:
@@ -136,6 +143,7 @@ The optimization is legal only because the recognized window has all of the foll
 - Mixed expression windows contain only no-trap integer operations: `add`, `sub`, `mul`, bitwise ops, shifts, and rotates.
 - Local-update windows may end in `local.set` or `local.tee` only when the destination local has the same value type as the computed expression.
 - The one-step constant-update form is restricted to different source and destination locals so it does not steal same-local update-local combination.
+- The one-step constant-update `local.tee` form requires one free register-ring slot for the result type.
 - `local.tee` windows are not rewritten when the next opcode is `br_if`; that path is reserved for the branch-fusion machinery.
 - All participating locals have the same value type. Preload accepts scalar `i32`, `i64`, `f32`, and `f64`; reduction accepts only `i32` and `i64`.
 - The window contains no memory access, global access, call, branch, table operation, or control-flow boundary.
@@ -155,7 +163,7 @@ The implementation is triggered from the `local.get` case of:
 compile_all_from_uwvm/translate/opcode/variable_cases.h
 ```
 
-At the first `local.get`, the translator performs bounded lookahead. Same-op local-update reduction is attempted before generic mixed expressions because it can use a compile-time `Op` template and avoids the runtime expression switch. Then the translator tries mixed expression local-update, pure local reduction, mixed expression fold, and finally full-ring preload.
+At the first `local.get`, the translator performs bounded lookahead. Same-op local-update reduction is attempted before generic mixed expressions because it can use a compile-time `Op` template and avoids the runtime expression switch. Then the translator tries mixed expression local-update, pure local reduction, mixed expression fold, and finally register-ring free-slot preload.
 
 Before any bounded scanner runs, the translator reads the opcode immediately following the current
 `local.get` once. If that opcode cannot start a supported reorder window, all reorder scanners are
@@ -169,13 +177,14 @@ For preload:
 
 1. Read the current local's type and frame offset.
 2. Scan following `local.get` opcodes while their locals have the same scalar type.
-3. Read the current architecture/`CompileOption` register-ring size for that value type.
-4. Require exactly one full register-ring worth of local reads for that value type. Shorter windows are left to delay-local and adjacent combination because they are usually better handled as ordinary producer-consumer pairs.
-5. If the architecture exposes a larger ring than the currently generated preload opfunc family supports, do not partially preload the window; disable this preload form until the generated family is widened.
-6. Spill enough existing cached values to make room for the whole burst.
-7. Emit `uwvmint_reorder_preload_nlocalget` with an immediate local-count byte followed by the local frame offsets.
-8. Update the validation operand-stack model with `N` pushed values.
-9. Commit `N` typed stack-top pushes in the register-ring model.
+3. Read the current architecture/`CompileOption` register-ring size for that value type and the current free-slot count in that range.
+4. Set the scan limit to `min(ring_size, free_slots)` and require at least two free slots. This guarantees that preload never forces an immediate stack-top spill.
+5. Derive the minimum profitable preload length from the physical ring. When the range is already partially occupied, preload must fill every current hole: `min_count = scan_limit`. When the range is empty and the ring has more than three slots, allow one unfilled slot: `min_count = ring_size - 1`.
+6. Emit the largest same-typed prefix that satisfies `min_count <= local_count <= scan_limit`. On AAPCS64's five-slot integer ring, an empty range therefore accepts 4 or 5 consecutive producers; a range with only two holes accepts exactly two.
+7. If the architecture exposes a larger ring than the currently generated preload opfunc family supports, do not partially preload the window; disable this preload form until the generated family is widened.
+8. Emit `uwvmint_reorder_preload_nlocalget` with an immediate local-count byte followed by the local frame offsets.
+9. Update the validation operand-stack model with `local_count` pushed values.
+10. Commit `local_count` typed stack-top pushes in the register-ring model.
 
 For integer reduction:
 
@@ -201,9 +210,10 @@ For one-step constant local update:
 2. Require one no-trap integer binary operation: add, sub, mul, bitwise op, shift, or rotate.
 3. Require an immediate `local.set` or a `local.tee` not immediately followed by `br_if`.
 4. Require the destination local to have the same value type and a different frame offset from the source local.
-5. Emit `uwvmint_reorder_int_const_binop_local_update` with source local offset, immediate, and destination local offset.
-6. For `local.set`, model no operand-stack result.
-7. For `local.tee`, model one pushed value and commit one typed stack-top push.
+5. For `local.tee`, require one free register-ring slot in the active stack-top range for the result type.
+6. Emit `uwvmint_reorder_int_const_binop_local_update` with source local offset, immediate, and destination local offset.
+7. For `local.set`, model no operand-stack result.
+8. For `local.tee`, model one pushed value and commit one typed stack-top push.
 
 For mixed expression fold and mixed expression local update:
 
@@ -215,7 +225,13 @@ For mixed expression fold and mixed expression local update:
 6. For local-update form, require at least four steps, or use the same-op local-update reduction and one-step constant-update paths for shorter profitable windows.
 7. For `local.tee`, skip the rewrite if the next opcode is `br_if`.
 
-The generated preload family currently covers rings up to eight slots. The policy is intentionally strict: `N` is the active register-ring size, not an arbitrary profitability constant. Architectures with a wider future ring must add matching generated preload variants before this pass can use that wider ring.
+The generated preload family currently covers rings up to eight slots. The policy is intentionally tied to the active register-ring layout: the scan limit and minimum profitable count are derived from the active ring size and the number of currently free slots, not from a fixed AAPCS64 constant. Architectures with a wider future ring must add matching generated preload variants before this pass can use that wider ring.
+
+The register-ring free-slot test is also strict. The translator computes free slots from the per-type
+stack-top cache counters over the current `CompileOption` range. Merged ranges, such as AAPCS64's
+shared `i32/i64` integer range, are counted as one physical ring by summing all value types that map
+to the same begin/end pair. `local.tee` update reorders that produce one stack result also require
+one free slot, so a short update never converts a dispatch reduction into an immediate spill.
 
 ## 4. Runtime Shape
 
@@ -304,13 +320,30 @@ The opcode-combination runtime disable switch does not disable instruction reord
 When runtime compiler logging is enabled, the function summary reports:
 
 ```text
-reorder{cand=...,applied=...,local_preload=...,local_reduce=...,reduce_set=...,reduce_tee=...,expr_fold=...,expr_set=...,expr_tee=...,expr_steps=...,local_reads=...}
+reorder{cand=...,applied=...,local_preload=...,local_reduce=...,reduce_set=...,reduce_tee=...,expr_fold=...,expr_set=...,expr_tee=...,const_set=...,const_tee=...,ring_reject=...,ring_used=...,expr_steps=...,local_reads=...}
 ```
 
 `local_reads` records the total number of `local.get` producers consumed by successful reorders. `expr_steps` records the total number of mixed expression steps executed by folded or local-update expression opfuncs. This makes the pass visible in microbenchmarks and in real clang-generated modules.
+`ring_reject` counts short result-producing rewrites skipped because the target stack-top range had
+no free register-ring slot. `ring_used` counts register-ring holes filled by successful preload and
+short `local.tee` update rewrites.
 
 ## 6. Relationship to Future Scheduling
 
 This pass is a safe first stage, not a full scheduler. A future stack-SSA DAG scheduler can generalize the idea by building basic-block-local dependency graphs, respecting trap and side-effect ordering, and scoring schedules by register-ring occupancy, dispatch count, and code-size pressure.
 
 The current bounded recompiler deliberately avoids that complexity. It establishes the translator interface, opfunc shape, runtime logging, and legality discipline needed for broader instruction reorder while keeping the shipped behavior easy to audit.
+
+## 7. Research Lineage
+
+The policy follows the interpreter literature in three narrow ways:
+
+- Stack caching motivates keeping top-of-stack VM operands in real machine registers, but UWVM2 uses a bounded register ring selected by `CompileOption` rather than a hard-coded global register count.
+- Efficient direct-threaded interpreters are sensitive to dispatch and branch-prediction cost, so the pass only emits a recompiled window when it removes multiple dispatches or fills meaningful register-ring holes.
+- Superinstruction work motivates compiling common opcode sequences into one interpreter operation, but this file keeps the reorder layer separate from adjacent-opcode combination because it first proves a legal expression window and then emits a register-ring-aware opfunc.
+
+References:
+
+- M. Anton Ertl, "Stack Caching for Interpreters", PLDI 1995: https://dl.acm.org/doi/10.1145/207110.207165
+- M. Anton Ertl and David Gregg, "The Structure and Performance of Efficient Interpreters", JILP 2003: https://jilp.org/vol5/v5paper12.pdf
+- M. Anton Ertl and David Gregg, "Combining Stack Caching with Dynamic Superinstructions", IVME 2004: https://dl.acm.org/doi/10.1145/1059579.1059583
