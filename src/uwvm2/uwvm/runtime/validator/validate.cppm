@@ -44,10 +44,12 @@ import uwvm2.parser.wasm.standard.wasm1.features;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm.standard.wasm3.type;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
-import uwvm2.object;
 import uwvm2.validation;
+import uwvm2.validation.standard.wasm1;
+import uwvm2.object;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.utils.memory;
 import uwvm2.uwvm.wasm;
 
 #ifndef UWVM_MODULE

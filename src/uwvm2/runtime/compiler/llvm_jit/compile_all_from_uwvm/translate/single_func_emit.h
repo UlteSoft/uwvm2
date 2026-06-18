@@ -12,8 +12,6 @@
 //     nodes for the single-result subset currently supported by this emitter.
 //   * A `false` return normally means "inline JIT emission cannot be completed safely"; callers may then keep running
 //     through the interpreter/tiered path instead of relying on malformed IR.
-#include <uwvm2/object/memory/linear/access.h>
-
 // A value currently held on the JIT's transient operand stack.  The Wasm value type is stored beside the LLVM value so
 // helper emitters can cheaply re-check stack discipline even though validation has already run.
 struct llvm_jit_stack_value_t

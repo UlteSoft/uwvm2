@@ -43,7 +43,7 @@ import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.validation.error;
-import uwvm2.validation.standard.wasm1:validator;
+import uwvm2.validation.standard.wasm1;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.runtime.storage;
 import uwvm2.runtime.compiler.uwvm_int.optable;

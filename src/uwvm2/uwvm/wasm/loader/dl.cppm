@@ -48,6 +48,7 @@ import uwvm2.uwvm.utils.memory;
 import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.custom;
 

@@ -80,10 +80,12 @@
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-namespace llvm
-{
-    class JITEventListener;
-}
+
+// apple unwind
+# if defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
+extern "C" void __register_frame(void const*);
+extern "C" void __deregister_frame(void const*);
+# endif
 
 // Lazy LLVM JIT compilation support for runtime-local Wasm functions.
 //

@@ -32,9 +32,7 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
-#if defined(UWVM)
-# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-#endif
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include <llvm/ADT/StringRef.h>
 # include <llvm/Bitcode/BitcodeWriter.h>
@@ -49,10 +47,8 @@ export module uwvm2.runtime.llvm_jit_cache:llvm_object_cache;
 import fast_io;
 import fast_io_crypto;
 import uwvm2.utils.container;
-#if defined(UWVM)
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
-#endif
 import :format;
 import :environment;
 import :store;
@@ -66,7 +62,3 @@ import :store;
 
 // The LLVM ObjectCache adapter is included from the header to keep callback behavior identical across build modes.
 #include "llvm_object_cache.h"
-
-#if defined(UWVM)
-# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#endif

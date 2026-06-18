@@ -74,9 +74,6 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 * WASM-WASI (self-hosting) (aka. [wasm32|wasm64]-[wasip1|wasip2]-(threads)). See [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
 * Other platforms: See [how-to-build](documents/how-to-build)
 
-## Releases
-* [Release V2.0.2.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.2): branch `V2.0.2`
-
 ## Support / Donations
 
 If you find this project useful, you can support its development with a crypto donation. See [donations.md](donations.md)
