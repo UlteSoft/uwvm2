@@ -12,6 +12,7 @@ The current implementation is intentionally conservative. It does not run a glob
 
 - full-register-ring `local.get` preload;
 - same-op integer local reduction;
+- one-step constant integer local update;
 - mixed local/constant integer expression fold;
 - expression-local-update recompilation for `local.set` and selected `local.tee` endpoints.
 
@@ -79,6 +80,22 @@ local.set dst
 
 Instead of producing a temporary operand-stack result and then consuming it with a separate local update, the recompiled opfunc computes the value and writes the destination local directly. The `local.tee` variant writes the local and pushes exactly one result, matching WebAssembly semantics.
 
+The short constant-update form exists because LLVM-generated Wasm contains a very high volume of
+one-step address and flag expressions:
+
+```text
+local.get src
+i32.const k
+i32.add / i32.and / i32.shl / ...
+local.set dst
+```
+
+The generic mixed-expression decoder is intentionally gated to longer windows, because decoding a
+one-step bytecode program at runtime costs more than it saves. The short form therefore emits a
+dedicated compile-time-binop opfunc for the one-step case. It is used only when `dst` is different
+from `src`; same-local updates remain owned by ordinary update-local combination, which has the
+smaller established runtime shape for induction-variable updates.
+
 ## 1. Motivation
 
 u2's register ring is most effective when several live operand-stack values stay in ABI argument registers across adjacent opfuncs. LLVM-generated MVP WebAssembly often uses locals aggressively and keeps the operand stack shallow. A common shape is:
@@ -113,10 +130,12 @@ The optimization is legal only because the recognized window has all of the foll
 
 - Every producer in a preload or pure-reduction window is `local.get`.
 - Mixed expression windows may use same-typed `local.get` and same-width integer constants as RHS operands.
+- One-step constant-update windows must have exactly one same-width integer constant followed by one legal no-trap integer binary operation.
 - Preload windows contain only consecutive `local.get` opcodes of the same scalar value type.
 - Reduction windows contain one repeated integer operation among `add`, `mul`, `and`, `or`, or `xor`.
 - Mixed expression windows contain only no-trap integer operations: `add`, `sub`, `mul`, bitwise ops, shifts, and rotates.
 - Local-update windows may end in `local.set` or `local.tee` only when the destination local has the same value type as the computed expression.
+- The one-step constant-update form is restricted to different source and destination locals so it does not steal same-local update-local combination.
 - `local.tee` windows are not rewritten when the next opcode is `br_if`; that path is reserved for the branch-fusion machinery.
 - All participating locals have the same value type. Preload accepts scalar `i32`, `i64`, `f32`, and `f64`; reduction accepts only `i32` and `i64`.
 - The window contains no memory access, global access, call, branch, table operation, or control-flow boundary.
@@ -137,6 +156,14 @@ compile_all_from_uwvm/translate/opcode/variable_cases.h
 ```
 
 At the first `local.get`, the translator performs bounded lookahead. Same-op local-update reduction is attempted before generic mixed expressions because it can use a compile-time `Op` template and avoids the runtime expression switch. Then the translator tries mixed expression local-update, pure local reduction, mixed expression fold, and finally full-ring preload.
+
+Before any bounded scanner runs, the translator reads the opcode immediately following the current
+`local.get` once. If that opcode cannot start a supported reorder window, all reorder scanners are
+skipped. A following `local.get` may start preload, reduction, or mixed-expression forms; a
+same-width integer constant may start only a one-step constant-update or mixed-expression form. This first-op gate is part of
+the profitability model: instruction reorder is runtime opt-in, but an opt-in pass still must keep
+translation overhead proportional to real candidates instead of probing every `local.get` in a
+clang-generated module.
 
 For preload:
 
@@ -168,6 +195,16 @@ For same-op local-update reduction:
 4. For `local.set`, model no operand-stack change.
 5. For `local.tee`, model one pushed value and commit one typed stack-top push.
 
+For one-step constant local update:
+
+1. Require the current `local.get` to be followed by `i32.const` or `i64.const` of the same width.
+2. Require one no-trap integer binary operation: add, sub, mul, bitwise op, shift, or rotate.
+3. Require an immediate `local.set` or a `local.tee` not immediately followed by `br_if`.
+4. Require the destination local to have the same value type and a different frame offset from the source local.
+5. Emit `uwvmint_reorder_int_const_binop_local_update` with source local offset, immediate, and destination local offset.
+6. For `local.set`, model no operand-stack result.
+7. For `local.tee`, model one pushed value and commit one typed stack-top push.
+
 For mixed expression fold and mixed expression local update:
 
 1. Start from the current typed local as the accumulator.
@@ -175,7 +212,7 @@ For mixed expression fold and mixed expression local update:
 3. Require the following operation to be a no-trap integer op with the same width as the accumulator.
 4. Roll back to the start of the step when a RHS was parsed but the following operation is not a legal expression op. This avoids swallowing a constant or local that belongs to the next normal Wasm expression.
 5. For a plain fold, require at least four steps and push one result.
-6. For local-update form, require at least four steps, or use the same-op local-update reduction path for shorter local-only reductions.
+6. For local-update form, require at least four steps, or use the same-op local-update reduction and one-step constant-update paths for shorter profitable windows.
 7. For `local.tee`, skip the rewrite if the next opcode is `br_if`.
 
 The generated preload family currently covers rings up to eight slots. The policy is intentionally strict: `N` is the active register-ring size, not an arbitrary profitability constant. Architectures with a wider future ring must add matching generated preload variants before this pass can use that wider ring.
@@ -212,6 +249,16 @@ The same-op local-update reduction layout is:
 [local_offset_0 : local_offset_t]
 ...
 [local_offset_N-1 : local_offset_t]
+[next opfunc pointer]
+```
+
+The one-step constant-update layout is:
+
+```text
+[opfunc pointer]
+[src_local_offset : local_offset_t]
+[imm : wasm_i32 or wasm_i64]
+[dst_local_offset : local_offset_t]
 [next opfunc pointer]
 ```
 

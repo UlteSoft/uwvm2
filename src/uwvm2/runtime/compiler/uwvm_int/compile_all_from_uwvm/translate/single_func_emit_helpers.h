@@ -77,6 +77,8 @@ struct runtime_log_stats_t
     ::std::uint_least64_t instr_reorder_expr_fold_count{};
     ::std::uint_least64_t instr_reorder_expr_local_set_count{};
     ::std::uint_least64_t instr_reorder_expr_local_tee_count{};
+    ::std::uint_least64_t instr_reorder_const_binop_local_set_count{};
+    ::std::uint_least64_t instr_reorder_const_binop_local_tee_count{};
     ::std::uint_least64_t instr_reorder_expr_step_count{};
     ::std::uint_least64_t instr_reorder_local_read_count{};
     ::std::uint_least64_t stacktop_spill1_count{};

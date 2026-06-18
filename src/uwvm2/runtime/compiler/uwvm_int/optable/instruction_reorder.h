@@ -96,9 +96,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
      *
      * The third and fourth families are update-aware. Same-op local reductions may write the result
      * directly to `local.set` or selected `local.tee`, avoiding a temporary operand-stack result.
-     * Longer mixed local/constant integer folds use a compact encoded expression program; they are
-     * gated by a higher step threshold because they trade dispatch reduction for a runtime step
-     * decoder. `local.tee` followed by `br_if` is deliberately left to branch fusion.
+     * One-step `local.get + const + int.binop + local.set/tee` updates use a dedicated compile-time
+     * binop opfunc when the destination local differs from the source local; same-local updates stay
+     * with ordinary update-local combination. Longer mixed local/constant integer folds use a compact
+     * encoded expression program; they are gated by a higher step threshold because they trade
+     * dispatch reduction for a runtime step decoder. `local.tee` followed by `br_if` is deliberately
+     * left to branch fusion.
      */
     namespace instruction_reorder_details
     {
@@ -185,6 +188,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
                     ::fast_io::fast_terminate();
                 }
+            }
+        }
+
+        template <int_expr_binop Op, typename IntT, typename UIntT>
+        UWVM_ALWAYS_INLINE inline constexpr IntT eval_int_expr_binop_constexpr(IntT lhs, IntT rhs) UWVM_THROWS
+        {
+            if constexpr(Op == int_expr_binop::add) { return numeric_details::eval_int_binop<numeric_details::int_binop::add, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::sub)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::sub, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::mul)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::mul, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::and_)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::and_, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::or_)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::or_, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::xor_)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::xor_, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::shl)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::shl, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::shr_s)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::shr_u)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::rotl)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::rotl, IntT, UIntT>(lhs, rhs);
+            }
+            else if constexpr(Op == int_expr_binop::rotr)
+            {
+                return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs);
+            }
+            else
+            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                ::fast_io::fast_terminate();
+                return {};
             }
         }
 
@@ -743,6 +800,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if constexpr(KeepResult) { instruction_reorder_details::push_operand_byref<CompileOption>(out, typeref...); }
     }
 
+    /// @brief Recompiled one-step `local.get; int.const; int.binop; local.set/local.tee` update.
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              typename IntT,
+              typename UIntT,
+              instruction_reorder_details::int_expr_binop Op,
+              bool KeepResult,
+              ::std::size_t curr_stack_top,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_const_binop_local_update(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        auto const src_off{instruction_reorder_details::read_imm<instruction_reorder_details::local_offset_t>(type...[0])};
+        IntT const imm{instruction_reorder_details::read_imm<IntT>(type...[0])};
+        auto const dst_off{instruction_reorder_details::read_imm<instruction_reorder_details::local_offset_t>(type...[0])};
+
+        IntT const src{instruction_reorder_details::load_local<IntT>(type...[2u], src_off)};
+        IntT const out{instruction_reorder_details::eval_int_expr_binop_constexpr<Op, IntT, UIntT>(src, imm)};
+        instruction_reorder_details::store_local<IntT>(type...[2u], dst_off, out);
+
+        if constexpr(KeepResult) { instruction_reorder_details::push_operand<CompileOption, IntT, curr_stack_top>(out, type...); }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief Byref variant of @ref uwvmint_reorder_int_const_binop_local_update.
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              typename IntT,
+              typename UIntT,
+              instruction_reorder_details::int_expr_binop Op,
+              bool KeepResult,
+              uwvm_int_stack_top_type... TypeRef>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_const_binop_local_update(TypeRef&... typeref) UWVM_THROWS
+    {
+        static_assert(sizeof...(TypeRef) >= 3uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
+        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+        typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+
+        auto const src_off{instruction_reorder_details::read_imm<instruction_reorder_details::local_offset_t>(typeref...[0])};
+        IntT const imm{instruction_reorder_details::read_imm<IntT>(typeref...[0])};
+        auto const dst_off{instruction_reorder_details::read_imm<instruction_reorder_details::local_offset_t>(typeref...[0])};
+
+        IntT const src{instruction_reorder_details::load_local<IntT>(typeref...[2u], src_off)};
+        IntT const out{instruction_reorder_details::eval_int_expr_binop_constexpr<Op, IntT, UIntT>(src, imm)};
+        instruction_reorder_details::store_local<IntT>(typeref...[2u], dst_off, out);
+
+        if constexpr(KeepResult) { instruction_reorder_details::push_operand_byref<CompileOption>(out, typeref...); }
+    }
+
     namespace translate
     {
         namespace reorder_details
@@ -976,6 +1099,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                   StepCount,
                                                                   KeepResult,
                                                                   Type...>;
+                }
+            };
+
+            template <instruction_reorder_details::int_expr_binop Op, bool KeepResult>
+            struct i32_const_binop_local_update_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                {
+                    return uwvmint_reorder_int_const_binop_local_update<Opt,
+                                                                         instruction_reorder_details::wasm_i32,
+                                                                         instruction_reorder_details::wasm_u32,
+                                                                         Op,
+                                                                         KeepResult,
+                                                                         Pos,
+                                                                         Type...>;
+                }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                {
+                    return uwvmint_reorder_int_const_binop_local_update<Opt,
+                                                                         instruction_reorder_details::wasm_i32,
+                                                                         instruction_reorder_details::wasm_u32,
+                                                                         Op,
+                                                                         KeepResult,
+                                                                         Type...>;
+                }
+            };
+
+            template <instruction_reorder_details::int_expr_binop Op, bool KeepResult>
+            struct i64_const_binop_local_update_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                {
+                    return uwvmint_reorder_int_const_binop_local_update<Opt,
+                                                                         instruction_reorder_details::wasm_i64,
+                                                                         instruction_reorder_details::wasm_u64,
+                                                                         Op,
+                                                                         KeepResult,
+                                                                         Pos,
+                                                                         Type...>;
+                }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                {
+                    return uwvmint_reorder_int_const_binop_local_update<Opt,
+                                                                         instruction_reorder_details::wasm_i64,
+                                                                         instruction_reorder_details::wasm_u64,
+                                                                         Op,
+                                                                         KeepResult,
+                                                                         Type...>;
                 }
             };
 
@@ -1675,6 +1852,94 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             uwvm_interpreter_stacktop_currpos_t const& curr,
             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_local_tee_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_const_binop_local_update_fptr(
+            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
+                                                                            CompileOption.i32_stack_top_begin_pos,
+                                                                            CompileOption.i32_stack_top_end_pos,
+                                                                            reorder_details::i32_const_binop_local_update_op<Op, KeepResult>,
+                                                                            Type...>(curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(
+            uwvm_interpreter_stacktop_currpos_t const& curr,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_reorder_i32_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_const_binop_local_update_fptr(
+            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return reorder_details::i32_const_binop_local_update_op<Op, KeepResult>::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(
+            uwvm_interpreter_stacktop_currpos_t const& curr,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_reorder_i32_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_const_binop_local_update_fptr(
+            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
+                                                                            CompileOption.i64_stack_top_begin_pos,
+                                                                            CompileOption.i64_stack_top_end_pos,
+                                                                            reorder_details::i64_const_binop_local_update_op<Op, KeepResult>,
+                                                                            Type...>(curr.i64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(
+            uwvm_interpreter_stacktop_currpos_t const& curr,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_reorder_i64_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_const_binop_local_update_fptr(
+            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return reorder_details::i64_const_binop_local_update_op<Op, KeepResult>::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  instruction_reorder_details::int_expr_binop Op,
+                  bool KeepResult,
+                  uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(
+            uwvm_interpreter_stacktop_currpos_t const& curr,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_reorder_i64_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
     }  // namespace translate
 
 # endif
