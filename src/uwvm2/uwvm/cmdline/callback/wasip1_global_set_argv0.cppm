@@ -33,7 +33,14 @@ module;
 
 export module uwvm2.uwvm.cmdline.callback:wasip1_global_set_argv0;
 
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;
 
 #ifndef UWVM_MODULE

@@ -465,13 +465,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::append_cache_key_value(out, u8"git-commit", u8"unknown");
 #endif
+#if defined(UWVM_GIT_COMMIT_DATA)
+        details::append_cache_key_value(out, u8"git-commit-date", UWVM_GIT_COMMIT_DATA);
+#else
+        details::append_cache_key_value(out, u8"git-commit-date", u8"unknown");
+#endif
 #if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
-        // Dirty builds include timestamp material because the same commit id no longer identifies the runtime binary.
         details::append_cache_key_value(out, u8"git-dirty", u8"1");
-        auto const build_date{details::u8string_from_cstr(__DATE__)};
-        auto const build_time{details::u8string_from_cstr(__TIME__)};
-        details::append_cache_key_value(out, u8"dirty-build-date", build_date);
-        details::append_cache_key_value(out, u8"dirty-build-time", build_time);
 #else
         details::append_cache_key_value(out, u8"git-dirty", u8"0");
 #endif
