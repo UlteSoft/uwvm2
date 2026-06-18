@@ -44,9 +44,11 @@
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/impl.h>
+# include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
+# include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 #endif
 

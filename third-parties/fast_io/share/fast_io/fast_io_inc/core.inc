@@ -49,6 +49,22 @@ using ::fast_io::open_mode;
 using ::fast_io::basic_io_lockable;
 using ::fast_io::basic_io_lockable_nonmovable;
 
+using ::fast_io::basic_ibuffer_view;
+using ::fast_io::basic_ibuffer_view_ref;
+using ::fast_io::basic_obuffer_view;
+using ::fast_io::basic_obuffer_view_ref;
+
+using ::fast_io::ibuffer_view;
+using ::fast_io::wibuffer_view;
+using ::fast_io::u8ibuffer_view;
+using ::fast_io::u16ibuffer_view;
+using ::fast_io::u32ibuffer_view;
+using ::fast_io::obuffer_view;
+using ::fast_io::wobuffer_view;
+using ::fast_io::u8obuffer_view;
+using ::fast_io::u16obuffer_view;
+using ::fast_io::u32obuffer_view;
+
 #if !defined(__clang__) // The gcc and msvc module does not support non-exported functions adl matching
 using ::fast_io::input_stream_ref_define;
 using ::fast_io::output_stream_ref_define;
@@ -217,6 +233,7 @@ using ::fast_io::manipulators::strvw;
 
 namespace char_category
 {
+    using ::fast_io::char_category::is_c_digit;
     using ::fast_io::char_category::is_dos_file_invalid_character;
 }
 
