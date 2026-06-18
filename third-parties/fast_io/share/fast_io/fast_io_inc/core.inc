@@ -229,6 +229,10 @@ using ::fast_io::manipulators::cur_src_loc;
 
 using ::fast_io::manipulators::ip_scan_generic;
 using ::fast_io::manipulators::strvw;
+
+using ::fast_io::manipulators::dec_get;
+using ::fast_io::manipulators::oct_get;
+using ::fast_io::manipulators::bin_get;
 } // namespace manipulators
 
 namespace char_category
