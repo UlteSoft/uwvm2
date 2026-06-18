@@ -76,7 +76,7 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 
 ## Releases
 * [Dev](https://github.com/UlteSoft/uwvm2/tree/master): branch `master`
-* [Beta V2.0.2.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.2): branch `V2.0.2`
+* [Release V2.0.2.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.2): branch `V2.0.2`
 * [Beta V2.0.1.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.1): branch `V2.0.1`
 
 ## Support / Donations
