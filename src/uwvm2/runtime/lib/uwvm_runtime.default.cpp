@@ -627,6 +627,7 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         // Keep the exit flag in a trivial namespace-scope object, not as a
         // member of runtime_process_exit_state. A scalar with constant
         // initialization is zero-initialized with the static storage image
@@ -653,6 +654,7 @@ namespace uwvm2::runtime::lib
         };
 
         inline runtime_process_exit_state g_runtime_process_exit_state{};  // [global]
+#endif
 
         inline constexpr compiled_module_record::~compiled_module_record() noexcept
         {
