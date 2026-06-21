@@ -517,17 +517,71 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
     apply_llvm_jit_frame_pointer_function_attrs(function);
 }
 
+#if defined(__i386__) || defined(_M_IX86)
+[[nodiscard]] inline constexpr bool llvm_jit_i386_fastcall_inreg_eligible(::llvm::Type* type) noexcept
+{
+    if(type == nullptr) [[unlikely]] { return false; }
+    if(type->isPointerTy()) { return true; }
+    return type->isIntegerTy() && type->getIntegerBitWidth() <= 32u;
+}
+
+inline constexpr void apply_llvm_jit_i386_fastcall_param_attrs(::llvm::Function& function) noexcept
+{
+    auto function_type{function.getFunctionType()};
+    if(function_type == nullptr) [[unlikely]] { return; }
+
+    unsigned inreg_count{};
+    auto const arg_count{function.arg_size()};
+    for(unsigned arg_index{}; arg_index != arg_count && inreg_count != 2u; ++arg_index)
+    {
+        if(!llvm_jit_i386_fastcall_inreg_eligible(function_type->getParamType(arg_index))) { continue; }
+        function.addParamAttr(arg_index, ::llvm::Attribute::InReg);
+        ++inreg_count;
+    }
+}
+
+inline constexpr void apply_llvm_jit_i386_fastcall_param_attrs(::llvm::CallInst& call_inst) noexcept
+{
+    unsigned inreg_count{};
+    auto const arg_count{call_inst.arg_size()};
+    for(unsigned arg_index{}; arg_index != arg_count && inreg_count != 2u; ++arg_index)
+    {
+        auto arg{call_inst.getArgOperand(arg_index)};
+        if(arg == nullptr || !llvm_jit_i386_fastcall_inreg_eligible(arg->getType())) { continue; }
+        call_inst.addParamAttr(arg_index, ::llvm::Attribute::InReg);
+        ++inreg_count;
+    }
+}
+#endif
+
 // Set the calling convention on an LLVM function and attach the common JIT attributes expected for generated functions.
 inline constexpr void apply_llvm_jit_calling_conv(::llvm::Function& function, ::llvm::CallingConv::ID calling_conv) noexcept
 {
     function.setCallingConv(calling_conv);
+#if defined(__i386__) || defined(_M_IX86)
+    if(calling_conv == ::llvm::CallingConv::X86_FastCall)
+    {
+        // Clang lowers i386 __fastcall as x86_fastcallcc with the first two integer arguments marked inreg.  MCJIT's ELF
+        // i386 lowering follows those parameter attributes; setting only the calling convention leaves the generated entry
+        // callable as cdecl and corrupts C++ fastcall callers at the raw-entry boundary.
+        apply_llvm_jit_i386_fastcall_param_attrs(function);
+    }
+#endif
     apply_llvm_jit_common_function_attrs(function);
 }
 
 // Set the calling convention on a call site.  Call sites must match the declaration or LLVM may emit an ABI-incompatible
 // native call.
 inline constexpr void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
-{ call_inst.setCallingConv(calling_conv); }
+{
+    call_inst.setCallingConv(calling_conv);
+#if defined(__i386__) || defined(_M_IX86)
+    if(calling_conv == ::llvm::CallingConv::X86_FastCall)
+    {
+        apply_llvm_jit_i386_fastcall_param_attrs(call_inst);
+    }
+#endif
+}
 
 // Null-safe call-site convention helper used by expression-style call builders.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_calling_conv(::llvm::CallInst* call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
