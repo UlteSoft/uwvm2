@@ -578,6 +578,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- third-parties/boost
 		add_includedirs("third-parties/boost_unordered/include")
 
+		if is_llvm_jit_test then
+			uwvm_add_llvm_jit_cache_openssl()
+		end
+
 		-- uwvm
 		add_defines("UWVM=2")
 		-- uwvm test
@@ -1001,6 +1005,8 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			-- third-parties/boost
 			add_includedirs("third-parties/boost_unordered/include")
 
+			uwvm_add_llvm_jit_cache_openssl()
+
 			-- uwvm
 			add_defines("UWVM=2")
 			-- uwvm test
@@ -1088,6 +1094,8 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 
 			-- third-parties/boost
 			add_includedirs("third-parties/boost_unordered/include")
+
+			uwvm_add_llvm_jit_cache_openssl()
 
 			-- uwvm
 			add_defines("UWVM=2")
