@@ -24,16 +24,23 @@ module;
 
 // std
 #include <algorithm>
-#include <array>
+#include <atomic>
+#include <cerrno>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 // import
 #include <fast_io_device.h>
 #if !defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
@@ -46,6 +53,8 @@ export module uwvm2.runtime.llvm_jit_cache:store;
 import fast_io;
 import fast_io_crypto;
 import uwvm2.utils.container;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
 import :format;
 import :compress;
 

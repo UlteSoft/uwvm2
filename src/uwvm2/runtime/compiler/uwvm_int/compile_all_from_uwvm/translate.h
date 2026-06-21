@@ -50,6 +50,7 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 #endif
 

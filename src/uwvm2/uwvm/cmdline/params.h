@@ -84,6 +84,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # endif
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_loop_unwind),
+#  if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_set_opcode_conbination_level),
+#  endif
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_delay_local),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_enable_instruction_reorder),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_loop_unwind_max_size),
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_jit),
@@ -185,6 +192,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
             // log
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_output),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::log_color),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_enable_warning),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_disable_warning),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),

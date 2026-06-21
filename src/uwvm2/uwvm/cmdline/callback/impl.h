@@ -60,6 +60,8 @@
 # include "runtime_jit.h"
 # include "runtime_aot.h"
 # include "runtime_tiered.h"
+# include "runtime_uwvm_int_set_opcode_conbination_level.h"
+# include "runtime_uwvm_int_loop_unwind_max_size.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"
@@ -123,6 +125,7 @@
 
 // log
 # include "log_output.h"
+# include "log_color.h"
 # include "log_enable_warning.h"
 # include "log_disable_warning.h"
 # include "log_convert_warn_to_fatal.h"

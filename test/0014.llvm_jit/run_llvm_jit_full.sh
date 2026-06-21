@@ -75,24 +75,18 @@ else
   done < <(
     {
       printf '%s\n' llvm_jit_verify_compile
+      index=0
       find test/0013.uwvm_int/strict -type f -name '*.cc' | sort | while IFS= read -r file; do
-        rel="${file#test/0013.uwvm_int/strict/}"
-        suffix="${rel%.cc}"
-        suffix="${suffix//\//_}"
-        suffix="${suffix//./_}"
-        suffix="${suffix//-/_}"
-        printf 'llvm_jit_reuse_0013_%s\n' "${suffix}"
+        index=$((index + 1))
+        printf 'lj13s_%03d\n' "${index}"
       done
+      index=0
       find test/0013.uwvm_int/lazy -type f -name '*.cc' | sort | while IFS= read -r file; do
         case "${file}" in
           *"/uwvm_int_lazy_split.cc"|*"/uwvm_int_lazy_strategy_matrix.cc") continue ;;
         esac
-        rel="${file#test/0013.uwvm_int/lazy/}"
-        suffix="${rel%.cc}"
-        suffix="${suffix//\//_}"
-        suffix="${suffix//./_}"
-        suffix="${suffix//-/_}"
-        printf 'llvm_jit_lazy_reuse_0013_%s\n' "${suffix}"
+        index=$((index + 1))
+        printf 'lj13l_%03d\n' "${index}"
       done
     } | awk '!seen[$0]++'
   )

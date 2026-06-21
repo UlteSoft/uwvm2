@@ -270,6 +270,28 @@ option("enable-uwvm-int-delay-local", function()
     set_values("none", "soft", "heavy")
 end)
 
+option("enable-uwvm-int-instruction-reorder", function()
+    set_description
+    (
+        "Compile in experimental register-ring-aware instruction rescheduling for uwvm-int.",
+        "default = false",
+        "    false: compile out instruction-reschedule code.",
+        "    true: make instruction-reschedule code available; runtime still defaults to off."
+    )
+    set_default(false)
+end)
+
+option("enable-uwvm-int-loop-unwind", function()
+    set_description
+    (
+        "Enable loop-unwind translation for uwvm-int.",
+        "default = true",
+        "    false: compile out loop-unwind code to reduce tiny-environment code size.",
+        "    true: enable loop-unwind translation, still controllable at runtime."
+    )
+    set_default(true)
+end)
+
 option("detailed-debug-check", function()
     set_description
     (

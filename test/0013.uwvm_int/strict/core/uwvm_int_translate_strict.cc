@@ -31,6 +31,23 @@
 # error "Module testing is not currently supported"
 #endif
 
+#ifndef UWVM_THROWS
+# if defined(__cpp_herbception)
+#  define UWVM_THROWS throws
+# else
+#  define UWVM_THROWS
+# endif
+#endif
+
+#if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
+    (defined(__GNUC__) || defined(__clang__))
+# define UWVM2TEST_WASM_ABI __attribute__((__sysv_abi__))
+#elif defined(__i386__) || defined(_M_IX86)
+# define UWVM2TEST_WASM_ABI UWVM_FASTCALL
+#else
+# define UWVM2TEST_WASM_ABI
+#endif
+
 namespace
 {
     using wasm_op = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
@@ -74,6 +91,62 @@ namespace
     {
         g_trap_ctx_mode = mode;
         g_trap_ctx_func = func_index;
+    }
+
+    inline void UWVM2TEST_WASM_ABI trap_unreachable() noexcept
+    {
+        ::std::fprintf(stderr, "uwvm2test TRAP: unreachable mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI trap_invalid_conversion() noexcept
+    {
+        ::std::fprintf(stderr, "uwvm2test TRAP: invalid_conversion mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI trap_div_by_zero() noexcept
+    {
+        ::std::fprintf(stderr, "uwvm2test TRAP: div_by_zero mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI trap_int_overflow() noexcept
+    {
+        ::std::fprintf(stderr, "uwvm2test TRAP: int_overflow mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI unexpected_call(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte**) UWVM_THROWS
+    {
+        ::std::fprintf(stderr,
+                       "uwvm2test TRAP: call mode=%s func=%zu wasm_module_id=%zu call_func_index=%zu\n",
+                       g_trap_ctx_mode,
+                       g_trap_ctx_func,
+                       wasm_module_id,
+                       func_index);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
+    }
+
+    inline void UWVM2TEST_WASM_ABI unexpected_call_indirect(::std::size_t wasm_module_id,
+                                                                            ::std::size_t type_index,
+                                                                            ::std::size_t table_index,
+                                                                            ::std::byte**) UWVM_THROWS
+    {
+        ::std::fprintf(stderr,
+                       "uwvm2test TRAP: call_indirect mode=%s func=%zu wasm_module_id=%zu type_index=%zu table_index=%zu\n",
+                       g_trap_ctx_mode,
+                       g_trap_ctx_func,
+                       wasm_module_id,
+                       type_index,
+                       table_index);
+        ::std::fflush(stderr);
+        ::fast_io::fast_terminate();
     }
 
     using byte_vec = ::std::vector<::std::byte>;
@@ -1301,54 +1374,13 @@ namespace
     [[nodiscard]] int test_compile_and_execute() noexcept
     {
         // Install optable hooks (unexpected traps/calls should terminate the test process).
-        optable::unreachable_func = +[]() noexcept
-        {
-            ::std::fprintf(stderr, "uwvm2test TRAP: unreachable mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
-        optable::trap_invalid_conversion_to_integer_func = +[]() noexcept
-        {
-            ::std::fprintf(stderr, "uwvm2test TRAP: invalid_conversion mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
-        optable::trap_integer_divide_by_zero_func = +[]() noexcept
-        {
-            ::std::fprintf(stderr, "uwvm2test TRAP: div_by_zero mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
-        optable::trap_integer_overflow_func = +[]() noexcept
-        {
-            ::std::fprintf(stderr, "uwvm2test TRAP: int_overflow mode=%s func=%zu\n", g_trap_ctx_mode, g_trap_ctx_func);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
+        optable::unreachable_func = trap_unreachable;
+        optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion;
+        optable::trap_integer_divide_by_zero_func = trap_div_by_zero;
+        optable::trap_integer_overflow_func = trap_int_overflow;
 
-        optable::call_func = +[](::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte**)
-        {
-            ::std::fprintf(stderr,
-                           "uwvm2test TRAP: call mode=%s func=%zu wasm_module_id=%zu call_func_index=%zu\n",
-                           g_trap_ctx_mode,
-                           g_trap_ctx_func,
-                           wasm_module_id,
-                           func_index);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
-        optable::call_indirect_func = +[](::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte**)
-        {
-            ::std::fprintf(stderr,
-                           "uwvm2test TRAP: call_indirect mode=%s func=%zu wasm_module_id=%zu type_index=%zu table_index=%zu\n",
-                           g_trap_ctx_mode,
-                           g_trap_ctx_func,
-                           wasm_module_id,
-                           type_index,
-                           table_index);
-            ::std::fflush(stderr);
-            ::fast_io::fast_terminate();
-        };
+        optable::call_func = unexpected_call;
+        optable::call_indirect_func = unexpected_call_indirect;
 
         auto wasm = build_strict_suite_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_mod");

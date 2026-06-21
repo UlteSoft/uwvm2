@@ -24,9 +24,14 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <atomic>
+# include <bit>
+# include <concepts>
+# include <coroutine>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <exception>
 # include <limits>
 # include <memory>
 # include <mutex>
@@ -63,11 +68,20 @@
 # include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
+# include <uwvm2/object/impl.h>
+# include <uwvm2/object/memory/flags/impl.h>
+# include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/memory/impl.h>
+# include <uwvm2/uwvm/wasm/feature/impl.h>
+# include <uwvm2/uwvm/wasm/type/impl.h>
+# include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 #endif
 

@@ -283,8 +283,8 @@ namespace
         optable::trap_integer_overflow_func = exit_11;
 
         // No calls expected in this test.
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::call_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call;
+        optable::call_indirect_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call_indirect;
 
         auto wasm = build_trunc_trap_matrix_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_trunc_trap_matrix");

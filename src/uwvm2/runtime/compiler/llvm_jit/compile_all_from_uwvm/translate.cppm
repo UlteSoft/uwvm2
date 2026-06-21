@@ -23,9 +23,14 @@
 module;
 
 // std
+# include <atomic>
+# include <bit>
+# include <concepts>
+# include <coroutine>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <exception>
 # include <limits>
 # include <memory>
 # include <mutex>
@@ -42,14 +47,19 @@ module;
 #  include <llvm/IR/BasicBlock.h>
 #  include <llvm/IR/CallingConv.h>
 #  include <llvm/IR/Constants.h>
+#  include <llvm/IR/DIBuilder.h>
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
+#  include <llvm/IR/InlineAsm.h>
+#  include <llvm/IR/Intrinsics.h>
 #  include <llvm/IR/LLVMContext.h>
+#  include <llvm/IR/Metadata.h>
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/Type.h>
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
+#  include <llvm/Support/DynamicLibrary.h>
 # endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm:translate;
@@ -59,11 +69,20 @@ import uwvm2.uwvm_predefine.io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.utils.hash;
 import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.concepts;
+import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.validation.error;
+import uwvm2.object;
+import uwvm2.object.memory.flags;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.memory;
+import uwvm2.uwvm.wasm.feature;
+import uwvm2.uwvm.wasm.type;
+import uwvm2.uwvm.wasm.storage;
 import uwvm2.uwvm.runtime.storage;
 
 #ifndef UWVM_MODULE

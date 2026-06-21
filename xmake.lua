@@ -187,6 +187,16 @@ function def_build(opt)
 		end
 	end
 
+	local enable_uwvm_int_instruction_reorder = get_config("enable-uwvm-int-instruction-reorder")
+	if enable_uwvm_int_instruction_reorder then
+		add_defines("UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER")
+	end
+
+	local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
+	if enable_uwvm_int_loop_unwind then
+		add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")
+	end
+
 	local use_thread_local = get_config("use-thread-local")
 	if use_thread_local then
 		add_defines("UWVM_USE_THREAD_LOCAL")
@@ -941,12 +951,12 @@ end
 -- original 0013 source files with a runner macro that routes Runner::run through
 -- llvm_jit_call_raw_host_api, so the LLVM coverage stays aligned with 0013.
 if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) then
-	for _, file in ipairs(os.files("test/0013.uwvm_int/strict/**.cc")) do
+	local llvm_jit_strict_files = os.files("test/0013.uwvm_int/strict/**.cc")
+	table.sort(llvm_jit_strict_files)
+	for index, file in ipairs(llvm_jit_strict_files) do
 		local rel = file:gsub("\\", "/")
 		rel = rel:gsub("^test/0013%.uwvm_int/strict/", "")
-		local suffix = rel:gsub("%.cc$", "")
-		suffix = suffix:gsub("/", "_"):gsub("%.", "_"):gsub("%-", "_")
-		local name = "llvm_jit_reuse_0013_" .. suffix
+		local name = string.format("lj13s_%03d", index)
 
 		target(name)
 			set_group("test/0014.llvm_jit")
@@ -1025,16 +1035,18 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 		target_end()
 	end
 
-	for _, file in ipairs(os.files("test/0013.uwvm_int/lazy/**.cc")) do
+	local llvm_jit_lazy_files = os.files("test/0013.uwvm_int/lazy/**.cc")
+	table.sort(llvm_jit_lazy_files)
+	local llvm_jit_lazy_index = 0
+	for _, file in ipairs(llvm_jit_lazy_files) do
 		local normalized = file:gsub("\\", "/")
 		if normalized:find("/uwvm_int_lazy_split.cc", 1, true) or normalized:find("/uwvm_int_lazy_strategy_matrix.cc", 1, true) then
 			goto continue_llvm_jit_lazy
 		end
 		local rel = normalized
 		rel = rel:gsub("^test/0013%.uwvm_int/lazy/", "")
-		local suffix = rel:gsub("%.cc$", "")
-		suffix = suffix:gsub("/", "_"):gsub("%.", "_"):gsub("%-", "_")
-		local name = "llvm_jit_lazy_reuse_0013_" .. suffix
+		llvm_jit_lazy_index = llvm_jit_lazy_index + 1
+		local name = string.format("lj13l_%03d", llvm_jit_lazy_index)
 
 		target(name)
 			set_group("test/0014.llvm_jit/lazy")

@@ -128,6 +128,10 @@ using ::fast_io::posix_clock_getres;
 
 using ::fast_io::native_mutex;
 
+#if ((defined(_WIN32) && !defined(__WINE__)) && !defined(__CYGWIN__)) || (defined(__wasi__) && defined(__wasi_thread__)) || (!defined(__SINGLE_THREAD__) && !defined(__NEWLIB__) && !defined(__MSDOS__) && !defined(__DJGPP__) && __has_include(<pthread.h>))
+using ::fast_io::native_thread;
+#endif
+
 using ::fast_io::native_socklen_t;
 
 namespace this_thread

@@ -9,8 +9,9 @@
  * @brief       NO_COLOR detection and process-wide color-output controls for UWVM diagnostics.
  * @details     This header defines the color policy used by UWVM diagnostic output.  `check_has_no_color()` detects the
  *              presence of the `NO_COLOR` environment variable without relying on C++ library state that may not be
- *              available in all target environments.  `put_color` caches the inverse result and is used by diagnostic
- *              formatting code to decide whether ANSI/color manipulators should be emitted.
+ *              available in all target environments.  `put_color` is initialized from the inverse result and is used by
+ *              diagnostic formatting code to decide whether ANSI/color manipulators should be emitted.  Command-line
+ *              policy can override this process-wide switch after argument parsing starts.
  *
  *              On old Windows targets, UWVM may need to choose between ANSI escape sequences and Win32 console text
  *              attributes at runtime.  `log_win32_use_ansi_b` records that choice for the color macro layer.
@@ -100,10 +101,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
     /// @brief Process-wide switch controlling whether UWVM diagnostics emit color sequences.
     /// @details The flag is initialized once from `check_has_no_color()`.  Diagnostic sites wrap color tokens with
     ///          `fast_io::mnp::cond(put_color, ...)`, so setting `NO_COLOR` disables color output while preserving the
-    ///          same message text.
+    ///          same message text.  `--log-color` may later force this flag on or off for the current process.
     /// @see check_has_no_color
     /// @see UWVM_COLOR_U8_RST_ALL
-    inline bool const put_color{!check_has_no_color()};  // [global] No global variable dependencies from other translation units
+    inline bool put_color{!check_has_no_color()};  // [global] No global variable dependencies from other translation units
 
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     /// @brief Selects ANSI escape output instead of Win32 text attributes on old Windows console targets.

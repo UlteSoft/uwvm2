@@ -60,6 +60,8 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_aot;
 export import :runtime_tiered;
+export import :runtime_uwvm_int_set_opcode_conbination_level;
+export import :runtime_uwvm_int_loop_unwind_max_size;
 
 // wasi
 export import :wasi_disable_utf8_check;
@@ -123,6 +125,7 @@ export import :wasip1_group_socket_udp_connect;
 
 // log
 export import :log_output;
+export import :log_color;
 export import :log_enable_warning;
 export import :log_disable_warning;
 export import :log_convert_warn_to_fatal;

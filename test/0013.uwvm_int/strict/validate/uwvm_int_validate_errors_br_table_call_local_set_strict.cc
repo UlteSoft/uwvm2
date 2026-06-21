@@ -351,13 +351,9 @@ namespace
 
     [[nodiscard]] int test_validate_errors_br_table_call_local_set()
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        ::uwvm2test::uwvm_int_strict::install_unexpected_traps();
+        optable::call_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call;
+        optable::call_indirect_func = ::uwvm2test::uwvm_int_strict::strict_terminate_call_indirect;
 
         UWVM2TEST_REQUIRE(compile_expect(build_br_table_default_target_type_mismatch_module(),
                                         u8"uwvm2test_validate_br_table_default_mismatch",

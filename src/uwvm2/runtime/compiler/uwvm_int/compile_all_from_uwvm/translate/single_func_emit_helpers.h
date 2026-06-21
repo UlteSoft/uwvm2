@@ -1,4 +1,38 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
+using runtime_uwvm_int_opcode_conbination_level_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_opcode_conbination_level_t;
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+[[maybe_unused]] auto const runtime_uwvm_int_opcode_conbination_level{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_uwvm_int_opcode_conbination_level};
+#else
+[[maybe_unused]] constexpr auto runtime_uwvm_int_opcode_conbination_level{runtime_uwvm_int_opcode_conbination_level_t::disable};
+#endif
+[[maybe_unused]] auto const runtime_uwvm_int_opcode_conbination_level_at_least{
+    [](runtime_uwvm_int_opcode_conbination_level_t curr, runtime_uwvm_int_opcode_conbination_level_t required) constexpr noexcept -> bool
+    {
+        return static_cast<unsigned>(curr) >= static_cast<unsigned>(required);
+    }};
+bool const runtime_uwvm_int_opcode_conbination_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::soft)};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_soft_enabled{runtime_uwvm_int_opcode_conbination_enabled};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_heavy_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::heavy)};
+[[maybe_unused]] bool const runtime_uwvm_int_opcode_conbination_extra_enabled{
+    runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_opcode_conbination_level_t::extra)};
+[[maybe_unused]] bool const runtime_uwvm_int_delay_local_enabled{runtime_uwvm_int_opcode_conbination_enabled &&
+                                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_delay_local};
+[[maybe_unused]] bool const runtime_uwvm_int_instruction_reorder_enabled{
+#if defined(UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER)
+    ::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_enable_instruction_reorder
+#else
+    false
+#endif
+};
+[[maybe_unused]] bool const runtime_uwvm_int_loop_unwind_enabled{
+#if defined(UWVM_ENABLE_UWVM_INT_LOOP_UNWIND)
+    !::uwvm2::uwvm::runtime::runtime_mode::runtime_uwvm_int_disable_loop_unwind
+#else
+    false
+#endif
+};
 // This include fragment is expanded inside one local-function translation frame. The lambdas below
 // deliberately capture parser state, bytecode buffers, label tables, and stack-top state by reference
 // so opcode case files can emit compact bytecode without passing a large context object through every
@@ -8,7 +42,7 @@ constexpr bool runtime_log_emit_opfuncs{false};
 constexpr bool runtime_log_emit_cf{false};
 constexpr bool runtime_log_emit_wasm_ops{false};
 constexpr bool runtime_log_emit_stacktop{false};
-constexpr bool runtime_log_emit_conbine{false};
+[[maybe_unused]] constexpr bool runtime_log_emit_conbine{false};
 constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t
@@ -26,6 +60,29 @@ struct runtime_log_stats_t
     ::std::uint_least64_t cf_br_if_count{};
     ::std::uint_least64_t cf_loop_entry_transform_count{};
     ::std::uint_least64_t cf_loop_entry_canonicalize_to_mem_count{};
+    ::std::uint_least64_t loop_unwind_candidate_count{};
+    ::std::uint_least64_t loop_unwind_applied_count{};
+    ::std::uint_least64_t loop_unwind_rejected_count{};
+    ::std::uint_least64_t loop_unwind_full_count{};
+    ::std::uint_least64_t loop_unwind_partial_count{};
+    ::std::uint_least64_t loop_unwind_replayed_body_count{};
+    ::std::uint_least64_t loop_unwind_replayed_wasm_bytes{};
+    ::std::uint_least64_t loop_unwind_replayed_bytecode_bytes{};
+    ::std::uint_least64_t instr_reorder_candidate_count{};
+    ::std::uint_least64_t instr_reorder_applied_count{};
+    ::std::uint_least64_t instr_reorder_local_preload_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_set_count{};
+    ::std::uint_least64_t instr_reorder_local_reduce_tee_count{};
+    ::std::uint_least64_t instr_reorder_expr_fold_count{};
+    ::std::uint_least64_t instr_reorder_expr_local_set_count{};
+    ::std::uint_least64_t instr_reorder_expr_local_tee_count{};
+    ::std::uint_least64_t instr_reorder_const_binop_local_set_count{};
+    ::std::uint_least64_t instr_reorder_const_binop_local_tee_count{};
+    ::std::uint_least64_t instr_reorder_ring_slot_reject_count{};
+    ::std::uint_least64_t instr_reorder_ring_slot_used_count{};
+    ::std::uint_least64_t instr_reorder_expr_step_count{};
+    ::std::uint_least64_t instr_reorder_local_read_count{};
     ::std::uint_least64_t stacktop_spill1_count{};
     ::std::uint_least64_t stacktop_spillN_count{};
     ::std::uint_least64_t stacktop_fill1_count{};
@@ -686,7 +743,45 @@ auto const stacktop_cache_count_for_range{
         return sum;
     }};
 
-// Reconcile per-type cache counters from the codegen type stack.
+[[maybe_unused]] auto const stacktop_ring_size_for_vt{
+    [&](curr_operand_stack_value_type vt) constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return SIZE_MAX; }
+        else
+        {
+            if(!stacktop_enabled_for_vt(vt)) { return 0uz; }
+            auto const begin_pos{stacktop_range_begin_pos(vt)};
+            auto const end_pos{stacktop_range_end_pos(vt)};
+            return end_pos > begin_pos ? (end_pos - begin_pos) : 0uz;
+        }
+    }};
+
+[[maybe_unused]] auto const stacktop_free_slot_count_for_vt{
+    [&](curr_operand_stack_value_type vt) constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return SIZE_MAX; }
+        else
+        {
+            auto const ring_size{stacktop_ring_size_for_vt(vt)};
+            if(ring_size == 0uz) { return 0uz; }
+            auto const begin_pos{stacktop_range_begin_pos(vt)};
+            auto const end_pos{stacktop_range_end_pos(vt)};
+            auto const used{stacktop_cache_count_for_range(begin_pos, end_pos)};
+            return used < ring_size ? (ring_size - used) : 0uz;
+        }
+    }};
+
+[[maybe_unused]] auto const stacktop_has_push_slots_without_spill{
+    [&](curr_operand_stack_value_type vt, ::std::size_t need) constexpr noexcept -> bool
+    {
+        if constexpr(!stacktop_enabled) { return true; }
+        else
+        {
+            return stacktop_free_slot_count_for_vt(vt) >= need;
+        }
+    }};
+
+	// Reconcile per-type cache counters from the codegen type stack.
 // This protects against missing/incorrect per-type updates on ops that only retype the top value
 // (e.g., reinterpret/extend) while keeping stack depth unchanged.
 [[maybe_unused]] auto const stacktop_rebuild_cache_type_counts_from_codegen{[&]() constexpr noexcept
@@ -1857,6 +1952,97 @@ auto const stacktop_flush_all_to_operand_stack{[&](bytecode_vec_t& dst) constexp
         curr_stacktop.v128_stack_top_curr_pos = stacktop_v128_enabled ? CompileOption.v128_stack_top_begin_pos : SIZE_MAX;
     }};
 
+[[maybe_unused]] auto const stacktop_currpos_is_begin{[&]() constexpr noexcept -> bool
+                                                      {
+                                                          if constexpr(!stacktop_enabled) { return true; }
+                                                          if constexpr(stacktop_i32_enabled)
+                                                          {
+                                                              if(curr_stacktop.i32_stack_top_curr_pos != CompileOption.i32_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_i64_enabled)
+                                                          {
+                                                              if(curr_stacktop.i64_stack_top_curr_pos != CompileOption.i64_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_f32_enabled)
+                                                          {
+                                                              if(curr_stacktop.f32_stack_top_curr_pos != CompileOption.f32_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_f64_enabled)
+                                                          {
+                                                              if(curr_stacktop.f64_stack_top_curr_pos != CompileOption.f64_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          if constexpr(stacktop_v128_enabled)
+                                                          {
+                                                              if(curr_stacktop.v128_stack_top_curr_pos != CompileOption.v128_stack_top_begin_pos)
+                                                              {
+                                                                  return false;
+                                                              }
+                                                          }
+                                                          return true;
+                                                      }};
+
+[[maybe_unused]] auto const loop_unwind_gcd_size{[](::std::size_t a, ::std::size_t b) constexpr noexcept -> ::std::size_t
+                                                 {
+                                                     while(b != 0uz)
+                                                     {
+                                                         auto const r{a % b};
+                                                         a = b;
+                                                         b = r;
+                                                     }
+                                                     return a;
+                                                 }};
+
+[[maybe_unused]] auto const loop_unwind_lcm_size{[&](::std::size_t a, ::std::size_t b) constexpr noexcept -> ::std::size_t
+                                                 {
+                                                     if(a == 0uz || b == 0uz) { return 0uz; }
+                                                     auto const g{loop_unwind_gcd_size(a, b)};
+                                                     auto const div{a / g};
+                                                     if(div > (::std::numeric_limits<::std::size_t>::max() / b))
+                                                     {
+                                                         return ::std::numeric_limits<::std::size_t>::max();
+                                                     }
+                                                     return div * b;
+                                                 }};
+
+// Loop-unwind uses the minimum recovery period for each enabled register ring:
+// ring_size / gcd(ring_size, delta). The global period is the lcm across ranges.
+// See src/uwvm2/runtime/compiler/uwvm_int/loop_unwind.md.
+[[maybe_unused]] auto const loop_unwind_currpos_period{
+    [&]() constexpr noexcept -> ::std::size_t
+    {
+        if constexpr(!stacktop_enabled) { return 1uz; }
+        ::std::size_t period{1uz};
+
+        auto const add_range{[&](bool enabled, ::std::size_t begin_pos, ::std::size_t end_pos, ::std::size_t currpos) constexpr noexcept
+                             {
+                                 if(!enabled || currpos == SIZE_MAX || end_pos <= begin_pos) { return; }
+                                 auto const ring_size{end_pos - begin_pos};
+                                 auto const delta{(currpos + ring_size - begin_pos) % ring_size};
+                                 if(delta == 0uz) { return; }
+                                 auto const range_period{ring_size / loop_unwind_gcd_size(ring_size, delta)};
+                                 period = loop_unwind_lcm_size(period, range_period);
+                             }};
+
+        add_range(stacktop_i32_enabled, CompileOption.i32_stack_top_begin_pos, CompileOption.i32_stack_top_end_pos, curr_stacktop.i32_stack_top_curr_pos);
+        add_range(stacktop_i64_enabled, CompileOption.i64_stack_top_begin_pos, CompileOption.i64_stack_top_end_pos, curr_stacktop.i64_stack_top_curr_pos);
+        add_range(stacktop_f32_enabled, CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos, curr_stacktop.f32_stack_top_curr_pos);
+        add_range(stacktop_f64_enabled, CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos, curr_stacktop.f64_stack_top_curr_pos);
+        add_range(stacktop_v128_enabled, CompileOption.v128_stack_top_begin_pos, CompileOption.v128_stack_top_end_pos, curr_stacktop.v128_stack_top_curr_pos);
+        return period;
+    }};
+
 [[maybe_unused]] auto const stacktop_transform_currpos_to_begin{
     [&](bytecode_vec_t& dst) constexpr UWVM_THROWS
     {
@@ -1908,6 +2094,76 @@ auto const stacktop_prepare_push1_if_reachable{[&](bytecode_vec_t& dst, curr_ope
                                                        stacktop_prepare_push1_typed(dst, vt);
                                                    }
                                                }};
+
+[[maybe_unused]] auto const stacktop_prepare_push_n_same_vt_if_reachable{
+    [&](bytecode_vec_t& dst, curr_operand_stack_value_type vt, ::std::size_t n) constexpr UWVM_THROWS
+    {
+        if constexpr(!stacktop_enabled) { return; }
+        else
+        {
+            if(is_polymorphic || n == 0uz) { return; }
+            if(!stacktop_enabled_for_vt(vt)) { return; }
+
+            ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
+            ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
+            ::std::size_t const ring_size{end_pos - begin_pos};
+
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            if(ring_size == 0uz || n > ring_size) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+            if(ring_size == 0uz || n > ring_size) [[unlikely]] { return; }
+
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+            {
+                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                     u8"[uwvm-int-translator] fn=",
+                                     function_index,
+                                     u8" event=stacktop.prepare_pushN(begin) | vt=",
+                                     runtime_log_vt_name(vt),
+                                     u8" n=",
+                                     n,
+                                     u8" begin=",
+                                     begin_pos,
+                                     u8" end=",
+                                     end_pos,
+                                     u8" range_cache=",
+                                     stacktop_cache_count_for_range(begin_pos, end_pos),
+                                     u8" stacktop{mem=",
+                                     stacktop_memory_count,
+                                     u8",cache=",
+                                     stacktop_cache_count,
+                                     u8"}\n");
+            }
+
+            ::std::size_t spill_cnt{};
+            while(stacktop_cache_count_for_range(begin_pos, end_pos) + n > ring_size)
+            {
+                stacktop_spill_one_deepest_to(dst, 1uz);
+                ++spill_cnt;
+            }
+
+            stacktop_assert_invariants();
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+            {
+                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                     u8"[uwvm-int-translator] fn=",
+                                     function_index,
+                                     u8" event=stacktop.prepare_pushN(end) | vt=",
+                                     runtime_log_vt_name(vt),
+                                     u8" n=",
+                                     n,
+                                     u8" spills=",
+                                     spill_cnt,
+                                     u8" range_cache=",
+                                     stacktop_cache_count_for_range(begin_pos, end_pos),
+                                     u8" stacktop{mem=",
+                                     stacktop_memory_count,
+                                     u8",cache=",
+                                     stacktop_cache_count,
+                                     u8"}\n");
+            }
+        }
+    }};
 
 [[maybe_unused]] auto const stacktop_commit_push1_if_reachable{[&](curr_operand_stack_value_type vt) constexpr noexcept
                                                                {
@@ -3020,6 +3276,12 @@ auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_
         {
             if(!is_polymorphic && stacktop_cache_count != 0uz)
             {
+                if(stacktop_currpos_is_begin())
+                {
+                    emit_br_to(dst, label_id, dst_is_thunk);
+                    return;
+                }
+
                 if(runtime_log_on) [[unlikely]]
                 {
                     ++runtime_log_stats.cf_br_transform_count;

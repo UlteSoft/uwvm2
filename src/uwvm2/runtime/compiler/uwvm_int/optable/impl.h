@@ -37,6 +37,7 @@
 # include "variable.h"
 # include "conbine.h"
 # include "delay_local.h"
+# include "instruction_reorder.h"
 # include "conbine_heavy.h"
 # include "combine_extra_heavy.h"
 #endif

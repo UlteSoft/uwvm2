@@ -32,6 +32,10 @@ This document summarizes both (1) the architecture and (2) the optimization work
   - Dispatch targets for arithmetic/control/memory/calls plus fused patterns.
 - **Register-ring cache**: `optable/register_ring.h`
   - Spill/fill and transform operations between canonical operand stack memory and the cached stack-top segment.
+- **Loop-unwind policy**: `loop_unwind.md`
+  - Whitepaper for the register-ring loop re-entry optimization, including WebAssembly loop-label semantics, minimum recovery period, safety invariants, limits, and measurement interpretation.
+- **Instruction-reorder whitepaper**: `instruction_reorder.md`
+  - Design note for the bounded integer local-reduction recompiler that turns LLVM-style shallow local folds into register-ring-friendly dispatch.
 
 ### 2.2 Execution model (direct-threaded stream)
 u2 executes a pointer stream:
@@ -94,6 +98,19 @@ u2’s `delay_local` provides analogous consumer variants:
 Build knobs (see the analysis note for empirical motivation):
 - `--enable-uwvm-int-combine-ops={none,soft,heavy,extra}`
 - `--enable-uwvm-int-delay-local={none,soft,heavy}`
+- `--enable-uwvm-int-instruction-reorder=[y|n]` (experimental; default `n`, runtime default off)
+
+### 5.3 Instruction reorder: bounded local-stack recompilation
+LLVM-generated MVP WebAssembly often expresses arithmetic as shallow local-heavy producer bursts and left folds:
+
+```text
+local.get a; local.get b; local.get c; ...
+local.get a; local.get b; i32.add; local.get c; i32.add; ...
+```
+
+When compiled in and explicitly enabled at runtime, u2 can recompile consecutive same-typed scalar `local.get` bursts into one register-ring preload opfunc, then let the following ordinary opcodes consume the cached operands. It also includes three integer expression retranslation forms: same-op local reductions, same-op reductions that write directly to `local.set`/selected `local.tee`, and bounded mixed local/constant left-folds for no-trap `i32`/`i64` operations. These live in `optable/instruction_reorder.h` and remain separate from `conbine`.
+
+See `instruction_reorder.md` for the legality model, emitted bytecode shape, and runtime log fields.
 
 ## 6. Leaf hot-path discipline (tail-threaded correctness and performance)
 
@@ -160,6 +177,9 @@ The main engineering takeaway from these measurements is methodological: when tw
 - Stack-top cache ring, spill/fill, transforms: `optable/register_ring.h`
 - Adjacent fusion: `optable/conbine.h`, `optable/conbine_heavy.h`, `optable/combine_extra_heavy.h`
 - Delay-local fused opfuncs: `optable/delay_local.h`
+- Instruction reorder opfuncs: `optable/instruction_reorder.h`
+- Loop-unwind design note: `loop_unwind.md`
+- Instruction-reorder whitepaper: `instruction_reorder.md`
 - Numeric ops and trap wrappers: `optable/numeric.h`
 - Memory ops (generality and fast paths): `optable/memory.h`
 - Per-target translate options (ABI sizing): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)

@@ -22,9 +22,11 @@
 module;
 
 // std
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -36,6 +38,7 @@ module;
 // platform
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include <llvm/Analysis/TargetTransformInfo.h>
+# include <llvm/Config/llvm-config.h>
 # include <llvm/ExecutionEngine/ExecutionEngine.h>
 # include <llvm/ExecutionEngine/MCJIT.h>
 # include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -50,12 +53,16 @@ module;
 # include <llvm/Transforms/Scalar.h>
 # include <llvm/Transforms/Scalar/GVN.h>
 # include <llvm/Transforms/Utils.h>
-# include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
+# if defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
+#  include <unwind.h>
+# endif
+# include "../compile_all_from_uwvm/translate/section_memory_manager.h"
 #endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_cu_from_lazy_validator:translate;
 
 import fast_io;
+import fast_io_crypto;
 import uwvm2.uwvm_predefine.io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
@@ -66,10 +73,11 @@ import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.validation.error;
-import uwvm2.validation.standard.wasm1:validator;
+import uwvm2.validation.standard.wasm1;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.runtime.storage;
 import uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm;
+import uwvm2.runtime.llvm_jit_cache;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

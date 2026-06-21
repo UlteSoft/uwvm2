@@ -187,6 +187,1286 @@ case wasm1_code::local_get:
     }
 #endif
 
+#if defined(UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER)
+    // Instruction reorder: recompile a shallow LLVM-style integer left fold
+    // `local.get a; local.get b; i*.binop; local.get c; i*.binop; ...`
+    // into one register-ring-friendly local reduction dispatch.
+    //
+    // Legal ops are the no-trap associative integer operations add/mul/and/or/xor. Floating-point
+    // arithmetic and trapping integer ops are intentionally excluded from this first reorder layer.
+    [[maybe_unused]] bool const instruction_reorder_pending_clean{
+# if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+        conbine_pending.kind == conbine_pending_kind::none
+# else
+        true
+# endif
+    };
+    [[maybe_unused]] bool const instruction_reorder_runtime_candidate{runtime_uwvm_int_instruction_reorder_enabled && !is_polymorphic &&
+                                                                      instruction_reorder_pending_clean};
+    [[maybe_unused]] wasm1_code instruction_reorder_follow_op{};  // init
+    [[maybe_unused]] bool instruction_reorder_has_follow_op{};
+    if(instruction_reorder_runtime_candidate && code_curr != code_end)
+    {
+        ::std::memcpy(::std::addressof(instruction_reorder_follow_op), code_curr, sizeof(instruction_reorder_follow_op));
+        instruction_reorder_has_follow_op = true;
+    }
+    [[maybe_unused]] bool const instruction_reorder_follow_is_local_get{instruction_reorder_has_follow_op &&
+                                                                        instruction_reorder_follow_op == wasm1_code::local_get};
+    [[maybe_unused]] bool const instruction_reorder_follow_is_typed_int_operand{
+        instruction_reorder_follow_is_local_get ||
+        (curr_local_type == curr_operand_stack_value_type::i32 && instruction_reorder_has_follow_op &&
+         instruction_reorder_follow_op == wasm1_code::i32_const) ||
+        (curr_local_type == curr_operand_stack_value_type::i64 && instruction_reorder_has_follow_op &&
+         instruction_reorder_follow_op == wasm1_code::i64_const)};
+
+    if(instruction_reorder_runtime_candidate && instruction_reorder_follow_is_typed_int_operand &&
+       (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64))
+    {
+        namespace reorder_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
+        using reorder_int_binop = reorder_optable::numeric_details::int_binop;
+
+        auto const decode_reorder_reduce_op{
+            [](curr_operand_stack_value_type vt, wasm1_code op, reorder_int_binop& out) constexpr noexcept -> bool
+            {
+                if(vt == curr_operand_stack_value_type::i32)
+                {
+                    switch(op)
+                    {
+                        case wasm1_code::i32_add: out = reorder_int_binop::add; return true;
+                        case wasm1_code::i32_mul: out = reorder_int_binop::mul; return true;
+                        case wasm1_code::i32_and: out = reorder_int_binop::and_; return true;
+                        case wasm1_code::i32_or: out = reorder_int_binop::or_; return true;
+                        case wasm1_code::i32_xor: out = reorder_int_binop::xor_; return true;
+                        [[unlikely]] default: return false;
+                    }
+                }
+
+                if(vt == curr_operand_stack_value_type::i64)
+                {
+                    switch(op)
+                    {
+                        case wasm1_code::i64_add: out = reorder_int_binop::add; return true;
+                        case wasm1_code::i64_mul: out = reorder_int_binop::mul; return true;
+                        case wasm1_code::i64_and: out = reorder_int_binop::and_; return true;
+                        case wasm1_code::i64_or: out = reorder_int_binop::or_; return true;
+                        case wasm1_code::i64_xor: out = reorder_int_binop::xor_; return true;
+                        [[unlikely]] default: return false;
+                    }
+                }
+
+                return false;
+            }};
+
+        using reorder_expr_binop = reorder_optable::instruction_reorder_details::int_expr_binop;
+        using reorder_expr_operand_kind = reorder_optable::instruction_reorder_details::int_expr_operand_kind;
+
+        auto const decode_reorder_expr_op{
+            [](curr_operand_stack_value_type vt, wasm1_code op, reorder_expr_binop& out) constexpr noexcept -> bool
+            {
+                if(vt == curr_operand_stack_value_type::i32)
+                {
+                    switch(op)
+                    {
+                        case wasm1_code::i32_add: out = reorder_expr_binop::add; return true;
+                        case wasm1_code::i32_sub: out = reorder_expr_binop::sub; return true;
+                        case wasm1_code::i32_mul: out = reorder_expr_binop::mul; return true;
+                        case wasm1_code::i32_and: out = reorder_expr_binop::and_; return true;
+                        case wasm1_code::i32_or: out = reorder_expr_binop::or_; return true;
+                        case wasm1_code::i32_xor: out = reorder_expr_binop::xor_; return true;
+                        case wasm1_code::i32_shl: out = reorder_expr_binop::shl; return true;
+                        case wasm1_code::i32_shr_s: out = reorder_expr_binop::shr_s; return true;
+                        case wasm1_code::i32_shr_u: out = reorder_expr_binop::shr_u; return true;
+                        case wasm1_code::i32_rotl: out = reorder_expr_binop::rotl; return true;
+                        case wasm1_code::i32_rotr: out = reorder_expr_binop::rotr; return true;
+                        [[unlikely]] default: return false;
+                    }
+                }
+
+                if(vt == curr_operand_stack_value_type::i64)
+                {
+                    switch(op)
+                    {
+                        case wasm1_code::i64_add: out = reorder_expr_binop::add; return true;
+                        case wasm1_code::i64_sub: out = reorder_expr_binop::sub; return true;
+                        case wasm1_code::i64_mul: out = reorder_expr_binop::mul; return true;
+                        case wasm1_code::i64_and: out = reorder_expr_binop::and_; return true;
+                        case wasm1_code::i64_or: out = reorder_expr_binop::or_; return true;
+                        case wasm1_code::i64_xor: out = reorder_expr_binop::xor_; return true;
+                        case wasm1_code::i64_shl: out = reorder_expr_binop::shl; return true;
+                        case wasm1_code::i64_shr_s: out = reorder_expr_binop::shr_s; return true;
+                        case wasm1_code::i64_shr_u: out = reorder_expr_binop::shr_u; return true;
+                        case wasm1_code::i64_rotl: out = reorder_expr_binop::rotl; return true;
+                        case wasm1_code::i64_rotr: out = reorder_expr_binop::rotr; return true;
+                        [[unlikely]] default: return false;
+                    }
+                }
+
+                return false;
+            }};
+
+        auto const try_reschedule_left_reduce_local_update{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t max_reschedule_local_count{8uz};
+                ::uwvm2::utils::container::array<local_offset_t, max_reschedule_local_count> offs{};
+                offs[0] = local_off;
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t local_count{1uz};
+                wasm1_code reduce_wasm_op{};    // init
+                reorder_int_binop reduce_op{};  // init
+                bool has_reduce_op{};
+
+                while(local_count < max_reschedule_local_count)
+                {
+                    if(scan == code_end) { break; }
+
+                    wasm1_code op;  // no init
+                    ::std::memcpy(::std::addressof(op), scan, sizeof(op));
+                    if(op != wasm1_code::local_get) { break; }
+
+                    wasm_u32 next_local_index{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [next_local_index_next, next_local_index_err]{
+                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                       local_type_from_index(next_local_index) != curr_local_type)
+                    {
+                        break;
+                    }
+
+                    auto const after_local_get{reinterpret_cast<::std::byte const*>(next_local_index_next)};
+                    if(after_local_get == code_end) { break; }
+
+                    wasm1_code next_op{};  // init
+                    ::std::memcpy(::std::addressof(next_op), after_local_get, sizeof(next_op));
+
+                    reorder_int_binop next_reduce_op{};  // init
+                    if(!decode_reorder_reduce_op(curr_local_type, next_op, next_reduce_op)) { break; }
+                    if(has_reduce_op)
+                    {
+                        if(next_op != reduce_wasm_op) { break; }
+                    }
+                    else
+                    {
+                        reduce_wasm_op = next_op;
+                        reduce_op = next_reduce_op;
+                        has_reduce_op = true;
+                    }
+
+                    offs[local_count] = local_offset_from_index(next_local_index);
+                    scan = after_local_get + 1u;
+                    ++local_count;
+                }
+
+                if(local_count < 3uz || scan == code_end) { return false; }
+
+                wasm1_code update_op{};  // init
+                ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
+                if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                ++scan;
+
+                wasm_u32 dst_local_index{};
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                auto const [dst_local_index_next, dst_local_index_err]{
+                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
+                   local_type_from_index(dst_local_index) != curr_local_type)
+                {
+                    return false;
+                }
+
+                scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+
+                if(update_op == wasm1_code::local_tee && scan != code_end)
+                {
+                    wasm1_code after_tee{};  // init
+                    ::std::memcpy(::std::addressof(after_tee), scan, sizeof(after_tee));
+                    if(after_tee == wasm1_code::br_if) { return false; }
+                }
+
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    for(::std::size_t i{}; i != local_count; ++i)
+                    {
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_local_reduce_set_count; }
+                    else { ++runtime_log_stats.instr_reorder_local_reduce_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
+                    runtime_log_stats.instr_reorder_local_read_count += local_count;
+                }
+
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_reduce_update{
+                    [&]<bool KeepResult, reorder_int_binop Op, ::std::size_t LocalCount>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            if constexpr(KeepResult)
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr_from_tuple<CompileOption, Op, LocalCount>(
+                                                   curr_stacktop,
+                                                   interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr_from_tuple<CompileOption, Op, LocalCount>(
+                                                   curr_stacktop,
+                                                   interpreter_tuple));
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(KeepResult)
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr_from_tuple<CompileOption, Op, LocalCount>(
+                                                   curr_stacktop,
+                                                   interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr_from_tuple<CompileOption, Op, LocalCount>(
+                                                   curr_stacktop,
+                                                   interpreter_tuple));
+                            }
+                        }
+                    }};
+
+                auto const emit_reduce_update_for_count{
+                    [&]<bool KeepResult, reorder_int_binop Op>() constexpr UWVM_THROWS -> void
+                    {
+                        switch(local_count)
+                        {
+                            case 3uz: emit_reduce_update.template operator()<KeepResult, Op, 3uz>(); break;
+                            case 4uz: emit_reduce_update.template operator()<KeepResult, Op, 4uz>(); break;
+                            case 5uz: emit_reduce_update.template operator()<KeepResult, Op, 5uz>(); break;
+                            case 6uz: emit_reduce_update.template operator()<KeepResult, Op, 6uz>(); break;
+                            case 7uz: emit_reduce_update.template operator()<KeepResult, Op, 7uz>(); break;
+                            case 8uz: emit_reduce_update.template operator()<KeepResult, Op, 8uz>(); break;
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+                    }};
+
+                auto const emit_reduce_update_for_op{
+                    [&]<bool KeepResult>() constexpr UWVM_THROWS -> void
+                    {
+                        switch(reduce_op)
+                        {
+                            case reorder_int_binop::add: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::add>(); break;
+                            case reorder_int_binop::mul: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::mul>(); break;
+                            case reorder_int_binop::and_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::and_>(); break;
+                            case reorder_int_binop::or_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::or_>(); break;
+                            case reorder_int_binop::xor_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::xor_>(); break;
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+                    }};
+
+                if(update_op == wasm1_code::local_tee)
+                {
+                    operand_stack_push(curr_local_type);
+                    stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                    emit_reduce_update_for_op.template operator()<true>();
+                }
+                else
+                {
+                    emit_reduce_update_for_op.template operator()<false>();
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(local_count));
+                emit_imm_to(bytecode, local_offset_from_index(dst_local_index));
+                for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
+
+                if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                code_curr = scan;
+                return true;
+            }};
+
+        if(instruction_reorder_follow_is_local_get && try_reschedule_left_reduce_local_update()) { break; }
+
+        auto const try_reschedule_const_binop_local_update{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                if(!instruction_reorder_has_follow_op) { return false; }
+                if(curr_local_type == curr_operand_stack_value_type::i32)
+                {
+                    if(instruction_reorder_follow_op != wasm1_code::i32_const) { return false; }
+                }
+                else if(curr_local_type == curr_operand_stack_value_type::i64)
+                {
+                    if(instruction_reorder_follow_op != wasm1_code::i64_const) { return false; }
+                }
+                else
+                {
+                    return false;
+                }
+
+                ::std::byte const* scan{code_curr};
+                wasm_i64 imm{};
+
+                if(curr_local_type == curr_operand_stack_value_type::i32)
+                {
+                    wasm_i32 imm_i32{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                            ::fast_io::mnp::leb128_get(imm_i32))};
+                    if(imm_err != ::fast_io::parse_code::ok) { return false; }
+                    imm = static_cast<wasm_i64>(imm_i32);
+                    scan = reinterpret_cast<::std::byte const*>(imm_next);
+                }
+                else
+                {
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                            ::fast_io::mnp::leb128_get(imm))};
+                    if(imm_err != ::fast_io::parse_code::ok) { return false; }
+                    scan = reinterpret_cast<::std::byte const*>(imm_next);
+                }
+
+                if(scan == code_end) { return false; }
+
+                wasm1_code binop{};  // init
+                ::std::memcpy(::std::addressof(binop), scan, sizeof(binop));
+
+                reorder_expr_binop expr_op{};  // init
+                if(!decode_reorder_expr_op(curr_local_type, binop, expr_op)) { return false; }
+                ++scan;
+
+                if(scan == code_end) { return false; }
+
+                wasm1_code update_op{};  // init
+                ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
+                if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                ++scan;
+
+                wasm_u32 dst_local_index{};
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                auto const [dst_local_index_next, dst_local_index_err]{
+                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
+                   local_type_from_index(dst_local_index) != curr_local_type)
+                {
+                    return false;
+                }
+
+                auto const dst_off{local_offset_from_index(dst_local_index)};
+                if(dst_off == local_off)
+                {
+                    // Same-local updates are already covered by ordinary conbine update-local opfuncs.
+                    return false;
+                }
+
+                scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+
+                if(update_op == wasm1_code::local_tee && scan != code_end)
+                {
+                    wasm1_code after_tee{};  // init
+                    ::std::memcpy(::std::addressof(after_tee), scan, sizeof(after_tee));
+                    if(after_tee == wasm1_code::br_if) { return false; }
+                }
+
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    auto const src_end_off{static_cast<local_offset_t>(local_off + local_size)};
+                    if(src_end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = src_end_off; }
+                }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_const_binop_local_set_count; }
+                    else { ++runtime_log_stats.instr_reorder_const_binop_local_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
+                    ++runtime_log_stats.instr_reorder_expr_step_count;
+                    ++runtime_log_stats.instr_reorder_local_read_count;
+                }
+
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_const_update{
+                    [&]<bool KeepResult, reorder_expr_binop Op>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(
+                                    curr_stacktop,
+                                    interpreter_tuple));
+                        }
+                        else
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(
+                                    curr_stacktop,
+                                    interpreter_tuple));
+                        }
+                    }};
+
+                auto const emit_const_update_for_op{
+                    [&]<reorder_expr_binop Op>() constexpr UWVM_THROWS -> void
+                    {
+                        if(update_op == wasm1_code::local_tee)
+                        {
+                            operand_stack_push(curr_local_type);
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                            emit_const_update.template operator()<true, Op>();
+                        }
+                        else
+                        {
+                            emit_const_update.template operator()<false, Op>();
+                        }
+                    }};
+
+                switch(expr_op)
+                {
+                    case reorder_expr_binop::add: emit_const_update_for_op.template operator()<reorder_expr_binop::add>(); break;
+                    case reorder_expr_binop::sub: emit_const_update_for_op.template operator()<reorder_expr_binop::sub>(); break;
+                    case reorder_expr_binop::mul: emit_const_update_for_op.template operator()<reorder_expr_binop::mul>(); break;
+                    case reorder_expr_binop::and_: emit_const_update_for_op.template operator()<reorder_expr_binop::and_>(); break;
+                    case reorder_expr_binop::or_: emit_const_update_for_op.template operator()<reorder_expr_binop::or_>(); break;
+                    case reorder_expr_binop::xor_: emit_const_update_for_op.template operator()<reorder_expr_binop::xor_>(); break;
+                    case reorder_expr_binop::shl: emit_const_update_for_op.template operator()<reorder_expr_binop::shl>(); break;
+                    case reorder_expr_binop::shr_s: emit_const_update_for_op.template operator()<reorder_expr_binop::shr_s>(); break;
+                    case reorder_expr_binop::shr_u: emit_const_update_for_op.template operator()<reorder_expr_binop::shr_u>(); break;
+                    case reorder_expr_binop::rotl: emit_const_update_for_op.template operator()<reorder_expr_binop::rotl>(); break;
+                    case reorder_expr_binop::rotr: emit_const_update_for_op.template operator()<reorder_expr_binop::rotr>(); break;
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, local_off);
+                if(curr_local_type == curr_operand_stack_value_type::i32) { emit_imm_to(bytecode, static_cast<wasm_i32>(imm)); }
+                else { emit_imm_to(bytecode, imm); }
+                emit_imm_to(bytecode, dst_off);
+
+                if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                code_curr = scan;
+                return true;
+            }};
+
+        if(!instruction_reorder_follow_is_local_get && try_reschedule_const_binop_local_update()) { break; }
+
+        auto const try_reschedule_mixed_int_expr_local_update{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t min_update_step_count{4uz};
+                constexpr ::std::size_t max_update_step_count{8uz};
+
+                ::uwvm2::utils::container::array<reorder_expr_binop, max_update_step_count> ops{};
+                ::uwvm2::utils::container::array<reorder_expr_operand_kind, max_update_step_count> kinds{};
+                ::uwvm2::utils::container::array<local_offset_t, max_update_step_count> offs{};
+                ::uwvm2::utils::container::array<wasm_i64, max_update_step_count> imms{};
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t step_count{};
+                ::std::size_t local_read_count{1uz};
+
+                while(step_count < max_update_step_count)
+                {
+                    if(scan == code_end) { break; }
+                    ::std::byte const* const step_begin{scan};
+
+                    reorder_expr_operand_kind operand_kind{};  // init
+                    local_offset_t operand_off{};              // init
+                    wasm_i64 operand_imm{};                    // init
+
+                    wasm1_code operand_op{};  // init
+                    ::std::memcpy(::std::addressof(operand_op), scan, sizeof(operand_op));
+
+                    if(operand_op == wasm1_code::local_get)
+                    {
+                        wasm_u32 next_local_index{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [next_local_index_next, next_local_index_err]{
+                            ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                     ::fast_io::mnp::leb128_get(next_local_index))};
+                        if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                           local_type_from_index(next_local_index) != curr_local_type)
+                        {
+                            break;
+                        }
+
+                        operand_kind = reorder_expr_operand_kind::local;
+                        operand_off = local_offset_from_index(next_local_index);
+                        scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                        ++local_read_count;
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32 && operand_op == wasm1_code::i32_const)
+                    {
+                        wasm_i32 imm{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(imm))};
+                        if(imm_err != ::fast_io::parse_code::ok) { break; }
+                        operand_kind = reorder_expr_operand_kind::imm;
+                        operand_imm = static_cast<wasm_i64>(imm);
+                        scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i64 && operand_op == wasm1_code::i64_const)
+                    {
+                        wasm_i64 imm{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(imm))};
+                        if(imm_err != ::fast_io::parse_code::ok) { break; }
+                        operand_kind = reorder_expr_operand_kind::imm;
+                        operand_imm = imm;
+                        scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    if(scan == code_end)
+                    {
+                        scan = step_begin;
+                        break;
+                    }
+
+                    wasm1_code binop{};  // init
+                    ::std::memcpy(::std::addressof(binop), scan, sizeof(binop));
+
+                    reorder_expr_binop expr_op{};  // init
+                    if(!decode_reorder_expr_op(curr_local_type, binop, expr_op))
+                    {
+                        scan = step_begin;
+                        break;
+                    }
+
+                    ops[step_count] = expr_op;
+                    kinds[step_count] = operand_kind;
+                    offs[step_count] = operand_off;
+                    imms[step_count] = operand_imm;
+                    ++scan;
+                    ++step_count;
+                }
+
+                if(step_count < min_update_step_count || scan == code_end) { return false; }
+
+                wasm1_code update_op{};  // init
+                ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
+                if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                ++scan;
+
+                wasm_u32 dst_local_index{};
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                auto const [dst_local_index_next, dst_local_index_err]{
+                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
+                   local_type_from_index(dst_local_index) != curr_local_type)
+                {
+                    return false;
+                }
+
+                scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+
+                if(update_op == wasm1_code::local_tee && scan != code_end)
+                {
+                    wasm1_code after_tee{};  // init
+                    ::std::memcpy(::std::addressof(after_tee), scan, sizeof(after_tee));
+                    if(after_tee == wasm1_code::br_if) { return false; }
+                }
+
+                if(update_op == wasm1_code::local_tee && !stacktop_has_push_slots_without_spill(curr_local_type, 1uz))
+                {
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                    return false;
+                }
+
+                auto const dst_off{local_offset_from_index(dst_local_index)};
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    auto const first_end_off{static_cast<local_offset_t>(local_off + local_size)};
+                    if(first_end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = first_end_off; }
+                    for(::std::size_t i{}; i != step_count; ++i)
+                    {
+                        if(kinds[i] != reorder_expr_operand_kind::local) { continue; }
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_expr_local_set_count; }
+                    else { ++runtime_log_stats.instr_reorder_expr_local_tee_count; }
+                    if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
+                    runtime_log_stats.instr_reorder_expr_step_count += step_count;
+                    runtime_log_stats.instr_reorder_local_read_count += local_read_count;
+                }
+
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_expr_local_update{
+                    [&]<bool KeepResult, ::std::size_t StepCount>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            if constexpr(KeepResult)
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                interpreter_tuple));
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(KeepResult)
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                interpreter_tuple));
+                            }
+                        }
+                    }};
+
+                auto const emit_expr_local_update_for_step_count{
+                    [&]<bool KeepResult>() constexpr UWVM_THROWS -> void
+                    {
+                        switch(step_count)
+                        {
+                            case 3uz: emit_expr_local_update.template operator()<KeepResult, 3uz>(); break;
+                            case 4uz: emit_expr_local_update.template operator()<KeepResult, 4uz>(); break;
+                            case 5uz: emit_expr_local_update.template operator()<KeepResult, 5uz>(); break;
+                            case 6uz: emit_expr_local_update.template operator()<KeepResult, 6uz>(); break;
+                            case 7uz: emit_expr_local_update.template operator()<KeepResult, 7uz>(); break;
+                            case 8uz: emit_expr_local_update.template operator()<KeepResult, 8uz>(); break;
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+                    }};
+
+                if(update_op == wasm1_code::local_tee)
+                {
+                    operand_stack_push(curr_local_type);
+                    stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                    emit_expr_local_update_for_step_count.template operator()<true>();
+                }
+                else
+                {
+                    emit_expr_local_update_for_step_count.template operator()<false>();
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(step_count));
+                emit_imm_to(bytecode, local_off);
+                emit_imm_to(bytecode, dst_off);
+                for(::std::size_t i{}; i != step_count; ++i)
+                {
+                    emit_imm_to(bytecode, static_cast<::std::uint8_t>(ops[i]));
+                    emit_imm_to(bytecode, static_cast<::std::uint8_t>(kinds[i]));
+                    if(kinds[i] == reorder_expr_operand_kind::local)
+                    {
+                        emit_imm_to(bytecode, offs[i]);
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32)
+                    {
+                        emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i]));
+                    }
+                    else
+                    {
+                        emit_imm_to(bytecode, imms[i]);
+                    }
+                }
+
+                if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                code_curr = scan;
+                return true;
+            }};
+
+        if(try_reschedule_mixed_int_expr_local_update()) { break; }
+
+        auto const try_reschedule_left_reduce_chain{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t max_reschedule_local_count{8uz};
+                ::uwvm2::utils::container::array<local_offset_t, max_reschedule_local_count> offs{};
+                offs[0] = local_off;
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t local_count{1uz};
+                wasm1_code reduce_wasm_op{};  // init
+                reorder_int_binop reduce_op{};  // init
+                bool has_reduce_op{};
+
+                while(local_count < max_reschedule_local_count)
+                {
+                    if(scan == code_end) { break; }
+
+                    wasm1_code op;  // no init
+                    ::std::memcpy(::std::addressof(op), scan, sizeof(op));
+                    if(op != wasm1_code::local_get) { break; }
+
+                    wasm_u32 next_local_index{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [next_local_index_next, next_local_index_err]{
+                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                       local_type_from_index(next_local_index) != curr_local_type)
+                    {
+                        break;
+                    }
+
+                    auto const after_local_get{reinterpret_cast<::std::byte const*>(next_local_index_next)};
+                    if(after_local_get == code_end) { break; }
+
+                    wasm1_code next_op{};  // init
+                    ::std::memcpy(::std::addressof(next_op), after_local_get, sizeof(next_op));
+
+                    reorder_int_binop next_reduce_op{};  // init
+                    if(!decode_reorder_reduce_op(curr_local_type, next_op, next_reduce_op)) { break; }
+                    if(has_reduce_op)
+                    {
+                        if(next_op != reduce_wasm_op) { break; }
+                    }
+                    else
+                    {
+                        reduce_wasm_op = next_op;
+                        reduce_op = next_reduce_op;
+                        has_reduce_op = true;
+                    }
+
+                    offs[local_count] = local_offset_from_index(next_local_index);
+                    scan = after_local_get + 1u;
+                    ++local_count;
+                }
+
+                if(local_count < 3uz) { return false; }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    ++runtime_log_stats.instr_reorder_local_reduce_count;
+                    runtime_log_stats.instr_reorder_local_read_count += local_count;
+                }
+
+                // Net Wasm stack effect of the consumed chain is one pushed integer value.
+                operand_stack_push(curr_local_type);
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    for(::std::size_t i{}; i != local_count; ++i)
+                    {
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_reduce{
+                    [&]<reorder_int_binop Op, ::std::size_t LocalCount>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i32_reduce_nlocalget_fptr_from_tuple<CompileOption, Op, LocalCount>(curr_stacktop,
+                                                                                                                                   interpreter_tuple));
+                        }
+                        else
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i64_reduce_nlocalget_fptr_from_tuple<CompileOption, Op, LocalCount>(curr_stacktop,
+                                                                                                                                   interpreter_tuple));
+                        }
+                    }};
+
+                auto const emit_reduce_for_op{
+                    [&]<reorder_int_binop Op>() constexpr UWVM_THROWS -> void
+                    {
+                        switch(local_count)
+                        {
+                            case 3uz: emit_reduce.template operator()<Op, 3uz>(); break;
+                            case 4uz: emit_reduce.template operator()<Op, 4uz>(); break;
+                            case 5uz: emit_reduce.template operator()<Op, 5uz>(); break;
+                            case 6uz: emit_reduce.template operator()<Op, 6uz>(); break;
+                            case 7uz: emit_reduce.template operator()<Op, 7uz>(); break;
+                            case 8uz: emit_reduce.template operator()<Op, 8uz>(); break;
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+                    }};
+
+                switch(reduce_op)
+                {
+                    case reorder_int_binop::add: emit_reduce_for_op.template operator()<reorder_int_binop::add>(); break;
+                    case reorder_int_binop::mul: emit_reduce_for_op.template operator()<reorder_int_binop::mul>(); break;
+                    case reorder_int_binop::and_: emit_reduce_for_op.template operator()<reorder_int_binop::and_>(); break;
+                    case reorder_int_binop::or_: emit_reduce_for_op.template operator()<reorder_int_binop::or_>(); break;
+                    case reorder_int_binop::xor_: emit_reduce_for_op.template operator()<reorder_int_binop::xor_>(); break;
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(local_count));
+                for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
+                stacktop_commit_push1_typed_if_reachable(curr_local_type);
+
+                code_curr = scan;
+                return true;
+            }};
+
+        if(instruction_reorder_follow_is_local_get && try_reschedule_left_reduce_chain()) { break; }
+
+        auto const try_reschedule_mixed_int_expr_chain{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t min_expr_step_count{4uz};
+                constexpr ::std::size_t max_expr_step_count{8uz};
+
+                ::uwvm2::utils::container::array<reorder_expr_binop, max_expr_step_count> ops{};
+                ::uwvm2::utils::container::array<reorder_expr_operand_kind, max_expr_step_count> kinds{};
+                ::uwvm2::utils::container::array<local_offset_t, max_expr_step_count> offs{};
+                ::uwvm2::utils::container::array<wasm_i64, max_expr_step_count> imms{};
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t step_count{};
+                ::std::size_t local_read_count{1uz};
+
+                while(step_count < max_expr_step_count)
+                {
+                    if(scan == code_end) { break; }
+                    ::std::byte const* const step_begin{scan};
+
+                    reorder_expr_operand_kind operand_kind{};  // init
+                    local_offset_t operand_off{};              // init
+                    wasm_i64 operand_imm{};                    // init
+
+                    wasm1_code operand_op{};  // init
+                    ::std::memcpy(::std::addressof(operand_op), scan, sizeof(operand_op));
+
+                    if(operand_op == wasm1_code::local_get)
+                    {
+                        wasm_u32 next_local_index{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [next_local_index_next, next_local_index_err]{
+                            ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                     ::fast_io::mnp::leb128_get(next_local_index))};
+                        if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                           local_type_from_index(next_local_index) != curr_local_type)
+                        {
+                            break;
+                        }
+
+                        operand_kind = reorder_expr_operand_kind::local;
+                        operand_off = local_offset_from_index(next_local_index);
+                        scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                        ++local_read_count;
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32 && operand_op == wasm1_code::i32_const)
+                    {
+                        wasm_i32 imm{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(imm))};
+                        if(imm_err != ::fast_io::parse_code::ok) { break; }
+                        operand_kind = reorder_expr_operand_kind::imm;
+                        operand_imm = static_cast<wasm_i64>(imm);
+                        scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i64 && operand_op == wasm1_code::i64_const)
+                    {
+                        wasm_i64 imm{};
+                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                        auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(imm))};
+                        if(imm_err != ::fast_io::parse_code::ok) { break; }
+                        operand_kind = reorder_expr_operand_kind::imm;
+                        operand_imm = imm;
+                        scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    if(scan == code_end)
+                    {
+                        scan = step_begin;
+                        break;
+                    }
+
+                    wasm1_code binop{};  // init
+                    ::std::memcpy(::std::addressof(binop), scan, sizeof(binop));
+
+                    reorder_expr_binop expr_op{};  // init
+                    if(!decode_reorder_expr_op(curr_local_type, binop, expr_op))
+                    {
+                        scan = step_begin;
+                        break;
+                    }
+
+                    ops[step_count] = expr_op;
+                    kinds[step_count] = operand_kind;
+                    offs[step_count] = operand_off;
+                    imms[step_count] = operand_imm;
+                    ++scan;
+                    ++step_count;
+                }
+
+                if(step_count < min_expr_step_count) { return false; }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    ++runtime_log_stats.instr_reorder_expr_fold_count;
+                    runtime_log_stats.instr_reorder_expr_step_count += step_count;
+                    runtime_log_stats.instr_reorder_local_read_count += local_read_count;
+                }
+
+                // Net stack effect of a left-fold expression is one pushed integer value.
+                operand_stack_push(curr_local_type);
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    auto const first_end_off{static_cast<local_offset_t>(local_off + local_size)};
+                    if(first_end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = first_end_off; }
+                    for(::std::size_t i{}; i != step_count; ++i)
+                    {
+                        if(kinds[i] != reorder_expr_operand_kind::local) { continue; }
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_expr_fold{
+                    [&]<::std::size_t StepCount>() constexpr UWVM_THROWS -> void
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                  interpreter_tuple));
+                        }
+                        else
+                        {
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                  interpreter_tuple));
+                        }
+                    }};
+
+                switch(step_count)
+                {
+                    case 3uz: emit_expr_fold.template operator()<3uz>(); break;
+                    case 4uz: emit_expr_fold.template operator()<4uz>(); break;
+                    case 5uz: emit_expr_fold.template operator()<5uz>(); break;
+                    case 6uz: emit_expr_fold.template operator()<6uz>(); break;
+                    case 7uz: emit_expr_fold.template operator()<7uz>(); break;
+                    case 8uz: emit_expr_fold.template operator()<8uz>(); break;
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(step_count));
+                emit_imm_to(bytecode, local_off);
+                for(::std::size_t i{}; i != step_count; ++i)
+                {
+                    emit_imm_to(bytecode, static_cast<::std::uint8_t>(ops[i]));
+                    emit_imm_to(bytecode, static_cast<::std::uint8_t>(kinds[i]));
+                    if(kinds[i] == reorder_expr_operand_kind::local)
+                    {
+                        emit_imm_to(bytecode, offs[i]);
+                    }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32)
+                    {
+                        emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i]));
+                    }
+                    else
+                    {
+                        emit_imm_to(bytecode, imms[i]);
+                    }
+                }
+
+                stacktop_commit_push1_typed_if_reachable(curr_local_type);
+                code_curr = scan;
+                return true;
+            }};
+
+        if(try_reschedule_mixed_int_expr_chain()) { break; }
+    }
+
+    // Instruction reorder base layer: recompile a consecutive same-typed `local.get` burst into
+    // one preload dispatch. This is the register-ring stack-caching form of the pass: it preserves
+    // the original producer order and lets any following opcode consume the now-cached operands.
+    if(instruction_reorder_runtime_candidate && instruction_reorder_follow_is_local_get &&
+       (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64 ||
+        curr_local_type == curr_operand_stack_value_type::f32 || curr_local_type == curr_operand_stack_value_type::f64))
+    {
+        auto const try_preload_local_get_burst{
+            [&]() constexpr UWVM_THROWS -> bool
+            {
+                constexpr ::std::size_t max_supported_preload_ring_size{8uz};
+                ::uwvm2::utils::container::array<local_offset_t, max_supported_preload_ring_size> offs{};
+                offs[0] = local_off;
+
+                ::std::size_t local_limit{};
+                ::std::size_t local_min{};
+                if constexpr(stacktop_enabled)
+                {
+                    if(!stacktop_enabled_for_vt(curr_local_type)) { return false; }
+
+                    auto const ring_size{stacktop_ring_size_for_vt(curr_local_type)};
+                    // The preload limit is the active physical register-ring size for the current
+                    // architecture/CompileOption. If a future ABI exposes a larger ring than this
+                    // generated opfunc family supports, do not silently treat the fixed template
+                    // limit as "full ring"; leave the window to ordinary local handling instead.
+                    if(ring_size < 2uz || ring_size > max_supported_preload_ring_size) { return false; }
+                    auto const free_slots{stacktop_free_slot_count_for_vt(curr_local_type)};
+                    if(free_slots < 2uz)
+                    {
+                        if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.instr_reorder_ring_slot_reject_count; }
+                        return false;
+                    }
+                    local_limit = free_slots < ring_size ? free_slots : ring_size;
+                    local_min = local_limit;
+                    if(local_limit == ring_size && ring_size > 3uz) { local_min = ring_size - 1uz; }
+                }
+                else
+                {
+                    return false;
+                }
+                if(local_limit < local_min) { return false; }
+
+                ::std::byte const* scan{code_curr};
+                ::std::size_t local_count{1uz};
+
+                while(local_count < local_limit)
+                {
+                    if(scan == code_end) { break; }
+
+                    wasm1_code op{};  // init
+                    ::std::memcpy(::std::addressof(op), scan, sizeof(op));
+                    if(op != wasm1_code::local_get) { break; }
+
+                    wasm_u32 next_local_index{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    auto const [next_local_index_next, next_local_index_err]{
+                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                       local_type_from_index(next_local_index) != curr_local_type)
+                    {
+                        break;
+                    }
+
+                    offs[local_count] = local_offset_from_index(next_local_index);
+                    scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                    ++local_count;
+                }
+
+                if(local_count < local_min) { return false; }
+
+                if(runtime_log_on) [[unlikely]]
+                {
+                    ++runtime_log_stats.instr_reorder_candidate_count;
+                    ++runtime_log_stats.instr_reorder_applied_count;
+                    ++runtime_log_stats.instr_reorder_local_preload_count;
+                    runtime_log_stats.instr_reorder_local_read_count += local_count;
+                    runtime_log_stats.instr_reorder_ring_slot_used_count += local_count;
+                }
+
+                for(::std::size_t i{}; i != local_count; ++i) { operand_stack_push(curr_local_type); }
+
+                auto const local_size{operand_stack_valtype_size(curr_local_type)};
+                if(local_size != 0uz)
+                {
+                    for(::std::size_t i{}; i != local_count; ++i)
+                    {
+                        auto const end_off{static_cast<local_offset_t>(offs[i] + local_size)};
+                        if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
+                    }
+                }
+
+                stacktop_prepare_push_n_same_vt_if_reachable(bytecode, curr_local_type, local_count);
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                auto const emit_preload{
+                    [&]<::std::size_t LocalCount>() constexpr UWVM_THROWS -> void
+                    {
+                        switch(curr_local_type)
+                        {
+                            case curr_operand_stack_value_type::i32:
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
+                                                                                                                                      interpreter_tuple));
+                                break;
+                            }
+                            case curr_operand_stack_value_type::i64:
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
+                                                                                                                                      interpreter_tuple));
+                                break;
+                            }
+                            case curr_operand_stack_value_type::f32:
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
+                                                                                                                                      interpreter_tuple));
+                                break;
+                            }
+                            case curr_operand_stack_value_type::f64:
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
+                                                                                                                                      interpreter_tuple));
+                                break;
+                            }
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+                    }};
+
+                switch(local_count)
+                {
+                    case 2uz: emit_preload.template operator()<2uz>(); break;
+                    case 3uz: emit_preload.template operator()<3uz>(); break;
+                    case 4uz: emit_preload.template operator()<4uz>(); break;
+                    case 5uz: emit_preload.template operator()<5uz>(); break;
+                    case 6uz: emit_preload.template operator()<6uz>(); break;
+                    case 7uz: emit_preload.template operator()<7uz>(); break;
+                    case 8uz: emit_preload.template operator()<8uz>(); break;
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, static_cast<::std::uint8_t>(local_count));
+                for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
+                for(::std::size_t i{}; i != local_count; ++i) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+
+                code_curr = scan;
+                return true;
+            }};
+
+        if(try_preload_local_get_burst()) { break; }
+    }
+#endif
+
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
     // Heavy combine: collapse the hot chain
     // `local.get src; f{32,64}.const mul; f{32,64}.mul; f{32,64}.const add; f{32,64}.add; local.set src`

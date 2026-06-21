@@ -230,6 +230,24 @@ Controls delay-local variantization for `uwvm-int`.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --enable-uwvm-int-delay-local=soft`
 
+### `--enable-uwvm-int-instruction-reorder=[y|n]`
+
+Controls whether the experimental register-ring-aware instruction reorder recompiler is compiled into `uwvm-int`.
+
+- **Default:** `n`
+- **Impact:** Defines `UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER` when enabled. The runtime still defaults to off; use `--runtime-uwvm-int-enable-instruction-reorder` or `-Rint-reorder` to enable the pass for a run. Keep this disabled for tiny builds or non-experimental releases.
+- **Example:**
+  - `xmake f --execution-int=uwvm-int --enable-uwvm-int-instruction-reorder=y`
+
+### `--enable-uwvm-int-loop-unwind=[y|n]`
+
+Controls loop-unwind translation for `uwvm-int`.
+
+- **Default:** `y`
+- **Impact:** Defines `UWVM_ENABLE_UWVM_INT_LOOP_UNWIND` when enabled. Disable it to compile out loop-unwind code for tiny runtime builds; the runtime flag can still turn the optimization off when it is compiled in.
+- **Example:**
+  - `xmake f --execution-int=uwvm-int --enable-uwvm-int-loop-unwind=n`
+
 ### `--detailed-debug-check=[y|n]`
 
 Enables a more detailed debug checking mode in **debug** builds (defines `UWVM_ENABLE_DETAILED_DEBUG_CHECK` when `-m debug` is used).

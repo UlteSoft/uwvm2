@@ -191,7 +191,7 @@ case wasm1_code::call:
     flush_conbine_pending();
 #endif
 
-    auto const stack_size{operand_stack.size()};
+    [[maybe_unused]] auto const stack_size{operand_stack.size()};
 
     if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"call", param_count); }
 
@@ -1006,7 +1006,7 @@ case wasm1_code::call_indirect:
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
     auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
-    auto const stack_size{operand_stack.size()};
+    [[maybe_unused]] auto const stack_size{operand_stack.size()};
 
     if(!is_polymorphic && (param_count_plus_table_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {

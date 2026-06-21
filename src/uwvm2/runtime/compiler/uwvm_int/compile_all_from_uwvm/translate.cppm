@@ -50,6 +50,7 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.runtime.storage;
+import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.runtime.compiler.uwvm_int.optable;
 
 #ifndef UWVM_MODULE
