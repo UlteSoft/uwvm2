@@ -622,6 +622,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
 			-- strictness and only downgrade this diagnostic for tests.
 			add_cxxflags("-Wno-error=undefined-inline")
+			add_cxxflags("-Wno-undefined-inline")
 		end
 
 		if is_libfuzzer then
@@ -1048,6 +1049,7 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 				-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
 				-- strictness and only downgrade this diagnostic for tests.
 				add_cxxflags("-Wno-error=undefined-inline")
+				add_cxxflags("-Wno-undefined-inline")
 			end
 
 			add_tests("unit", { group = "default" }) -- xmake test -g default
@@ -1135,6 +1137,7 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 
 			if get_config("use-llvm-compiler") then
 				add_cxxflags("-Wno-error=undefined-inline")
+				add_cxxflags("-Wno-undefined-inline")
 			end
 
 			add_tests("unit", { group = "default" }) -- xmake test -g default
