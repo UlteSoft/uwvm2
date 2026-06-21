@@ -18,7 +18,7 @@ Build-time `xmake f ...` switches are documented separately in [`../xmake-option
 - [Global And Debug Commands](global-debug.md): `--help`, `--mode`, `--run`, `--version`, and `--debug-test`.
 - [WebAssembly Commands](wasm.md): module loading, explicit start-function invocation, preload modules, native dynamic libraries, import binding rewrites, weak symbols, parser limits, initializer limits, memory limits, preload memory attributes, and strict memory growth.
 - [Runtime Commands](runtime.md): runtime mode/compiler selection, shortcut conflicts, LLVM IR verifier control, compile-thread resolution, scheduling, and compiler logs.
-- [Logging Commands](logging.md): diagnostic output routing, warning enable/disable/fatal conversion, verbose mode, and Windows ANSI mode.
+- [Logging Commands](logging.md): diagnostic output routing, color policy, warning enable/disable/fatal conversion, verbose mode, and Windows ANSI mode.
 - [WASI Commands](wasi.md): core WASI option, WASI Preview 1 global/single/group targets, environment variables, mounts, trace output, sockets, and target override rules.
 
 ## Quick Availability Model

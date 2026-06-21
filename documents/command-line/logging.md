@@ -4,6 +4,7 @@ Source focus:
 
 - `src/uwvm2/uwvm/cmdline/params/log_*.h`
 - `src/uwvm2/uwvm/cmdline/callback/log_*.h`
+- `src/uwvm2/uwvm_predefine/utils/ansies/no_color.h`
 - `src/uwvm2/uwvm_predefine/io/warn_control.h`
 - `src/uwvm2/uwvm_predefine/io/runtime_log.h`
 
@@ -12,6 +13,7 @@ Source focus:
 | Command | Aliases | Arguments | Repeatability | Availability | Behavior |
 | --- | --- | --- | --- | --- | --- |
 | `--log-output` | `-log` | `[out|err|file <file:path>]` | Once | Core; file target gated on constrained platforms | Route main diagnostics to stdout, stderr, or file. |
+| `--log-color` | `-log-c` | `[enable|disable]` | Repeatable | Core | Force colored diagnostic output on or off. |
 | `--log-enable-warning` | `-log-ew` | `[all|parser]` | Repeatable | Core | Enable selected warning categories. |
 | `--log-disable-warning` | `-log-dw` | `[all|vm|untrusted-dl|dl|weak-symbol|depend|nt-path|toctou|runtime|runtime-compile-threads]` | Repeatable | Core; some categories gated | Disable selected warning categories. |
 | `--log-convert-warn-to-fatal` | `-log-wfatal` | `[all|vm|parser|untrusted-dl|dl|weak-symbol|depend|nt-path|toctou|runtime|runtime-compile-threads]` | Repeatable | Core; some categories gated | Convert selected warning categories to fatal termination. |
@@ -51,6 +53,28 @@ Examples:
 ```bash
 uwvm --log-output err --run app.wasm
 uwvm --log-output file uwvm.log --version
+```
+
+## Color Policy: `--log-color`
+
+Default behavior:
+
+- UWVM initializes diagnostic color output from the `NO_COLOR` environment variable.
+- If `NO_COLOR` exists, color output starts disabled.
+- If `NO_COLOR` does not exist, color output starts enabled.
+
+Command behavior:
+
+- `--log-color enable` forces diagnostic color output on for later diagnostics.
+- `--log-color disable` forces diagnostic color output off for later diagnostics.
+- The command can override the environment-derived default.
+- Repeating the command is allowed; the later value wins.
+
+Examples:
+
+```bash
+NO_COLOR=1 uwvm --log-color enable --run app.wasm
+uwvm --log-color disable --version
 ```
 
 ## Warning Categories
