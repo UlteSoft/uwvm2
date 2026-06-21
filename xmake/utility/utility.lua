@@ -930,13 +930,6 @@ function get_llvm_jit_options()
         native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
             or (_run_llvm_config(llvm_config, native_codegen_args) or "")
     end
-    if not link_static and native_codegen_linkflags and native_codegen_linkflags ~= "" and host_target_components and #host_target_components ~= 0 then
-        local direct_native_link_names = _llvm_direct_link_names({}, host_target_components)
-        local direct_native_codegen_linkflags = _filter_llvm_dynamic_link_flags(native_codegen_linkflags, direct_native_link_names)
-        if direct_native_codegen_linkflags ~= "" then
-            native_codegen_linkflags = direct_native_codegen_linkflags
-        end
-    end
     result.native_codegen_linkflags = native_codegen_linkflags
 
     cprint("detecting for llvm-jit ... ${color.success}%s (%s), component set: %s",

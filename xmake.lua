@@ -341,11 +341,24 @@ end
 local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
 	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
 
-add_requires("openssl", {configs = {shared = false}})
+if get_config("openssl-root") == "default" then
+	add_requires("openssl", {configs = {shared = false}})
+end
 
 function uwvm_add_llvm_jit_cache_openssl()
 	add_defines("UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519")
-	add_packages("openssl")
+	local openssl_root = get_config("openssl-root")
+	if openssl_root and openssl_root ~= "default" then
+		local openssl_libdir = path.join(openssl_root, "lib")
+		if not os.isdir(openssl_libdir) then
+			openssl_libdir = openssl_root
+		end
+		add_includedirs(path.join(openssl_root, "include"))
+		add_linkdirs(openssl_libdir)
+		add_links("ssl", "crypto")
+	else
+		add_packages("openssl")
+	end
 end
 
 target("uwvm")
