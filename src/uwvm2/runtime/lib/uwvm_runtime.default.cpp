@@ -8006,7 +8006,7 @@ namespace uwvm2::runtime::lib
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
+        [[maybe_unused]] UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
                                                                                                                         ::std::uintptr_t result_buffer_address,
                                                                                                                         ::std::size_t result_bytes,
                                                                                                                         ::std::uintptr_t param_buffer_address,
@@ -8339,7 +8339,7 @@ namespace uwvm2::runtime::lib
         // - parameter/result byte counts are checked before any buffer copy.
         // - tiered wrappers prefer ready LLVM entries, then no-T0 demand LLVM, then T0.
         // - interpreter fallback preserves the caller's logical wasm frame.
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR [[maybe_unused]] inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
+        [[maybe_unused]] UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR inline constexpr void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
                                                                                                                         ::std::uintptr_t result_buffer_address,
                                                                                                                         ::std::size_t result_bytes,
                                                                                                                         ::std::uintptr_t param_buffer_address,
@@ -8396,8 +8396,7 @@ namespace uwvm2::runtime::lib
         }
 # endif
 
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
-        [[maybe_unused]] inline constexpr void llvm_jit_raw_call_defined_entry(::std::uintptr_t context_address,
+        [[maybe_unused]] UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR inline constexpr void llvm_jit_raw_call_defined_entry(::std::uintptr_t context_address,
                                                                                ::std::uintptr_t result_buffer_address,
                                                                                ::std::size_t result_bytes,
                                                                                ::std::uintptr_t param_buffer_address,
@@ -8438,8 +8437,7 @@ namespace uwvm2::runtime::lib
         // Non-tiered LLVM raw placeholders share the same ABI contract but skip interpreter T0 policy. The lazy wrapper compiles the
         // requested function before dispatch; the raw interpreter wrapper is used only when generated code must call interpreter-backed
         // wasm definitions.
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
-        [[maybe_unused]] inline constexpr void llvm_jit_lazy_raw_call_defined_entry(::std::uintptr_t context_address,
+        [[maybe_unused]] UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR inline constexpr void llvm_jit_lazy_raw_call_defined_entry(::std::uintptr_t context_address,
                                                                                     ::std::uintptr_t result_buffer_address,
                                                                                     ::std::size_t result_bytes,
                                                                                     ::std::uintptr_t param_buffer_address,
@@ -8503,8 +8501,7 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
-        UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR
-        [[maybe_unused]] inline constexpr void llvm_jit_raw_call_cached_import_entry(::std::uintptr_t context_address,
+        [[maybe_unused]] UWVM2_RUNTIME_LLVM_JIT_RAW_ENTRY_FUNC_ATTR inline constexpr void llvm_jit_raw_call_cached_import_entry(::std::uintptr_t context_address,
                                                                                      ::std::uintptr_t result_buffer_address,
                                                                                      ::std::size_t result_bytes,
                                                                                      ::std::uintptr_t param_buffer_address,
