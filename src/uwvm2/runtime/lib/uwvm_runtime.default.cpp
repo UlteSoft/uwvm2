@@ -170,7 +170,7 @@ extern "C" void __deregister_frame(void const*);
 #   define UWVM2_RUNTIME_LLVM_JIT_HAS_SEEDED_LIBUNWIND_BACKTRACE 1
 #   define UWVM2_RUNTIME_LLVM_JIT_HAS_TRAP_FRAME_POINTER_CHAIN 1
 #  elif defined(__aarch64__) || defined(_M_ARM64)
-#   define UWVM2_RUNTIME_LLVM_JIT_LIBUNWIND_FRAME_POINTER_REG UNW_AARCH64_FP
+#   define UWVM2_RUNTIME_LLVM_JIT_LIBUNWIND_FRAME_POINTER_REG UNW_AARCH64_X29
 #   define UWVM2_RUNTIME_LLVM_JIT_HAS_SEEDED_LIBUNWIND_BACKTRACE 1
 #   define UWVM2_RUNTIME_LLVM_JIT_HAS_TRAP_FRAME_POINTER_CHAIN 1
 #  else
@@ -1585,6 +1585,21 @@ namespace uwvm2::runtime::lib
             ::std::uintptr_t stack_pointer{};
         };
 
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE
+        [[nodiscard]] inline int llvm_jit_unw_getcontext(unw_context_t* context) noexcept
+        {
+#   if defined(__clang__)
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wgnu-statement-expression-from-macro-expansion"
+#   endif
+            return unw_getcontext(context);
+#   if defined(__clang__)
+#    pragma clang diagnostic pop
+#   endif
+        }
+#  endif
+
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_TRAP_FRAME_POINTER_CHAIN
         [[nodiscard]] inline constexpr bool llvm_jit_frame_record_address_aligned(::std::uintptr_t address) noexcept
         { return (address % alignof(::std::uintptr_t)) == 0u; }
 
@@ -1605,6 +1620,7 @@ namespace uwvm2::runtime::lib
             if(next_frame_pointer <= current_frame_pointer) { return false; }
             return next_frame_pointer - current_frame_pointer <= max_frame_chain_delta;
         }
+#  endif
 
         [[nodiscard]] inline constexpr llvm_jit_trap_frame_context get_llvm_jit_trap_frame_context(::std::uintptr_t return_address,
                                                                                                    ::std::uintptr_t trap_frame_address,
@@ -1692,12 +1708,14 @@ namespace uwvm2::runtime::lib
             return storage;
         }
 
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_TRAP_FRAME_POINTER_CHAIN
         [[nodiscard]] inline constexpr ::std::uintptr_t llvm_jit_align_stack_scan_address(::std::uintptr_t address) noexcept
         {
             constexpr auto alignment{static_cast<::std::uintptr_t>(alignof(::std::uintptr_t))};
             auto const mask{alignment - 1u};
             return (address + mask) & ~mask;
         }
+#  endif
 
         [[nodiscard]] inline constexpr llvm_jit_unwind_backtrace_storage capture_llvm_jit_stack_scan_backtrace(llvm_jit_trap_frame_context const& trap_context,
                                                                                                                ::std::size_t omit) noexcept
@@ -1773,7 +1791,7 @@ namespace uwvm2::runtime::lib
             llvm_jit_unwind_backtrace_storage storage{};
 
             unw_context_t context;
-            if(unw_getcontext(::std::addressof(context)) != 0) [[unlikely]] { return storage; }
+            if(llvm_jit_unw_getcontext(::std::addressof(context)) != 0) [[unlikely]] { return storage; }
 
             unw_cursor_t cursor;
             if(unw_init_local(::std::addressof(cursor), ::std::addressof(context)) != 0) [[unlikely]] { return storage; }
@@ -1803,7 +1821,7 @@ namespace uwvm2::runtime::lib
             if(trap_context.return_address == 0u || trap_context.stack_pointer == 0u || trap_context.frame_pointer == 0u) [[unlikely]] { return storage; }
 
             unw_context_t context;
-            if(unw_getcontext(::std::addressof(context)) != 0) [[unlikely]] { return storage; }
+            if(llvm_jit_unw_getcontext(::std::addressof(context)) != 0) [[unlikely]] { return storage; }
 
             unw_cursor_t cursor;
             if(unw_init_local(::std::addressof(cursor), ::std::addressof(context)) != 0) [[unlikely]] { return storage; }
