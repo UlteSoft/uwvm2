@@ -381,6 +381,16 @@ template <auto Function>
 {
     if(host_address == 0u || object_type == nullptr || symbol_name.empty()) [[unlikely]] { return nullptr; }
 
+    auto pointer_type{get_llvm_pointer_type(object_type)};
+    if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
+
+#if defined(__i386__) || defined(_M_IX86)
+    // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds. These host objects are
+    // process-stable tables/storage, so use the same direct pointer constant strategy that runtime bridge function pointers use.
+    static_cast<void>(ir_builder);
+    static_cast<void>(symbol_name);
+    return get_llvm_host_pointer_constant(host_address, pointer_type);
+#else
     auto current_block{ir_builder.GetInsertBlock()};
     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
     auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
@@ -393,6 +403,7 @@ template <auto Function>
     global->setLinkage(::llvm::GlobalValue::ExternalLinkage);
     global->setInitializer(nullptr);
     return global;
+#endif
 }
 
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_address(::llvm::IRBuilder<>& ir_builder,
