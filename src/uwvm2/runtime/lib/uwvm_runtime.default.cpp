@@ -1591,6 +1591,7 @@ namespace uwvm2::runtime::lib
 #   if defined(__clang__)
 #    pragma clang diagnostic push
 #    pragma clang diagnostic ignored "-Wgnu-statement-expression-from-macro-expansion"
+#    pragma clang diagnostic ignored "-Winline-asm"
 #   endif
             return unw_getcontext(context);
 #   if defined(__clang__)

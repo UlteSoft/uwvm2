@@ -130,6 +130,8 @@ function def_build(opt)
 		end
 
 		on_load(function(target)
+			local utility = import("utility.utility", { anonymous = true })
+			local llvm_jit_options = utility.get_llvm_jit_options()
 			for _, field in ipairs({
 				"linkdirs",
 				"frameworkdirs",
