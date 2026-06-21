@@ -120,9 +120,16 @@ function def_build(opt)
 	end
 
 	if execution_jit == "default" or execution_jit == "llvm" then
+		for _, value in ipairs({
+			"-lLLVMAArch64CodeGen",
+			"-lLLVMAArch64Desc",
+			"-lLLVMAArch64Utils",
+			"-lLLVMAArch64Info"
+		}) do
+			add_ldflags(value, { force = true })
+		end
+
 		on_load(function(target)
-			local utility = import("utility.utility", { anonymous = true })
-			local llvm_jit_options = utility.get_llvm_jit_options()
 			for _, field in ipairs({
 				"linkdirs",
 				"frameworkdirs",
@@ -140,7 +147,9 @@ function def_build(opt)
 					end
 				end
 			end
-			utility.add_linkflags_to_target(target, llvm_jit_options.native_codegen_linkflags, "links")
+			for _, value in ipairs(os.argv(llvm_jit_options.native_codegen_linkflags or "")) do
+				target:add("ldflags", value, { force = true })
+			end
 		end)
 	end
 
