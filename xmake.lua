@@ -1,6 +1,7 @@
 ﻿set_xmakever("2.9.8")
 
 set_project("uwvm")
+set_policy("check.auto_ignore_flags", false)
 
 -- Version
 set_version("2.0.3")
@@ -120,6 +121,8 @@ function def_build(opt)
 	end
 
 	if execution_jit == "default" or execution_jit == "llvm" then
+		add_cxxflags("-Wno-deprecated-declarations", { force = true })
+
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()
@@ -371,7 +374,10 @@ function uwvm_add_llvm_jit_cache_openssl()
 			local ssl_archive = path.join(openssl_libdir, "libssl.a")
 			local crypto_archive = path.join(openssl_libdir, "libcrypto.a")
 			if os.isfile(ssl_archive) and os.isfile(crypto_archive) then
-				add_ldflags(ssl_archive, crypto_archive, "-lcrypt32", "-lgdi32", "-ladvapi32", "-luser32", "-lws2_32", { force = true })
+				add_ldflags(ssl_archive, crypto_archive, { force = true })
+				if is_plat("windows", "mingw") then
+					add_ldflags("-lcrypt32", "-lgdi32", "-ladvapi32", "-luser32", "-lws2_32", { force = true })
+				end
 			else
 				add_linkdirs(openssl_libdir)
 				add_links("ssl", "crypto")

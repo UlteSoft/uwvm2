@@ -627,9 +627,6 @@ local function _llvm_link_query_args(link_static, query, components)
     local args = {}
     if link_static then
         table.insert(args, "--link-static")
-        if query == "--libfiles" then
-            table.insert(args, "--quote-paths")
-        end
     end
     table.insert(args, query)
     for _, component in ipairs(components) do

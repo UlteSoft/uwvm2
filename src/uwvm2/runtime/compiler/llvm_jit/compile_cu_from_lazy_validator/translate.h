@@ -938,7 +938,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            llvm_module->setTargetTriple(target_machine->getTargetTriple());
+            llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
             llvm_module->setDataLayout(target_machine->createDataLayout());
             apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
@@ -1093,7 +1093,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            llvm_module->setTargetTriple(target_machine->getTargetTriple());
+            llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
             llvm_module->setDataLayout(target_machine->createDataLayout());
             apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))

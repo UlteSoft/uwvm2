@@ -284,7 +284,9 @@ template <typename FunctionPtr>
                              ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(name_prefix.data()), name_prefix.size()},
                              ::fast_io::mnp::hex<false, true>(host_address));
     }
-    auto address_global{llvm_module->getOrInsertGlobal(get_llvm_string_ref(address_symbol_name), llvm_intptr_type)};
+    auto address_global_value{llvm_module->getOrInsertGlobal(get_llvm_string_ref(address_symbol_name), llvm_intptr_type)};
+    auto address_global{::llvm::dyn_cast<::llvm::GlobalVariable>(address_global_value)};
+    if(address_global == nullptr) [[unlikely]] { return nullptr; }
     address_global->setLinkage(::llvm::GlobalValue::PrivateLinkage);
     address_global->setInitializer(::llvm::ConstantInt::get(llvm_intptr_type, host_address));
 
@@ -407,7 +409,9 @@ template <auto Function>
     auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
     ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
     if(auto existing{llvm_module->getGlobalVariable(symbol_name_ref, true)}; existing != nullptr) { return existing; }
-    auto global{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
+    auto global_value{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
+    auto global{::llvm::dyn_cast<::llvm::GlobalVariable>(global_value)};
+    if(global == nullptr) [[unlikely]] { return nullptr; }
     global->setLinkage(::llvm::GlobalValue::ExternalLinkage);
     global->setInitializer(nullptr);
     return global;
@@ -855,7 +859,7 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
     // runtime reconstruct the generated caller rather than starting the unwind from the C++ trap helper frame.
     call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
     call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
-    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, {call_arguments.data(), call_arguments.size()})};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -924,7 +928,7 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     auto const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(llvm_intptr_type)};
     call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
     call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
-    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, {call_arguments.data(), call_arguments.size()})};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -1536,7 +1540,7 @@ struct runtime_direct_callee_resolution_t
 
     // Wasm function types have a fixed arity.  The final `false` explicitly disables LLVM varargs so verifier/type checks
     // catch any call-site arity mismatch instead of treating extra operands as native variadic arguments.
-    return ::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false);
+    return ::llvm::FunctionType::get(llvm_result_type, {llvm_parameter_types.data(), llvm_parameter_types.size()}, false);
 }
 
 // Runtime raw-call bridge signature.  Arguments are: module address, function index, result buffer address/size, and
@@ -3579,7 +3583,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         if(llvm_result_type == nullptr) [[unlikely]] { return false; }
     }
 
-    auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
+    auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, {llvm_parameter_types.data(), llvm_parameter_types.size()}, false)};
     // Keep every LLVM symbol/debug name on the same checked Wasm32 function index; silent truncation here would alias
     // two runtime functions to the same generated declaration.
     auto const function_name{get_llvm_wasm_function_name(*runtime_module_ptr, function_index)};
@@ -3633,7 +3637,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         core_parameter_types.push_back(llvm_intptr_type);
         for(auto param_type: llvm_parameter_types) { core_parameter_types.push_back(param_type); }
 
-        auto core_function_type{::llvm::FunctionType::get(llvm_result_type, core_parameter_types, false)};
+        auto core_function_type{::llvm::FunctionType::get(llvm_result_type, {core_parameter_types.data(), core_parameter_types.size()}, false)};
         auto const core_function_name{get_llvm_wasm_tiered_core_function_name(*runtime_module_ptr, function_index)};
         state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(core_function_name));
         if(state.llvm_function == nullptr)
@@ -3896,7 +3900,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             // the core to run normal local initialization instead of OSR local restore.
             for(auto& arg: public_function->args()) { core_arguments.push_back(::std::addressof(arg)); }
 
-            auto core_call{apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, core_arguments))};
+            auto core_call{
+                apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
             if(state.emit_call_stack_frames && !emit_runtime_local_func_llvm_jit_call_stack_pop(public_builder)) [[unlikely]] { return false; }
 
             if(public_function->getReturnType()->isVoidTy()) { public_builder.CreateRetVoid(); }
@@ -4044,7 +4049,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     core_arguments.push_back(::llvm::Constant::getNullValue(llvm_param_type));
                 }
 
-                auto core_call{apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, core_arguments))};
+                auto core_call{
+                    apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
                 if(abi_layout.result_count == 1uz)
                 {
                     auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
@@ -4212,7 +4218,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 param_offset += abi_size;
             }
 
-            auto typed_call{apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
+            auto typed_call{
+                apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, {call_arguments.data(), call_arguments.size()}))};
             if(abi_layout.result_count == 1uz)
             {
                 // Store the typed return value back into the caller-provided raw result buffer, completing the raw ABI
@@ -5591,7 +5598,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
                                                                                     *runtime_module_ptr,
                                                                                     callee_resolution.func_index,
                                                                                     *callee_resolution.function_type_ptr,
-                                                                                    prepared_call.arguments)};
+                                                                                    {prepared_call.arguments.data(), prepared_call.arguments.size()})};
             // `push_runtime_local_func_llvm_jit_wasm_call_result` intentionally accepts null for void callees, so direct
             // call emission must be checked here or a failed void call would be silently dropped from the IR.
             if(call_value == nullptr) [[unlikely]] { return false; }
@@ -5622,7 +5629,8 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
         if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
     }
 
-    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call.arguments)};
+    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(
+        state, *runtime_module_ptr, func_index, *callee_type_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()})};
     if(call_value == nullptr) [[unlikely]] { return false; }
     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
 }
