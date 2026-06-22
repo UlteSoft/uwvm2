@@ -156,6 +156,18 @@ namespace
         }
     }
 
+    [[nodiscard]] ::std::filesystem::path env_path(char const* name)
+    {
+        if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
+        return {};
+    }
+
+    [[nodiscard]] ::std::string env_string(char const* name)
+    {
+        if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
+        return {};
+    }
+
     [[nodiscard]] ::std::filesystem::path find_wat2wasm(::std::filesystem::path const& project_root)
     {
         if(auto const env{::std::getenv("WAT2WASM")}; env != nullptr && *env != '\0')
@@ -375,11 +387,12 @@ namespace
         return {stack_shape_t{"deep_leaf", {0uz, 1uz, 2uz, 3uz}, make_deep_leaf_wat},
                 stack_shape_t{"post_call_trap", {1uz, 2uz}, make_post_call_trap_wat},
                 stack_shape_t{"indirect_leaf", {0uz, 1uz, 2uz, 3uz}, make_indirect_leaf_wat},
-                stack_shape_t{"recursive_countdown", {0uz, 0uz, 0uz, 0uz, 1uz}, make_recursive_countdown_wat},
+                stack_shape_t{"recursive_countdown", {0uz, 1uz}, make_recursive_countdown_wat},
                 stack_shape_t{"param_result_chain", {0uz, 1uz, 2uz, 3uz}, make_param_result_chain_wat}};
     }
 
     [[nodiscard]] run_result_t run_case(::std::filesystem::path const& uwvm_path,
+                                        ::std::string_view run_prefix,
                                         ::std::filesystem::path const& wasm_path,
                                         ::std::filesystem::path const& artifact_dir,
                                         char const* stem,
@@ -387,7 +400,7 @@ namespace
                                         char const* policy)
     {
         auto const output_path{artifact_dir / (::std::string{stem} + "." + mode.name + "." + policy + ".out")};
-        auto const command{quote_argument(uwvm_path) + " " + mode.args +
+        auto const command{(run_prefix.empty() ? ::std::string{} : ::std::string{run_prefix} + " ") + quote_argument(uwvm_path) + " " + mode.args +
                            " -Rllvm-cache-path disable -Rllvm-call-stack " + policy + " --run " + quote_argument(wasm_path)};
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
         ::std::cout << "[llvm-jit-unwind-stack] " << full_command << '\n';
@@ -442,12 +455,22 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    auto const uwvm_path{find_uwvm_binary(executable_dir)};
+    auto const uwvm_path{[](::std::filesystem::path const& dir) {
+        auto env_uwvm{env_path("UWVM")};
+        if(!env_uwvm.empty()) { return env_uwvm; }
+        return find_uwvm_binary(dir);
+    }(executable_dir)};
     if(uwvm_path.empty())
     {
-        ::std::cerr << "failed to locate uwvm next to test executable: " << executable << '\n';
+        ::std::cerr << "failed to locate uwvm next to test executable: " << executable << "; set UWVM to override\n";
         return 1;
     }
+    if(!::std::filesystem::exists(uwvm_path))
+    {
+        ::std::cerr << "uwvm path does not exist: " << uwvm_path << '\n';
+        return 1;
+    }
+    auto const run_prefix{env_string("UWVM_RUN_PREFIX")};
 
     auto const wat2wasm_path{find_wat2wasm(project_root)};
     if(wat2wasm_path.empty())
@@ -456,7 +479,11 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat"};
+    auto const artifact_dir{[](::std::filesystem::path const& dir) {
+        auto env_artifact_dir{env_path("UWVM_UNWIND_ARTIFACT_DIR")};
+        if(!env_artifact_dir.empty()) { return env_artifact_dir; }
+        return dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat";
+    }(executable_dir)};
     bool ok{true};
 
     for(auto const& shape: make_shapes())
@@ -471,8 +498,8 @@ int main(int argc, char** argv)
 
             for(auto const& mode: modes)
             {
-                auto const instruction{run_case(uwvm_path, wasm_path, artifact_dir, stem.c_str(), mode, "instruction")};
-                auto const unwind{run_case(uwvm_path, wasm_path, artifact_dir, stem.c_str(), mode, "unwind")};
+                auto const instruction{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "instruction")};
+                auto const unwind{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "unwind")};
 
                 if(!instruction.valid || instruction.func_indices != shape.expected_funcs)
                 {

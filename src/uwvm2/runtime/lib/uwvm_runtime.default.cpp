@@ -1437,7 +1437,7 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        [[nodiscard]] inline constexpr bool
+        [[nodiscard, maybe_unused]] inline constexpr bool
             parse_llvm_jit_inline_frame_name(::uwvm2::utils::container::u8string_view name, ::std::size_t& module_id, ::std::size_t& function_index) noexcept
         {
             // The LLVM translator encodes wasm inline-frame identity in synthetic function names. Parsing it here lets trap reports
@@ -1583,7 +1583,7 @@ namespace uwvm2::runtime::lib
             ::std::uintptr_t offset{};
         };
 
-        [[nodiscard]] inline constexpr resolved_llvm_jit_unwind_entry resolve_llvm_jit_unwind_entry(::std::uintptr_t ip) noexcept
+        [[nodiscard, maybe_unused]] inline constexpr resolved_llvm_jit_unwind_entry resolve_llvm_jit_unwind_entry(::std::uintptr_t ip) noexcept
         {
             // Resolve to the nearest entry at or before the IP, after confirming the IP belongs to generated code.
             auto const& entries{g_runtime.llvm_jit_unwind_entries};
@@ -2208,7 +2208,7 @@ namespace uwvm2::runtime::lib
             return runtime_llvm_jit_live_unwind_probe_saw_jit_frame(state);
         }
 # else
-        [[nodiscard]] inline constexpr bool runtime_llvm_jit_live_unwind_probe() noexcept { return false; }
+        [[nodiscard, maybe_unused]] inline constexpr bool runtime_llvm_jit_live_unwind_probe() noexcept { return false; }
 # endif
 
         enum class runtime_llvm_jit_unwind_probe_status : unsigned
@@ -2456,10 +2456,10 @@ namespace uwvm2::runtime::lib
         }
 
         template <typename Output>
-        inline constexpr void dump_llvm_jit_unwind_call_stack_frames_for_trap(Output& u8log_output_ul,
-                                                                              ::std::size_t& printed_frame_count,
-                                                                              trap_kind current_trap_kind,
-                                                                              printed_call_stack_frame_tracker* printed_frames = nullptr) noexcept
+        inline constexpr void dump_llvm_jit_unwind_call_stack_frames_for_trap([[maybe_unused]] Output& u8log_output_ul,
+                                                                              [[maybe_unused]] ::std::size_t& printed_frame_count,
+                                                                              [[maybe_unused]] trap_kind current_trap_kind,
+                                                                              [[maybe_unused]] printed_call_stack_frame_tracker* printed_frames = nullptr) noexcept
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             ::std::size_t last_printed_module_id{::std::numeric_limits<::std::size_t>::max()};
