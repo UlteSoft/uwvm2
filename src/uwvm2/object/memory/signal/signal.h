@@ -351,9 +351,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #   elif defined(__linux__) && (defined(__powerpc__) || defined(__PPC__))
             // Linux PowerPC stores NIP (next instruction pointer) at general-register slot 32.
             // This is PT_NIP in the kernel uapi ptrace register layout.
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[32u]);
+            auto const regs{uctx->uc_mcontext.uc_regs};
+            if(regs == nullptr) [[unlikely]] { return 0u; }
+            return static_cast<::std::uintptr_t>(regs->gregs[32u]);
 #   elif defined(__linux__) && (defined(__s390__) || defined(__s390x__))
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.psw.addr);
+#   elif defined(__linux__) && (defined(__sparc64__) || ((defined(__sparc__) || defined(__sparc)) && defined(__arch64__)))
+            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.mc_gregs[MC_PC]);
 #   elif defined(__linux__) && (defined(__sparc__) || defined(__sparc))
             return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_PC]);
 #   elif defined(__linux__) && defined(__alpha__)

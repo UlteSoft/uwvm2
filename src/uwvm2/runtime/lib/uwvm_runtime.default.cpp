@@ -295,6 +295,11 @@ namespace uwvm2::runtime::lib
                                                               ::fast_io::unix_timestamp stop_end) noexcept;
 #endif
 
+#if (defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)) || \
+    (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC))
+# define UWVM_TARGET_POWERPC_FAMILY 1
+#endif
+
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
         using compiled_local_func_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
@@ -3087,7 +3092,7 @@ namespace uwvm2::runtime::lib
             // lazily materialized functions are indistinguishable from eagerly translated ones.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -3116,11 +3121,7 @@ namespace uwvm2::runtime::lib
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 4uz;
 #  endif
 # elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
-            // PowerPC64 ABIs provide wide integer/floating argument windows that can carry stack-top cache values efficiently.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+            // UWVM opfunc dispatch is indirect; PPC musttail is conditional and this dispatch form is rejected.
 # elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
             // RV64 soft/single-float ABIs route more scalar values through integer registers, so fp cache slots share that window.
@@ -6931,7 +6932,7 @@ namespace uwvm2::runtime::lib
             // disabled because spills can cost more than byte-stack traffic.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -6973,11 +6974,7 @@ namespace uwvm2::runtime::lib
             // i386: (usually) only 2 register argument slots under fastcall (ecx/edx), and we already need 3 fixed args.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
 # elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
-            // powerpc64: SysV ELF (r3-r10 integer args, VSX for fp/simd)
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+            // powerpc64: UWVM opfunc dispatch is indirect; PPC musttail is conditional and this dispatch form is rejected.
 # elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)
             // powerpc32: AIX/SysV/EABI variants differ in i64/f64 passing (often reg-pairs) and hard-float rules.
             // Keep stack-top caching disabled by default for correctness across ABIs.
@@ -7086,6 +7083,8 @@ namespace uwvm2::runtime::lib
         static_assert(get_curr_target_tiered_tranopt().enable_tiered_loop_osr_poll);
 # endif
 #endif
+
+#undef UWVM_TARGET_POWERPC_FAMILY
 
         [[maybe_unused]] UWVM_ALWAYS_INLINE inline constexpr void copy_bytes_small(::std::byte* dst, ::std::byte const* src, ::std::size_t n) noexcept
         {

@@ -1109,12 +1109,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             u8"\n");
 
         // u2int para
+#if (defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)) || \
+    (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC))
+# define UWVM_VERSION_TARGET_POWERPC_FAMILY 1
+#endif
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         {
             using size_type = ::std::size_t;
             constexpr size_type npos{static_cast<size_type>(-1)};
             constexpr bool is_tail_call{
-# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_VERSION_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
                 true
 # else
                 false
@@ -1167,15 +1171,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             abi_name = u8"i386";
             abi_note = u8"Stack-top cache: Off (fastcall typically has only 2 reg args; need 3 fixed args).";
 # elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
-            // powerpc64: SysV ELF (r3-r10 integer args, VSX for fp/simd)
             abi_name = u8"powerpc64 SysV ELF ABI";
-            i32_begin = i64_begin = 3uz;
-            i32_end = i64_end = 8uz;
-            f32_begin = f64_begin = v128_begin = 8uz;
-            f32_end = f64_end = v128_end = 16uz;
+            abi_note = u8"Stack-top cache: Off (UWVM opfunc dispatch is indirect; PPC musttail is conditional).";
 # elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)
             abi_name = u8"powerpc32";
-            abi_note = u8"Stack-top cache: Off (ABI variants; keep disabled for correctness).";
+            abi_note = u8"Stack-top cache: Off (PPC ABI variants and indirect musttail constraints).";
 # elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
             // riscv64: soft-float / single-float
@@ -1348,6 +1348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
         }
 #endif
+#undef UWVM_VERSION_TARGET_POWERPC_FAMILY
         // LLVM JIT
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         version_u8print_llvm_jit_impl(u8log_output_ul);
