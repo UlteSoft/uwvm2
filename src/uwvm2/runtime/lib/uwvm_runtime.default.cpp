@@ -2257,7 +2257,7 @@ namespace uwvm2::runtime::lib
             if(target_machine == nullptr) [[unlikely]] { return false; }
             target_machine->setFastISel(true);
 
-            module->setTargetTriple(target_machine->getTargetTriple());
+            module->setTargetTriple(target_machine->getTargetTriple().str());
             module->setDataLayout(target_machine->createDataLayout());
 
             auto const i32_type{::llvm::Type::getInt32Ty(context)};
@@ -9943,7 +9943,7 @@ namespace uwvm2::runtime::lib
                 make_runtime_llvm_jit_materialize_target_machine(context->host_cpu_name, context->host_target_attribute_storage, context->codegen_opt_level)};
             if(target_machine == nullptr) [[unlikely]] { return false; }
 
-            module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple());
+            module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
             module_storage.llvm_module->setDataLayout(target_machine->createDataLayout());
             run_runtime_llvm_jit_legacy_light_function_pipeline(*module_storage.llvm_module, *target_machine);
             context->optimized_task_modules.fetch_add(1uz, ::std::memory_order_relaxed);
@@ -10217,7 +10217,7 @@ namespace uwvm2::runtime::lib
                 }
                 if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-                module->setTargetTriple(target_machine->getTargetTriple());
+                module->setTargetTriple(target_machine->getTargetTriple().str());
                 module->setDataLayout(target_machine->createDataLayout());
                 if(verify_llvm_jit_ir && ::llvm::verifyModule(*module)) [[unlikely]]
                 {
@@ -10538,7 +10538,7 @@ namespace uwvm2::runtime::lib
             }
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            merged_module->setTargetTriple(target_machine->getTargetTriple());
+            merged_module->setTargetTriple(target_machine->getTargetTriple().str());
             merged_module->setDataLayout(target_machine->createDataLayout());
             auto llvm_jit_cache_key{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"full-module")};
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", rec.module_name);
@@ -10721,7 +10721,7 @@ namespace uwvm2::runtime::lib
                     }
                     return false;
                 }
-                engine_module->setTargetTriple(target_machine->getTargetTriple());
+                engine_module->setTargetTriple(target_machine->getTargetTriple().str());
                 engine_module->setDataLayout(target_machine->createDataLayout());
                 merged_module.reset();
                 raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
