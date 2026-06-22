@@ -61,6 +61,81 @@ $ xmake i -o <install_path>
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 4. `--apple-platform` Set Apple platform target and minimum OS version (see below)
 
+## Static release artifacts
+
+Darwin does not support fully static executables in the ELF/Linux sense. For
+release artifacts, use `--static=non-system` and keep Apple platform libraries
+dynamic. If the LLVM installation only provides `libLLVM*.dylib` and not
+`libLLVM*.a`, build the static release artifact with the LLVM JIT backend
+disabled.
+
+Use `--march=none` for all release artifact builds. Select x86_64 ISA tiers with
+explicit feature flags such as `--cxflags="-mssse3"` instead of `--march`.
+
+Common environment:
+
+```shell
+export SYSROOT=/path/to/apple-darwin-sysroot
+export PATH="$SYSROOT/../llvm/bin:$PATH"
+```
+
+Apple Silicon release artifact:
+
+```shell
+xmake f -y -c -m release \
+  --plat=macosx --arch=arm64 \
+  --use-llvm-compiler=y \
+  --sysroot="$SYSROOT" \
+  --llvm-target=aarch64-apple-darwin \
+  --use-cxx-module=n \
+  --static=non-system \
+  --execution-jit=none \
+  --march=none \
+  --openssl-root=/opt/homebrew \
+  --ccache=n \
+  --ldflags="-nostdlib++"
+xmake -j1 uwvm
+cp build/macosx/arm64/release/uwvm build/aarch64-apple-darwin-uwvm2
+```
+
+Intel macOS release tiers:
+
+| Artifact | Extra compiler flags | Intended baseline |
+| --- | --- | --- |
+| `x86_64_SSSE3-apple-darwin-uwvm2` | `-mssse3` | Core 2 Duo class x86_64 Macs |
+| `x86_64_SSE4_2-apple-darwin-uwvm2` | `-msse4.2` | Nehalem / Westmere |
+| `x86_64_AVX-apple-darwin-uwvm2` | `-mavx` | Sandy Bridge / Ivy Bridge |
+| `x86_64_AVX2-apple-darwin-uwvm2` | `-mavx2 -mbmi -mbmi2` | Haswell and newer |
+| `x86_64_AVX2_PRFCHW-apple-darwin-uwvm2` | `-mavx2 -mbmi -mbmi2 -mprfchw` | Broadwell and newer |
+
+Build one Intel tier:
+
+```shell
+xmake f -y -c -m release \
+  --plat=macosx --arch=x86_64 \
+  --use-llvm-compiler=y \
+  --sysroot="$SYSROOT" \
+  --llvm-target=x86_64-apple-darwin \
+  --use-cxx-module=n \
+  --static=non-system \
+  --execution-jit=none \
+  --march=none \
+  --openssl-root="$PWD/build/deps/openssl-src-x86_64" \
+  --ccache=n \
+  --cxflags="-mavx2 -mbmi -mbmi2" \
+  --ldflags="-nostdlib++"
+xmake -j1 uwvm
+cp build/macosx/x86_64/release/uwvm build/x86_64_AVX2-apple-darwin-uwvm2
+```
+
+Check that only Apple system libraries remain dynamic:
+
+```shell
+file build/aarch64-apple-darwin-uwvm2
+otool -L build/aarch64-apple-darwin-uwvm2
+arch -x86_64 build/x86_64_AVX2-apple-darwin-uwvm2 --version
+```
+
 ## Build for Apple platforms (iOS / watchOS / tvOS / visionOS)
 
 `xmake/option.lua` defines an `apple-platform` option. It controls the `-mtargetos` flag and the minimum OS version (`-m*-version-min`) when using Clang/LLVM.
