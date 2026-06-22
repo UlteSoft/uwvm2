@@ -140,7 +140,9 @@ function def_build(opt)
 					end
 				end
 			end
-			utility.add_linkflags_to_target(target, llvm_jit_options.native_codegen_linkflags, "links")
+			for _, value in ipairs(os.argv(llvm_jit_options.native_codegen_linkflags or "")) do
+				target:add("ldflags", value, { force = true })
+			end
 		end)
 	end
 
@@ -348,19 +350,43 @@ function def_build(opt)
 	)
 end
 
-local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
+local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
+local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or uwvm_uses_llvm_jit
 
-add_requires("openssl", {configs = {shared = false}})
+if uwvm_uses_llvm_jit and get_config("openssl-root") == "default" then
+	add_requires("openssl", {configs = {shared = false}})
+end
 
 function uwvm_add_llvm_jit_cache_openssl()
 	add_defines("UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519")
-	add_packages("openssl")
+	local openssl_root = get_config("openssl-root")
+	if openssl_root and openssl_root ~= "default" then
+		local openssl_libdir = path.join(openssl_root, "lib")
+		if not os.isdir(openssl_libdir) then
+			openssl_libdir = openssl_root
+		end
+		add_includedirs(path.join(openssl_root, "include"))
+		local static_mode = get_config("static")
+		if static_mode == "non-system" or static_mode == "compiler" then
+			local ssl_archive = path.join(openssl_libdir, "libssl.a")
+			local crypto_archive = path.join(openssl_libdir, "libcrypto.a")
+			if os.isfile(ssl_archive) and os.isfile(crypto_archive) then
+				add_ldflags(ssl_archive, crypto_archive, "-lcrypt32", "-lgdi32", "-ladvapi32", "-luser32", "-lws2_32", { force = true })
+			else
+				add_linkdirs(openssl_libdir)
+				add_links("ssl", "crypto")
+			end
+		else
+			add_linkdirs(openssl_libdir)
+			add_links("ssl", "crypto")
+		end
+	else
+		add_packages("openssl")
+	end
 end
 
 target("uwvm")
 	set_kind("binary")
-	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
 	def_build({ skip_static_libcxx = uwvm_uses_llvm_jit })
 
 	-- uwvm uses precise floating-point model to ensure determinism.
@@ -386,7 +412,9 @@ target("uwvm")
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
 
-	uwvm_add_llvm_jit_cache_openssl()
+	if uwvm_uses_llvm_jit then
+		uwvm_add_llvm_jit_cache_openssl()
+	end
 
 	-- uwvm
 	add_defines("UWVM=2")
@@ -460,7 +488,9 @@ target("uwvm_runtime")
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
 
-	uwvm_add_llvm_jit_cache_openssl()
+	if uwvm_uses_llvm_jit then
+		uwvm_add_llvm_jit_cache_openssl()
+	end
 
 	-- src
 	add_includedirs("src/")
@@ -566,6 +596,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- third-parties/boost
 		add_includedirs("third-parties/boost_unordered/include")
 
+		if is_llvm_jit_test then
+			uwvm_add_llvm_jit_cache_openssl()
+		end
+
 		-- uwvm
 		add_defines("UWVM=2")
 		-- uwvm test
@@ -604,6 +638,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
 			-- strictness and only downgrade this diagnostic for tests.
 			add_cxxflags("-Wno-error=undefined-inline")
+			add_cxxflags("-Wno-undefined-inline")
 		end
 
 		if is_libfuzzer then
@@ -989,6 +1024,8 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			-- third-parties/boost
 			add_includedirs("third-parties/boost_unordered/include")
 
+			uwvm_add_llvm_jit_cache_openssl()
+
 			-- uwvm
 			add_defines("UWVM=2")
 			-- uwvm test
@@ -1028,6 +1065,7 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 				-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
 				-- strictness and only downgrade this diagnostic for tests.
 				add_cxxflags("-Wno-error=undefined-inline")
+				add_cxxflags("-Wno-undefined-inline")
 			end
 
 			add_tests("unit", { group = "default" }) -- xmake test -g default
@@ -1079,6 +1117,8 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			-- third-parties/boost
 			add_includedirs("third-parties/boost_unordered/include")
 
+			uwvm_add_llvm_jit_cache_openssl()
+
 			-- uwvm
 			add_defines("UWVM=2")
 			-- uwvm test
@@ -1115,6 +1155,7 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 
 			if get_config("use-llvm-compiler") then
 				add_cxxflags("-Wno-error=undefined-inline")
+				add_cxxflags("-Wno-undefined-inline")
 			end
 
 			add_tests("unit", { group = "default" }) -- xmake test -g default

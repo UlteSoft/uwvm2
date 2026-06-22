@@ -48,6 +48,7 @@ function bsd_target()
 
     -- dynamic libary loader
     add_syslinks("dl")
+    add_syslinks("pthread")
     --if use_llvm_compiler then	
     --    add_syslinks("c++abi")
     --end
