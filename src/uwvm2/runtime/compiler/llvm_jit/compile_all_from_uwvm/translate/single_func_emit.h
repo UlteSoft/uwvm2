@@ -508,9 +508,11 @@ inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& fun
 {
     apply_llvm_jit_platform_function_attrs(function);
     apply_llvm_jit_semantic_function_attrs(function);
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    // Win64 trap bridges always pass explicit generated-frame context via read_register("rbp"/"rsp").  LLVM rejects
-    // reading rbp from a function where rbp remains allocatable, so every generated caller needs a fixed frame pointer.
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+    (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
+    // Win64 trap bridges always pass explicit generated-frame context via read_register.  LLVM rejects reading the
+    // architectural frame pointer from a function where that register remains allocatable, so every generated caller
+    // needs a fixed frame pointer.
     apply_llvm_jit_frame_pointer_function_attrs(function);
 #endif
 }
@@ -765,10 +767,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 // Report whether generated trap calls must pass explicit frame/stack context for Win64 SEH unwind reconstruction.
 [[nodiscard]] inline consteval bool llvm_jit_win64_seh_explicit_trap_context_enabled() noexcept
 {
-    // Windows x64 unwind state is reconstructed from a CONTEXT record, not from a DWARF cursor.  When a generated Wasm
+    // Windows unwind state is reconstructed from a CONTEXT record, not from a DWARF cursor.  When a generated Wasm
     // frame calls into the C++ trap helper, the helper's own frame is already a different ABI boundary, so the generated
-    // caller must pass its live RBP/RSP values explicitly.
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    // caller must pass its live frame/stack pointer values explicitly.
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+    (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
     return true;
 #else
     return false;
@@ -785,6 +788,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     // lowered in terms of the current function's abstract frame rather than the exact machine register value we need.
     auto& llvm_context{ir_builder.getContext()};
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"rbp"))};
+    auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"x29"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else
@@ -804,6 +812,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     // prologue state, and frame-register offsets.  Capture the live stack pointer before crossing into the helper.
     auto& llvm_context{ir_builder.getContext()};
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"rsp"))};
+    auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"sp"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else

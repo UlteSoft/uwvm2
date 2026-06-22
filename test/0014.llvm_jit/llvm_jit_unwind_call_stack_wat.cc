@@ -541,6 +541,8 @@ int main(int argc, char** argv)
         if(!env_artifact_dir.empty()) { return env_artifact_dir; }
         return dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat";
     }(executable_dir)};
+    auto comparison_policy{env_string("UWVM_UNWIND_COMPARISON_POLICY")};
+    if(comparison_policy.empty()) { comparison_policy = "unwind"; }
     bool ok{true};
 
     for(auto const& shape: make_shapes())
@@ -556,7 +558,7 @@ int main(int argc, char** argv)
             for(auto const& mode: modes)
             {
                 auto const instruction{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "instruction")};
-                auto const unwind{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "unwind")};
+                auto const unwind{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, comparison_policy.c_str())};
 
                 auto const instruction_matches_expected{instruction.valid && instruction.func_indices == shape.expected_funcs};
                 if(!instruction_matches_expected)
