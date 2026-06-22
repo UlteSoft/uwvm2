@@ -69,6 +69,13 @@ dynamic. If the LLVM installation only provides `libLLVM*.dylib` and not
 `libLLVM*.a`, build the static release artifact with the LLVM JIT backend
 disabled.
 
+If a release artifact enables LLVM JIT and statically links LLVM archives, the
+LLVM archives must be built for the same CPU baseline as the artifact. Do not
+link an AVX2-built LLVM archive into an SSSE3/SSE4.2/AVX artifact; LLVM itself
+may execute instructions that are unavailable on the target machine. Either
+build one conservative LLVM archive for the lowest supported baseline and reuse
+it for higher tiers, or build one LLVM archive per release tier.
+
 Use `--march=none` for all release artifact builds. Select x86_64 ISA tiers with
 explicit feature flags such as `--cxflags="-mssse3"` instead of `--march`.
 
