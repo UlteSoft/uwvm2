@@ -65,6 +65,15 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#pragma push_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND")
+#undef UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND
+#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) &&                                                            \
+    ((!defined(_WIN32) && (__has_include(<libunwind.h>) || __has_include(<unwind.h>))) ||                                                                    \
+     (defined(_WIN64) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                \
+      !defined(__CYGWIN__)))
+# define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
     template <typename Stm>
@@ -178,7 +187,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # if defined(LLVM_VERSION_STRING)
                             u8"    - LLVM Version: ",
                             ::fast_io::mnp::code_cvt(LLVM_VERSION_STRING),
-                            u8"\n"
+                            u8"\n",
 # elif defined(LLVM_VERSION_MAJOR) && defined(LLVM_VERSION_MINOR) && defined(LLVM_VERSION_PATCH)
                             u8"    - LLVM Version: ",
                             LLVM_VERSION_MAJOR,
@@ -186,10 +195,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             LLVM_VERSION_MINOR,
                             u8".",
                             LLVM_VERSION_PATCH,
-                            u8"\n"
+                            u8"\n",
 # else
-                            u8"    - LLVM Version: Unknown\n"
+                            u8"    - LLVM Version: Unknown\n",
 # endif
+                            u8"    - Call Stack Modes Support: instruction"
+# ifdef UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND
+                            u8", unwind"
+# endif
+                            u8"\n"
         );
     }
 #endif
@@ -1363,6 +1377,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     }
 
 }  // namespace uwvm2::uwvm::cmdline::params::details
+
+#pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND")
 
 #ifndef UWVM_MODULE
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>

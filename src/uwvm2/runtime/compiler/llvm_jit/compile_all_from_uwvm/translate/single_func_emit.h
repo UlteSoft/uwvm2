@@ -523,6 +523,10 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
     // Keep a physical frame pointer in generated functions.  Trap bridges capture the current frame address explicitly,
     // and a stable frame chain makes mixed JIT/runtime unwinding resilient after LLVM has inlined or optimized Wasm calls.
     apply_llvm_jit_frame_pointer_function_attrs(function);
+
+    // Explicit unwind call-stack mode must report the Wasm call chain from native frames. Do not rely on DWARF inline
+    // reconstruction for correctness: optimized Mach-O JIT objects can expose only the outer concrete frame on Darwin/Rosetta.
+    function.addFnAttr(::llvm::Attribute::NoInline);
 }
 
 #if defined(__i386__) || defined(_M_IX86)

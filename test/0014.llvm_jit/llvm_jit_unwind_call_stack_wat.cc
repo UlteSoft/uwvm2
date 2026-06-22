@@ -283,11 +283,51 @@ namespace
     {
         return ::std::string{R"((module
   (memory 1)
-  (func $leaf
-)"} + ::std::string{trap_body} + R"(  )
-  (func $mid call $leaf)
-  (func $top call $mid)
-  (func $_start (export "_start") call $top)
+  (global $sink (mut i32) (i32.const 0))
+  (func $pad (param $base i32) (result i32)
+    (local $i i32)
+    local.get $base
+    local.set $i
+    block $exit
+      loop $loop
+        local.get $i
+        i32.const 96
+        i32.ge_u
+        br_if $exit
+        global.get $sink
+        local.get $i
+        i32.add
+        global.set $sink
+        local.get $i
+        i32.const 1
+        i32.add
+        local.set $i
+        br $loop
+      end
+    end
+    global.get $sink)
+  (func $leaf (param $trap i32)
+    i32.const 0
+    call $pad
+    drop
+    local.get $trap
+    if
+)"} + ::std::string{trap_body} + R"(    end)
+  (func $mid (param $trap i32)
+    i32.const 1
+    call $pad
+    drop
+    local.get $trap
+    call $leaf)
+  (func $top (param $trap i32)
+    i32.const 2
+    call $pad
+    drop
+    local.get $trap
+    call $mid)
+  (func $_start (export "_start")
+    i32.const 1
+    call $top)
 )
 )";
     }
@@ -296,16 +336,21 @@ namespace
     {
         return ::std::string{R"((module
   (memory 1)
-  (func $helper (result i32)
+  (global $sink (mut i32) (i32.const 0))
+  (func $pad (param $base i32) (result i32)
     (local $i i32)
-    i32.const 0
+    local.get $base
     local.set $i
     block $exit
       loop $loop
         local.get $i
-        i32.const 16
+        i32.const 96
         i32.ge_u
         br_if $exit
+        global.get $sink
+        local.get $i
+        i32.add
+        global.set $sink
         local.get $i
         i32.const 1
         i32.add
@@ -313,12 +358,24 @@ namespace
         br $loop
       end
     end
+    global.get $sink)
+  (func $helper (result i32)
+    i32.const 3
+    call $pad
+    drop
     i32.const 7)
-  (func $caller
+  (func $caller (param $trap i32)
     call $helper
     drop
-)"} + ::std::string{trap_body} + R"(  )
-  (func $_start (export "_start") call $caller)
+    i32.const 4
+    call $pad
+    drop
+    local.get $trap
+    if
+)"} + ::std::string{trap_body} + R"(    end)
+  (func $_start (export "_start")
+    i32.const 1
+    call $caller)
 )
 )";
     }
@@ -396,8 +453,8 @@ namespace
 
     [[nodiscard]] ::std::array<stack_shape_t, 5> make_shapes()
     {
-        return {stack_shape_t{"deep_leaf", {0uz, 1uz, 2uz, 3uz}, make_deep_leaf_wat},
-                stack_shape_t{"post_call_trap", {1uz, 2uz}, make_post_call_trap_wat},
+        return {stack_shape_t{"deep_leaf", {1uz, 2uz, 3uz, 4uz}, make_deep_leaf_wat},
+                stack_shape_t{"post_call_trap", {2uz, 3uz}, make_post_call_trap_wat},
                 stack_shape_t{"indirect_leaf", {0uz, 1uz, 2uz, 3uz}, make_indirect_leaf_wat},
                 stack_shape_t{"recursive_countdown", {0uz, 1uz}, make_recursive_countdown_wat},
                 stack_shape_t{"param_result_chain", {0uz, 1uz, 2uz, 3uz}, make_param_result_chain_wat}};
