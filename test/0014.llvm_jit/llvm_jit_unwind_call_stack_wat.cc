@@ -168,6 +168,18 @@ namespace
         return {};
     }
 
+    [[nodiscard]] bool env_flag(char const* name, bool default_value)
+    {
+        auto const value{env_string(name)};
+        if(value.empty()) { return default_value; }
+        if(value == "0" || value == "false" || value == "FALSE" || value == "no" || value == "NO" || value == "off" ||
+           value == "OFF")
+        {
+            return false;
+        }
+        return true;
+    }
+
     [[nodiscard]] ::std::filesystem::path find_wat2wasm(::std::filesystem::path const& project_root)
     {
         if(auto const env{::std::getenv("WAT2WASM")}; env != nullptr && *env != '\0')
@@ -485,6 +497,7 @@ int main(int argc, char** argv)
         return dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat";
     }(executable_dir)};
     bool ok{true};
+    auto const strict_instruction_baseline{env_flag("UWVM_UNWIND_STRICT_INSTRUCTION", true)};
 
     for(auto const& shape: make_shapes())
     {
@@ -501,9 +514,10 @@ int main(int argc, char** argv)
                 auto const instruction{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "instruction")};
                 auto const unwind{run_case(uwvm_path, run_prefix, wasm_path, artifact_dir, stem.c_str(), mode, "unwind")};
 
-                if(!instruction.valid || instruction.func_indices != shape.expected_funcs)
+                auto const instruction_matches_expected{instruction.valid && instruction.func_indices == shape.expected_funcs};
+                if(!instruction_matches_expected)
                 {
-                    ok = false;
+                    if(strict_instruction_baseline) { ok = false; }
                     ::std::cerr << "[llvm-jit-unwind-stack] instruction baseline mismatch for " << stem << '/' << mode.name << " expected=";
                     print_funcs(::std::cerr, shape.expected_funcs);
                     ::std::cerr << " actual=";
@@ -511,7 +525,16 @@ int main(int argc, char** argv)
                     ::std::cerr << " output=" << instruction.output_path << '\n';
                 }
 
-                if(!unwind.valid || unwind.func_indices != instruction.func_indices)
+                if(!unwind.valid || unwind.func_indices != shape.expected_funcs)
+                {
+                    ok = false;
+                    ::std::cerr << "[llvm-jit-unwind-stack] unwind expected mismatch for " << stem << '/' << mode.name << " expected=";
+                    print_funcs(::std::cerr, shape.expected_funcs);
+                    ::std::cerr << " actual=";
+                    print_funcs(::std::cerr, unwind.func_indices);
+                    ::std::cerr << " output=" << unwind.output_path << '\n';
+                }
+                else if(instruction_matches_expected && unwind.func_indices != instruction.func_indices)
                 {
                     ok = false;
                     ::std::cerr << "[llvm-jit-unwind-stack] unwind mismatch for " << stem << '/' << mode.name << '\n';
