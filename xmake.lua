@@ -365,8 +365,19 @@ function uwvm_add_llvm_jit_cache_openssl()
 			openssl_libdir = openssl_root
 		end
 		add_includedirs(path.join(openssl_root, "include"))
-		add_linkdirs(openssl_libdir)
-		add_links("ssl", "crypto")
+		if get_config("static") == "non-system" then
+			local ssl_archive = path.join(openssl_libdir, "libssl.a")
+			local crypto_archive = path.join(openssl_libdir, "libcrypto.a")
+			if os.isfile(ssl_archive) and os.isfile(crypto_archive) then
+				add_ldflags(ssl_archive, crypto_archive, { force = true })
+			else
+				add_linkdirs(openssl_libdir)
+				add_links("ssl", "crypto")
+			end
+		else
+			add_linkdirs(openssl_libdir)
+			add_links("ssl", "crypto")
+		end
 	else
 		add_packages("openssl")
 	end
