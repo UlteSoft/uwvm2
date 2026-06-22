@@ -44,10 +44,12 @@ FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL RtlNtPathNameToDosPat
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL rtl_free_unicode_string(::fast_io::win32::nt::unicode_string *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlFreeUnicodeString, 4);
 FAST_IO_DLLIMPORT ::std::uint_least16_t FAST_IO_WINSTDCALL RtlCaptureStackBackTrace(::std::uint_least32_t, ::std::uint_least32_t, void **, ::std::uint_least32_t *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlCaptureStackBackTrace, 16);
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RtlCaptureContext(::fast_io::win32::win_current_context *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlCaptureContext, 4);
+#if defined(__arm64ec__) || defined(_M_ARM64EC) || (defined(_WIN64) && (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64))) || (defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64))) || defined(__arm__) || defined(_M_ARM)
 FAST_IO_DLLIMPORT ::std::uint_least8_t FAST_IO_WINSTDCALL RtlAddFunctionTable(::fast_io::win32::win_current_runtime_function *, ::std::uint_least32_t, ::fast_io::win32::win_current_unwind_address) noexcept FAST_IO_WINSTDCALL_RENAME(RtlAddFunctionTable, 12);
 FAST_IO_DLLIMPORT ::std::uint_least8_t FAST_IO_WINSTDCALL RtlDeleteFunctionTable(::fast_io::win32::win_current_runtime_function *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlDeleteFunctionTable, 4);
 FAST_IO_DLLIMPORT ::fast_io::win32::win_current_runtime_function *FAST_IO_WINSTDCALL RtlLookupFunctionEntry(::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_unwind_address *, void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlLookupFunctionEntry, 12);
 FAST_IO_DLLIMPORT void *FAST_IO_WINSTDCALL RtlVirtualUnwind(::std::uint_least32_t, ::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_unwind_address, ::fast_io::win32::win_current_runtime_function *, ::fast_io::win32::win_current_context *, void **, ::fast_io::win32::win_current_unwind_address *, ::fast_io::win32::win_current_nonvolatile_context_pointers *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlVirtualUnwind, 32);
+#endif
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RtlInitializeCriticalSection(void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlInitializeCriticalSection, 4);
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RtlEnterCriticalSection(void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlEnterCriticalSection, 4);
 FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL RtlTryEnterCriticalSection(void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlTryEnterCriticalSection, 4);

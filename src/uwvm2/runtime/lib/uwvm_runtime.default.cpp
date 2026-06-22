@@ -199,7 +199,9 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_cu_from_lazy_validator/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
-# include <uwvm2/runtime/llvm_jit_cache/impl.h>
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <uwvm2/runtime/llvm_jit_cache/impl.h>
+# endif
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>

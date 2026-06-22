@@ -14,6 +14,14 @@
 //     through the interpreter/tiered path instead of relying on malformed IR.
 // A value currently held on the JIT's transient operand stack.  The Wasm value type is stored beside the LLVM value so
 // helper emitters can cheaply re-check stack discipline even though validation has already run.
+#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER")
+#undef UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+# define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 1
+#else
+# define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 0
+#endif
+
 struct llvm_jit_stack_value_t
 {
     // Wasm scalar type represented by `value`.
@@ -249,12 +257,11 @@ template <typename FunctionPtr>
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
 }
 
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-// Put host addresses in the JIT module's own data section on Win64.  COFF/MCJIT may lower `load (inttoptr host_addr)`
-// or direct local C++ function constants through relocations that become zero/truncated when JIT code is allocated far
-// from the host image.  A private non-constant global is loaded RIP-relatively from JIT data and carries the full address.
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+// Put host addresses in the JIT module's own data section on targets where MCJIT cannot reliably materialize arbitrary
+// process addresses directly. COFF/Win64 may truncate far host-image addresses.
 [[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_win64_jit_host_address_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::StringRef name_prefix) noexcept
+    get_llvm_jit_host_address_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::StringRef name_prefix) noexcept
 {
     if(host_address == 0u) [[unlikely]] { return nullptr; }
 
@@ -286,39 +293,39 @@ template <typename FunctionPtr>
     address_global->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);
     address_global->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
 
-    // Keep the load visible to codegen.  On Win64 this encourages a RIP-relative load from nearby JIT data instead of a
-    // direct relocation against the far-away host image, avoiding zero/truncated address materialization.
+    // Keep the load visible to codegen. This encourages a target-local load from nearby JIT data instead of a direct
+    // relocation against the host image or runtime storage.
     auto loaded_address{ir_builder.CreateLoad(llvm_intptr_type, address_global, get_llvm_string_ref(u8"uwvm.host.addr"))};
     loaded_address->setVolatile(true);
     loaded_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     return loaded_address;
 }
 
-// Convert a Win64 host address into a typed pointer value by first loading the address from JIT-owned data.
+// Convert a host address into a typed pointer value by first loading the address from JIT-owned data.
 [[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_win64_jit_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
+    get_llvm_jit_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
     if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
-    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, host_address, get_llvm_string_ref(u8"uwvm.win64.host.ptr."))};
+    auto loaded_address{get_llvm_jit_host_address_value(ir_builder, host_address, get_llvm_string_ref(u8"uwvm.host.ptr."))};
     if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
     return ir_builder.CreateIntToPtr(loaded_address, pointer_type, get_llvm_string_ref(u8"uwvm.host.ptr"));
 }
 #endif
 
-// Return a typed LLVM pointer value for a stable host address, using the Win64 data-section workaround when required.
+// Return a typed LLVM pointer value for a stable host address, using the data-section workaround when required.
 [[nodiscard]] inline constexpr ::llvm::Value*
     get_llvm_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    return get_llvm_win64_jit_host_pointer_value(ir_builder, host_address, pointer_type);
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+    return get_llvm_jit_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     static_cast<void>(ir_builder);
     return get_llvm_host_pointer_constant(host_address, pointer_type);
 #endif
 }
 
-// Materialize a runtime bridge function pointer at the current insertion point.  On Win64 this may need a runtime load
+// Materialize a runtime bridge function pointer at the current insertion point. Some MCJIT targets need a runtime load
 // from JIT-owned data; on other targets an LLVM constant pointer is sufficient.
 template <typename FunctionPtr>
 [[nodiscard]] inline constexpr ::llvm::Value*
@@ -330,10 +337,10 @@ template <typename FunctionPtr>
     auto const function_address{get_llvm_runtime_bridge_function_address(function_pointer)};
     if(function_address == 0u) [[unlikely]] { return nullptr; }
 
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    // Keep this in sync with Win64 tiered/raw validation.  Direct `inttoptr` host bridge constants are not reliable on
-    // COFF/MCJIT: local C++ bridge relocations and high host addresses can be materialized as zero or truncated operands.
-    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, function_address, get_llvm_string_ref(u8"uwvm.win64.bridge."))};
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+    // Keep this in sync with tiered/raw validation. Direct `inttoptr` host bridge constants are not reliable on every
+    // MCJIT target covered by UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER.
+    auto loaded_address{get_llvm_jit_host_address_value(ir_builder, function_address, get_llvm_string_ref(u8"uwvm.bridge."))};
     if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
     return ir_builder.CreateIntToPtr(loaded_address, get_llvm_pointer_type(function_type), get_llvm_string_ref(u8"runtime.bridge.ptr"));
 #else
@@ -374,19 +381,20 @@ template <auto Function>
     return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
 }
 
-[[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
-                                                                                       ::std::uintptr_t host_address,
-                                                                                       ::llvm::Type* object_type,
-                                                                                       ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
+                                                                                    ::std::uintptr_t host_address,
+                                                                                    ::llvm::Type* object_type,
+                                                                                    ::uwvm2::utils::container::u8string_view symbol_name) noexcept
 {
     if(host_address == 0u || object_type == nullptr || symbol_name.empty()) [[unlikely]] { return nullptr; }
 
     auto pointer_type{get_llvm_pointer_type(object_type)};
     if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
-#if defined(__i386__) || defined(_M_IX86)
-    // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds. These host objects are
-    // process-stable tables/storage, so use the same direct pointer constant strategy that runtime bridge function pointers use.
+#if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+    // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds.
+    // ELF riscv64 RuntimeDyld handles absolute HI20/LO12 data-symbol relocations as 32-bit addresses and lacks LO12_S.
+    // These host objects are process-stable tables/storage, so materialize their full pointer values as constants.
     static_cast<void>(ir_builder);
     static_cast<void>(symbol_name);
     return get_llvm_host_pointer_constant(host_address, pointer_type);
@@ -1837,12 +1845,12 @@ struct runtime_global_access_info_t
 }
 
 // Build an LLVM external-symbol pointer to the concrete scalar field inside a directly addressable global storage record.
-[[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
-                                                                                 ::llvm::IRBuilder<>& ir_builder,
-                                                                                 ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                                 validation_module_traits_t::wasm_u32 global_index,
-                                                                                 ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
-                                                                                 runtime_operand_stack_value_type value_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
+                                                                              ::llvm::IRBuilder<>& ir_builder,
+                                                                              ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                              validation_module_traits_t::wasm_u32 global_index,
+                                                                              ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
+                                                                              runtime_operand_stack_value_type value_type) noexcept
 {
     if(global_storage_ptr == nullptr) [[unlikely]] { return nullptr; }
 
@@ -7361,3 +7369,5 @@ template <typename CreateValue>
 
     return code_curr == code_end;
 }
+
+#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER")

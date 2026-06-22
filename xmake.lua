@@ -340,10 +340,10 @@ function def_build(opt)
 	)
 end
 
-local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
+local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
+local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or uwvm_uses_llvm_jit
 
-if get_config("openssl-root") == "default" then
+if uwvm_uses_llvm_jit and get_config("openssl-root") == "default" then
 	add_requires("openssl", {configs = {shared = false}})
 end
 
@@ -376,7 +376,6 @@ end
 
 target("uwvm")
 	set_kind("binary")
-	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
 	def_build({ skip_static_libcxx = uwvm_uses_llvm_jit })
 
 	-- uwvm uses precise floating-point model to ensure determinism.
@@ -402,7 +401,9 @@ target("uwvm")
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
 
-	uwvm_add_llvm_jit_cache_openssl()
+	if uwvm_uses_llvm_jit then
+		uwvm_add_llvm_jit_cache_openssl()
+	end
 
 	-- uwvm
 	add_defines("UWVM=2")
@@ -476,7 +477,9 @@ target("uwvm_runtime")
 	-- third-parties/boost
 	add_includedirs("third-parties/boost_unordered/include")
 
-	uwvm_add_llvm_jit_cache_openssl()
+	if uwvm_uses_llvm_jit then
+		uwvm_add_llvm_jit_cache_openssl()
+	end
 
 	-- src
 	add_includedirs("src/")
