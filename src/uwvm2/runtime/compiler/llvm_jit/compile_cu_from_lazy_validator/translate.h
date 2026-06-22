@@ -72,7 +72,9 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
-# include <uwvm2/runtime/llvm_jit_cache/impl.h>
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <uwvm2/runtime/llvm_jit_cache/impl.h>
+# endif
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -515,6 +517,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
         }
 
+        [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
+        {
+# if defined(__APPLE__)
+            // Cross-built JIT binaries must register the target of the running process, not the target baked into llvm-config's
+            // LLVM_NATIVE_TARGET. This is especially important for x86_64 Darwin binaries executed through Rosetta on Apple Silicon.
+#  if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            ::LLVMInitializeX86TargetInfo();
+            ::LLVMInitializeX86Target();
+            ::LLVMInitializeX86TargetMC();
+            ::LLVMInitializeX86AsmPrinter();
+            return true;
+#  elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+            ::LLVMInitializeAArch64TargetInfo();
+            ::LLVMInitializeAArch64Target();
+            ::LLVMInitializeAArch64TargetMC();
+            ::LLVMInitializeAArch64AsmPrinter();
+            return true;
+#  elif defined(__arm__) || defined(_M_ARM)
+            ::LLVMInitializeARMTargetInfo();
+            ::LLVMInitializeARMTarget();
+            ::LLVMInitializeARMTargetMC();
+            ::LLVMInitializeARMAsmPrinter();
+            return true;
+#  elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+            ::LLVMInitializePowerPCTargetInfo();
+            ::LLVMInitializePowerPCTarget();
+            ::LLVMInitializePowerPCTargetMC();
+            ::LLVMInitializePowerPCAsmPrinter();
+            return true;
+#  else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+#  endif
+# else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+# endif
+        }
+
         // Initializes LLVM native-target support exactly once and records whether the initialization succeeded.
         [[nodiscard]] inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept
         {
@@ -542,7 +581,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::llvm::initializeInstCombine(pass_registry);
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
-                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter()};
+                auto const ok{initialize_llvm_jit_process_target()};
                 // Publish the result before publishing completion.  Readers synchronize through the `initialized` flag,
                 // whose release store is sequenced after this store.
                 success.store(ok, ::std::memory_order_release);
@@ -676,6 +715,95 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     {
                         append_unique_local_function_index(callees, function_index_uz - import_count);
                     }
+                    continue;
+                }
+
+                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+            }
+
+            return true;
+        }
+
+        [[nodiscard]] inline constexpr bool collect_call_indirect_defined_targets(runtime_module_storage_t const& curr_module,
+                                                                                  all_details::validation_module_traits_t::wasm_u32 table_index,
+                                                                                  ::uwvm2::utils::container::vector<::std::size_t>& targets) noexcept
+        {
+            auto const table{all_details::resolve_runtime_table_storage(curr_module, table_index)};
+            if(table == nullptr) [[unlikely]] { return false; }
+
+            auto const import_count{curr_module.imported_function_vec_storage.size()};
+            auto const local_count{curr_module.local_defined_function_vec_storage.size()};
+            for(auto const& elem: table->elems)
+            {
+                auto const callee{all_details::resolve_runtime_call_indirect_callee(curr_module, elem)};
+                if(!callee.state_valid) [[unlikely]] { return false; }
+                if(!callee.present || !callee.belongs_to_current_module) { continue; }
+
+                auto const function_index{static_cast<::std::size_t>(callee.func_index)};
+                if(function_index < import_count) { continue; }
+                auto const local_function_index{function_index - import_count};
+                if(local_function_index >= local_count) [[unlikely]] { return false; }
+
+                append_unique_local_function_index(targets, local_function_index);
+            }
+
+            return true;
+        }
+
+        [[nodiscard]] inline constexpr bool collect_unwind_defined_callees(runtime_module_storage_t const& curr_module,
+                                                                           ::std::size_t local_function_index,
+                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+        {
+            callees.clear();
+            if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]] { return false; }
+
+            auto const& local_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
+            if(local_func.wasm_code_ptr == nullptr) [[unlikely]] { return false; }
+
+            auto code_curr{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.expr_begin)};
+            auto const code_end{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.code_end)};
+            if(code_curr == nullptr || code_end == nullptr || code_curr > code_end) [[unlikely]] { return false; }
+
+            auto const import_count{curr_module.imported_function_vec_storage.size()};
+            auto const local_count{curr_module.local_defined_function_vec_storage.size()};
+            auto const all_function_count{import_count + local_count};
+            auto const all_table_count{curr_module.imported_table_vec_storage.size() + curr_module.local_defined_table_vec_storage.size()};
+
+            while(code_curr < code_end)
+            {
+                all_details::wasm1_code op{};
+                ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
+                if(op == all_details::wasm1_code::call)
+                {
+                    ++code_curr;
+                    all_details::validation_module_traits_t::wasm_u32 function_index{};
+                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]] { return false; }
+
+                    auto const function_index_uz{static_cast<::std::size_t>(function_index)};
+                    if(function_index_uz >= import_count && function_index_uz < all_function_count)
+                    {
+                        append_unique_local_function_index(callees, function_index_uz - import_count);
+                    }
+                    continue;
+                }
+
+                if(op == all_details::wasm1_code::call_indirect)
+                {
+                    ++code_curr;
+                    all_details::validation_module_traits_t::wasm_u32 type_index{};
+                    all_details::validation_module_traits_t::wasm_u32 table_index{};
+                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, type_index) ||
+                       !all_details::parse_wasm_leb128_immediate(code_curr, code_end, table_index))
+                        [[unlikely]]
+                    {
+                        return false;
+                    }
+
+                    if(static_cast<::std::size_t>(table_index) >= all_table_count) [[unlikely]] { return false; }
+                    // Native unwind mode must not discover a table target by entering the lazy raw trampoline from an
+                    // active JIT frame: Rosetta and libunwind may then see only the callee object.  Pre-materialize all
+                    // current-module targets of the selected table so call_indirect can take the typed native entry.
+                    if(!collect_call_indirect_defined_targets(curr_module, table_index, callees)) [[unlikely]] { return false; }
                     continue;
                 }
 
@@ -1200,6 +1328,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
         }
 
+        // In native-unwind call-stack mode, a Wasm call should correspond to a physical generated frame.  Build the
+        // complete transitive graph rooted at the demanded entry, including current-module call_indirect table targets,
+        // so one MCJIT object can avoid lazy raw-entry trampolines across Wasm-to-Wasm edges.
+        inline constexpr void collect_lazy_unwind_direct_call_group(runtime_module_storage_t const& curr_module,
+                                                                    lazy_module_storage_t& storage,
+                                                                    ::std::size_t entry_local_function_index,
+                                                                    ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+        {
+            out.clear();
+            auto const local_count{curr_module.local_defined_function_vec_storage.size()};
+            if(entry_local_function_index >= local_count || entry_local_function_index >= storage.functions.size()) [[unlikely]] { return; }
+
+            ::uwvm2::utils::container::vector<bool> seen{};
+            seen.resize(local_count);
+
+            ::uwvm2::utils::container::vector<::std::size_t> stack{};
+            stack.reserve(local_count);
+            seen.index_unchecked(entry_local_function_index) = true;
+            stack.push_back(entry_local_function_index);
+
+            ::uwvm2::utils::container::vector<::std::size_t> callees{};
+            while(!stack.empty())
+            {
+                auto const local_index{stack.back()};
+                stack.pop_back();
+                out.push_back(local_index);
+
+                callees.clear();
+                if(!collect_unwind_defined_callees(curr_module, local_index, callees)) { continue; }
+
+                for(auto remaining{callees.size()}; remaining != 0uz;)
+                {
+                    --remaining;
+                    auto const callee_local_index{callees.index_unchecked(remaining)};
+                    if(callee_local_index >= local_count || callee_local_index >= storage.functions.size()) [[unlikely]] { continue; }
+                    if(seen.index_unchecked(callee_local_index)) { continue; }
+                    seen.index_unchecked(callee_local_index) = true;
+                    stack.push_back(callee_local_index);
+                }
+            }
+        }
+
         // Claims, validates, emits, materializes, publishes, and marks ready a group of lazy LLVM JIT functions.
         inline constexpr void compile_lazy_local_function_group(runtime_module_storage_t const& curr_module,
                                                                 lazy_module_storage_t& storage,
@@ -1210,7 +1380,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                 void* publish_user_data = nullptr) UWVM_THROWS
         {
             ::uwvm2::utils::container::vector<::std::size_t> candidate_group{};
-            if(::uwvm2::runtime::llvm_jit_cache::default_cache_policy().enable)
+            if(options.compile_options.emit_unwind_call_stack_frames)
+            {
+                collect_lazy_unwind_direct_call_group(curr_module, storage, entry_local_function_index, candidate_group);
+            }
+            else if(::uwvm2::runtime::llvm_jit_cache::default_cache_policy().enable)
             {
                 // Opportunistic lazy groups depend on scheduler timing and existing cache warmth.  Cache-enabled lazy JIT
                 // uses one stable demanded function per cache object; cache-disabled mode keeps group warmup below.
@@ -1290,6 +1464,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
 
             if(claimed_group.empty()) { return; }
+            auto const use_direct_wasm_calls_for_claimed_group{options.compile_options.emit_unwind_call_stack_frames &&
+                                                               claimed_group.size() == candidate_group.size()};
 
 # ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -1300,7 +1476,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 for(auto const local_function_index: claimed_group) { validate_function_if_needed(curr_module, options, local_function_index, err); }
 
                 compile_option emit_options{options.compile_options};
-                emit_options.route_wasm_calls_through_runtime_bridge = true;
+                emit_options.route_wasm_calls_through_runtime_bridge = !use_direct_wasm_calls_for_claimed_group;
                 llvm_jit_module_storage_t llvm_ir_storage{};
                 if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage, emit_options.emit_unwind_call_stack_frames))
                     [[unlikely]]

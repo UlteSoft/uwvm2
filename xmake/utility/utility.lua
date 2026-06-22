@@ -73,7 +73,7 @@ local function _llvm_host_target_component_candidates()
         table.insert(candidates, "x86")
     elseif arch:find("riscv") then
         table.insert(candidates, "riscv")
-    elseif arch:find("loongarch") then
+    elseif arch == "loong64" or arch:find("loongarch") then
         table.insert(candidates, "loongarch")
     elseif arch:find("ppc") or arch:find("powerpc") then
         table.insert(candidates, "powerpc")
@@ -95,6 +95,16 @@ local function _llvm_host_target_components(available)
         end
     end
     return components
+end
+
+local function _llvm_jit_uses_apple_process_target_codegen()
+    local plat = (get_config("plat") or ""):lower()
+    if plat == "macosx" or plat == "iphoneos" or plat == "watchos" then
+        return true
+    end
+
+    local llvm_target = (get_config("llvm-target") or ""):lower()
+    return llvm_target:find("apple", 1, true) ~= nil
 end
 
 local function _llvm_jit_base_components(available)
@@ -769,13 +779,20 @@ local function _resolve_llvm_jit_components(llvm_config, link_static)
     table.sort(asmparser_components)
 
     local candidate_sets = {}
+    local apple_process_target_codegen = _llvm_jit_uses_apple_process_target_codegen()
+    if apple_process_target_codegen and #host_target_components ~= 0 then
+        table.insert(candidate_sets, {
+            name = "host-target",
+            components = host_target_components
+        })
+    end
     if #native_components ~= 0 then
         table.insert(candidate_sets, {
             name = "native-codegen",
             components = native_components
         })
     end
-    if #host_target_components ~= 0 then
+    if not apple_process_target_codegen and #host_target_components ~= 0 then
         table.insert(candidate_sets, {
             name = "host-target",
             components = host_target_components
@@ -843,10 +860,10 @@ function get_llvm_jit_options()
     assert(llvm_config and llvm_config.program,
         [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
     local static_mode = get_static_link_mode()
-    local link_static = static_mode == "non-system"
+    local link_static = static_mode == "non-system" or static_mode == "compiler"
 
     local cache_key = table.concat({
-        "llvm-jit-v15",
+        "llvm-jit-v17",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
@@ -897,11 +914,14 @@ function get_llvm_jit_options()
     -- Some LLVM builds omit explicit JIT driver libraries and/or the native
     -- target codegen family from component queries. Re-add them explicitly so
     -- MCJIT-backed runtime linking remains stable across LLVM distributions.
-    local explicit_jit_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
-        "executionengine",
-        "mcjit",
-        "nativecodegen"
-    })
+    local apple_process_target_codegen = _llvm_jit_uses_apple_process_target_codegen()
+    local explicit_jit_components = { "executionengine", "mcjit" }
+    if apple_process_target_codegen and host_target_components and #host_target_components ~= 0 then
+        explicit_jit_components = table.join(explicit_jit_components, host_target_components)
+    else
+        table.insert(explicit_jit_components, "nativecodegen")
+    end
+    local explicit_jit_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), explicit_jit_components)
     local explicit_jit_libs = link_static and _run_required_llvm_link_query(llvm_config, explicit_jit_args)
         or (_run_llvm_config(llvm_config, explicit_jit_args) or "")
     if explicit_jit_libs == "" then
@@ -922,20 +942,22 @@ function get_llvm_jit_options()
     end
     _parse_llvm_linkflags(explicit_jit_libs, result, seen, "links")
 
-    local native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "nativecodegen" })
+    local native_codegen_components = apple_process_target_codegen and host_target_components or nil
+    if not native_codegen_components or #native_codegen_components == 0 then
+        native_codegen_components = { "nativecodegen" }
+    end
+    local native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), native_codegen_components)
     local native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
         or (_run_llvm_config(llvm_config, native_codegen_args) or "")
+    if not native_codegen_linkflags or native_codegen_linkflags == "" then
+        native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "nativecodegen" })
+        native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
+            or (_run_llvm_config(llvm_config, native_codegen_args) or "")
+    end
     if not native_codegen_linkflags or native_codegen_linkflags == "" then
         native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "native" })
         native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
             or (_run_llvm_config(llvm_config, native_codegen_args) or "")
-    end
-    if not link_static and native_codegen_linkflags and native_codegen_linkflags ~= "" and host_target_components and #host_target_components ~= 0 then
-        local direct_native_link_names = _llvm_direct_link_names({}, host_target_components)
-        local direct_native_codegen_linkflags = _filter_llvm_dynamic_link_flags(native_codegen_linkflags, direct_native_link_names)
-        if direct_native_codegen_linkflags ~= "" then
-            native_codegen_linkflags = direct_native_codegen_linkflags
-        end
     end
     result.native_codegen_linkflags = native_codegen_linkflags
 

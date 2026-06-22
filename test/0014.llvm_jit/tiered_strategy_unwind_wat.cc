@@ -623,6 +623,7 @@ int main(int argc, char** argv)
     }
 
     auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "tiered_strategy_wat"};
+
     bool ok{true};
     for(auto const& test_case: make_cases())
     {

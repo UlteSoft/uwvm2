@@ -75,6 +75,10 @@ else
   done < <(
     {
       printf '%s\n' llvm_jit_verify_compile
+      printf '%s\n' llvm_jit_trap_matrix_wat
+      printf '%s\n' llvm_jit_unwind_call_stack_wat
+      printf '%s\n' tiered_osr_call_stack_wat
+      printf '%s\n' tiered_strategy_unwind_wat
       find test/0013.uwvm_int/strict -type f -name '*.cc' | sort | while IFS= read -r file; do
         rel="${file#test/0013.uwvm_int/strict/}"
         suffix="${rel%.cc}"

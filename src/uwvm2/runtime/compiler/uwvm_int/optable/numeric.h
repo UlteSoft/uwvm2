@@ -509,7 +509,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return ::std::nearbyint(v);
                 }
 
-# elif defined(__ARM_NEON)
+# elif defined(__ARM_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
 #  if defined(__clang__)
                 using float64x1_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
                 using float64x2_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
