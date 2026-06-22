@@ -3909,14 +3909,14 @@ namespace uwvm2::runtime::lib
             if(local_function_index < rec->llvm_jit_lazy_direct_call_targets.size())
             {
                 auto& target{rec->llvm_jit_lazy_direct_call_targets.index_unchecked(local_function_index)};
-                target.entry_address = raw_entry_address;
-                target.context_address = 0u;
+                ::std::atomic_ref<::std::uintptr_t>{target.context_address}.store(0u, ::std::memory_order_release);
+                ::std::atomic_ref<::std::uintptr_t>{target.entry_address}.store(raw_entry_address, ::std::memory_order_release);
             }
 
             if(local_function_index < rec->llvm_jit_lazy_direct_typed_entry_targets.size())
             {
                 auto& target{rec->llvm_jit_lazy_direct_typed_entry_targets.index_unchecked(local_function_index)};
-                target = typed_entry_address;
+                ::std::atomic_ref<::std::uintptr_t>{target}.store(typed_entry_address, ::std::memory_order_release);
             }
 
             compiled_defined_func_info const* info_for_targets{};
@@ -8571,12 +8571,13 @@ namespace uwvm2::runtime::lib
                         if(local_index < rec.llvm_jit_lazy_direct_call_targets.size())
                         {
                             auto& target{rec.llvm_jit_lazy_direct_call_targets.index_unchecked(local_index)};
-                            target.entry_address = function_address;
-                            target.context_address = 0u;
+                            ::std::atomic_ref<::std::uintptr_t>{target.context_address}.store(0u, ::std::memory_order_release);
+                            ::std::atomic_ref<::std::uintptr_t>{target.entry_address}.store(function_address, ::std::memory_order_release);
                         }
                         if(local_index < rec.llvm_jit_lazy_direct_typed_entry_targets.size())
                         {
-                            rec.llvm_jit_lazy_direct_typed_entry_targets.index_unchecked(local_index) = typed_function_address;
+                            auto& target{rec.llvm_jit_lazy_direct_typed_entry_targets.index_unchecked(local_index)};
+                            ::std::atomic_ref<::std::uintptr_t>{target}.store(typed_function_address, ::std::memory_order_release);
                         }
                     }
                 }
@@ -12952,13 +12953,13 @@ namespace uwvm2::runtime::lib
                 }
 # endif
 
-                if(::uwvm2::runtime::llvm_jit_cache::default_cache_policy().enable)
-                {
-                    // Cacheable lazy LLVM IR must not depend on whether another lazy function happened to be materialized
-                    // earlier in this process. Force dynamic target-table loads so identical local functions hash the same
-                    // across cold and warm cache runs.
-                    rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_targets_are_atomic = true;
-                }
+                // Lazy direct-call target slots are published by demand/background materialization and read by generated code.
+                // Always use acquire/release cells here: volatile IR loads are not a cross-thread synchronization primitive, and
+                // stale placeholder reads can route a Wasm direct call through the raw bridge, breaking native unwind frame order.
+                //
+                // This also keeps cacheable lazy LLVM IR independent of whether another lazy function happened to be materialized
+                // earlier in this process; callers always emit dynamic target-table loads instead of baking warm-process pointers.
+                rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_targets_are_atomic = true;
 
                 rec.llvm_jit_lazy_direct_call_targets.clear();
                 rec.llvm_jit_lazy_direct_call_targets.resize(local_n);
@@ -13156,7 +13157,10 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            auto const llvm_lazy_background_enabled{!tiered_t0_backend};
+            // Native unwind call-stack mode needs the first demanded direct-call graph to materialize as one stable group.
+            // Background prefetch can otherwise claim small subgroups first, forcing later direct calls through lazy raw-entry
+            // trampolines whose host ABI frames are not part of the Wasm stack.
+            auto const llvm_lazy_background_enabled{!tiered_t0_backend && !runtime_llvm_jit_unwind_call_stack_requested()};
             if(llvm_lazy_background_enabled && g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
             {
                 auto& preferred_rec{g_runtime.modules.index_unchecked(g_runtime.lazy_prefetch_module_id)};

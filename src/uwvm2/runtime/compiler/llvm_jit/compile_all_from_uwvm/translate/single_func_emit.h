@@ -497,7 +497,11 @@ inline constexpr void apply_llvm_jit_semantic_function_attrs(::llvm::Function& f
 
 // Keep a physical frame pointer in functions that may need to report an exact trap call-site frame.
 inline constexpr void apply_llvm_jit_frame_pointer_function_attrs(::llvm::Function& function) noexcept
-{ function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all")); }
+{
+    function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all"));
+    function.addFnAttr(get_llvm_string_ref(u8"no-frame-pointer-elim"), get_llvm_string_ref(u8"true"));
+    function.addFnAttr(get_llvm_string_ref(u8"no-frame-pointer-elim-non-leaf"));
+}
 
 // Apply all common attributes shared by public, private, and raw-entry JIT functions.
 inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& function) noexcept
@@ -527,6 +531,7 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
     // Explicit unwind call-stack mode must report the Wasm call chain from native frames. Do not rely on DWARF inline
     // reconstruction for correctness: optimized Mach-O JIT objects can expose only the outer concrete frame on Darwin/Rosetta.
     function.addFnAttr(::llvm::Attribute::NoInline);
+    function.addFnAttr(::llvm::Attribute::OptimizeNone);
 }
 
 #if defined(__i386__) || defined(_M_IX86)
