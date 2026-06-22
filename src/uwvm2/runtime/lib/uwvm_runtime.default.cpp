@@ -76,9 +76,6 @@
 # elif !UWVM_HAS_BUILTIN(__builtin_alloca)
 #  include <alloca.h>
 # endif
-# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32)
-#  include <sys/sysctl.h>
-# endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 // Keep LLVM dependencies behind the backend macro so interpreter-only builds do not pay the compile-time or link dependency cost.
 #  include <llvm/Analysis/TargetTransformInfo.h>
@@ -480,6 +477,7 @@ namespace uwvm2::runtime::lib
         struct llvm_jit_unwind_entry
         {
             ::std::uintptr_t address{};
+            ::std::uintptr_t end{};
             ::std::size_t module_id{};
             ::std::size_t function_index{};
             bool raw_entry{};
@@ -1332,6 +1330,8 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
+        inline constexpr void refresh_llvm_jit_unwind_entry_bounds() noexcept;
+
         inline constexpr void
             record_llvm_jit_unwind_entry(::std::size_t module_id, ::std::size_t function_index, ::std::uintptr_t address, bool raw_entry) noexcept
         {
@@ -1345,11 +1345,13 @@ namespace uwvm2::runtime::lib
                 entry.module_id = module_id;
                 entry.function_index = function_index;
                 entry.raw_entry = raw_entry;
+                refresh_llvm_jit_unwind_entry_bounds();
                 return;
             }
 
-            entries.push_back(llvm_jit_unwind_entry{address, module_id, function_index, raw_entry});
+            entries.push_back(llvm_jit_unwind_entry{address, 0u, module_id, function_index, raw_entry});
             ::std::sort(entries.begin(), entries.end(), [](auto const& lhs, auto const& rhs) constexpr noexcept { return lhs.address < rhs.address; });
+            refresh_llvm_jit_unwind_entry_bounds();
         }
 
         inline constexpr void record_llvm_jit_code_range(::std::uintptr_t begin, ::std::uintptr_t size) noexcept
@@ -1379,6 +1381,7 @@ namespace uwvm2::runtime::lib
                 if(range.end > previous.end) { previous.end = range.end; }
             }
             ranges.resize(write_index);
+            refresh_llvm_jit_unwind_entry_bounds();
         }
 
         [[nodiscard]] inline constexpr bool llvm_jit_ip_in_code_range(::std::uintptr_t ip) noexcept
@@ -1395,6 +1398,43 @@ namespace uwvm2::runtime::lib
 
             auto const& range{*(it - 1u)};
             return ip >= range.begin && ip < range.end;
+        }
+
+        [[nodiscard]] inline constexpr ::std::uintptr_t llvm_jit_code_range_end_for_ip(::std::uintptr_t ip) noexcept
+        {
+            auto const& ranges{g_runtime.llvm_jit_code_ranges};
+            if(ranges.empty()) [[unlikely]] { return 0u; }
+
+            auto const it{::std::upper_bound(ranges.begin(),
+                                             ranges.end(),
+                                             ip,
+                                             [](auto const address, llvm_jit_code_range const& range) constexpr noexcept { return address < range.begin; })};
+            if(it == ranges.begin()) [[unlikely]] { return 0u; }
+
+            auto const& range{*(it - 1u)};
+            return ip >= range.begin && ip < range.end ? range.end : 0u;
+        }
+
+        inline constexpr void refresh_llvm_jit_unwind_entry_bounds() noexcept
+        {
+            // Native unwind reports instruction pointers, but our fallback map used to contain only entry addresses.
+            // Give every entry a conservative half-open range so stale frame-pointer or stack-scan addresses cannot be
+            // attributed to the previous wasm function merely because they are inside a larger generated text section.
+            auto& entries{g_runtime.llvm_jit_unwind_entries};
+            for(::std::size_t i{}; i != entries.size(); ++i)
+            {
+                auto& entry{entries.index_unchecked(i)};
+                ::std::uintptr_t end{};
+                if(i + 1uz != entries.size())
+                {
+                    auto const next_address{entries.index_unchecked(i + 1uz).address};
+                    if(next_address > entry.address) { end = next_address; }
+                }
+
+                auto const code_range_end{llvm_jit_code_range_end_for_ip(entry.address)};
+                if(code_range_end != 0u && code_range_end > entry.address && (end == 0u || code_range_end < end)) { end = code_range_end; }
+                entry.end = end;
+            }
         }
 
         [[nodiscard]] inline constexpr bool
@@ -1558,6 +1598,7 @@ namespace uwvm2::runtime::lib
             if(it == entries.begin()) [[unlikely]] { return {}; }
 
             auto const entry_it{it - 1u};
+            if(entry_it->end != 0u && ip >= entry_it->end) [[unlikely]] { return {}; }
             auto const offset{ip - entry_it->address};
             return resolved_llvm_jit_unwind_entry{::std::addressof(*entry_it), offset};
         }
@@ -1969,23 +2010,6 @@ namespace uwvm2::runtime::lib
 # endif
         }
 
-        [[nodiscard]] inline constexpr bool runtime_llvm_jit_process_is_apple_translated() noexcept
-        {
-# if defined(__APPLE__) && !defined(_WIN32)
-            // `sysctl.proc_translated` reports Rosetta today. Probe it for every Darwin architecture, not only x86_64, so a
-            // future Apple ISA translation layer also fails closed instead of trusting native unwind frame replacement.
-            int translated{};
-            ::std::size_t translated_size{sizeof(translated)};
-            if(::sysctlbyname("sysctl.proc_translated", ::std::addressof(translated), ::std::addressof(translated_size), nullptr, 0) != 0)
-            {
-                return false;
-            }
-            return translated != 0;
-# else
-            return false;
-# endif
-        }
-
         [[nodiscard]] inline constexpr bool runtime_llvm_jit_unwind_can_replace_instruction_frames() noexcept
         {
             // JIT unwind mode only requires generated code to carry registered native unwind tables.
@@ -2191,7 +2215,6 @@ namespace uwvm2::runtime::lib
         {
             ok,
             no_backend,
-            apple_translated_process,
             no_frame_replacement,
             live_probe_failed
         };
@@ -2203,8 +2226,6 @@ namespace uwvm2::runtime::lib
             {
                 case runtime_llvm_jit_unwind_probe_status::ok: return u8"ok";
                 case runtime_llvm_jit_unwind_probe_status::no_backend: return u8"no unwind backend was compiled into this build";
-                case runtime_llvm_jit_unwind_probe_status::apple_translated_process:
-                    return u8"Apple translated process native unwind cannot currently replace instruction-emitted wasm frames";
                 case runtime_llvm_jit_unwind_probe_status::no_frame_replacement: return u8"generated-code unwind-frame replacement is not verified";
                 case runtime_llvm_jit_unwind_probe_status::live_probe_failed: return u8"generated-code live unwind probe failed";
             }
@@ -2282,11 +2303,7 @@ namespace uwvm2::runtime::lib
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
                                                                          status = runtime_llvm_jit_unwind_probe_status::no_backend;
 # else
-                                                                         if(runtime_llvm_jit_process_is_apple_translated()) [[unlikely]]
-                                                                         {
-                                                                             status = runtime_llvm_jit_unwind_probe_status::apple_translated_process;
-                                                                         }
-                                                                         else if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
+                                                                         if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
                                                                          {
                                                                              status = runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
                                                                          }
@@ -2319,7 +2336,6 @@ namespace uwvm2::runtime::lib
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             return runtime_llvm_jit_unwind_probe_status::no_backend;
 # else
-            if(runtime_llvm_jit_process_is_apple_translated()) { return runtime_llvm_jit_unwind_probe_status::apple_translated_process; }
             if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) { return runtime_llvm_jit_unwind_probe_status::no_frame_replacement; }
             return runtime_llvm_jit_unwind_probe_status::ok;
 # endif
@@ -2468,8 +2484,14 @@ namespace uwvm2::runtime::lib
                     }
                 }};
 
+            struct llvm_jit_debug_inline_frame
+            {
+                ::std::size_t module_id{};
+                ::std::size_t function_index{};
+            };
+
             auto const print_debug_inline_frames{
-                [&](::std::uintptr_t ip) constexpr noexcept -> bool
+                [&](::std::uintptr_t ip, llvm_jit_unwind_entry const* expected_entry) constexpr noexcept -> bool
                 {
                     // Full JIT and tier-2 JIT can inline multiple Wasm functions into one native frame.  Native unwind
                     // entries alone would then report only the outer entry/raw wrapper, so prefer DWARF inline frames when
@@ -2477,8 +2499,9 @@ namespace uwvm2::runtime::lib
                     //
                     // The IP available from a trap is a native return address normalized by the unwinder.  On targets such
                     // as AArch64 that address can still land at the end of the trap call instruction, while DWARF inline
-                    // ranges are often keyed at the instruction start.  Probe a small bounded window around the IP before
-                    // falling back to the coarse native unwind entry.
+                    // ranges are often keyed at the instruction start.  Probe only the current instruction neighbourhood:
+                    // wider backward scans can hit stale inlined call-site locations on x86_64 Darwin/Rosetta after the
+                    // inlined callee has already returned.
                     bool printed{};
                     ::llvm::DILineInfoSpecifier specifier{::llvm::DILineInfoSpecifier::FileLineInfoKind::RawValue,
                                                           ::llvm::DILineInfoSpecifier::FunctionNameKind::ShortName};
@@ -2493,6 +2516,8 @@ namespace uwvm2::runtime::lib
                                     auto const frame_count{inline_info.getNumberOfFrames()};
                                     if(frame_count == 0u) { return false; }
 
+                                    ::uwvm2::utils::container::array<llvm_jit_debug_inline_frame, llvm_jit_unwind_backtrace_storage::max_frames> parsed_frames{};
+                                    ::std::size_t parsed_frame_count{};
                                     bool matched{};
                                     for(unsigned i{}; i != frame_count; ++i)
                                     {
@@ -2502,9 +2527,39 @@ namespace uwvm2::runtime::lib
                                         auto const frame_name_view{::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(
                                             ::llvm::StringRef{frame_name.data(), frame_name.size()})};
                                         if(!parse_llvm_jit_inline_frame_name(frame_name_view, module_id, function_index)) { continue; }
-                                        print_wasm_frame(module_id, function_index);
-                                        printed = true;
+                                        if(matched && parsed_frames.index_unchecked(parsed_frame_count - 1uz).module_id == module_id &&
+                                           parsed_frames.index_unchecked(parsed_frame_count - 1uz).function_index == function_index)
+                                        {
+                                            continue;
+                                        }
+                                        if(parsed_frame_count == llvm_jit_unwind_backtrace_storage::max_frames) { break; }
+                                        parsed_frames.index_unchecked(parsed_frame_count++) = llvm_jit_debug_inline_frame{module_id, function_index};
                                         matched = true;
+                                    }
+
+                                    if(!matched) { return false; }
+
+                                    auto const frame_matches_expected_entry{
+                                        [&](llvm_jit_debug_inline_frame const& frame) constexpr noexcept
+                                        {
+                                            return expected_entry != nullptr && frame.module_id == expected_entry->module_id &&
+                                                   frame.function_index == expected_entry->function_index;
+                                        }};
+
+                                    bool reverse_order{};
+                                    if(parsed_frame_count > 1uz)
+                                    {
+                                        auto const first_is_expected{frame_matches_expected_entry(parsed_frames.index_unchecked(0uz))};
+                                        auto const last_is_expected{frame_matches_expected_entry(parsed_frames.index_unchecked(parsed_frame_count - 1uz))};
+                                        reverse_order = first_is_expected && !last_is_expected;
+                                    }
+
+                                    for(::std::size_t frame_index{}; frame_index != parsed_frame_count; ++frame_index)
+                                    {
+                                        auto const index{reverse_order ? parsed_frame_count - 1uz - frame_index : frame_index};
+                                        auto const& frame{parsed_frames.index_unchecked(index)};
+                                        print_wasm_frame(frame.module_id, frame.function_index);
+                                        printed = true;
                                     }
 
                                     return matched;
@@ -2538,8 +2593,12 @@ namespace uwvm2::runtime::lib
                             return false;
                         }};
 
-                    constexpr ::std::uintptr_t probe_stride{4u};
-                    constexpr ::std::uintptr_t backward_probe_limit{64u};
+#  if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+                    constexpr ::std::uintptr_t backward_probe_limit{8u};
+#  else
+                    constexpr ::std::uintptr_t backward_probe_limit{16u};
+#  endif
+                    constexpr ::std::uintptr_t probe_stride{1u};
                     for(::std::uintptr_t delta{}; delta <= backward_probe_limit; delta += probe_stride)
                     {
                         if(ip >= delta && try_print_address({ip - delta, ::llvm::object::SectionedAddress::UndefSection})) { return true; }
@@ -2561,7 +2620,7 @@ namespace uwvm2::runtime::lib
                                                     {
                                                         return;
                                                     }
-                                                    if(print_debug_inline_frames(ip)) { return; }
+                                                    if(print_debug_inline_frames(ip, resolved.entry)) { return; }
 
                                                     if(resolved.entry == nullptr) { return; }
                                                     print_wasm_frame(resolved.entry->module_id, resolved.entry->function_index);

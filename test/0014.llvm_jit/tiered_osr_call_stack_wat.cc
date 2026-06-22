@@ -231,31 +231,6 @@ namespace
         return false;
     }
 
-    [[nodiscard]] bool output_reports_unwind_unavailable(::std::filesystem::path const& output_path)
-    {
-        ::std::string output{};
-        if(!read_text_file(output_path, output)) { return false; }
-
-        return output.find("LLVM JIT unwind call-stack mode cannot be used") != ::std::string::npos;
-    }
-
-    [[nodiscard]] bool runtime_unwind_unavailable_or_skip(::std::filesystem::path const& uwvm_path,
-                                                          ::std::filesystem::path const& wasm_path,
-                                                          ::std::filesystem::path const& artifact_dir,
-                                                          char const* label)
-    {
-        auto const output_path{artifact_dir / (::std::string{label} + ".unwind_availability_probe.out")};
-        auto const command{quote_argument(uwvm_path) + " -Rjit -Rllvm-cache-path disable -Rllvm-call-stack unwind --run " + quote_argument(wasm_path)};
-        auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
-        ::std::cout << "[tiered-osr-wat] " << full_command << '\n';
-        static_cast<void>(run_system_command(full_command));
-
-        if(!output_reports_unwind_unavailable(output_path)) { return false; }
-
-        ::std::cout << "[tiered-osr-wat] skip: LLVM JIT unwind call-stack mode is unavailable in this runtime environment\n";
-        return true;
-    }
-
     [[nodiscard]] ::std::vector<::std::size_t> parse_func_indices(::std::string_view output)
     {
         ::std::vector<::std::size_t> result{};
@@ -381,7 +356,6 @@ namespace
         auto const wasm_path{artifact_dir / fixture.wasm_name};
 
         if(!compile_wat(wat2wasm_path, wat_path, generated_wat_path, wasm_path, fixture.label)) { return false; }
-        if(runtime_unwind_unavailable_or_skip(uwvm_path, wasm_path, artifact_dir, fixture.label)) { return true; }
 
         for(auto const& mode: modes)
         {

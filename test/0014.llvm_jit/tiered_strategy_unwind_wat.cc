@@ -292,41 +292,6 @@ namespace
         return ok;
     }
 
-    [[nodiscard]] bool output_reports_unwind_unavailable(::std::filesystem::path const& output_path)
-    {
-        ::std::string output{};
-        if(!read_text_file(output_path, output)) { return false; }
-
-        auto const plain_output{strip_ansi_codes(output)};
-        return plain_output.find("LLVM JIT unwind call-stack mode cannot be used") != ::std::string::npos;
-    }
-
-    [[nodiscard]] bool runtime_unwind_unavailable_or_skip(::std::filesystem::path const& uwvm_path,
-                                                          ::std::filesystem::path const& wat2wasm_path,
-                                                          ::std::filesystem::path const& artifact_dir)
-    {
-        auto const wat_path{artifact_dir / "unwind_availability_probe.wat"};
-        auto const wasm_path{artifact_dir / "unwind_availability_probe.wasm"};
-        auto const output_path{artifact_dir / "unwind_availability_probe.out"};
-
-        constexpr ::std::string_view wat{R"((module
-  (func $_start (export "_start") unreachable)
-)
-)"};
-        if(!write_text_file(wat_path, wat)) { return false; }
-        if(!compile_wat(wat2wasm_path, wat_path, wasm_path)) { return false; }
-
-        auto const command{quote_argument(uwvm_path) + " -Rjit -Rllvm-cache-path disable -Rllvm-call-stack unwind --run " + quote_argument(wasm_path)};
-        auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
-        ::std::cout << "[tiered-strategy] " << full_command << '\n';
-        static_cast<void>(run_system_command(full_command));
-
-        if(!output_reports_unwind_unavailable(output_path)) { return false; }
-
-        ::std::cout << "[tiered-strategy] skip: LLVM JIT unwind call-stack mode is unavailable in this runtime environment\n";
-        return true;
-    }
-
     [[nodiscard]] ::std::string make_nops(::std::size_t count)
     {
         ::std::string nops{};
@@ -658,7 +623,6 @@ int main(int argc, char** argv)
     }
 
     auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "tiered_strategy_wat"};
-    if(runtime_unwind_unavailable_or_skip(uwvm_path, wat2wasm_path, artifact_dir)) { return 0; }
 
     bool ok{true};
     for(auto const& test_case: make_cases())
