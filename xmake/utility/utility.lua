@@ -860,7 +860,7 @@ function get_llvm_jit_options()
     assert(llvm_config and llvm_config.program,
         [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
     local static_mode = get_static_link_mode()
-    local link_static = static_mode == "non-system"
+    local link_static = static_mode == "non-system" or static_mode == "compiler"
 
     local cache_key = table.concat({
         "llvm-jit-v17",
