@@ -76,6 +76,9 @@
 # elif !UWVM_HAS_BUILTIN(__builtin_alloca)
 #  include <alloca.h>
 # endif
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32)
+#  include <sys/sysctl.h>
+# endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 // Keep LLVM dependencies behind the backend macro so interpreter-only builds do not pay the compile-time or link dependency cost.
 #  include <llvm/Analysis/TargetTransformInfo.h>
@@ -1966,6 +1969,23 @@ namespace uwvm2::runtime::lib
 # endif
         }
 
+        [[nodiscard]] inline constexpr bool runtime_llvm_jit_process_is_apple_translated() noexcept
+        {
+# if defined(__APPLE__) && !defined(_WIN32)
+            // `sysctl.proc_translated` reports Rosetta today. Probe it for every Darwin architecture, not only x86_64, so a
+            // future Apple ISA translation layer also fails closed instead of trusting native unwind frame replacement.
+            int translated{};
+            ::std::size_t translated_size{sizeof(translated)};
+            if(::sysctlbyname("sysctl.proc_translated", ::std::addressof(translated), ::std::addressof(translated_size), nullptr, 0) != 0)
+            {
+                return false;
+            }
+            return translated != 0;
+# else
+            return false;
+# endif
+        }
+
         [[nodiscard]] inline constexpr bool runtime_llvm_jit_unwind_can_replace_instruction_frames() noexcept
         {
             // JIT unwind mode only requires generated code to carry registered native unwind tables.
@@ -2171,6 +2191,7 @@ namespace uwvm2::runtime::lib
         {
             ok,
             no_backend,
+            apple_translated_process,
             no_frame_replacement,
             live_probe_failed
         };
@@ -2182,6 +2203,8 @@ namespace uwvm2::runtime::lib
             {
                 case runtime_llvm_jit_unwind_probe_status::ok: return u8"ok";
                 case runtime_llvm_jit_unwind_probe_status::no_backend: return u8"no unwind backend was compiled into this build";
+                case runtime_llvm_jit_unwind_probe_status::apple_translated_process:
+                    return u8"Apple translated process native unwind cannot currently replace instruction-emitted wasm frames";
                 case runtime_llvm_jit_unwind_probe_status::no_frame_replacement: return u8"generated-code unwind-frame replacement is not verified";
                 case runtime_llvm_jit_unwind_probe_status::live_probe_failed: return u8"generated-code live unwind probe failed";
             }
@@ -2259,7 +2282,11 @@ namespace uwvm2::runtime::lib
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
                                                                          status = runtime_llvm_jit_unwind_probe_status::no_backend;
 # else
-                                                                         if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
+                                                                         if(runtime_llvm_jit_process_is_apple_translated()) [[unlikely]]
+                                                                         {
+                                                                             status = runtime_llvm_jit_unwind_probe_status::apple_translated_process;
+                                                                         }
+                                                                         else if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) [[unlikely]]
                                                                          {
                                                                              status = runtime_llvm_jit_unwind_probe_status::no_frame_replacement;
                                                                          }
@@ -2292,6 +2319,7 @@ namespace uwvm2::runtime::lib
 # if !UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE
             return runtime_llvm_jit_unwind_probe_status::no_backend;
 # else
+            if(runtime_llvm_jit_process_is_apple_translated()) { return runtime_llvm_jit_unwind_probe_status::apple_translated_process; }
             if(!runtime_llvm_jit_unwind_can_replace_instruction_frames()) { return runtime_llvm_jit_unwind_probe_status::no_frame_replacement; }
             return runtime_llvm_jit_unwind_probe_status::ok;
 # endif
