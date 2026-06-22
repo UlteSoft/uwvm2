@@ -58,7 +58,7 @@ namespace
     };
 
     inline constexpr ::std::array modes{
-        mode_t{"aot",          "-Raot"                       },
+        mode_t{"full",         "-Rcm full -Rcc jit"          },
         mode_t{"lazy",         "-Rjit"                       },
         mode_t{"tiered",       "-Rtiered"                    },
         mode_t{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0"},
@@ -166,18 +166,6 @@ namespace
     {
         if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
         return {};
-    }
-
-    [[nodiscard]] bool env_flag(char const* name, bool default_value)
-    {
-        auto const value{env_string(name)};
-        if(value.empty()) { return default_value; }
-        if(value == "0" || value == "false" || value == "FALSE" || value == "no" || value == "NO" || value == "off" ||
-           value == "OFF")
-        {
-            return false;
-        }
-        return true;
     }
 
     [[nodiscard]] ::std::filesystem::path find_wat2wasm(::std::filesystem::path const& project_root)
@@ -554,7 +542,6 @@ int main(int argc, char** argv)
         return dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat";
     }(executable_dir)};
     bool ok{true};
-    auto const strict_instruction_baseline{env_flag("UWVM_UNWIND_STRICT_INSTRUCTION", true)};
 
     for(auto const& shape: make_shapes())
     {
@@ -574,7 +561,7 @@ int main(int argc, char** argv)
                 auto const instruction_matches_expected{instruction.valid && instruction.func_indices == shape.expected_funcs};
                 if(!instruction_matches_expected)
                 {
-                    if(strict_instruction_baseline) { ok = false; }
+                    ok = false;
                     ::std::cerr << "[llvm-jit-unwind-stack] instruction baseline mismatch for " << stem << '/' << mode.name << " expected=";
                     print_funcs(::std::cerr, shape.expected_funcs);
                     ::std::cerr << " actual=";
@@ -591,7 +578,8 @@ int main(int argc, char** argv)
                     print_funcs(::std::cerr, unwind.func_indices);
                     ::std::cerr << " output=" << unwind.output_path << '\n';
                 }
-                else if(instruction_matches_expected && unwind.func_indices != instruction.func_indices)
+
+                if(instruction.valid && unwind.valid && unwind.func_indices != instruction.func_indices)
                 {
                     ok = false;
                     ::std::cerr << "[llvm-jit-unwind-stack] unwind mismatch for " << stem << '/' << mode.name << '\n';
