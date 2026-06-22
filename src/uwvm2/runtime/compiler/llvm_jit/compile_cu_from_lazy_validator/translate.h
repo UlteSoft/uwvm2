@@ -1340,12 +1340,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const local_count{curr_module.local_defined_function_vec_storage.size()};
             if(entry_local_function_index >= local_count || entry_local_function_index >= storage.functions.size()) [[unlikely]] { return; }
 
-            ::uwvm2::utils::container::vector<::std::uint_least8_t> seen{};
+            ::uwvm2::utils::container::vector<bool> seen{};
             seen.resize(local_count);
 
             ::uwvm2::utils::container::vector<::std::size_t> stack{};
             stack.reserve(local_count);
-            seen.index_unchecked(entry_local_function_index) = 1u;
+            seen.index_unchecked(entry_local_function_index) = true;
             stack.push_back(entry_local_function_index);
 
             ::uwvm2::utils::container::vector<::std::size_t> callees{};
@@ -1363,8 +1363,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     --remaining;
                     auto const callee_local_index{callees.index_unchecked(remaining)};
                     if(callee_local_index >= local_count || callee_local_index >= storage.functions.size()) [[unlikely]] { continue; }
-                    if(seen.index_unchecked(callee_local_index) != 0u) { continue; }
-                    seen.index_unchecked(callee_local_index) = 1u;
+                    if(seen.index_unchecked(callee_local_index)) { continue; }
+                    seen.index_unchecked(callee_local_index) = true;
                     stack.push_back(callee_local_index);
                 }
             }
