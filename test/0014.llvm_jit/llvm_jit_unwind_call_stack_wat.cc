@@ -299,10 +299,84 @@ namespace
 )";
     }
 
-    [[nodiscard]] ::std::array<stack_shape_t, 2> make_shapes()
+    [[nodiscard]] ::std::string make_indirect_leaf_wat(::std::string_view trap_body)
+    {
+        return ::std::string{R"((module
+  (type $v (func))
+  (memory 1)
+  (table 1 funcref)
+  (elem (i32.const 0) $leaf)
+
+  (func $leaf (type $v)
+)"} + ::std::string{trap_body} + R"(  )
+
+  (func $dispatch (type $v)
+    i32.const 0
+    call_indirect (type $v))
+
+  (func $top (type $v) call $dispatch)
+  (func $_start (export "_start") (type $v) call $top)
+)
+)";
+    }
+
+    [[nodiscard]] ::std::string make_recursive_countdown_wat(::std::string_view trap_body)
+    {
+        return ::std::string{R"((module
+  (memory 1)
+
+  (func $recurse (param $n i32)
+    local.get $n
+    if
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $recurse
+      return
+    end
+)"} + ::std::string{trap_body} + R"(  )
+
+  (func $_start (export "_start")
+    i32.const 3
+    call $recurse)
+)
+)";
+    }
+
+    [[nodiscard]] ::std::string make_param_result_chain_wat(::std::string_view trap_body)
+    {
+        return ::std::string{R"((module
+  (type $i2i (func (param i32) (result i32)))
+  (memory 1)
+
+  (func $leaf (type $i2i) (param $x i32) (result i32)
+    local.get $x
+    drop
+)"} + ::std::string{trap_body} + R"(    i32.const 0)
+
+  (func $mid (type $i2i) (param $x i32) (result i32)
+    local.get $x
+    call $leaf)
+
+  (func $top (type $i2i) (param $x i32) (result i32)
+    local.get $x
+    call $mid)
+
+  (func $_start (export "_start")
+    i32.const 7
+    call $top
+    drop)
+)
+)";
+    }
+
+    [[nodiscard]] ::std::array<stack_shape_t, 5> make_shapes()
     {
         return {stack_shape_t{"deep_leaf", {0uz, 1uz, 2uz, 3uz}, make_deep_leaf_wat},
-                stack_shape_t{"post_call_trap", {1uz, 2uz}, make_post_call_trap_wat}};
+                stack_shape_t{"post_call_trap", {1uz, 2uz}, make_post_call_trap_wat},
+                stack_shape_t{"indirect_leaf", {0uz, 1uz, 2uz, 3uz}, make_indirect_leaf_wat},
+                stack_shape_t{"recursive_countdown", {0uz, 0uz, 0uz, 0uz, 1uz}, make_recursive_countdown_wat},
+                stack_shape_t{"param_result_chain", {0uz, 1uz, 2uz, 3uz}, make_param_result_chain_wat}};
     }
 
     [[nodiscard]] run_result_t run_case(::std::filesystem::path const& uwvm_path,
