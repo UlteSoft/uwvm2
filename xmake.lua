@@ -120,15 +120,6 @@ function def_build(opt)
 	end
 
 	if execution_jit == "default" or execution_jit == "llvm" then
-		for _, value in ipairs({
-			"-lLLVMAArch64CodeGen",
-			"-lLLVMAArch64Desc",
-			"-lLLVMAArch64Utils",
-			"-lLLVMAArch64Info"
-		}) do
-			add_ldflags(value, { force = true })
-		end
-
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()

@@ -73,7 +73,7 @@ local function _llvm_host_target_component_candidates()
         table.insert(candidates, "x86")
     elseif arch:find("riscv") then
         table.insert(candidates, "riscv")
-    elseif arch:find("loongarch") then
+    elseif arch == "loong64" or arch:find("loongarch") then
         table.insert(candidates, "loongarch")
     elseif arch:find("ppc") or arch:find("powerpc") then
         table.insert(candidates, "powerpc")
