@@ -515,6 +515,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
         }
 
+        [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
+        {
+# if defined(__APPLE__)
+            // Cross-built JIT binaries must register the target of the running process, not the target baked into llvm-config's
+            // LLVM_NATIVE_TARGET. This is especially important for x86_64 Darwin binaries executed through Rosetta on Apple Silicon.
+#  if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            ::LLVMInitializeX86TargetInfo();
+            ::LLVMInitializeX86Target();
+            ::LLVMInitializeX86TargetMC();
+            ::LLVMInitializeX86AsmPrinter();
+            return true;
+#  elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+            ::LLVMInitializeAArch64TargetInfo();
+            ::LLVMInitializeAArch64Target();
+            ::LLVMInitializeAArch64TargetMC();
+            ::LLVMInitializeAArch64AsmPrinter();
+            return true;
+#  elif defined(__arm__) || defined(_M_ARM)
+            ::LLVMInitializeARMTargetInfo();
+            ::LLVMInitializeARMTarget();
+            ::LLVMInitializeARMTargetMC();
+            ::LLVMInitializeARMAsmPrinter();
+            return true;
+#  elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+            ::LLVMInitializePowerPCTargetInfo();
+            ::LLVMInitializePowerPCTarget();
+            ::LLVMInitializePowerPCTargetMC();
+            ::LLVMInitializePowerPCAsmPrinter();
+            return true;
+#  else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+#  endif
+# else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+# endif
+        }
+
         // Initializes LLVM native-target support exactly once and records whether the initialization succeeded.
         [[nodiscard]] inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept
         {
@@ -542,7 +579,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::llvm::initializeInstCombine(pass_registry);
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
-                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter()};
+                auto const ok{initialize_llvm_jit_process_target()};
                 // Publish the result before publishing completion.  Readers synchronize through the `initialized` flag,
                 // whose release store is sequenced after this store.
                 success.store(ok, ::std::memory_order_release);

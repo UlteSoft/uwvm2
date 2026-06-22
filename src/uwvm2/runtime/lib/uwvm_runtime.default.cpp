@@ -9292,6 +9292,43 @@ namespace uwvm2::runtime::lib
             }
         }
 
+        [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
+        {
+# if defined(__APPLE__)
+            // Cross-built JIT binaries must register the target of the running process, not the target baked into llvm-config's
+            // LLVM_NATIVE_TARGET. This is especially important for x86_64 Darwin binaries executed through Rosetta on Apple Silicon.
+#  if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            ::LLVMInitializeX86TargetInfo();
+            ::LLVMInitializeX86Target();
+            ::LLVMInitializeX86TargetMC();
+            ::LLVMInitializeX86AsmPrinter();
+            return true;
+#  elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+            ::LLVMInitializeAArch64TargetInfo();
+            ::LLVMInitializeAArch64Target();
+            ::LLVMInitializeAArch64TargetMC();
+            ::LLVMInitializeAArch64AsmPrinter();
+            return true;
+#  elif defined(__arm__) || defined(_M_ARM)
+            ::LLVMInitializeARMTargetInfo();
+            ::LLVMInitializeARMTarget();
+            ::LLVMInitializeARMTargetMC();
+            ::LLVMInitializeARMAsmPrinter();
+            return true;
+#  elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+            ::LLVMInitializePowerPCTargetInfo();
+            ::LLVMInitializePowerPCTarget();
+            ::LLVMInitializePowerPCTargetMC();
+            ::LLVMInitializePowerPCAsmPrinter();
+            return true;
+#  else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+#  endif
+# else
+            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
+# endif
+        }
+
         inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept
         {
             // LLVM native target setup is process-global and not idempotent in all versions; lazy/full materialization can race.
@@ -9316,7 +9353,7 @@ namespace uwvm2::runtime::lib
                 ::llvm::initializeInstCombine(pass_registry);
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
-                success.store(!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter(), ::std::memory_order_release);
+                success.store(initialize_llvm_jit_process_target(), ::std::memory_order_release);
                 initialized.store(true, ::std::memory_order_release);
             }
 
@@ -9342,6 +9379,13 @@ namespace uwvm2::runtime::lib
                 }
             }
             return mattrs;
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_jit_host_cpu_name_storage() noexcept
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            return ::uwvm2::utils::container::u8string{llvm_jit_translate_details::get_uwvm_u8string_view(host_cpu_name)};
         }
 
         inline constexpr void
@@ -10158,7 +10202,9 @@ namespace uwvm2::runtime::lib
                 return false;
             }
 
-            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            auto const host_cpu_name_storage{get_llvm_jit_host_cpu_name_storage()};
+            auto const host_cpu_name{
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_llvm_string_ref(host_cpu_name_storage)};
             auto const host_target_attribute_storage{get_llvm_jit_host_target_attribute_storage()};
             ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
             append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
@@ -11791,9 +11837,7 @@ namespace uwvm2::runtime::lib
                             if(full_translation_strategy.pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light &&
                                ensure_llvm_jit_native_target_initialized())
                             {
-                                auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                                legacy_light_task_preopt_context.host_cpu_name = ::uwvm2::utils::container::u8string{
-                                    ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::get_uwvm_u8string_view(host_cpu_name)};
+                                legacy_light_task_preopt_context.host_cpu_name = get_llvm_jit_host_cpu_name_storage();
                                 legacy_light_task_preopt_context.host_target_attribute_storage = get_llvm_jit_host_target_attribute_storage();
                                 legacy_light_task_preopt_context.codegen_opt_level = full_translation_strategy.codegen_opt_level;
                                 llvm_jit_opt.llvm_jit_task_module_pre_link_callback =
