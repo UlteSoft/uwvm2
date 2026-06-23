@@ -322,6 +322,14 @@ namespace uwvm2::runtime::lib
 # define UWVM_TARGET_POWERPC_FAMILY 1
 #endif
 
+#if defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+# define UWVM_TARGET_MIPS_FAMILY 1
+#endif
+
+#if defined(__alpha__) || defined(__hppa__) || defined(__HPPA__) || defined(__m68k__) || defined(__mc68000__) || defined(__sh__)
+# define UWVM_TARGET_LEGACY_LOOP_DISPATCH 1
+#endif
+
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
         using compiled_local_func_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
@@ -3410,7 +3418,8 @@ namespace uwvm2::runtime::lib
             // lazily materialized functions are indistinguishable from eagerly translated ones.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || defined(UWVM_TARGET_MIPS_FAMILY) || defined(UWVM_TARGET_LEGACY_LOOP_DISPATCH) || \
+       (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -3440,6 +3449,9 @@ namespace uwvm2::runtime::lib
 #  endif
 # elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
             // UWVM opfunc dispatch is indirect; PPC musttail is conditional and this dispatch form is rejected.
+# elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+            // LLVM's MIPS backend rejects UWVM's indirect opfunc dispatch when it is marked musttail.
+            // Use the loop-dispatch interpreter here so int-only release builds remain codegen-valid.
 # elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
             // RV64 soft/single-float ABIs route more scalar values through integer registers, so fp cache slots share that window.
@@ -3469,19 +3481,8 @@ namespace uwvm2::runtime::lib
 # elif defined(__loongarch__)
             // 32-bit LoongArch leaves caching disabled for the same register-pressure reason as other 32-bit targets.
 # elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
-#  if defined(__mips_n32) || defined(__mips_n64)
-#   if defined(__mips_soft_float)
-            // MIPS n32/n64 soft-float keeps scalar caches in the available general-purpose argument registers.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#   else
-            // MIPS n32/n64 hard-float has a narrower practical cache window, so only a few stack-top values are assigned.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#   endif
-#  endif
+            // MIPS uses loop-dispatch because LLVM rejects UWVM's indirect musttail opfunc dispatch.
+            // Stack-top caching requires tail-call mode, so leave all cache windows disabled here.
 # elif defined(__s390x__)
             // s390x has enough call argument slots for a small integer/fp stack-top cache after the fixed interpreter arguments.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
@@ -7239,7 +7240,8 @@ namespace uwvm2::runtime::lib
             // disabled because spills can cost more than byte-stack traffic.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || defined(UWVM_TARGET_MIPS_FAMILY) || defined(UWVM_TARGET_LEGACY_LOOP_DISPATCH) || \
+       (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -7317,21 +7319,8 @@ namespace uwvm2::runtime::lib
 # elif defined(__loongarch__)
             // loongarch32: i64/f64 passing uses pairs / stack depending on ABI; keep caching disabled by default.
 # elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
-            // MIPS ABIs are slot-based: fp args are only register-passed while they remain within the ABI's argument slots.
-            // We conservatively target the 8-slot N32/N64 ABIs; O32 has only 4 slots and cannot satisfy Wasm1's minimum ring sizes without heavy spilling.
-#  if defined(__mips_n32) || defined(__mips_n64)
-#   if defined(__mips_soft_float)
-            // N32/N64 soft-float: use a scalar4-merged ring in the integer slots (fits in the 8 arg slots).
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#   else
-            // N32/N64 hard-float: keep total args within 8 slots so fp values still use FPRs.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#   endif
-#  endif
+            // MIPS loop-dispatch is selected above because its LLVM backend does not reliably lower UWVM's indirect musttail
+            // opfunc dispatch. Stack-top caching is only valid in tail-call mode, so keep it disabled for all MIPS ABIs.
 # elif defined(__s390x__)
             // s390x: Linux ABI (r2-r6 integer args, f0/f2/... fp args). Keep v128 caching off by default:
             // 16-byte vectors can be passed indirectly by pointer.
@@ -7392,6 +7381,8 @@ namespace uwvm2::runtime::lib
 #endif
 
 #undef UWVM_TARGET_POWERPC_FAMILY
+#undef UWVM_TARGET_MIPS_FAMILY
+#undef UWVM_TARGET_LEGACY_LOOP_DISPATCH
 
         [[maybe_unused]] UWVM_ALWAYS_INLINE inline constexpr void copy_bytes_small(::std::byte* dst, ::std::byte const* src, ::std::size_t n) noexcept
         {
