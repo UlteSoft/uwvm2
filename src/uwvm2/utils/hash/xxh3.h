@@ -63,9 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 #if !defined(__SIZEOF_INT128__)
         struct xxh3_128_storage_t
         {
-            // For msvc, which targets little-endian, msvc does not have the uint128 extension.
-            // Only the uint64_t is guaranteed to be 64 bits.
-            static_assert(::std::endian::native == ::std::endian::little);
+            // Semantic low/high 64-bit lanes for targets without uint128 extension.
             ::std::uint64_t low64;
             ::std::uint64_t high64;
         };

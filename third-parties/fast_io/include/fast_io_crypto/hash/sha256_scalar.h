@@ -14,6 +14,13 @@ inline constexpr auto create_k256scalar() noexcept
 
 inline constexpr auto k256scalar{create_k256scalar()};
 
+inline ::std::uint_least32_t sha256_load_be32_unaligned(::std::byte const *p) noexcept
+{
+	::std::uint_least32_t word{};
+	::std::memcpy(__builtin_addressof(word), p, sizeof(word));
+	return ::fast_io::big_endian(word);
+}
+
 #if __has_cpp_attribute(__gnu__::__flatten__)
 [[__gnu__::__flatten__]]
 #endif
@@ -35,11 +42,6 @@ inline constexpr void sha256_round(::std::uint_least32_t T1, ::std::uint_least32
 inline void sha256_runtime_routine(::std::uint_least32_t *__restrict state, ::std::byte const *__restrict blocks_start,
 								   ::std::byte const *__restrict blocks_last) noexcept
 {
-	using ul32_may_alias
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-		[[__gnu__::__may_alias__]]
-#endif
-		= ::std::uint_least32_t;
 	::std::uint_least32_t a{state[0]};
 	::std::uint_least32_t b{state[1]};
 	::std::uint_least32_t c{state[2]};
@@ -53,24 +55,23 @@ inline void sha256_runtime_routine(::std::uint_least32_t *__restrict state, ::st
 	constexpr ::std::uint_least32_t const *k5_last{k256scalar.element + k256scalar.size()};
 	for (; blocks_start != blocks_last; blocks_start += 64)
 	{
-		ul32_may_alias const *W{reinterpret_cast<ul32_may_alias const *>(blocks_start)};
 		::std::uint_least32_t bpc{b ^ c};
-		sha256_round(x[0] = big_endian(W[0]), a, b, d, e, f, g, h, bpc, 0x428A2F98);
-		sha256_round(x[1] = big_endian(W[1]), h, a, c, d, e, f, g, bpc, 0x71374491);
-		sha256_round(x[2] = big_endian(W[2]), g, h, b, c, d, e, f, bpc, 0xB5C0FBCF);
-		sha256_round(x[3] = big_endian(W[3]), f, g, a, b, c, d, e, bpc, 0xE9B5DBA5);
-		sha256_round(x[4] = big_endian(W[4]), e, f, h, a, b, c, d, bpc, 0x3956C25B);
-		sha256_round(x[5] = big_endian(W[5]), d, e, g, h, a, b, c, bpc, 0x59F111F1);
-		sha256_round(x[6] = big_endian(W[6]), c, d, f, g, h, a, b, bpc, 0x923F82A4);
-		sha256_round(x[7] = big_endian(W[7]), b, c, e, f, g, h, a, bpc, 0xAB1C5ED5);
-		sha256_round(x[8] = big_endian(W[8]), a, b, d, e, f, g, h, bpc, 0xD807AA98);
-		sha256_round(x[9] = big_endian(W[9]), h, a, c, d, e, f, g, bpc, 0x12835B01);
-		sha256_round(x[10] = big_endian(W[10]), g, h, b, c, d, e, f, bpc, 0x243185BE);
-		sha256_round(x[11] = big_endian(W[11]), f, g, a, b, c, d, e, bpc, 0x550C7DC3);
-		sha256_round(x[12] = big_endian(W[12]), e, f, h, a, b, c, d, bpc, 0x72BE5D74);
-		sha256_round(x[13] = big_endian(W[13]), d, e, g, h, a, b, c, bpc, 0x80DEB1FE);
-		sha256_round(x[14] = big_endian(W[14]), c, d, f, g, h, a, b, bpc, 0x9BDC06A7);
-		sha256_round(x[15] = big_endian(W[15]), b, c, e, f, g, h, a, bpc, 0xC19BF174);
+		sha256_round(x[0] = sha256_load_be32_unaligned(blocks_start), a, b, d, e, f, g, h, bpc, 0x428A2F98);
+		sha256_round(x[1] = sha256_load_be32_unaligned(blocks_start + 4), h, a, c, d, e, f, g, bpc, 0x71374491);
+		sha256_round(x[2] = sha256_load_be32_unaligned(blocks_start + 8), g, h, b, c, d, e, f, bpc, 0xB5C0FBCF);
+		sha256_round(x[3] = sha256_load_be32_unaligned(blocks_start + 12), f, g, a, b, c, d, e, bpc, 0xE9B5DBA5);
+		sha256_round(x[4] = sha256_load_be32_unaligned(blocks_start + 16), e, f, h, a, b, c, d, bpc, 0x3956C25B);
+		sha256_round(x[5] = sha256_load_be32_unaligned(blocks_start + 20), d, e, g, h, a, b, c, bpc, 0x59F111F1);
+		sha256_round(x[6] = sha256_load_be32_unaligned(blocks_start + 24), c, d, f, g, h, a, b, bpc, 0x923F82A4);
+		sha256_round(x[7] = sha256_load_be32_unaligned(blocks_start + 28), b, c, e, f, g, h, a, bpc, 0xAB1C5ED5);
+		sha256_round(x[8] = sha256_load_be32_unaligned(blocks_start + 32), a, b, d, e, f, g, h, bpc, 0xD807AA98);
+		sha256_round(x[9] = sha256_load_be32_unaligned(blocks_start + 36), h, a, c, d, e, f, g, bpc, 0x12835B01);
+		sha256_round(x[10] = sha256_load_be32_unaligned(blocks_start + 40), g, h, b, c, d, e, f, bpc, 0x243185BE);
+		sha256_round(x[11] = sha256_load_be32_unaligned(blocks_start + 44), f, g, a, b, c, d, e, bpc, 0x550C7DC3);
+		sha256_round(x[12] = sha256_load_be32_unaligned(blocks_start + 48), e, f, h, a, b, c, d, bpc, 0x72BE5D74);
+		sha256_round(x[13] = sha256_load_be32_unaligned(blocks_start + 52), d, e, g, h, a, b, c, bpc, 0x80DEB1FE);
+		sha256_round(x[14] = sha256_load_be32_unaligned(blocks_start + 56), c, d, f, g, h, a, b, bpc, 0x9BDC06A7);
+		sha256_round(x[15] = sha256_load_be32_unaligned(blocks_start + 60), b, c, e, f, g, h, a, bpc, 0xC19BF174);
 		for (::std::uint_least32_t const *k5{k5_start}; k5 != k5_last; k5 += 16)
 		{
 			sha256_round((x[0] += sigma0(x[1]) + sigma1(x[14]) + x[9]), a, b, d, e, f, g, h, bpc, *k5);

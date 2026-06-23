@@ -1,7 +1,7 @@
 function bsd_target()
 
-    local use_llvm_toolchain = get_config("use-llvm-compiler")
-    if use_llvm_toolchain then	
+    local use_llvm_compiler = get_config("use-llvm-compiler")
+    if use_llvm_compiler then
         set_toolchains("clang")
         add_ldflags("-fuse-ld=lld", {force = true})
     end
@@ -26,8 +26,7 @@ function bsd_target()
         add_cxflags("-fno-ident") -- also strip ident data
     end
 
-    local static_link = get_config("static")
-    if static_link then	
+    if uwvm_static_mode_is_compiler() then
         add_ldflags("-static", {force = true})
     end
 
@@ -49,7 +48,8 @@ function bsd_target()
 
     -- dynamic libary loader
     add_syslinks("dl")
-    --if use_llvm_toolchain then	
+    add_syslinks("pthread")
+    --if use_llvm_compiler then
     --    add_syslinks("c++abi")
     --end
 
