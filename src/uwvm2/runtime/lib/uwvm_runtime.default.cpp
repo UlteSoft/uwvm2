@@ -292,7 +292,7 @@ namespace uwvm2::runtime::lib
 
         inline void set_llvm_module_target_triple_from_machine(::llvm::Module& module, ::llvm::TargetMachine const& target_machine)
         {
-# if LLVM_VERSION_MAJOR >= 22
+# if LLVM_VERSION_MAJOR >= 21
             module.setTargetTriple(target_machine.getTargetTriple());
 # else
             module.setTargetTriple(target_machine.getTargetTriple().str());
