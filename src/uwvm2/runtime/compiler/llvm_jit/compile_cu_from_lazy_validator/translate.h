@@ -42,6 +42,7 @@
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  include <llvm/Config/llvm-config.h>
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/IR/Verifier.h>
@@ -375,6 +376,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     namespace details
     {
+        inline void set_llvm_module_target_triple_from_machine(::llvm::Module& module, ::llvm::TargetMachine const& target_machine)
+        {
+#  if LLVM_VERSION_MAJOR >= 22
+            module.setTargetTriple(target_machine.getTargetTriple());
+#  else
+            module.setTargetTriple(target_machine.getTargetTriple().str());
+#  endif
+        }
+
         // Serializes LLVM MCJIT materialization and publication.  LLVM global initialization, MCJIT object finalization,
         // and this runtime's target-table publication are intentionally kept behind a narrow process-local lock because
         // those phases touch process-wide LLVM state and runtime dispatch tables.
@@ -938,7 +948,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
+            set_llvm_module_target_triple_from_machine(*llvm_module, *target_machine);
             llvm_module->setDataLayout(target_machine->createDataLayout());
             apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
@@ -1093,7 +1103,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
+            set_llvm_module_target_triple_from_machine(*llvm_module, *target_machine);
             llvm_module->setDataLayout(target_machine->createDataLayout());
             apply_llvm_jit_native_target_function_attrs(*llvm_module, target_config, *target_machine);
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))

@@ -88,6 +88,7 @@
 #  include <llvm/ExecutionEngine/JITEventListener.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  include <llvm/Config/llvm-config.h>
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/DIBuilder.h>
 #  include <llvm/IR/Constants.h>
@@ -288,6 +289,15 @@ namespace uwvm2::runtime::lib
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
         using win64_context_t = ::fast_io::win32::win_current_context;
 # endif
+
+        inline void set_llvm_module_target_triple_from_machine(::llvm::Module& module, ::llvm::TargetMachine const& target_machine)
+        {
+# if LLVM_VERSION_MAJOR >= 22
+            module.setTargetTriple(target_machine.getTargetTriple());
+# else
+            module.setTargetTriple(target_machine.getTargetTriple().str());
+# endif
+        }
 #endif
         using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
 
@@ -2257,7 +2267,7 @@ namespace uwvm2::runtime::lib
             if(target_machine == nullptr) [[unlikely]] { return false; }
             target_machine->setFastISel(true);
 
-            module->setTargetTriple(target_machine->getTargetTriple().str());
+            set_llvm_module_target_triple_from_machine(*module, *target_machine);
             module->setDataLayout(target_machine->createDataLayout());
 
             auto const i32_type{::llvm::Type::getInt32Ty(context)};
@@ -9978,7 +9988,7 @@ namespace uwvm2::runtime::lib
                 make_runtime_llvm_jit_materialize_target_machine(context->host_cpu_name, context->host_target_attribute_storage, context->codegen_opt_level)};
             if(target_machine == nullptr) [[unlikely]] { return false; }
 
-            module_storage.llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
+            set_llvm_module_target_triple_from_machine(*module_storage.llvm_module, *target_machine);
             module_storage.llvm_module->setDataLayout(target_machine->createDataLayout());
             apply_runtime_llvm_jit_native_target_function_attrs(
                 *module_storage.llvm_module, context->host_cpu_name, context->host_tune_cpu_name, *target_machine);
@@ -10255,7 +10265,7 @@ namespace uwvm2::runtime::lib
                 }
                 if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-                module->setTargetTriple(target_machine->getTargetTriple().str());
+                set_llvm_module_target_triple_from_machine(*module, *target_machine);
                 module->setDataLayout(target_machine->createDataLayout());
                 apply_runtime_llvm_jit_native_target_function_attrs(*module, host_cpu_name, host_tune_cpu_name, *target_machine);
                 if(verify_llvm_jit_ir && ::llvm::verifyModule(*module)) [[unlikely]]
@@ -10583,7 +10593,7 @@ namespace uwvm2::runtime::lib
             }
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
-            merged_module->setTargetTriple(target_machine->getTargetTriple().str());
+            set_llvm_module_target_triple_from_machine(*merged_module, *target_machine);
             merged_module->setDataLayout(target_machine->createDataLayout());
             apply_runtime_llvm_jit_native_target_function_attrs(*merged_module, host_cpu_name, host_tune_cpu_name, *target_machine);
             auto llvm_jit_cache_key{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"full-module")};
@@ -10768,7 +10778,7 @@ namespace uwvm2::runtime::lib
                     }
                     return false;
                 }
-                engine_module->setTargetTriple(target_machine->getTargetTriple().str());
+                set_llvm_module_target_triple_from_machine(*engine_module, *target_machine);
                 engine_module->setDataLayout(target_machine->createDataLayout());
                 merged_module.reset();
                 raw_engine = ::llvm::EngineBuilder(llvm_module_owner_t{engine_module.release()})
