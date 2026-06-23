@@ -14,6 +14,14 @@
 //     through the interpreter/tiered path instead of relying on malformed IR.
 // A value currently held on the JIT's transient operand stack.  The Wasm value type is stored beside the LLVM value so
 // helper emitters can cheaply re-check stack discipline even though validation has already run.
+#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER")
+#undef UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+# define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 1
+#else
+# define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 0
+#endif
+
 struct llvm_jit_stack_value_t
 {
     // Wasm scalar type represented by `value`.
@@ -249,12 +257,11 @@ template <typename FunctionPtr>
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
 }
 
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-// Put host addresses in the JIT module's own data section on Win64.  COFF/MCJIT may lower `load (inttoptr host_addr)`
-// or direct local C++ function constants through relocations that become zero/truncated when JIT code is allocated far
-// from the host image.  A private non-constant global is loaded RIP-relatively from JIT data and carries the full address.
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+// Put host addresses in the JIT module's own data section on targets where MCJIT cannot reliably materialize arbitrary
+// process addresses directly. COFF/Win64 may truncate far host-image addresses.
 [[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_win64_jit_host_address_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::StringRef name_prefix) noexcept
+    get_llvm_jit_host_address_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::StringRef name_prefix) noexcept
 {
     if(host_address == 0u) [[unlikely]] { return nullptr; }
 
@@ -277,7 +284,9 @@ template <typename FunctionPtr>
                              ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(name_prefix.data()), name_prefix.size()},
                              ::fast_io::mnp::hex<false, true>(host_address));
     }
-    auto address_global{llvm_module->getOrInsertGlobal(get_llvm_string_ref(address_symbol_name), llvm_intptr_type)};
+    auto address_global_value{llvm_module->getOrInsertGlobal(get_llvm_string_ref(address_symbol_name), llvm_intptr_type)};
+    auto address_global{::llvm::dyn_cast<::llvm::GlobalVariable>(address_global_value)};
+    if(address_global == nullptr) [[unlikely]] { return nullptr; }
     address_global->setLinkage(::llvm::GlobalValue::PrivateLinkage);
     address_global->setInitializer(::llvm::ConstantInt::get(llvm_intptr_type, host_address));
 
@@ -286,39 +295,39 @@ template <typename FunctionPtr>
     address_global->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);
     address_global->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
 
-    // Keep the load visible to codegen.  On Win64 this encourages a RIP-relative load from nearby JIT data instead of a
-    // direct relocation against the far-away host image, avoiding zero/truncated address materialization.
+    // Keep the load visible to codegen. This encourages a target-local load from nearby JIT data instead of a direct
+    // relocation against the host image or runtime storage.
     auto loaded_address{ir_builder.CreateLoad(llvm_intptr_type, address_global, get_llvm_string_ref(u8"uwvm.host.addr"))};
     loaded_address->setVolatile(true);
     loaded_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     return loaded_address;
 }
 
-// Convert a Win64 host address into a typed pointer value by first loading the address from JIT-owned data.
+// Convert a host address into a typed pointer value by first loading the address from JIT-owned data.
 [[nodiscard]] inline constexpr ::llvm::Value*
-    get_llvm_win64_jit_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
+    get_llvm_jit_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
     if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
-    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, host_address, get_llvm_string_ref(u8"uwvm.win64.host.ptr."))};
+    auto loaded_address{get_llvm_jit_host_address_value(ir_builder, host_address, get_llvm_string_ref(u8"uwvm.host.ptr."))};
     if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
     return ir_builder.CreateIntToPtr(loaded_address, pointer_type, get_llvm_string_ref(u8"uwvm.host.ptr"));
 }
 #endif
 
-// Return a typed LLVM pointer value for a stable host address, using the Win64 data-section workaround when required.
+// Return a typed LLVM pointer value for a stable host address, using the data-section workaround when required.
 [[nodiscard]] inline constexpr ::llvm::Value*
     get_llvm_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    return get_llvm_win64_jit_host_pointer_value(ir_builder, host_address, pointer_type);
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+    return get_llvm_jit_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     static_cast<void>(ir_builder);
     return get_llvm_host_pointer_constant(host_address, pointer_type);
 #endif
 }
 
-// Materialize a runtime bridge function pointer at the current insertion point.  On Win64 this may need a runtime load
+// Materialize a runtime bridge function pointer at the current insertion point. Some MCJIT targets need a runtime load
 // from JIT-owned data; on other targets an LLVM constant pointer is sufficient.
 template <typename FunctionPtr>
 [[nodiscard]] inline constexpr ::llvm::Value*
@@ -330,10 +339,10 @@ template <typename FunctionPtr>
     auto const function_address{get_llvm_runtime_bridge_function_address(function_pointer)};
     if(function_address == 0u) [[unlikely]] { return nullptr; }
 
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    // Keep this in sync with Win64 tiered/raw validation.  Direct `inttoptr` host bridge constants are not reliable on
-    // COFF/MCJIT: local C++ bridge relocations and high host addresses can be materialized as zero or truncated operands.
-    auto loaded_address{get_llvm_win64_jit_host_address_value(ir_builder, function_address, get_llvm_string_ref(u8"uwvm.win64.bridge."))};
+#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+    // Keep this in sync with tiered/raw validation. Direct `inttoptr` host bridge constants are not reliable on every
+    // MCJIT target covered by UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER.
+    auto loaded_address{get_llvm_jit_host_address_value(ir_builder, function_address, get_llvm_string_ref(u8"uwvm.bridge."))};
     if(loaded_address == nullptr) [[unlikely]] { return nullptr; }
     return ir_builder.CreateIntToPtr(loaded_address, get_llvm_pointer_type(function_type), get_llvm_string_ref(u8"runtime.bridge.ptr"));
 #else
@@ -374,13 +383,24 @@ template <auto Function>
     return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
 }
 
-[[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
-                                                                                       ::std::uintptr_t host_address,
-                                                                                       ::llvm::Type* object_type,
-                                                                                       ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
+                                                                                    ::std::uintptr_t host_address,
+                                                                                    ::llvm::Type* object_type,
+                                                                                    ::uwvm2::utils::container::u8string_view symbol_name) noexcept
 {
     if(host_address == 0u || object_type == nullptr || symbol_name.empty()) [[unlikely]] { return nullptr; }
 
+    auto pointer_type{get_llvm_pointer_type(object_type)};
+    if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
+
+#if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+    // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds.
+    // ELF riscv64 RuntimeDyld handles absolute HI20/LO12 data-symbol relocations as 32-bit addresses and lacks LO12_S.
+    // These host objects are process-stable tables/storage, so materialize their full pointer values as constants.
+    static_cast<void>(ir_builder);
+    static_cast<void>(symbol_name);
+    return get_llvm_host_pointer_constant(host_address, pointer_type);
+#else
     auto current_block{ir_builder.GetInsertBlock()};
     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
     auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
@@ -389,10 +409,13 @@ template <auto Function>
     auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
     ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
     if(auto existing{llvm_module->getGlobalVariable(symbol_name_ref, true)}; existing != nullptr) { return existing; }
-    auto global{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
+    auto global_value{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
+    auto global{::llvm::dyn_cast<::llvm::GlobalVariable>(global_value)};
+    if(global == nullptr) [[unlikely]] { return nullptr; }
     global->setLinkage(::llvm::GlobalValue::ExternalLinkage);
     global->setInitializer(nullptr);
     return global;
+#endif
 }
 
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_address(::llvm::IRBuilder<>& ir_builder,
@@ -478,16 +501,22 @@ inline constexpr void apply_llvm_jit_semantic_function_attrs(::llvm::Function& f
 
 // Keep a physical frame pointer in functions that may need to report an exact trap call-site frame.
 inline constexpr void apply_llvm_jit_frame_pointer_function_attrs(::llvm::Function& function) noexcept
-{ function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all")); }
+{
+    function.addFnAttr(get_llvm_string_ref(u8"frame-pointer"), get_llvm_string_ref(u8"all"));
+    function.addFnAttr(get_llvm_string_ref(u8"no-frame-pointer-elim"), get_llvm_string_ref(u8"true"));
+    function.addFnAttr(get_llvm_string_ref(u8"no-frame-pointer-elim-non-leaf"));
+}
 
 // Apply all common attributes shared by public, private, and raw-entry JIT functions.
 inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& function) noexcept
 {
     apply_llvm_jit_platform_function_attrs(function);
     apply_llvm_jit_semantic_function_attrs(function);
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
-    // Win64 trap bridges always pass explicit generated-frame context via read_register("rbp"/"rsp").  LLVM rejects
-    // reading rbp from a function where rbp remains allocatable, so every generated caller needs a fixed frame pointer.
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+    (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
+    // Win64 trap bridges always pass explicit generated-frame context via read_register.  LLVM rejects reading the
+    // architectural frame pointer from a function where that register remains allocatable, so every generated caller
+    // needs a fixed frame pointer.
     apply_llvm_jit_frame_pointer_function_attrs(function);
 #endif
 }
@@ -504,19 +533,78 @@ inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Fu
     // Keep a physical frame pointer in generated functions.  Trap bridges capture the current frame address explicitly,
     // and a stable frame chain makes mixed JIT/runtime unwinding resilient after LLVM has inlined or optimized Wasm calls.
     apply_llvm_jit_frame_pointer_function_attrs(function);
+
+    // Explicit unwind call-stack mode must report the Wasm call chain from native frames. Do not rely on DWARF inline
+    // reconstruction for correctness: optimized Mach-O JIT objects can expose only the outer concrete frame on Darwin/Rosetta.
+    function.addFnAttr(::llvm::Attribute::NoInline);
+    function.addFnAttr(::llvm::Attribute::OptimizeNone);
 }
+
+#if defined(__i386__) || defined(_M_IX86)
+[[nodiscard]] inline constexpr bool llvm_jit_i386_fastcall_inreg_eligible(::llvm::Type* type) noexcept
+{
+    if(type == nullptr) [[unlikely]] { return false; }
+    if(type->isPointerTy()) { return true; }
+    return type->isIntegerTy() && type->getIntegerBitWidth() <= 32u;
+}
+
+inline constexpr void apply_llvm_jit_i386_fastcall_param_attrs(::llvm::Function& function) noexcept
+{
+    auto function_type{function.getFunctionType()};
+    if(function_type == nullptr) [[unlikely]] { return; }
+
+    unsigned inreg_count{};
+    auto const arg_count{function.arg_size()};
+    for(unsigned arg_index{}; arg_index != arg_count && inreg_count != 2u; ++arg_index)
+    {
+        if(!llvm_jit_i386_fastcall_inreg_eligible(function_type->getParamType(arg_index))) { continue; }
+        function.addParamAttr(arg_index, ::llvm::Attribute::InReg);
+        ++inreg_count;
+    }
+}
+
+inline constexpr void apply_llvm_jit_i386_fastcall_param_attrs(::llvm::CallInst& call_inst) noexcept
+{
+    unsigned inreg_count{};
+    auto const arg_count{call_inst.arg_size()};
+    for(unsigned arg_index{}; arg_index != arg_count && inreg_count != 2u; ++arg_index)
+    {
+        auto arg{call_inst.getArgOperand(arg_index)};
+        if(arg == nullptr || !llvm_jit_i386_fastcall_inreg_eligible(arg->getType())) { continue; }
+        call_inst.addParamAttr(arg_index, ::llvm::Attribute::InReg);
+        ++inreg_count;
+    }
+}
+#endif
 
 // Set the calling convention on an LLVM function and attach the common JIT attributes expected for generated functions.
 inline constexpr void apply_llvm_jit_calling_conv(::llvm::Function& function, ::llvm::CallingConv::ID calling_conv) noexcept
 {
     function.setCallingConv(calling_conv);
+#if defined(__i386__) || defined(_M_IX86)
+    if(calling_conv == ::llvm::CallingConv::X86_FastCall)
+    {
+        // Clang lowers i386 __fastcall as x86_fastcallcc with the first two integer arguments marked inreg.  MCJIT's ELF
+        // i386 lowering follows those parameter attributes; setting only the calling convention leaves the generated entry
+        // callable as cdecl and corrupts C++ fastcall callers at the raw-entry boundary.
+        apply_llvm_jit_i386_fastcall_param_attrs(function);
+    }
+#endif
     apply_llvm_jit_common_function_attrs(function);
 }
 
 // Set the calling convention on a call site.  Call sites must match the declaration or LLVM may emit an ABI-incompatible
 // native call.
 inline constexpr void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
-{ call_inst.setCallingConv(calling_conv); }
+{
+    call_inst.setCallingConv(calling_conv);
+#if defined(__i386__) || defined(_M_IX86)
+    if(calling_conv == ::llvm::CallingConv::X86_FastCall)
+    {
+        apply_llvm_jit_i386_fastcall_param_attrs(call_inst);
+    }
+#endif
+}
 
 // Null-safe call-site convention helper used by expression-style call builders.
 inline constexpr ::llvm::CallInst* apply_llvm_jit_calling_conv(::llvm::CallInst* call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
@@ -683,10 +771,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
 // Report whether generated trap calls must pass explicit frame/stack context for Win64 SEH unwind reconstruction.
 [[nodiscard]] inline consteval bool llvm_jit_win64_seh_explicit_trap_context_enabled() noexcept
 {
-    // Windows x64 unwind state is reconstructed from a CONTEXT record, not from a DWARF cursor.  When a generated Wasm
+    // Windows unwind state is reconstructed from a CONTEXT record, not from a DWARF cursor.  When a generated Wasm
     // frame calls into the C++ trap helper, the helper's own frame is already a different ABI boundary, so the generated
-    // caller must pass its live RBP/RSP values explicitly.
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    // caller must pass its live frame/stack pointer values explicitly.
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+    (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
     return true;
 #else
     return false;
@@ -703,6 +792,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     // lowered in terms of the current function's abstract frame rather than the exact machine register value we need.
     auto& llvm_context{ir_builder.getContext()};
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"rbp"))};
+    auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"x29"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else
@@ -722,6 +816,11 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     // prologue state, and frame-register offsets.  Capture the live stack pointer before crossing into the helper.
     auto& llvm_context{ir_builder.getContext()};
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"rsp"))};
+    auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
+    return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    auto& llvm_context{ir_builder.getContext()};
+    auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"sp"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else
@@ -760,7 +859,7 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
     // runtime reconstruct the generated caller rather than starting the unwind from the C++ trap helper frame.
     call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
     call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
-    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, {call_arguments.data(), call_arguments.size()})};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -829,7 +928,7 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     auto const llvm_intptr_param_type{::llvm::cast<::llvm::IntegerType>(llvm_intptr_type)};
     call_arguments.emplace_back(emit_llvm_jit_current_frame_address(ir_builder, llvm_intptr_param_type));
     call_arguments.emplace_back(emit_llvm_jit_current_stack_pointer(ir_builder, llvm_intptr_param_type));
-    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, call_arguments)};
+    auto trap_call{ir_builder.CreateCall(function_type, bridge_pointer, {call_arguments.data(), call_arguments.size()})};
     trap_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
     apply_llvm_jit_host_calling_conv(trap_call);
 
@@ -1441,7 +1540,7 @@ struct runtime_direct_callee_resolution_t
 
     // Wasm function types have a fixed arity.  The final `false` explicitly disables LLVM varargs so verifier/type checks
     // catch any call-site arity mismatch instead of treating extra operands as native variadic arguments.
-    return ::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false);
+    return ::llvm::FunctionType::get(llvm_result_type, {llvm_parameter_types.data(), llvm_parameter_types.size()}, false);
 }
 
 // Runtime raw-call bridge signature.  Arguments are: module address, function index, result buffer address/size, and
@@ -1772,12 +1871,12 @@ struct runtime_global_access_info_t
 }
 
 // Build an LLVM external-symbol pointer to the concrete scalar field inside a directly addressable global storage record.
-[[nodiscard]] inline constexpr ::llvm::Constant* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
-                                                                                 ::llvm::IRBuilder<>& ir_builder,
-                                                                                 ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                                 validation_module_traits_t::wasm_u32 global_index,
-                                                                                 ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
-                                                                                 runtime_operand_stack_value_type value_type) noexcept
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_global_storage_pointer(::llvm::LLVMContext& llvm_context,
+                                                                              ::llvm::IRBuilder<>& ir_builder,
+                                                                              ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                              validation_module_traits_t::wasm_u32 global_index,
+                                                                              ::uwvm2::object::global::wasm_global_storage_t* global_storage_ptr,
+                                                                              runtime_operand_stack_value_type value_type) noexcept
 {
     if(global_storage_ptr == nullptr) [[unlikely]] { return nullptr; }
 
@@ -3484,7 +3583,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         if(llvm_result_type == nullptr) [[unlikely]] { return false; }
     }
 
-    auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
+    auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, {llvm_parameter_types.data(), llvm_parameter_types.size()}, false)};
     // Keep every LLVM symbol/debug name on the same checked Wasm32 function index; silent truncation here would alias
     // two runtime functions to the same generated declaration.
     auto const function_name{get_llvm_wasm_function_name(*runtime_module_ptr, function_index)};
@@ -3538,7 +3637,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         core_parameter_types.push_back(llvm_intptr_type);
         for(auto param_type: llvm_parameter_types) { core_parameter_types.push_back(param_type); }
 
-        auto core_function_type{::llvm::FunctionType::get(llvm_result_type, core_parameter_types, false)};
+        auto core_function_type{::llvm::FunctionType::get(llvm_result_type, {core_parameter_types.data(), core_parameter_types.size()}, false)};
         auto const core_function_name{get_llvm_wasm_tiered_core_function_name(*runtime_module_ptr, function_index)};
         state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(core_function_name));
         if(state.llvm_function == nullptr)
@@ -3801,7 +3900,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
             // the core to run normal local initialization instead of OSR local restore.
             for(auto& arg: public_function->args()) { core_arguments.push_back(::std::addressof(arg)); }
 
-            auto core_call{apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, core_arguments))};
+            auto core_call{
+                apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
             if(state.emit_call_stack_frames && !emit_runtime_local_func_llvm_jit_call_stack_pop(public_builder)) [[unlikely]] { return false; }
 
             if(public_function->getReturnType()->isVoidTy()) { public_builder.CreateRetVoid(); }
@@ -3949,7 +4049,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     core_arguments.push_back(::llvm::Constant::getNullValue(llvm_param_type));
                 }
 
-                auto core_call{apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, core_arguments))};
+                auto core_call{
+                    apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
                 if(abi_layout.result_count == 1uz)
                 {
                     auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
@@ -4117,7 +4218,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 param_offset += abi_size;
             }
 
-            auto typed_call{apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
+            auto typed_call{
+                apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, {call_arguments.data(), call_arguments.size()}))};
             if(abi_layout.result_count == 1uz)
             {
                 // Store the typed return value back into the caller-provided raw result buffer, completing the raw ABI
@@ -5496,7 +5598,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
                                                                                     *runtime_module_ptr,
                                                                                     callee_resolution.func_index,
                                                                                     *callee_resolution.function_type_ptr,
-                                                                                    prepared_call.arguments)};
+                                                                                    {prepared_call.arguments.data(), prepared_call.arguments.size()})};
             // `push_runtime_local_func_llvm_jit_wasm_call_result` intentionally accepts null for void callees, so direct
             // call emission must be checked here or a failed void call would be silently dropped from the IR.
             if(call_value == nullptr) [[unlikely]] { return false; }
@@ -5527,7 +5629,8 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
         if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
     }
 
-    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call.arguments)};
+    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(
+        state, *runtime_module_ptr, func_index, *callee_type_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()})};
     if(call_value == nullptr) [[unlikely]] { return false; }
     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
 }
@@ -7296,3 +7399,5 @@ template <typename CreateValue>
 
     return code_curr == code_end;
 }
+
+#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER")

@@ -234,6 +234,16 @@ option("llvm-jit-env", function()
     end)
 end)
 
+option("openssl-root", function()
+    set_default("default")
+    set_showmenu(true)
+    set_description(
+        "Use a prebuilt OpenSSL root instead of the xmake openssl package.",
+        [[    default: use xmake package resolution.]],
+        [[    path: use headers from path/include and libraries from path or path/lib.]]
+    )
+end)
+
 option("debug-int", function()
     set_description
     (

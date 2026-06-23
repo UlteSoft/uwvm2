@@ -20,7 +20,7 @@ inline return_value_type system_call(Args... args) noexcept
 template <::std::uint_least64_t syscall_number, ::std::signed_integral return_value_type>
 	requires(1 < sizeof(return_value_type))
 [[__gnu__::__always_inline__]]
-inline return_value_type inline_syscall(auto p1, auto p2) noexcept
+inline return_value_type inline_syscall(auto, auto) noexcept
 {
 	static_assert(false, "force inline for generic syscall is not supported");
 }
