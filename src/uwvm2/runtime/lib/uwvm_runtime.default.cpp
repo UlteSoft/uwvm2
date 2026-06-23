@@ -10565,6 +10565,7 @@ namespace uwvm2::runtime::lib
             auto const host_tune_cpu_name_storage{host_cpu_name_storage};
             auto const& host_cpu_name{host_cpu_name_storage};
             auto const& host_tune_cpu_name{host_tune_cpu_name_storage};
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             auto const host_target_attribute_storage{get_llvm_jit_host_target_attribute_storage()};
             ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
             append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
