@@ -10,6 +10,8 @@
 #include "riscv64.h"
 #elif defined(__loongarch__) && __SIZEOF_SIZE_T__ == 8
 #include "loongarch64.h"
+#elif defined(__s390x__)
+#include "s390x.h"
 #else
 #include "generic.h"
 #endif
