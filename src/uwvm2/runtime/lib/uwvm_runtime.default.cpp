@@ -1773,7 +1773,7 @@ namespace uwvm2::runtime::lib
 #   endif
         }
 
-        [[nodiscard]] inline constexpr ::std::uintptr_t llvm_jit_win64_context_frame_pointer(win64_context_t const& context) noexcept
+        [[nodiscard, maybe_unused]] inline constexpr ::std::uintptr_t llvm_jit_win64_context_frame_pointer(win64_context_t const& context) noexcept
         {
 #   if defined(_WIN64) && (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64))
             return static_cast<::std::uintptr_t>(context.Rbp);
@@ -1797,7 +1797,7 @@ namespace uwvm2::runtime::lib
 #   endif
         }
 
-        [[nodiscard]] inline constexpr ::std::uintptr_t llvm_jit_win64_context_link_register(win64_context_t const& context) noexcept
+        [[nodiscard, maybe_unused]] inline constexpr ::std::uintptr_t llvm_jit_win64_context_link_register(win64_context_t const& context) noexcept
         {
 #   if defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
             return static_cast<::std::uintptr_t>(context.X[30u]);
@@ -1807,7 +1807,7 @@ namespace uwvm2::runtime::lib
 #   endif
         }
 
-        inline constexpr void llvm_jit_win64_context_set_link_register(win64_context_t& context, ::std::uintptr_t value) noexcept
+        [[maybe_unused]] inline constexpr void llvm_jit_win64_context_set_link_register(win64_context_t& context, ::std::uintptr_t value) noexcept
         {
 #   if defined(_WIN64) && (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
             context.X[30u] = static_cast<::std::uint64_t>(value);
