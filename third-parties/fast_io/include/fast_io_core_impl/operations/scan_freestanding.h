@@ -308,6 +308,150 @@ template <typename input, typename T>
 		}
 	}
 }
+
+namespace decay
+{
+
+struct precise_scan_run_result
+{
+	::std::size_t position{};
+	::std::size_t neededspace{};
+};
+
+template <::std::integral char_type, typename T>
+inline constexpr bool batch_precise_scannable_no_error{
+	::fast_io::precise_reserve_scannable_no_error<char_type, T>};
+
+template <::std::integral char_type, typename Arg, typename... Args>
+inline constexpr precise_scan_run_result find_continuous_precise_scan_n()
+{
+	if constexpr (::fast_io::details::decay::batch_precise_scannable_no_error<char_type, Arg>)
+	{
+		constexpr ::std::size_t sz{scan_precise_reserve_size(::fast_io::io_reserve_type<char_type, Arg>)};
+		if constexpr (sizeof...(Args) == 0)
+		{
+			return {1u, sz};
+		}
+		else
+		{
+			constexpr precise_scan_run_result res{
+				::fast_io::details::decay::find_continuous_precise_scan_n<char_type, Args...>()};
+			return {res.position + 1u,
+					::fast_io::details::intrinsics::add_or_overflow_die(res.neededspace, sz)};
+		}
+	}
+	else
+	{
+		return {};
+	}
+}
+
+template <::std::size_t n, ::std::integral char_type>
+inline constexpr char_type const *scan_n_precise_reserve_no_error(char_type const *p) noexcept
+{
+	return p;
+}
+
+template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+inline constexpr char_type const *scan_n_precise_reserve_no_error(char_type const *p, T t, Args... args)
+{
+	if constexpr (n == 0)
+	{
+		return p;
+	}
+	else
+	{
+		constexpr ::std::size_t sz{scan_precise_reserve_size(::fast_io::io_reserve_type<char_type, T>)};
+		scan_precise_reserve_define(::fast_io::io_reserve_type<char_type, T>, p, t);
+		if constexpr (n == 1)
+		{
+			return p + sz;
+		}
+		else
+		{
+			return ::fast_io::details::decay::scan_n_precise_reserve_no_error<n - 1, char_type>(p + sz, args...);
+		}
+	}
+}
+
+template <typename input, ::std::size_t skippings = 0>
+[[nodiscard]] inline constexpr bool scan_controls_impl(input) noexcept
+{
+	return true;
+}
+
+template <typename input, ::std::size_t skippings = 0, typename T, typename... Args>
+[[nodiscard]] inline constexpr bool scan_controls_impl(input in, T t, Args... args)
+{
+	if constexpr (skippings != 0)
+	{
+		if constexpr (sizeof...(Args) == 0)
+		{
+			return true;
+		}
+		else
+		{
+			return ::fast_io::details::decay::scan_controls_impl<input, skippings - 1>(in, args...);
+		}
+	}
+	else if constexpr (::fast_io::details::asan_state::current == ::fast_io::details::asan_state::activate)
+	{
+		if (!::fast_io::details::scan_single_impl(in, t))
+		{
+			return false;
+		}
+		if constexpr (sizeof...(Args) == 0)
+		{
+			return true;
+		}
+		else
+		{
+			return ::fast_io::details::decay::scan_controls_impl(in, args...);
+		}
+	}
+	else
+	{
+		using char_type = typename input::input_char_type;
+		constexpr precise_scan_run_result res{
+			::fast_io::details::decay::find_continuous_precise_scan_n<char_type, T, Args...>()};
+		if constexpr (res.position > 1)
+		{
+			auto curr_ptr{ibuffer_curr(in)};
+			char_type const *curr{curr_ptr};
+			char_type const *end{ibuffer_end(in)};
+			::std::size_t const diff{static_cast<::std::size_t>(end - curr)};
+			if (diff >= res.neededspace) [[likely]]
+			{
+				::fast_io::details::decay::scan_n_precise_reserve_no_error<res.position, char_type>(curr, t,
+																									args...);
+				ibuffer_set_curr(in, curr_ptr + res.neededspace);
+				if constexpr (res.position == sizeof...(Args) + 1u)
+				{
+					return true;
+				}
+				else
+				{
+					return ::fast_io::details::decay::scan_controls_impl<input, res.position - 1u>(in, args...);
+				}
+			}
+		}
+
+		if (!::fast_io::details::scan_single_impl(in, t))
+		{
+			return false;
+		}
+		if constexpr (sizeof...(Args) == 0)
+		{
+			return true;
+		}
+		else
+		{
+			return ::fast_io::details::decay::scan_controls_impl(in, args...);
+		}
+	}
+}
+
+} // namespace decay
 } // namespace details
 
 namespace operations::decay
@@ -328,7 +472,7 @@ template <typename input, typename... Args>
 	}
 	else if constexpr (::fast_io::operations::decay::defines::has_ibuffer_basic_operations<input>)
 	{
-		return (::fast_io::details::scan_single_impl(instm, args) && ...);
+		return ::fast_io::details::decay::scan_controls_impl(instm, args...);
 	}
 	else if constexpr (::fast_io::operations::defines::available_add_ibuf<input>)
 	{
