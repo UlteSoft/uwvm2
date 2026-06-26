@@ -42,6 +42,8 @@
 
 namespace uwvm2_test_scan_precise_batch
 {
+    inline constexpr bool asan_scan_single_path{::fast_io::details::asan_state::current == ::fast_io::details::asan_state::activate};
+
     struct scan_input_state
     {
         char* begin{};
@@ -381,9 +383,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(c == load_le(buffer + 8u, 8u));
         UWVM_TEST_REQUIRE(d == load_le(buffer + 16u, 1u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 17u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 1u);
-        UWVM_TEST_REQUIRE(state.end_calls == 1u);
-        UWVM_TEST_REQUIRE(state.set_calls == 1u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 4u : 1u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 4u : 1u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 4u : 1u));
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -411,9 +413,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(c == load_le(buffer + 11u, 8u));
         UWVM_TEST_REQUIRE(d == load_le(buffer + 19u, 8u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 27u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 3u);
-        UWVM_TEST_REQUIRE(state.end_calls == 3u);
-        UWVM_TEST_REQUIRE(state.set_calls == 3u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 5u : 3u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 5u : 3u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 5u : 3u));
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -469,10 +471,10 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
                                                                                  get_u32{&b}));
         UWVM_TEST_REQUIRE(a == load_le(buffer, 2u));
         UWVM_TEST_REQUIRE(b == 777u);
-        UWVM_TEST_REQUIRE(state.curr == buffer);
+        UWVM_TEST_REQUIRE(state.curr == (asan_scan_single_path ? buffer + 2u : buffer));
         UWVM_TEST_REQUIRE(state.curr_calls == 1u);
         UWVM_TEST_REQUIRE(state.end_calls == 1u);
-        UWVM_TEST_REQUIRE(state.set_calls == 0u);
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 1u : 0u));
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -494,9 +496,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(b == load_le(buffer + 2u, 4u));
         UWVM_TEST_REQUIRE(c == load_le(buffer + 6u, 4u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 10u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 2u);
-        UWVM_TEST_REQUIRE(state.end_calls == 2u);
-        UWVM_TEST_REQUIRE(state.set_calls == 2u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 3u : 2u));
         return 0;
     }
 
@@ -517,9 +519,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(b == load_le(buffer + 4u, 4u));
         UWVM_TEST_REQUIRE(c == load_le(buffer + 8u, 2u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 10u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 2u);
-        UWVM_TEST_REQUIRE(state.end_calls == 2u);
-        UWVM_TEST_REQUIRE(state.set_calls == 2u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 3u : 2u));
         return 0;
     }
 
@@ -555,16 +557,16 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(g == load_le(buffer + 20u, 4u));
         UWVM_TEST_REQUIRE(h == load_le(buffer + 24u, 4u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 28u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 5u);
-        UWVM_TEST_REQUIRE(state.end_calls == 5u);
-        UWVM_TEST_REQUIRE(state.set_calls == 5u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 8u : 5u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 8u : 5u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 8u : 5u));
         return 0;
     }
 
     int test_buffer_has_first_field_only() noexcept
     {
         char buffer[4]{};
-        char cold[8]{};
+        char cold[asan_scan_single_path ? 12u : 8u]{};
         fill_sequence(buffer, sizeof(buffer), 51u);
         fill_sequence(cold, sizeof(cold), 61u);
         auto state{make_state(buffer, sizeof(buffer), cold, sizeof(cold))};
@@ -576,12 +578,12 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
                                                                                 get_u32{&a},
                                                                                 get_u32{&b},
                                                                                 get_u32{&c}));
-        UWVM_TEST_REQUIRE(a == load_le(buffer, 4u));
-        UWVM_TEST_REQUIRE(b == load_le(cold, 4u));
-        UWVM_TEST_REQUIRE(c == load_le(cold + 4u, 4u));
-        UWVM_TEST_REQUIRE(state.curr == buffer + 4u);
-        UWVM_TEST_REQUIRE(state.set_calls == 1u);
-        UWVM_TEST_REQUIRE(state.read_all_calls == 2u);
+        UWVM_TEST_REQUIRE(a == load_le(asan_scan_single_path ? cold : buffer, 4u));
+        UWVM_TEST_REQUIRE(b == load_le(cold + (asan_scan_single_path ? 4u : 0u), 4u));
+        UWVM_TEST_REQUIRE(c == load_le(cold + (asan_scan_single_path ? 8u : 4u), 4u));
+        UWVM_TEST_REQUIRE(state.curr == (asan_scan_single_path ? buffer : buffer + 4u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 0u : 1u));
+        UWVM_TEST_REQUIRE(state.read_all_calls == (asan_scan_single_path ? 3u : 2u));
         return 0;
     }
 
@@ -624,9 +626,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(a != 0u);
         UWVM_TEST_REQUIRE(b != 0u);
         UWVM_TEST_REQUIRE(state.curr == buffer + 5u);
-        UWVM_TEST_REQUIRE(state.curr_calls == 1u);
-        UWVM_TEST_REQUIRE(state.end_calls == 1u);
-        UWVM_TEST_REQUIRE(state.set_calls == 1u);
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 2u : 1u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 2u : 1u));
+        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 2u : 1u));
         return 0;
     }
 
