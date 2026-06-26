@@ -209,12 +209,14 @@ using ::fast_io::manipulators::general;
 using ::fast_io::manipulators::fixed;
 using ::fast_io::manipulators::scientific;
 using ::fast_io::manipulators::hexfloat;
+using ::fast_io::manipulators::hexfloat0x;
 
 using ::fast_io::manipulators::comma_decimal;
 using ::fast_io::manipulators::comma_general;
 using ::fast_io::manipulators::comma_fixed;
 using ::fast_io::manipulators::comma_scientific;
 using ::fast_io::manipulators::comma_hexfloat;
+using ::fast_io::manipulators::comma_hexfloat0x;
 
 using ::fast_io::manipulators::width;
 using ::fast_io::manipulators::left;
@@ -240,6 +242,8 @@ using ::fast_io::manipulators::oct0o_get;
 using ::fast_io::manipulators::bin_get;
 using ::fast_io::manipulators::bin0b_get;
 using ::fast_io::manipulators::hex0x_get;
+using ::fast_io::manipulators::hexfloat_get;
+using ::fast_io::manipulators::hexfloat0x_get;
 } // namespace manipulators
 
 namespace char_category

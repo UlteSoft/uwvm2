@@ -208,9 +208,9 @@ inline constexpr ::fast_io::manipulators::scalar_flags base_mani_flags_cache{
 template <bool upper>
 inline constexpr ::fast_io::manipulators::scalar_flags boolalpha_mani_flags_cache{.alphabet = true, .uppercase = upper};
 
-template <bool uppercase, bool comma>
+template <bool uppercase, bool comma, bool showbase = false>
 inline constexpr ::fast_io::manipulators::scalar_flags hexafloat_mani_flags_cache{
-	.showbase = true,
+	.showbase = showbase,
 	.uppercase_showbase = uppercase,
 	.uppercase = uppercase,
 	.uppercase_e = uppercase,
@@ -786,10 +786,28 @@ inline constexpr auto hexfloat(scalar_type t) noexcept
 
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat0x(scalar_type t) noexcept
+{
+	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
+	return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>, float_alias_type>{
+		static_cast<float_alias_type>(t)};
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
 	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false>, float_alias_type>{
+		static_cast<float_alias_type>(t), n};
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat0x(scalar_type t, ::std::size_t n) noexcept
+{
+	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
+	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>, float_alias_type>{
 		static_cast<float_alias_type>(t), n};
 }
 
@@ -804,10 +822,28 @@ inline constexpr auto comma_hexfloat(scalar_type t) noexcept
 
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat0x(scalar_type t) noexcept
+{
+	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
+	return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>, float_alias_type>{
+		static_cast<float_alias_type>(t)};
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
 	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true>, float_alias_type>{
+		static_cast<float_alias_type>(t), n};
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat0x(scalar_type t, ::std::size_t n) noexcept
+{
+	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
+	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>, float_alias_type>{
 		static_cast<float_alias_type>(t), n};
 }
 
