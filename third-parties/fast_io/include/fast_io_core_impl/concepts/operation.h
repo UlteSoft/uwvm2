@@ -118,6 +118,28 @@ concept dynamic_reserve_printable = ::std::integral<char_type> && requires(T t, 
 	} -> ::std::convertible_to<char_type *>;
 };
 
+namespace details
+{
+
+template <::std::size_t>
+struct reserve_static_stack_size_constant
+{};
+
+} // namespace details
+
+/// @brief      dynamic_reserve_with_possible_static_stack_size
+/// @details    That a type is dynamic reserve printable with a constexpr possible
+///             stack buffer size for small run-time reserve materialization.
+/// @fn         print_reserve_static_stack_size
+/// @brief      Returns the possible stack buffer size, in char_type units.
+template <typename char_type, typename T>
+concept dynamic_reserve_with_possible_static_stack_size =
+	::std::integral<char_type> && dynamic_reserve_printable<char_type, T> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<print_reserve_static_stack_size(
+			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		requires(print_reserve_static_stack_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
+	};
+
 /// @warning    UNSTABLE
 /// @brief      context_printable
 /// @details    That a type is context printable
@@ -320,6 +342,14 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, p
 										   parameter<value_type> para)
 {
 	return print_reserve_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>, para.reference);
+}
+
+template <::std::integral char_type, typename value_type>
+	requires dynamic_reserve_with_possible_static_stack_size<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return print_reserve_static_stack_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>);
 }
 
 template <::std::integral char_type, typename value_type>

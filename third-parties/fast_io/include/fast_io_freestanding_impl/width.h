@@ -290,6 +290,26 @@ inline constexpr ::std::size_t print_reserve_size_width_impl(T t, ::std::size_t 
 	return wid;
 }
 
+template <typename char_type, typename T>
+concept print_reserve_static_stack_size_width_ok =
+	::std::integral<char_type> && (reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
+								   dynamic_reserve_with_possible_static_stack_size<char_type, ::std::remove_cvref_t<T>>);
+
+template <::std::integral char_type, typename T>
+	requires print_reserve_static_stack_size_width_ok<char_type, T>
+inline constexpr ::std::size_t print_reserve_static_stack_size_width_impl() noexcept
+{
+	using value_type = ::std::remove_cvref_t<T>;
+	if constexpr (reserve_printable<char_type, value_type>)
+	{
+		return print_reserve_size(io_reserve_type<char_type, value_type>);
+	}
+	else
+	{
+		return print_reserve_static_stack_size(io_reserve_type<char_type, value_type>);
+	}
+}
+
 template <::fast_io::manipulators::scalar_placement placement, ::std::integral char_type>
 inline constexpr char_type *handle_common_ch(char_type *first, char_type *last, ::std::size_t wd, char_type fillch)
 {
@@ -500,6 +520,16 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, :
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T>
+	requires(::fast_io::details::print_reserve_static_stack_size_width_ok<char_type, T> &&
+			 (static_cast<::std::size_t>(static_cast<::std::size_t>(placement) - static_cast<::std::size_t>(1u)) <
+			  static_cast<::std::size_t>(4u)))
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, ::fast_io::manipulators::width_t<placement, T>>) noexcept
+{
+	return ::fast_io::details::print_reserve_static_stack_size_width_impl<char_type, T>();
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T>
 	requires((reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
 			  dynamic_reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
 			  scatter_printable<char_type, ::std::remove_cvref_t<T>>) &&
@@ -516,6 +546,16 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ::
 	{
 		return ::fast_io::details::print_reserve_define_width_impl<placement>(iter, t.reference, t.width);
 	}
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T>
+	requires(::fast_io::details::print_reserve_static_stack_size_width_ok<char_type, T> &&
+			 (static_cast<::std::size_t>(static_cast<::std::size_t>(placement) - static_cast<::std::size_t>(1u)) <
+			  static_cast<::std::size_t>(4u)))
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::width_ch_t<placement, T, char_type>>) noexcept
+{
+	return ::fast_io::details::print_reserve_static_stack_size_width_impl<char_type, T>();
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T>
@@ -560,6 +600,14 @@ print_reserve_define(io_reserve_type_t<char_type, ::fast_io::manipulators::width
 }
 
 template <::std::integral char_type, typename T>
+	requires(::fast_io::details::print_reserve_static_stack_size_width_ok<char_type, T>)
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::width_runtime_t<T>>) noexcept
+{
+	return ::fast_io::details::print_reserve_static_stack_size_width_impl<char_type, T>();
+}
+
+template <::std::integral char_type, typename T>
 	requires(reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
 			 dynamic_reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
 			 scatter_printable<char_type, ::std::remove_cvref_t<T>>)
@@ -574,6 +622,14 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, :
 	{
 		return ::fast_io::details::print_reserve_size_width_impl<char_type>(t.reference, t.width);
 	}
+}
+
+template <::std::integral char_type, typename T>
+	requires(::fast_io::details::print_reserve_static_stack_size_width_ok<char_type, T>)
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::width_runtime_ch_t<T, char_type>>) noexcept
+{
+	return ::fast_io::details::print_reserve_static_stack_size_width_impl<char_type, T>();
 }
 
 template <::std::integral char_type, typename T>

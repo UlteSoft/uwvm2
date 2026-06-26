@@ -248,7 +248,27 @@ concept cond_ok_dynamic_rsv_printable_impl =
 	reserve_printable<char_type, T1> || dynamic_reserve_printable<char_type, T1> || scatter_printable<char_type, T1>;
 
 template <typename char_type, typename T1>
+concept cond_ok_static_stack_size_impl =
+	reserve_printable<char_type, ::std::remove_cvref_t<T1>> ||
+	dynamic_reserve_with_possible_static_stack_size<char_type, ::std::remove_cvref_t<T1>>;
+
+template <typename char_type, typename T1>
 concept cond_ok_printable_impl = cond_ok_dynamic_rsv_printable_impl<char_type, T1> || printable<char_type, T1>;
+
+template <::std::integral char_type, typename T1>
+	requires(cond_ok_static_stack_size_impl<char_type, T1>)
+inline constexpr ::std::size_t cond_print_reserve_static_stack_size_impl() noexcept
+{
+	using value_type = ::std::remove_cvref_t<T1>;
+	if constexpr (reserve_printable<char_type, value_type>)
+	{
+		return print_reserve_size(io_reserve_type<char_type, value_type>);
+	}
+	else
+	{
+		return print_reserve_static_stack_size(io_reserve_type<char_type, value_type>);
+	}
+}
 
 template <::std::integral char_type, typename T1>
 	requires(cond_value_transferable<T1>)
@@ -357,6 +377,26 @@ print_reserve_size(io_reserve_type_t<char_type, ::fast_io::manipulators::conditi
 }
 
 template <::std::integral char_type, typename T1, typename T2>
+	requires(details::cond_ok_static_stack_size_impl<char_type, T1> &&
+			 details::cond_ok_static_stack_size_impl<char_type, T2>)
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, T2>>) noexcept
+{
+	constexpr ::std::size_t s1{
+		::fast_io::details::cond_print_reserve_static_stack_size_impl<char_type, T1>()};
+	constexpr ::std::size_t s2{
+		::fast_io::details::cond_print_reserve_static_stack_size_impl<char_type, T2>()};
+	if constexpr (s1 < s2)
+	{
+		return s2;
+	}
+	else
+	{
+		return s1;
+	}
+}
+
+template <::std::integral char_type, typename T1, typename T2>
 	requires((details::cond_ok_dynamic_rsv_printable_impl<char_type, T1> &&
 			  details::cond_ok_dynamic_rsv_printable_impl<char_type, T2>) &&
 			 (!(scatter_printable<char_type, T1> && scatter_printable<char_type, T2>)) &&
@@ -429,6 +469,14 @@ print_reserve_size(io_reserve_type_t<char_type, ::fast_io::manipulators::conditi
 }
 
 template <::std::integral char_type, typename T1>
+	requires(details::cond_ok_static_stack_size_impl<char_type, T1>)
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, ::fast_io::io_null_t>>) noexcept
+{
+	return ::fast_io::details::cond_print_reserve_static_stack_size_impl<char_type, T1>();
+}
+
+template <::std::integral char_type, typename T1>
 	requires(details::cond_ok_dynamic_rsv_printable_impl<char_type, T1> && !scatter_printable<char_type, T1> &&
 			 details::cond_value_transferable<T1>)
 inline constexpr char_type *
@@ -494,6 +542,14 @@ print_reserve_size(io_reserve_type_t<char_type, ::fast_io::manipulators::conditi
 	{
 		return 0;
 	}
+}
+
+template <::std::integral char_type, typename T2>
+	requires(details::cond_ok_static_stack_size_impl<char_type, T2>)
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::condition<::fast_io::io_null_t, T2>>) noexcept
+{
+	return ::fast_io::details::cond_print_reserve_static_stack_size_impl<char_type, T2>();
 }
 
 template <::std::integral char_type, typename T2>
