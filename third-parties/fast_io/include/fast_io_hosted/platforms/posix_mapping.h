@@ -336,7 +336,7 @@ public:
 	{
 		return address_begin[pos];
 	}
-	inline constexpr void close()
+	inline void close()
 	{
 		if (this->address_begin != MAP_FAILED) [[likely]]
 		{
@@ -352,7 +352,7 @@ public:
 #endif
 		}
 	}
-	inline constexpr ~posix_memory_map_file()
+	inline ~posix_memory_map_file()
 	{
 		if (this->address_begin != MAP_FAILED) [[likely]]
 		{
