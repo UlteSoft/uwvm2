@@ -192,14 +192,14 @@ struct whole_get_t
 
 namespace details
 {
-template <::std::size_t bs, bool upper, bool shbase, bool fll, bool showpos = false, bool comma = false, bool modoct = false,
+template <::std::size_t bs, bool upper, bool shbase, bool fll, bool showpos = false, bool comma = false, bool oct_c2y = false,
 		  ::fast_io::manipulators::percentage_flag perflag = ::fast_io::manipulators::percentage_flag::none>
 inline constexpr ::fast_io::manipulators::scalar_flags base_mani_flags_cache{
 	.base = bs,
 	.showbase = shbase,
 	.showpos = showpos,
-	.uppercase_showbase = ((bs == 2 || bs == 3 || (bs == 8 && modoct) || bs == 16) ? upper : false),
-	.modern_octal = (bs == 8 ? modoct : false),
+	.uppercase_showbase = ((bs == 2 || bs == 3 || (bs == 8 && oct_c2y) || bs == 16) ? upper : false),
+	.modern_octal = (bs == 8 ? oct_c2y : false),
 	.uppercase = ((bs <= 10) ? false : upper),
 	.comma = comma,
 	.full = fll,
@@ -225,9 +225,9 @@ template <bool uppercase, bool shbase>
 inline constexpr ::fast_io::manipulators::scalar_flags cryptohash_mani_flags_cache{
 	.base = 16, .showbase = shbase, .uppercase_showbase = uppercase, .uppercase = uppercase};
 
-template <::std::size_t bs, bool noskipws, bool shbase, bool skipzero, bool modern_octal>
+template <::std::size_t bs, bool noskipws, bool shbase, bool skipzero, bool oct_c2y>
 inline constexpr ::fast_io::manipulators::scalar_flags base_scan_mani_flags_cache{
-	.base = bs, .showbase = shbase, .noskipws = noskipws, .modern_octal = modern_octal, .full = skipzero};
+	.base = bs, .showbase = shbase, .noskipws = noskipws, .modern_octal = oct_c2y, .full = skipzero};
 
 template <bool shport>
 inline constexpr ::fast_io::manipulators::ip_flags base_ip_prefix_flags_cache{.showport = shport};
@@ -536,20 +536,20 @@ struct width_runtime_ch_t
 	char_type ch;
 };
 
-template <::std::size_t bs, bool shbase = false, bool full = false, bool modern_octal = false, typename scalar_type>
+template <::std::size_t bs, bool shbase = false, bool full = false, bool oct_c2y = false, typename scalar_type>
 	requires((2 <= bs && bs <= 36) && (::fast_io::details::scalar_integrals<scalar_type>))
 inline constexpr auto base(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
-		::fast_io::details::base_mani_flags_cache<bs, false, shbase, full, false, false, modern_octal>>(t);
+		::fast_io::details::base_mani_flags_cache<bs, false, shbase, full, false, false, oct_c2y>>(t);
 }
 
-template <::std::size_t bs, bool shbase = false, bool full = false, bool modern_octal = false, typename scalar_type>
+template <::std::size_t bs, bool shbase = false, bool full = false, bool oct_c2y = false, typename scalar_type>
 	requires((2 <= bs && bs <= 36) && (::fast_io::details::scalar_integrals<scalar_type>))
 inline constexpr auto baseupper(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
-		::fast_io::details::base_mani_flags_cache<bs, true, shbase, full, false, false, modern_octal>>(t);
+		::fast_io::details::base_mani_flags_cache<bs, true, shbase, full, false, false, oct_c2y>>(t);
 }
 
 template <bool shbase = false, bool full = false, typename scalar_type>
@@ -713,12 +713,28 @@ inline constexpr auto dec(scalar_type t) noexcept
 		::fast_io::details::base_mani_flags_cache<10, false, shbase, full>>(t);
 }
 
-template <bool shbase = false, bool full = false, bool modern_octal = false, bool uppercase_showbase = false, typename scalar_type>
+template <bool shbase = false, bool full = false, bool oct_c2y = false, bool uppercase_showbase = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
 inline constexpr auto oct(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
-		::fast_io::details::base_mani_flags_cache<8, uppercase_showbase, shbase, full, false, false, modern_octal>>(t);
+		::fast_io::details::base_mani_flags_cache<8, uppercase_showbase, shbase, full, false, false, oct_c2y>>(t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto oct0(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<8, false, true, full>>(
+		t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto oct0o(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<8, false, true, full, false, false, true>>(t);
 }
 
 template <bool shbase = false, bool full = false, typename scalar_type>
@@ -727,6 +743,14 @@ inline constexpr auto bin(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
 		::fast_io::details::base_mani_flags_cache<2, false, shbase, full>>(t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto bin0b(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<2, false, true, full>>(
+		t);
 }
 
 template <scalar_flags flags, typename scalar_type>
@@ -983,7 +1007,7 @@ inline constexpr auto generate_base_prefix_array() noexcept
 template <::std::integral char_type, ::std::size_t base>
 inline constexpr auto base_prefix_array{generate_base_prefix_array<char_type, base>()};
 
-template <::std::size_t base, bool uppercase_showbase, bool modern_octal, ::std::integral char_type>
+template <::std::size_t base, bool uppercase_showbase, bool oct_c2y, ::std::integral char_type>
 inline constexpr char_type *print_reserve_show_base_impl(char_type *iter)
 {
 	static_assert(2 <= base && base <= 36);
@@ -1087,7 +1111,7 @@ inline constexpr char_type *print_reserve_show_base_impl(char_type *iter)
 	}
 	else if constexpr (base == 8)
 	{
-		if constexpr (modern_octal)
+		if constexpr (oct_c2y)
 		{
 			if constexpr (uppercase_showbase)
 			{
@@ -1379,12 +1403,12 @@ inline constexpr void print_reserve_integral_withfull_precise_main_impl(char_typ
 }
 
 template <::std::size_t base, bool showbase = false, bool uppercase_showbase = false, bool showpos = false,
-		  bool uppercase = false, bool full = false, bool modern_octal = false, typename int_type, ::std::integral char_type>
+		  bool uppercase = false, bool full = false, bool oct_c2y = false, typename int_type, ::std::integral char_type>
 inline constexpr char_type *print_reserve_integral_define(char_type *first, int_type t)
 {
 	if constexpr (base <= 10 && uppercase)
 	{
-		return print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, false, full, modern_octal>(
+		return print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, false, full, oct_c2y>(
 			first, t); // prevent duplications
 	}
 	else
@@ -1399,7 +1423,7 @@ inline constexpr char_type *print_reserve_integral_define(char_type *first, int_
 			}
 			if constexpr (showbase && (base != 10))
 			{
-				first = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(first);
+				first = print_reserve_show_base_impl<base, uppercase_showbase, oct_c2y>(first);
 			}
 			*first = t ? char_literal_v<u8'1', char_type> : char_literal_v<u8'0', char_type>;
 			++first;
@@ -1445,7 +1469,7 @@ inline constexpr char_type *print_reserve_integral_define(char_type *first, int_
 			}
 			if constexpr (showbase && (base != 10))
 			{
-				first = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(first);
+				first = print_reserve_show_base_impl<base, uppercase_showbase, oct_c2y>(first);
 			}
 			return print_reserve_integral_withfull_main_impl<full, base, uppercase>(first, u);
 		}
@@ -1453,12 +1477,12 @@ inline constexpr char_type *print_reserve_integral_define(char_type *first, int_
 }
 
 template <::std::size_t base, bool showbase = false, bool uppercase_showbase = false, bool showpos = false,
-		  bool uppercase = false, bool modern_octal = false, typename int_type, ::std::integral char_type>
+		  bool uppercase = false, bool oct_c2y = false, typename int_type, ::std::integral char_type>
 inline constexpr void print_reserve_integral_define_precise(char_type *start, ::std::size_t n, int_type t)
 {
 	if constexpr (base <= 10 && uppercase)
 	{
-		return print_reserve_integral_define_precise<base, showbase, uppercase_showbase, showpos, false, modern_octal>(
+		return print_reserve_integral_define_precise<base, showbase, uppercase_showbase, showpos, false, oct_c2y>(
 			start, n, t); // prevent duplications
 	}
 	else
@@ -1474,7 +1498,7 @@ inline constexpr void print_reserve_integral_define_precise(char_type *start, ::
 			}
 			if constexpr (showbase && (base != 10))
 			{
-				first = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(first);
+				first = print_reserve_show_base_impl<base, uppercase_showbase, oct_c2y>(first);
 			}
 			*first = t ? char_literal_v<u8'1', char_type> : char_literal_v<u8'0', char_type>;
 			++first;
@@ -1520,7 +1544,7 @@ inline constexpr void print_reserve_integral_define_precise(char_type *start, ::
 			}
 			if constexpr (showbase && (base != 10))
 			{
-				first = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(first);
+				first = print_reserve_show_base_impl<base, uppercase_showbase, oct_c2y>(first);
 			}
 			if constexpr (base == 10 && (::std::numeric_limits<::std::uint_least32_t>::digits == 32u))
 			{
@@ -1543,7 +1567,7 @@ inline constexpr void print_reserve_integral_define_precise(char_type *start, ::
 	}
 }
 
-template <::std::size_t base, bool modern_octal>
+template <::std::size_t base, bool oct_c2y>
 inline constexpr ::std::size_t compute_print_showbase_length() noexcept
 {
 	if (base == 2 || base == 3 || base == 16)
@@ -1552,7 +1576,7 @@ inline constexpr ::std::size_t compute_print_showbase_length() noexcept
 	}
 	else if (base == 8)
 	{
-		return modern_octal ? 2 : 1; // modern_octal: 0o, default: 0
+		return oct_c2y ? 2 : 1; // oct_c2y: 0o, default: 0
 	}
 	else if (base < 10)
 	{
@@ -1565,10 +1589,10 @@ inline constexpr ::std::size_t compute_print_showbase_length() noexcept
 	return 0;
 }
 
-template <::std::size_t base, bool modern_octal>
-inline constexpr ::std::size_t print_showbase_length{compute_print_showbase_length<base, modern_octal>()};
+template <::std::size_t base, bool oct_c2y>
+inline constexpr ::std::size_t print_showbase_length{compute_print_showbase_length<base, oct_c2y>()};
 
-template <::std::size_t base = 10, bool showbase = false, bool showpos = false, bool modern_octal = false, my_integral T>
+template <::std::size_t base = 10, bool showbase = false, bool showpos = false, bool oct_c2y = false, my_integral T>
 inline constexpr ::std::size_t print_reserve_scalar_size_impl()
 {
 	::std::size_t total_sum{};
@@ -1578,7 +1602,7 @@ inline constexpr ::std::size_t print_reserve_scalar_size_impl()
 	}
 	if constexpr (showbase)
 	{
-		total_sum += ::fast_io::details::print_showbase_length<base, modern_octal>;
+		total_sum += ::fast_io::details::print_showbase_length<base, oct_c2y>;
 	}
 	if constexpr (::std::same_as<::std::remove_cvref_t<T>, bool>)
 	{
@@ -1598,11 +1622,11 @@ inline constexpr ::std::size_t print_reserve_scalar_size_impl()
 	return total_sum;
 }
 
-template <::std::size_t base, bool showbase, bool showpos, bool modern_octal, my_integral T>
+template <::std::size_t base, bool showbase, bool showpos, bool oct_c2y, my_integral T>
 inline constexpr ::std::size_t print_integer_reserved_size_cache{
-	print_reserve_scalar_size_impl<base, showbase, showpos, modern_octal, T>()};
+	print_reserve_scalar_size_impl<base, showbase, showpos, oct_c2y, T>()};
 
-template <::std::size_t base, bool showbase, bool showpos, bool full, bool modern_octal, my_integral T>
+template <::std::size_t base, bool showbase, bool showpos, bool full, bool oct_c2y, my_integral T>
 inline constexpr ::std::size_t print_reserve_scalar_cal_precise_cache_size_impl()
 {
 	::std::size_t total_sum{};
@@ -1612,7 +1636,7 @@ inline constexpr ::std::size_t print_reserve_scalar_cal_precise_cache_size_impl(
 	}
 	if constexpr (showbase)
 	{
-		constexpr auto curr_length{::fast_io::details::print_showbase_length<base, modern_octal>};
+		constexpr auto curr_length{::fast_io::details::print_showbase_length<base, oct_c2y>};
 		total_sum += curr_length;
 		// base==10 does not have showbase
 		if constexpr (full)
@@ -1637,22 +1661,22 @@ inline constexpr ::std::size_t print_reserve_scalar_cal_precise_cache_size_impl(
 	return total_sum;
 }
 
-template <::std::size_t base, bool showbase, bool showpos, bool full, bool modern_octal, my_integral T>
+template <::std::size_t base, bool showbase, bool showpos, bool full, bool oct_c2y, my_integral T>
 inline constexpr ::std::size_t print_integer_reserved_precise_size_cache{
-	print_reserve_scalar_cal_precise_cache_size_impl<base, showbase, showpos, full, modern_octal, T>()};
+	print_reserve_scalar_cal_precise_cache_size_impl<base, showbase, showpos, full, oct_c2y, T>()};
 
-template <::std::size_t base, bool showbase, bool showpos, bool full, bool modern_octal, my_integral T>
+template <::std::size_t base, bool showbase, bool showpos, bool full, bool oct_c2y, my_integral T>
 inline constexpr ::std::size_t print_integer_reserved_precise_size(T t)
 {
 	if constexpr (::std::same_as<::std::remove_cvref_t<T>, bool>)
 	{
-		return print_integer_reserved_size_cache<base, showbase, showpos, modern_octal, T>;
+		return print_integer_reserved_size_cache<base, showbase, showpos, oct_c2y, T>;
 	}
 	else if constexpr (full)
 	{
 		if constexpr (!showpos && my_signed_integral<T>)
 		{
-			::std::size_t total_sum{print_integer_reserved_precise_size_cache<base, showbase, showpos, full, modern_octal, T>};
+			::std::size_t total_sum{print_integer_reserved_precise_size_cache<base, showbase, showpos, full, oct_c2y, T>};
 			if (t < 0)
 			{
 				++total_sum;
@@ -1661,12 +1685,12 @@ inline constexpr ::std::size_t print_integer_reserved_precise_size(T t)
 		}
 		else
 		{
-			return print_integer_reserved_precise_size_cache<base, showbase, showpos, full, modern_octal, T>;
+			return print_integer_reserved_precise_size_cache<base, showbase, showpos, full, oct_c2y, T>;
 		}
 	}
 	else
 	{
-		::std::size_t total_sum{print_integer_reserved_precise_size_cache<base, showbase, showpos, false, modern_octal, T>};
+		::std::size_t total_sum{print_integer_reserved_precise_size_cache<base, showbase, showpos, false, oct_c2y, T>};
 		if constexpr (my_signed_integral<T>)
 		{
 			using unsigned_type = my_make_unsigned_t<T>;
@@ -1687,39 +1711,39 @@ inline constexpr ::std::size_t print_integer_reserved_precise_size(T t)
 }
 
 template <::std::integral char_type, ::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos,
-		  bool uppercase, bool full, bool modern_octal>
+		  bool uppercase, bool full, bool oct_c2y>
 inline constexpr ::std::size_t nullptr_print_optimization_call_size_impl() noexcept
 {
 	::fast_io::freestanding::array<char_type,
-								   print_integer_reserved_size_cache<base, showbase, showpos, modern_octal, ::std::size_t>>
+								   print_integer_reserved_size_cache<base, showbase, showpos, oct_c2y, ::std::size_t>>
 		arr;
-	auto res{print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, modern_octal>(
+	auto res{print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, oct_c2y>(
 		arr.data(), ::std::size_t{})};
 	return static_cast<::std::size_t>(res - arr.data());
 }
 
 template <::std::integral char_type, ::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos,
-		  bool uppercase, bool full, bool modern_octal>
+		  bool uppercase, bool full, bool oct_c2y>
 inline constexpr ::std::size_t nullptr_print_optimization_call_size_cache{
 	nullptr_print_optimization_call_size_impl<char_type, base, showbase, uppercase_showbase, showpos, uppercase,
-											  full, modern_octal>()};
+											  full, oct_c2y>()};
 
 template <::std::integral char_type, ::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos,
-		  bool uppercase, bool full, bool modern_octal>
+		  bool uppercase, bool full, bool oct_c2y>
 inline constexpr auto nullptr_print_optimization_call_impl() noexcept
 {
 	constexpr ::std::size_t sz{nullptr_print_optimization_call_size_cache<char_type, base, showbase, uppercase_showbase,
-																		  showpos, uppercase, full, modern_octal>};
+																		  showpos, uppercase, full, oct_c2y>};
 	::fast_io::freestanding::array<char_type, sz> arr{};
-	[[maybe_unused]] auto res{print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, modern_octal>(
+	[[maybe_unused]] auto res{print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, oct_c2y>(
 		arr.data(), ::std::size_t{})};
 	return arr;
 }
 
 template <::std::integral char_type, ::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos,
-		  bool uppercase, bool full, bool modern_octal>
+		  bool uppercase, bool full, bool oct_c2y>
 inline constexpr auto nullptr_print_optimization_call_cache{
-	nullptr_print_optimization_call_impl<char_type, base, showbase, uppercase_showbase, showpos, uppercase, full, modern_octal>()};
+	nullptr_print_optimization_call_impl<char_type, base, showbase, uppercase_showbase, showpos, uppercase, full, oct_c2y>()};
 
 template <bool uppercase, ::std::integral char_type>
 inline constexpr char_type *print_reserve_boolalpha_impl(char_type *iter, bool b)
@@ -1903,13 +1927,13 @@ inline constexpr char_type *print_reserve_nullptr_alphabet_impl(char_type *iter)
 }
 
 template <::std::size_t base, bool showbase = false, bool uppercase_showbase = false, bool showpos = false,
-		  bool uppercase = false, bool full = false, bool modern_octal = false, ::std::integral char_type>
+		  bool uppercase = false, bool full = false, bool oct_c2y = false, ::std::integral char_type>
 inline constexpr char_type *print_reserve_method_impl(char_type *iter,
 													  ::fast_io::manipulators::member_function_pointer_holder_t mfph)
 {
 	if constexpr (base <= 10 && uppercase)
 	{
-		return print_reserve_method_impl<base, showbase, uppercase_showbase, showpos, false, full, modern_octal>(
+		return print_reserve_method_impl<base, showbase, uppercase_showbase, showpos, false, full, oct_c2y>(
 			iter, mfph); // prevent duplications
 	}
 	else if constexpr (::fast_io::details::method_ptr_hold_size == 0)
@@ -1918,13 +1942,13 @@ inline constexpr char_type *print_reserve_method_impl(char_type *iter,
 	}
 	else
 	{
-		iter = details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, modern_octal>(
+		iter = details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full, oct_c2y>(
 			iter, mfph.reference.front());
 		using myssizet = ::std::make_signed_t<::std::size_t>;
 		if constexpr (::fast_io::details::method_ptr_hold_size == 2)
 		{
 			::std::size_t backptr{mfph.reference.back()};
-			return details::print_reserve_integral_define<base, showbase, uppercase_showbase, true, uppercase, false, modern_octal>(
+			return details::print_reserve_integral_define<base, showbase, uppercase_showbase, true, uppercase, false, oct_c2y>(
 				iter, static_cast<myssizet>(backptr));
 		}
 		else
@@ -1934,7 +1958,7 @@ inline constexpr char_type *print_reserve_method_impl(char_type *iter,
 			for (::std::size_t i{1}; i != last; ++i)
 			{
 				iter =
-					details::print_reserve_integral_define<base, showbase, uppercase_showbase, true, uppercase, false, modern_octal>(
+					details::print_reserve_integral_define<base, showbase, uppercase_showbase, true, uppercase, false, oct_c2y>(
 						iter, static_cast<myssizet>(mfph.reference[i]));
 			}
 			return iter;
