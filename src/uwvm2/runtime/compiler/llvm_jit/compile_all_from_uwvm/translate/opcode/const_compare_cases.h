@@ -46,7 +46,7 @@ case wasm1_code::i32_const:
     //               ^^ code_curr
 
     // Stack effect: () -> (i32)
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+    operand_stack_push(runtime_operand_stack_value_type::i32);
 
     if(emit_llvm_jit_active)
     {
@@ -107,7 +107,7 @@ case wasm1_code::i64_const:
     //               ^^ code_curr
 
     // Stack effect: () -> (i64)
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64);
+    operand_stack_push(runtime_operand_stack_value_type::i64);
 
     if(emit_llvm_jit_active)
     {
@@ -166,7 +166,7 @@ case wasm1_code::f32_const:
     //               ^^ code_curr
 
     // Stack effect: () -> (f32)
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32);
+    operand_stack_push(runtime_operand_stack_value_type::f32);
 
     if(emit_llvm_jit_active)
     {
@@ -224,7 +224,7 @@ case wasm1_code::f64_const:
     //               ^^ code_curr
 
     // Stack effect: () -> (f64)
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64);
+    operand_stack_push(runtime_operand_stack_value_type::f64);
 
     if(emit_llvm_jit_active)
     {

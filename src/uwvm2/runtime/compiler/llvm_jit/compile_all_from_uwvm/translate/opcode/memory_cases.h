@@ -503,7 +503,7 @@ case wasm1_code::memory_size:
     }
 
     // Stack effect: () -> (i32)
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+    operand_stack_push(runtime_operand_stack_value_type::i32);
 
     if(emit_llvm_jit_active)
     {
@@ -584,16 +584,16 @@ case wasm1_code::memory_grow:
     // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
 
-    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
+    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != runtime_operand_stack_value_type::i32)
         [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
+        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_diagnostic_value_type(delta.type);
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+    operand_stack_push(runtime_operand_stack_value_type::i32);
 
     if(emit_llvm_jit_active)
     {

@@ -210,8 +210,12 @@ namespace details
     // extend the dispatch layer when those instructions are enabled.
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
 
-    // MVP scalar operand type used by both the validator and LLVM JIT operand stack.
-    using runtime_operand_stack_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    // Finalized scalar operand type used by both the validator and LLVM JIT operand stack.
+    using runtime_operand_stack_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
+    using runtime_diagnostic_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+
+    [[nodiscard]] inline constexpr runtime_diagnostic_value_type to_wasm1_diagnostic_value_type(runtime_operand_stack_value_type type) noexcept
+    { return static_cast<runtime_diagnostic_value_type>(type); }
 
     // Virtual register ids give the stack validator a de-stackified view for later JIT bookkeeping.
     using runtime_virtual_register_id = ::std::size_t;
@@ -1199,7 +1203,7 @@ namespace details
                                              // selected memory's address type and update LLVM effective-address lowering.
                                              err.err_curr = op_begin;
                                              err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                             err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_diagnostic_value_type(addr.type);
                                              err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                          }
@@ -1284,7 +1288,7 @@ namespace details
                                               // must use the selected memory address type.
                                               err.err_curr = op_begin;
                                               err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                              err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                              err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_diagnostic_value_type(addr.type);
                                               err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
@@ -1296,7 +1300,7 @@ namespace details
                                               err.err_curr = op_begin;
                                               err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
                                               err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_value_type);
-                                              err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                                              err.err_selectable.store_value_type_mismatch.actual_type = to_wasm1_diagnostic_value_type(value.type);
                                               err.err_code = code_validation_error_code::store_value_type_mismatch;
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
