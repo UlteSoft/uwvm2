@@ -5,27 +5,19 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Standard
+ * @brief       WebAssembly Release 1.1 (Draft 2021-11-16)
+ * @details     Opcode module.
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-02
+ * @date        2026-06-26
  * @copyright   APL-2.0 License
  */
 
-/****************************************
- *  _   _ __        ____     __ __  __  *
- * | | | |\ \      / /\ \   / /|  \/  | *
- * | | | | \ \ /\ / /  \ \ / / | |\/| | *
- * | |_| |  \ V  V /    \ V /  | |  | | *
- *  \___/    \_/\_/      \_/   |_|  |_| *
- *                                      *
- ****************************************/
-
 module;
 
-export module uwvm2.validation.standard;
-export import uwvm2.validation.standard.wasm1;
-export import uwvm2.validation.standard.wasm1p1;
+export module uwvm2.parser.wasm.standard.wasm1p1.opcode;
+export import :mvp;
+export import :additions;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

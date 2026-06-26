@@ -102,6 +102,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         memory_grow_delta_type_not_i32,
         invalid_const_immediate,
         numeric_operand_type_mismatch,
+        wasm1p1_feature_required,
+        illegal_data_index,
+        illegal_element_index,
+        wasm1p1_undeclared_ref_func,
+        wasm1p1_invalid_reference_type,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -295,6 +300,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
     };
 
+    struct wasm1p1_feature_required_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value;
+        ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature;
+        ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject;
+    };
+
+    struct illegal_data_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_data_count;
+    };
+
+    struct illegal_element_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 element_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_element_count;
+    };
+
+    struct wasm1p1_undeclared_ref_func_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 function_index;
+    };
+
+    struct wasm1p1_invalid_reference_type_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte value;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -391,6 +425,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         numeric_operand_type_mismatch_err_t numeric_operand_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<numeric_operand_type_mismatch_err_t> &&
                       ::std::is_trivially_destructible_v<numeric_operand_type_mismatch_err_t>);
+
+        wasm1p1_feature_required_err_t wasm1p1_feature_required;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_err_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_feature_required_err_t>);
+
+        illegal_data_index_err_t illegal_data_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_data_index_err_t> && ::std::is_trivially_destructible_v<illegal_data_index_err_t>);
+
+        illegal_element_index_err_t illegal_element_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_element_index_err_t> &&
+                      ::std::is_trivially_destructible_v<illegal_element_index_err_t>);
+
+        wasm1p1_undeclared_ref_func_err_t wasm1p1_undeclared_ref_func;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_undeclared_ref_func_err_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_undeclared_ref_func_err_t>);
+
+        wasm1p1_invalid_reference_type_err_t wasm1p1_invalid_reference_type;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_invalid_reference_type_err_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_invalid_reference_type_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;
