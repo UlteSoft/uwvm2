@@ -42,10 +42,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::feature
     //////////////////////////
     /// @brief All feature ///
     //////////////////////////
-    inline constexpr ::uwvm2::utils::container::tuple all_features{
-        ::uwvm2::parser::wasm::standard::wasm1::features::wasm1{}
-        // Add here
-    };
+    inline constexpr ::uwvm2::utils::container::tuple<::uwvm2::parser::wasm::standard::wasm1::features::wasm1,
+                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1>
+        all_features{};
     /// @brief All feature type (::uwvm2::utils::container::tuple)
     using all_feature_t = decltype(all_features);
     static_assert(::fast_io::is_tuple<all_feature_t>);  // check is tuple

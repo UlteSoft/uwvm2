@@ -97,6 +97,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
         externref = 0x6F
     };
 
+    inline constexpr value_type section_details(value_type type) noexcept { return type; }
+
     /// @brief      Result Types
     /// @details    Result types are encoded by the respective vectors of value types `.
     /// @details    Modify the result type of wasm1 to support multiple returns.

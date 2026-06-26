@@ -349,7 +349,9 @@ Accepted type names:
 | --- | --- |
 | `codesec_codes` | Maximum code-section function bodies. |
 | `code_locals` | Maximum local declarations per code body. |
+| `datacountsec_count` | Maximum count accepted in the WebAssembly 1.1 data-count section. |
 | `datasec_entries` | Maximum data-section entries. |
+| `elemsec_expr` | Maximum WebAssembly 1.1 reference expressions in element-section expression vectors. |
 | `elemsec_funcidx` | Maximum function indexes in element-section parsing. |
 | `elemsec_elems` | Maximum element entries. |
 | `exportsec_exports` | Maximum exports. |

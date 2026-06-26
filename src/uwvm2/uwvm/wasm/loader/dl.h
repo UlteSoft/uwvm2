@@ -93,20 +93,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
     inline constexpr void apply_wasip1_host_api_to_loaded_dl(::uwvm2::uwvm::wasm::type::wasm_dl_t & wd) noexcept
     {
+# if defined(UWVM_IMPORT_WASI_WASIP1) && !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
         ::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1{};
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
         try
-# endif
+#  endif
         {
             set_wasip1_host_api_v1 = reinterpret_cast<::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t>(
                 ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_set_wasip1_host_api_v1"));
         }
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
         {
         }
-# endif
+#  endif
 
         auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preloaded_dl,
@@ -129,6 +130,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 set_wasip1_host_api_v1(nullptr);
             }
         }
+# else
+        (void)wd;
+# endif
     }
 
     inline constexpr void refresh_preloaded_dl_wasip1_host_api() noexcept

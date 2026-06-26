@@ -91,8 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::base::error_impl& err,
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
     {
-        // Note that section_curr may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // section_curr may equal section_end; parse_by_scan below bounds-checks the type index against section_end.
 
         // [... import_func_type] type_index ... module_namelen (section_end)
         // [       safe         ] unsafe (could be the section_end)
@@ -131,7 +130,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // Storing Temporary Variables into Modules
         funcptr_r = typesec.types.cbegin() + type_index;
 
-        // set curr
+        // parse_by_scan succeeded, so [section_curr, type_index_next) is now proven safe and type_index_next is inside [section_curr, section_end].
+        // Proof view before moving section_curr: section_curr still points at the type index, and type_index_next marks the next import field.
+        // Pointer move: advance section_curr to the first byte after the checked type index.
         section_curr = reinterpret_cast<::std::byte const*>(type_index_next);
         // [... import_func_type type_index ...] module_namelen (section_end)
         // [              safe                 ] unsafe (could be the section_end)
@@ -365,8 +366,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse import section (id: 2)"};
 #endif
-        // Note that section_begin may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // section_begin may equal section_end; parse_by_scan below bounds-checks the import count against section_end.
 
         // get import_section_storage_t from storages
         auto& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
@@ -448,8 +448,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 import_counter{};  // use for check
 
-        section_curr = reinterpret_cast<::std::byte const*>(import_count_next);  // never out of bounds
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // parse_by_scan succeeded, so [section_curr, import_count_next) is now proven safe and import_count_next is inside [section_curr, section_end].
+        // Proof view before moving section_curr: section_curr still points at the import count, and import_count_next marks the first import entry.
+        // Pointer move: advance section_curr to the first import entry, or to section_end when the import vector is empty.
+        section_curr = reinterpret_cast<::std::byte const*>(import_count_next);
 
         // [before_section ... | import_count ...] module_namelen ...
         // [        safe                         ] unsafe (could be the section_end)
@@ -546,14 +548,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [         safe          ] unsafe (could be the section_end)
             //       ^^ import_module_name_too_length_ptr
 
+            // parse_by_scan succeeded, so [section_curr, module_namelen_next) is now proven safe and module_namelen_next is inside [section_curr, section_end].
+            // Proof view before moving section_curr: section_curr still points at the module-name length, and module_namelen_next marks the name bytes.
+            // Pointer move: advance section_curr to the first module-name byte, or to extern name length when the name is empty.
             section_curr = reinterpret_cast<::std::byte const*>(module_namelen_next);
-            // Note that section_curr may be equal to section_end
 
             // [...  module_namelen ...] module_name ... extern_namelen ... extern_name ... import_type extern_func ...
             // [         safe          ] unsafe (could be the section_end)
             //                           ^^ section_curr
 
             // check modulenamelen
+            // section_curr was produced by parse_by_scan inside [section_begin, section_end], so this subtraction is in range.
             if(static_cast<::std::size_t>(section_end - section_curr) < static_cast<::std::size_t>(module_namelen)) [[unlikely]]
             {
                 err.err_curr = import_module_name_too_length_ptr;
@@ -565,9 +570,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [...  module_namelen ... module_name ...] extern_namelen ... extern_name ... import_type extern_func ...
             // [         safe                          ] unsafe (could be the section_end)
             //                          ^^ section_curr
+            //
+            // The length check above proves [section_curr, section_curr + module_namelen) is safe inside the current section.
 
             // No access, security
             // Storing Temporary Variables into Modules
+            // Pointer storage: fit.module_name records the checked module-name byte range.
             fit.module_name = ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr), module_namelen};
 
             // For platforms with CHAR_BIT greater than 8, the view here does not need to do any non-zero checking of non-low 8 bits within a single byte,
@@ -579,7 +587,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                             reinterpret_cast<::std::byte const*>(fit.module_name.cend()),
                                             err);
 
-            section_curr += module_namelen;  // safe
+            // Pointer move: advance by module_namelen bytes, which were proven safe by the length check above.
+            section_curr += module_namelen;
 
             // [...  module_namelen ... module_name ...] extern_namelen ... extern_name ... import_type extern_func ...
             // [         safe                          ] unsafe (could be the section_end)
@@ -632,14 +641,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [                            safe                          ] unsafe (could be the section_end)
             //                                          ^^ import_extern_name_too_length_ptr
 
+            // parse_by_scan succeeded, so [section_curr, extern_namelen_next) is now proven safe and extern_namelen_next is inside [section_curr, section_end].
+            // Proof view before moving section_curr: section_curr still points at the extern-name length, and extern_namelen_next marks the name bytes.
+            // Pointer move: advance section_curr to the first extern-name byte, or to import type when the name is empty.
             section_curr = reinterpret_cast<::std::byte const*>(extern_namelen_next);
-            // Note that section_curr may be equal to section_end
 
             // [...  module_namelen ... module_name ... extern_namelen ...] extern_name ... import_type extern_func ...
             // [                            safe                          ] unsafe (could be the section_end)
             //                                                              ^^ section_curr
 
             // check externnamelen
+            // section_curr was produced by parse_by_scan inside [section_begin, section_end], so this subtraction is in range.
             if(static_cast<::std::size_t>(section_end - section_curr) < static_cast<::std::size_t>(extern_namelen)) [[unlikely]]
             {
                 err.err_curr = import_extern_name_too_length_ptr;
@@ -651,8 +663,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [...  module_namelen ... module_name ... extern_namelen ... extern_name ...] import_type extern_func ...
             // [                                safe                                      ] unsafe (could be the section_end)
             //                                                             ^^ section_curr
+            //
+            // The length check above proves [section_curr, section_curr + extern_namelen) is safe inside the current section.
 
             // Storing Temporary Variables into Modules
+            // Pointer storage: fit.extern_name records the checked extern-name byte range.
             fit.extern_name = ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr), extern_namelen};
 
             // For platforms with CHAR_BIT greater than 8, the view here does not need to do any non-zero checking of non-low 8 bits within a single byte,
@@ -664,7 +679,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                             reinterpret_cast<::std::byte const*>(fit.extern_name.cend()),
                                             err);
 
-            section_curr += extern_namelen;  // safe
+            // Pointer move: advance by extern_namelen bytes, which were proven safe by the length check above.
+            section_curr += extern_namelen;
             // [...  module_namelen ... module_name ... extern_namelen ... extern_name ...] import_type extern_func ...
             // [                                safe                                      ] unsafe (could be the section_end)
             //                                                                              ^^ section_curr
@@ -751,6 +767,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
 
+            // section_curr points at the one-byte import type already proven safe by section_curr != section_end and validated above.
+            // Pointer move: advance to the import descriptor payload.
             ++section_curr;
 
             // [...  module_namelen ... module_name ... extern_namelen ... extern_name ... import_type] extern_func ...
@@ -762,6 +780,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_extern_prefix_imports_handler<Fs...>,
                           "define_extern_prefix_imports_handler(...) not found");
             // handle it, fit.imports.type is always valid
+            // define_extern_prefix_imports_handler checks the descriptor payload against section_end and returns the first byte after it.
+            // Pointer move: replace section_curr with the first byte after the checked import descriptor.
             section_curr = define_extern_prefix_imports_handler(sec_adl, fit.imports, module_storage, section_curr, section_end, err, fs_para);
 
             importsec.imports.push_back_unchecked(::std::move(fit));
@@ -831,19 +851,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         }
 
-        constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
-        if constexpr(!allow_multi_table)
+        constexpr bool check_single_table{::uwvm2::parser::wasm::standard::wasm1::features::need_check_single_table_by_feature<Fs...>()};
+        if constexpr(check_single_table)
         {
-            // When multiple table allocations are not permitted, ensure no more than one is checked.
-            constexpr auto table_pos{
-                static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::table)};
-            static_assert(table_pos < importdesc_count);
+            /// @brief Check the WebAssembly 1.0 single-table import restriction selected by the feature set.
+            auto const check_single_table_imports{
+                [&]() constexpr UWVM_THROWS
+                {
+                    // When multiple table allocations are not permitted, ensure no more than one is checked.
+                    constexpr auto table_pos{
+                        static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::table)};
+                    static_assert(table_pos < importdesc_count);
 
-            if(importsec_importdesc_begin[table_pos].size() > 1uz) [[unlikely]]
+                    // importsec.importdesc was allocated as importdesc_count buckets, and table_pos is proven below importdesc_count at compile time.
+                    // The vector size() read is therefore in bounds and does not inspect section bytes.
+                    if(importsec_importdesc_begin[table_pos].size() > 1uz) [[unlikely]]
+                    {
+                        err.err_curr = section_curr;
+                        err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+                }};
+
+            constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
+
+            if constexpr(!allow_multi_table) { check_single_table_imports(); }
+            else
             {
-                err.err_curr = section_curr;
-                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
-                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                /// @brief Keep wasm1 import validation strict until a runtime extension flag enables multi-table.
+                if(::uwvm2::parser::wasm::standard::wasm1::features::get_feature_parameter_controllable_allow_multi_table_from_paras(fs_para))
+                {
+                    check_single_table_imports();
+                }
             }
         }
     }

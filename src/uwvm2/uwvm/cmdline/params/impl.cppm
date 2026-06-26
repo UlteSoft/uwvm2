@@ -45,6 +45,7 @@ export import :wasm_set_parser_limit;
 export import :wasm_set_initializer_limit;
 export import :wasm_list_weak_symbol_module;
 export import :wasm_memory_grow_strict;
+export import :wasm_feature;
 
 // runtime
 export import :runtime_custom_mode;

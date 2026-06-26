@@ -45,6 +45,7 @@
 # include "wasm_set_initializer_limit.h"
 # include "wasm_list_weak_symbol_module.h"
 # include "wasm_memory_grow_strict.h"
+# include "wasm_feature.h"
 
 // runtime
 # include "runtime_custom_mode.h"

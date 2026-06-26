@@ -167,7 +167,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         init_const_expr_ref_mutable_imported_global,
         illegal_custom_section_order,
         missing_code_body_end,
-        exceed_the_max_parser_limit
+        exceed_the_max_parser_limit,
+        wasm1p1_feature_required,
+        wasm1p1_invalid_data_count_section_count,
+        wasm1p1_data_count_section_resolved_not_match_the_actual_number,
+        wasm1p1_invalid_element_segment_flag,
+        wasm1p1_invalid_data_segment_flag,
+        wasm1p1_invalid_element_kind_byte,
+        wasm1p1_invalid_reference_type,
+        wasm1p1_invalid_elem_expr_count,
+        wasm1p1_element_table_type_mismatch,
+        wasm1p1_reference_type_mismatch,
+        wasm1p1_init_ref_func_index_exceeds_maxvul
     };
 
     /// @brief used for duplicate_imports_of_the_same_import_type
@@ -246,6 +257,73 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         ::std::size_t maxval;
     };
 
+    /// @brief WebAssembly 1.1 feature groups used by wasm1p1_feature_required.
+    enum class wasm1p1_feature_kind : ::std::uint_least8_t
+    {
+        bulk_memory,
+        reference_types,
+        simd
+    };
+
+    /// @brief WebAssembly 1.1 syntax/semantic site used by wasm1p1-specific diagnostics.
+    enum class wasm1p1_error_subject : ::std::uint_least8_t
+    {
+        data_count_section,
+        element_segment,
+        data_segment,
+        element_kind,
+        reference_type,
+        table_type,
+        init_ref_null,
+        init_ref_func,
+        init_v128_const
+    };
+
+    /// @brief Used to set the output of wasm1p1_feature_required errors.
+    struct wasm1p1_feature_required_t
+    {
+        ::std::uint_least32_t value;
+        wasm1p1_feature_kind feature;
+        wasm1p1_error_subject subject;
+    };
+
+    /// @brief Used to set the output of wasm1p1 data count mismatch errors.
+    struct wasm1p1_data_count_mismatch_t
+    {
+        ::std::uint_least32_t actual;
+        ::std::uint_least32_t expected;
+    };
+
+    /// @brief Used to set the output of wasm1p1 reference type parse errors.
+    struct wasm1p1_reference_type_t
+    {
+        ::std::uint_least8_t value;
+        wasm1p1_error_subject subject;
+    };
+
+    /// @brief Used to set the output of wasm1p1 reference type mismatch errors.
+    struct wasm1p1_reference_type_mismatch_t
+    {
+        ::std::uint_least8_t expected;
+        ::std::uint_least8_t actual;
+        wasm1p1_error_subject subject;
+    };
+
+    /// @brief Used to set the output of wasm1p1 element-table reference type mismatch errors.
+    struct wasm1p1_element_table_type_mismatch_t
+    {
+        ::std::uint_least32_t table_idx;
+        ::std::uint_least8_t segment_type;
+        ::std::uint_least8_t table_type;
+    };
+
+    /// @brief Used to set the output of wasm1p1 init ref.func index errors.
+    struct wasm1p1_func_index_exceeds_maxvul_t
+    {
+        ::std::uint_least32_t idx;
+        ::std::uint_least32_t maxval;
+    };
+
     /// @brief define IEEE 754 F32 and F64
     using error_f32 = ::uwvm2::utils::precfloat::float32_t;
     using error_f64 = ::uwvm2::utils::precfloat::float64_t;
@@ -274,6 +352,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         static_assert(::std::is_trivially_copyable_v<illegal_custom_section_order_t> && ::std::is_trivially_destructible_v<illegal_custom_section_order_t>);
         exceed_the_max_parser_limit_t exceed_the_max_parser_limit;
         static_assert(::std::is_trivially_copyable_v<exceed_the_max_parser_limit_t> && ::std::is_trivially_destructible_v<exceed_the_max_parser_limit_t>);
+        wasm1p1_feature_required_t wasm1p1_feature_required;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_t> && ::std::is_trivially_destructible_v<wasm1p1_feature_required_t>);
+        wasm1p1_data_count_mismatch_t wasm1p1_data_count_mismatch;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_data_count_mismatch_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_data_count_mismatch_t>);
+        wasm1p1_reference_type_t wasm1p1_reference_type;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_reference_type_t> && ::std::is_trivially_destructible_v<wasm1p1_reference_type_t>);
+        wasm1p1_reference_type_mismatch_t wasm1p1_reference_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_reference_type_mismatch_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_reference_type_mismatch_t>);
+        wasm1p1_element_table_type_mismatch_t wasm1p1_element_table_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_element_table_type_mismatch_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_element_table_type_mismatch_t>);
+        wasm1p1_func_index_exceeds_maxvul_t wasm1p1_func_index_exceeds_maxvul;
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_func_index_exceeds_maxvul_t> &&
+                      ::std::is_trivially_destructible_v<wasm1p1_func_index_exceeds_maxvul_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

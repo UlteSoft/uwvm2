@@ -77,6 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
     inline constexpr void apply_wasip1_host_api_to_loaded_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws) noexcept
     {
+# if defined(UWVM_IMPORT_WASI_WASIP1) && !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
         auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::weak_symbol,
             wws.module_name)};
@@ -98,6 +99,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 wws.set_wasip1_host_api_v1(nullptr);
             }
         }
+# else
+        (void)wws;
+# endif
     }
 
     inline constexpr void refresh_loaded_weak_symbol_wasip1_host_api() noexcept

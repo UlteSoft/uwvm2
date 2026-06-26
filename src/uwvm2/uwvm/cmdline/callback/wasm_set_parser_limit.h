@@ -37,6 +37,7 @@
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm_custom/customs/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
@@ -184,13 +185,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
         auto& wasm1_parser_limit{wasm1_feapara_r.parser_limit};
 
+        // wasm1.1
+        auto& wasm1p1_feapara_r{
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
+        auto& wasm1p1_parser_limit{wasm1p1_feapara_r.parser_limit};
+
         // custom name
         auto& name_parser_para{::uwvm2::uwvm::wasm::custom::customs::name_parser_param};
         auto& name_parser_limit{name_parser_para.name_parser_limit};
 
         if(set_type_name == u8"codesec_codes") { wasm1_parser_limit.max_code_sec_codes = limit; }
         else if(set_type_name == u8"code_locals") { wasm1_parser_limit.max_code_locals = limit; }
+        else if(set_type_name == u8"datacountsec_count") { wasm1p1_parser_limit.max_data_count_sec_count = limit; }
         else if(set_type_name == u8"datasec_entries") { wasm1_parser_limit.max_data_sec_entries = limit; }
+        else if(set_type_name == u8"elemsec_expr") { wasm1p1_parser_limit.max_elem_sec_expr = limit; }
         else if(set_type_name == u8"elemsec_funcidx") { wasm1_parser_limit.max_elem_sec_funcidx = limit; }
         else if(set_type_name == u8"elemsec_elems") { wasm1_parser_limit.max_elem_sec_elems = limit; }
         else if(set_type_name == u8"exportsec_exports") { wasm1_parser_limit.max_export_sec_exports = limit; }
@@ -224,8 +232,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::uwvm2::parser::wasm::standard::wasm1::features::default_max_code_sec_codes,
                                 u8")\n" u8"              - code_locals (default=",
                                 ::uwvm2::parser::wasm::standard::wasm1::features::default_max_code_locals,
+                                u8")\n" u8"              - datacountsec_count (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1p1::features::default_max_data_count_sec_count,
                                 u8")\n" u8"              - datasec_entries (default=",
                                 ::uwvm2::parser::wasm::standard::wasm1::features::default_max_data_sec_entries,
+                                u8")\n" u8"              - elemsec_expr (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1p1::features::default_max_elem_sec_expr,
                                 u8")\n" u8"              - elemsec_funcidx (default=",
                                 ::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_funcidx,
                                 u8")\n" u8"              - elemsec_elems (default=",
@@ -262,4 +274,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

@@ -410,6 +410,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         requires ::std::same_as<::std::remove_cvref_t<decltype(curr_feature_para.controllable_allow_multi_result_vector)>, bool>;
     };
 
+    /// @brief Detect whether exactly one feature parameter can runtime-control the MVP single-result restriction.
+    /// @details This lets an extension compile multi-result storage while preserving wasm1 checks until the feature flag is enabled.
     template <typename... Para>
     inline consteval bool has_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(
         ::uwvm2::utils::container::tuple<Para...> const&) noexcept
@@ -1003,8 +1005,106 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }(::std::make_index_sequence<sizeof...(Fs)>{});
     }
 
-    // Since multi-table changes the parsing behavior, wasm1.1 uses the features of wasm1.0 for extension, so a freely controllable version is not provided
-    // here.
+    /// @brief      controllable allow multi table
+    /// @details    Use a runtime boolean variable to control whether to keep the WebAssembly 1.0 single-table check when a compiled-in feature can parse
+    ///             multiple tables.
+    ///
+    ///             Prerequisites, satisfied:
+    ///             - allow_multi_table<Fs...>
+    ///
+    /// @see        allow_multi_table
+    template <typename FsCurr>
+    concept has_curr_feature_parameter_controllable_allow_multi_table = requires(FsCurr const& curr_feature_para) {
+        requires ::std::same_as<::std::remove_cvref_t<decltype(curr_feature_para.controllable_allow_multi_table)>, bool>;
+    };
+
+    /// @brief Detect whether exactly one feature parameter can runtime-control the MVP single-table restriction.
+    /// @details This lets an extension compile multi-table storage while preserving wasm1 checks until the feature flag is enabled.
+    template <typename... Para>
+    inline consteval bool has_feature_parameter_controllable_allow_multi_table_from_paras_parameters(
+        ::uwvm2::utils::container::tuple<Para...> const&) noexcept
+    {
+        bool has{};
+
+        [&]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
+        {
+            ((
+                 [&]<typename CurrParaType>() constexpr noexcept
+                 {
+                     if constexpr(has_curr_feature_parameter_controllable_allow_multi_table<CurrParaType>)
+                     {
+#if __cpp_contracts >= 202502L
+                         contract_assert(!has);
+#else
+                         if(has) { ::fast_io::fast_terminate(); }
+#endif
+                         has = true;
+                     }
+                 }.template operator()<Para...[I]>()),
+             ...);
+        }(::std::make_index_sequence<sizeof...(Para)>{});
+
+        return has;
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval bool has_feature_parameter_controllable_allow_multi_table_from_paras(
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
+    { return has_feature_parameter_controllable_allow_multi_table_from_paras_parameters(paras.parameters); }
+
+    template <typename... Fs>
+    concept has_feature_parameter_controllable_allow_multi_table_from_paras_c =
+        has_feature_parameter_controllable_allow_multi_table_from_paras<Fs...>(::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...>{});
+
+    /// @brief Decide at compile time whether this feature set may use the wasm1 single-table validation path.
+    /// @details The return value only controls code generation. If a feature parameter supplies controllable_allow_multi_table, the runtime parameter still
+    ///          decides whether the wasm1 single-table restriction is enforced for the current parse.
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval bool need_check_single_table_by_feature() noexcept
+    {
+        constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
+        if constexpr(!allow_multi_table) { return true; }
+        else
+        {
+            constexpr bool has_controllable_allow_multi_table{
+                ::uwvm2::parser::wasm::standard::wasm1::features::has_feature_parameter_controllable_allow_multi_table_from_paras_c<Fs...>};
+            if constexpr(has_controllable_allow_multi_table) { return true; }
+            else
+            {
+                return false;
+            }
+        }
+    }
+
+    /// @brief Read the runtime-control value for the MVP single-table restriction.
+    /// @details Returns the first matching feature parameter; the detector above rejects duplicate providers at compile time.
+    template <::std::size_t N, typename... Paras>
+    inline constexpr bool get_feature_parameter_controllable_allow_multi_table_from_paras_parameters_impl(
+        ::uwvm2::utils::container::tuple<Paras...> const& paras) noexcept
+    {
+        if constexpr(N >= sizeof...(Paras)) { return false; }
+        else
+        {
+            auto const& curr_para{get<N>(paras)};
+            using curr_para_t = ::std::remove_cvref_t<decltype(curr_para)>;
+            if constexpr(has_curr_feature_parameter_controllable_allow_multi_table<curr_para_t>) { return curr_para.controllable_allow_multi_table; }
+            else
+            {
+                return get_feature_parameter_controllable_allow_multi_table_from_paras_parameters_impl<N + 1uz>(paras);
+            }
+        }
+    }
+
+    template <typename... Para>
+    inline constexpr bool get_feature_parameter_controllable_allow_multi_table_from_paras_parameters(
+        ::uwvm2::utils::container::tuple<Para...> const& paras) noexcept
+    { return get_feature_parameter_controllable_allow_multi_table_from_paras_parameters_impl<0uz>(paras); }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires (has_feature_parameter_controllable_allow_multi_table_from_paras_c<Fs...>)
+    inline constexpr bool get_feature_parameter_controllable_allow_multi_table_from_paras(
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
+    { return get_feature_parameter_controllable_allow_multi_table_from_paras_parameters(paras.parameters); }
 
     /////////////////////////////
     //      Memory Section     //

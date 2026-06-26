@@ -36,7 +36,9 @@
 
 void test_build()
 {
-    ::uwvm2::uwvm::wasm::type::all_module_t s{};
+    ::uwvm2::uwvm::wasm::type::wasm_file_t wf{1u};
+    ::uwvm2::uwvm::wasm::type::all_module_t s{.module_storage_ptr = {.wf = ::std::addressof(wf)},
+                                               .type = ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm};
 
     ::fast_io::black_hole dev_null{};
     ::fast_io::io::print(dev_null, ::uwvm2::uwvm::wasm::section_detail::section_details(s));
@@ -54,4 +56,7 @@ void test_build()
     ::fast_io::io::print(u32dev_null, ::uwvm2::uwvm::wasm::section_detail::section_details(s));
 }
 
-int main() {}
+int main()
+{
+    test_build();
+}
