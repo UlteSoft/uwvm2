@@ -185,6 +185,10 @@ concept context_printable = ::std::integral<char_type> && requires(T t, char_typ
 /// @brief      context_printable_with_static_buffer_size
 /// @details    That a context printable type declares a constexpr contiguous
 ///             buffer window size that callers may use to drive the producer.
+///             The value is a stack/local streaming window in char_type units,
+///             not a total output size. Multiple context producers should share
+///             a window by taking the maximum required size, not by summing the
+///             returned values. Opt-in producers should keep this value stack-safe.
 /// @fn         print_context_static_buffer_size
 /// @brief      Returns the static context buffer window size, in char_type units.
 template <typename char_type, typename T>

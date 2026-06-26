@@ -841,7 +841,6 @@ inline constexpr context_capture_run_result find_context_capture_run_n()
 			ret = ::fast_io::details::decay::find_context_capture_run_n<char_type, Args...>();
 		}
 		++ret.position;
-		ret.leading_static_reserve_burst_size = 0;
 		return ret;
 	}
 	else
@@ -1448,6 +1447,12 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 		static_assert(SIZE_MAX != sizeof...(Args));
 		constexpr ::std::size_t n{sizeof...(Args) + static_cast<::std::size_t>(1)};
 		constexpr bool needprintlf{n == context_capture_res.position && line};
+		/*
+		Context and dynamic producer sizes are reusable streaming windows.
+		Only consecutive static reserve producers contribute a burst size, so
+		the final capture buffer uses max semantics instead of summing producer
+		windows across the run.
+		*/
 		constexpr ::std::size_t context_dynamic_size{
 			context_capture_res.context_buffer_size < context_capture_res.dynamic_buffer_size
 				? context_capture_res.dynamic_buffer_size
