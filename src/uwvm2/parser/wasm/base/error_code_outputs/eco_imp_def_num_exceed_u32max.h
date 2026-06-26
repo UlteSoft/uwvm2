@@ -69,6 +69,7 @@ constexpr auto get_exceeding_imported_type_name{
             }
             [[unlikely]] default:
             {
+            /// @warning Extension point: new import/defined categories need index-count ECO names here.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();

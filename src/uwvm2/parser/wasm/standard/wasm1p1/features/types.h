@@ -271,7 +271,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr ::std::byte const* parse_and_check_global_expr_valid(
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<global_section_storage_t<Fs...>> sec_adl,
         ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type const& global_r,
-        ::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t& global_expr,
+        ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...>& global_expr,
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
         ::std::byte const* section_curr,
         ::std::byte const* const section_end,
@@ -387,7 +387,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     //                                      ^^ section_curr
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.i32 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.i32 = value},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const);
                     break;
                 }
@@ -438,7 +438,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.i64 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.i64 = value},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const);
                     break;
                 }
@@ -485,7 +485,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f32 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f32 = value},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const);
                     break;
                 }
@@ -531,7 +531,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     //                                        ^^ section_curr
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f64 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f64 = value},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const);
                     break;
                 }
@@ -601,7 +601,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.imported_global_idx = global_idx},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.imported_global_idx = global_idx},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get);
                     break;
                 }
@@ -666,6 +666,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     // [before_expr ... ref.null reftype] expr_tail ... end ... (section_end)
                     // [              safe             ] unsafe (could be the section_end)
                     //                                  ^^ section_curr
+                    global_expr.opcodes.reserve(1uz);
+                    global_expr.opcodes.emplace_back_unchecked(
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.ref_null_type = raw_ref},
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD0u));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD2u):
@@ -731,6 +735,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     // [before_expr ... ref.func funcidx ...] expr_tail ... end ... (section_end)
                     // [                safe                ] unsafe (could be the section_end)
                     //                                      ^^ section_curr
+                    global_expr.opcodes.reserve(1uz);
+                    global_expr.opcodes.emplace_back_unchecked(
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.ref_func_idx = func_idx},
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD2u));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xFDu):
@@ -782,7 +790,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     // [                     safe                     ] unsafe (could be the section_end)
                     //                                                  ^^ section_curr
 
-                    if(static_cast<::std::size_t>(section_end - section_curr) < 16uz) [[unlikely]]
+                    if(static_cast<::std::size_t>(section_end - section_curr) <
+                       sizeof(::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_v128_storage_t)) [[unlikely]]
                     {
                         err.err_curr = section_curr;
                         err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_data;
@@ -794,16 +803,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     //                                             ^^ section_curr
 
                     // The length check above proves [section_curr, section_curr + 16) is safe inside the current section.
+                    ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_v128_storage_t v128_value{};
+                    ::std::memcpy(::std::addressof(v128_value), section_curr, sizeof(v128_value));
                     // Pointer move: advance by the 16 bytes proven safe by the fixed-width payload check.
-                    section_curr += 16uz;
+                    section_curr += sizeof(v128_value);
 
                     // [before_expr ... simd_prefix simd_subopcode v128_payload[16]] expr_tail ... end ... (section_end)
                     // [                              safe                         ] unsafe (could be the section_end)
                     //                                                               ^^ section_curr
+                    global_expr.opcodes.reserve(1uz);
+                    global_expr.opcodes.emplace_back_unchecked(
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.v128 = v128_value},
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xFDu));
                     break;
                 }
                 [[unlikely]] default:
                 {
+                    /// @warning Extension point: new global const-expression opcodes need storage, type checking, and initializer evaluation before this fallback.
                     err.err_curr = section_curr;
                     err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_instruction;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);

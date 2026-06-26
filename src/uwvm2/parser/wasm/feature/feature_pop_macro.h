@@ -22,5 +22,6 @@
 
 // #pragma once
 
+/// @warning Extension point: keep this synchronized with feature_push_macro.h when adding a new WebAssembly standard feature macro.
 /// @todo add more features here
 #pragma pop_macro("UWVM_WASM_SUPPORT_WASM1")

@@ -27,7 +27,11 @@ control_flow_stack.push_back({
 // start parse the code
 auto code_curr{code_begin};
 
-using wasm_value_type_u = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+using wasm_value_type_u = curr_operand_stack_value_type;
+using wasm_error_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+
+auto const to_wasm1_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> wasm_error_value_type
+                               { return static_cast<wasm_error_value_type>(type); }};
 
 // Numeric validators advance the Wasm cursor, enforce typed-stack rules, and update the abstract
 // operand stack before opcode-specific emission runs. Keeping this shared avoids subtly different
@@ -64,8 +68,8 @@ auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view o
                                           err.err_curr = op_begin;
                                           err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
                                           err.err_selectable.numeric_operand_type_mismatch.expected_type =
-                                              static_cast<wasm_value_type_u>(expected_operand_type);
-                                          err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(operand.type);
+                                              to_wasm1_value_type(expected_operand_type);
+                                          err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
                                           err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
                                           ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                       }
@@ -103,8 +107,8 @@ auto const validate_numeric_binary{
         {
             err.err_curr = op_begin;
             err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-            err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_operand_type);
-            err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(rhs.type);
+            err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+            err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(rhs.type);
             err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -114,8 +118,8 @@ auto const validate_numeric_binary{
         {
             err.err_curr = op_begin;
             err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-            err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_operand_type);
-            err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(lhs.type);
+            err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+            err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(lhs.type);
             err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -217,7 +221,7 @@ auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_nam
                                  {
                                      err.err_curr = op_begin;
                                      err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                     err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                     err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                      err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                  }
@@ -325,7 +329,7 @@ auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_na
                                   {
                                       err.err_curr = op_begin;
                                       err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                      err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                      err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                       err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                   }
@@ -334,8 +338,8 @@ auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_na
                                   {
                                       err.err_curr = op_begin;
                                       err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
-                                      err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_value_type);
-                                      err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                                      err.err_selectable.store_value_type_mismatch.expected_type = to_wasm1_value_type(expected_value_type);
+                                      err.err_selectable.store_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                       err.err_code = code_validation_error_code::store_value_type_mismatch;
                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                   }
@@ -4003,6 +4007,7 @@ auto const translate_one_opcode{
 
         // The opcode fragments are included inside the switch so they can share the helper lambdas above
         // while still keeping each opcode family in a separate file.
+        /// @warning Extension point: new opcode families must be included here and mirrored in the lazy validator immediate scanner.
         switch(curr_opbase)
         {
 #include "opcode/control_flow_cases.h"

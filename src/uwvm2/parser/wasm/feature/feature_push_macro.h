@@ -26,4 +26,5 @@
 #undef UWVM_WASM_SUPPORT_WASM1
 #define UWVM_WASM_SUPPORT_WASM1
 
+/// @warning Extension point: when adding a new WebAssembly standard feature macro, update this push file and the matching pop file together.
 /// @todo add more features here

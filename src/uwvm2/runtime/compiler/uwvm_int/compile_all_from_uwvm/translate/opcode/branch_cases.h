@@ -1,4 +1,5 @@
-﻿case wasm1_code::br:
+﻿/// @warning Extension point: branch stack repair must be audited when adding new value categories or block result forms.
+case wasm1_code::br:
 {
     // Branch translation is where Wasm's structured label stack becomes concrete interpreter jumps.
     // The runtime branch helper does not know the validation stack shape, so this case must validate
@@ -74,8 +75,8 @@
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1174,7 +1175,7 @@ case wasm1_code::br_if:
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
-            err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<wasm_value_type_u>(cond.type);
+            err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
             err.err_code = code_validation_error_code::br_cond_type_not_i32;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -1192,8 +1193,8 @@ case wasm1_code::br_if:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -3409,8 +3410,8 @@ case wasm1_code::br_table:
             err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
             err.err_selectable.br_table_target_type_mismatch.expected_arity = static_cast<wasm_u32>(expected_arity);
             err.err_selectable.br_table_target_type_mismatch.actual_arity = static_cast<wasm_u32>(arity);
-            err.err_selectable.br_table_target_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-            err.err_selectable.br_table_target_type_mismatch.actual_type = static_cast<wasm_value_type_u>(type);
+            err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+            err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(type);
             err.err_code = code_validation_error_code::br_table_target_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -3460,8 +3461,8 @@ case wasm1_code::br_table:
         err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = default_label;
         err.err_selectable.br_table_target_type_mismatch.expected_arity = static_cast<wasm_u32>(expected_arity);
         err.err_selectable.br_table_target_type_mismatch.actual_arity = static_cast<wasm_u32>(default_arity);
-        err.err_selectable.br_table_target_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-        err.err_selectable.br_table_target_type_mismatch.actual_type = static_cast<wasm_value_type_u>(default_type);
+        err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+        err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(default_type);
         err.err_code = code_validation_error_code::br_table_target_type_mismatch;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -3481,7 +3482,7 @@ case wasm1_code::br_table:
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
-            err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<wasm_value_type_u>(idx.type);
+            err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
             err.err_code = code_validation_error_code::br_cond_type_not_i32;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -3518,8 +3519,8 @@ case wasm1_code::br_table:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }

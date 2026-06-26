@@ -53,6 +53,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 {
     /// @brief wasm1.1 table type with funcref/externref reference type support.
+    /// @warning Extension point: new table reference types must be reflected in parser gates, element segments, runtime table storage, and diagnostics.
     struct table_type
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::limits_type limits{};
@@ -99,6 +100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief wasm1.1 global type with extended value-type support.
+    /// @warning Extension point: new global value types must be reflected in const_expr storage, runtime global storage, initializer, local_imported, and ECO output.
     struct global_type
     {
         ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type type{};
@@ -162,6 +164,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         }
     }
 
+    /// @brief Fixed-width SIMD payload for the wasm1.1 `v128.const` constant-expression instruction.
+    using wasm1p1_const_expr_v128_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128;
+
+    static_assert(sizeof(::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_v128_storage_t) == 16uz);
+
+    /// @brief wasm1.1 constant-expression opcode payload.
+    /// @details Keeps wasm1 MVP payloads in the wasm1.1 replacement type, while adding reference and SIMD initializer payloads.
+    /// @warning Extension point: new const-expression opcodes need storage here plus parser, validator, initializer, and diagnostics updates.
+    union wasm1p1_const_expr_opcode_storage_u
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 imported_global_idx;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_idx;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 ref_func_idx;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte ref_null_type;
+        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_v128_storage_t v128;
+    };
+
+    struct wasm1p1_const_expr_opcode_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u storage{};
+        ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic opcode{};
+    };
+}
+
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                  ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
+{
+    /// @brief wasm1.1 constant-expression storage.
+    struct wasm1p1_const_expr_storage_t
+    {
+        ::std::byte const* begin{};
+        ::std::byte const* end{};
+
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_t> opcodes{};
+    };
+}
+
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_trivially_copyable_or_relocatable<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
+{
+
     /// @brief Storage for wasm1.1 data count section (section id 12).
     /// @details The count is checked against the parsed data section during the final module check.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -176,6 +248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     };
 
     /// @brief Wire-format data segment flags introduced by bulk memory.
+    /// @warning Extension point: new data segment flags must be mirrored in data_section parsing, final checks, runtime storage, and instantiation.
     enum class wasm1p1_data_type_t : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32
     {
         active_implicit = 0u,
@@ -422,6 +495,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief Wire-format element segment flags introduced by reference types and bulk memory.
+    /// @warning Extension point: new element segment flags must be mirrored in element_section parsing, final checks, runtime storage, and instantiation.
     enum class wasm1p1_element_type_t : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32
     {
         active_implicit_funcidx = 0u,

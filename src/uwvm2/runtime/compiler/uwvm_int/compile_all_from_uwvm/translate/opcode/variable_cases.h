@@ -1,6 +1,7 @@
 // Variable opcode translation keeps the validated Wasm local/global model synchronized with the
 // interpreter bytecode model. Most of the code below exists to explain when a stack value can be
 // delayed, fused, or read directly from storage without violating Wasm's typed stack semantics.
+/// @warning Extension point: new local/global value categories require local frame layout, stack-top cache, global storage, and opfunc support here.
 case wasm1_code::local_get:
 {
     // `local.get` is both a semantic stack push and the most common seed for later fusions.
@@ -2434,8 +2435,8 @@ case wasm1_code::local_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = set_operand_type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(set_operand_type);
             err.err_code = code_validation_error_code::local_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -3160,8 +3161,8 @@ case wasm1_code::local_tee:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
             err.err_code = code_validation_error_code::local_tee_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -4084,8 +4085,8 @@ case wasm1_code::global_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
-            err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
-            err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
+            err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
             err.err_code = code_validation_error_code::global_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }

@@ -7,7 +7,7 @@ using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
 using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 using wasm_byte = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
-using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
 using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
 
 // no necessary to set err to default
@@ -227,6 +227,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
     // We track the exact max byte usage during validation so the runtime can allocate precisely.
+    /// @warning Extension point: new runtime value types need a byte size here plus stack-top cache and local frame layout support.
     auto const operand_stack_valtype_size{[&](wasm_value_type t) constexpr noexcept -> ::std::size_t
                                           {
                                               switch(t)

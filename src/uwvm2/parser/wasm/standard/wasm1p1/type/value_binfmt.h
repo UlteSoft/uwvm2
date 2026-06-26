@@ -80,6 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     /// @brief      Value Types
     /// @details    Value types are encoded with their respective encoding as a number type or reference type.
     /// @details    Extends wasm1's value_type
+    /// @warning    Extension point: new value types must be mirrored in validity checks, printable names, parser feature gates, runtime storage, and ECO output.
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 5.3.4
     enum class value_type : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte
     {
@@ -103,10 +104,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     /// @details    Result types are encoded by the respective vectors of value types `.
     /// @details    Modify the result type of wasm1 to support multiple returns.
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 5.3.5
-    using result_type = ::uwvm2::parser::wasm::standard::wasm1::type::vec_value_type;
+    struct vec_value_type
+    {
+        value_type const* begin{};
+        value_type const* end{};
+    };
+
+    using result_type = vec_value_type;
 
     // func
 
+    /// @warning Extension point: keep this classifier synchronized with number_type/value_type when a future standard adds numeric types.
     inline constexpr bool is_valid_number_type(value_type type) noexcept
     {
         switch(type)
@@ -119,6 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
         }
     }
 
+    /// @warning Extension point: keep this classifier synchronized with vector_type/value_type when a future standard adds vector types.
     inline constexpr bool is_valid_vector_type(value_type type) noexcept
     {
         switch(type)
@@ -128,6 +137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
         }
     }
 
+    /// @warning Extension point: keep this classifier synchronized with reference_type/value_type when a future standard adds reference types.
     inline constexpr bool is_valid_reference_type(value_type type) noexcept
     {
         switch(type)
@@ -138,6 +148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
         }
     }
 
+    /// @warning Extension point: keep this total value-type classifier synchronized with every value_type enumerator.
     inline constexpr bool is_valid_value_type(value_type type) noexcept
     {
         switch(type)
@@ -154,6 +165,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     }
 
     template <::std::integral char_type>
+    /// @warning Extension point: update every character-specialized switch when adding a new value_type enumerator.
     inline constexpr auto get_value_name(value_type valtype) noexcept
     {
         if constexpr(::std::same_as<char_type, char>)
@@ -237,6 +249,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     namespace details
     {
         template <::std::integral char_type>
+        /// @warning Extension point: update every character-specialized print switch when adding a new value_type enumerator.
         inline constexpr char_type* print_reserve_value_type_impl(char_type* iter, value_type valtype) noexcept
         {
             if constexpr(::std::same_as<char_type, char>)

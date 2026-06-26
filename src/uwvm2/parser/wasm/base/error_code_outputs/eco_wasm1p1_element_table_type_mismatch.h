@@ -22,6 +22,8 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
+#include "eco_wasm1p1_type_name.h"
+
 if constexpr(::std::same_as<char_type, char>)
 {
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -43,17 +45,27 @@ if constexpr(::std::same_as<char_type, char>)
                                                              ") ",
                                                              "Element segment reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             " (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             " does not match table ",
+                                                             ") does not match table ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              " reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             " (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ".",
+                                                             ").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -70,17 +82,27 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ") ",
                                                      "Element segment reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
+                                                     " (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     " does not match table ",
+                                                     ") does not match table ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_LT_GREEN),
                                                      errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      " reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
+                                                     " (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ".",
+                                                     ").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -105,17 +127,27 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              L") ",
                                                              L"Element segment reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<wchar_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             L" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L" does not match table ",
+                                                             L") does not match table ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L" reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<wchar_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             L" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L".",
+                                                             L").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -132,17 +164,27 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      L") ",
                                                      L"Element segment reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<wchar_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
+                                                     L" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L" does not match table ",
+                                                     L") does not match table ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_LT_GREEN),
                                                      errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L" reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<wchar_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
+                                                     L" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L".",
+                                                     L").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -167,17 +209,27 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              u8") ",
                                                              u8"Element segment reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char8_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u8" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8" does not match table ",
+                                                             u8") does not match table ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8" reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char8_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u8" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8".",
+                                                             u8").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -194,17 +246,27 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      u8") ",
                                                      u8"Element segment reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char8_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
+                                                     u8" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8" does not match table ",
+                                                     u8") does not match table ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_LT_GREEN),
                                                      errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8" reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char8_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
+                                                     u8" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8".",
+                                                     u8").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -229,17 +291,27 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              u") ",
                                                              u"Element segment reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char16_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u" does not match table ",
+                                                             u") does not match table ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u" reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char16_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u".",
+                                                             u").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -256,17 +328,27 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      u") ",
                                                      u"Element segment reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char16_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
+                                                     u" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u" does not match table ",
+                                                     u") does not match table ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_LT_GREEN),
                                                      errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u" reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char16_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
+                                                     u" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u".",
+                                                     u").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -291,17 +373,27 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              U") ",
                                                              U"Element segment reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char32_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             U" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U" does not match table ",
+                                                             U") does not match table ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U" reference type ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
+                                                             get_wasm1p1_type_name.template operator()<char32_t>(
+                                                                 errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             U" (",
+                                                             UWVM_WIN32_TEXTATTR_CYAN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U".",
+                                                             U").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -318,17 +410,27 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      U") ",
                                                      U"Element segment reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char32_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
+                                                     U" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U" does not match table ",
+                                                     U") does not match table ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_LT_GREEN),
                                                      errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U" reference type ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
+                                                     get_wasm1p1_type_name.template operator()<char32_t>(
+                                                         errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
+                                                     U" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U".",
+                                                     U").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }

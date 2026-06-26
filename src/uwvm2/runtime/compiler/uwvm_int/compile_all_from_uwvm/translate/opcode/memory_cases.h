@@ -1,6 +1,7 @@
 // Memory opcode translation separates Wasm validation from runtime address execution. Each case
 // validates memarg alignment/offset and memory-0 availability first, then emits a typed opfunc that
 // can trust those invariants and focus on bounds checking plus the actual load/store.
+/// @warning Extension point: memory64, multi-memory, SIMD memory ops, or bulk-memory opcodes require validator, immediate parsing, and opfunc updates here.
 case wasm1_code::i32_load:
 {
     // Validate the static memarg before touching combine state; malformed immediates must be
@@ -1429,7 +1430,7 @@ case wasm1_code::memory_grow:
     if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != wasm_value_type_u::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
+        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_value_type(delta.type);
         err.err_code = code_validation_error_code::memory_grow_delta_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }

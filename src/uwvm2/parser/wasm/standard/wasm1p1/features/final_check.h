@@ -28,7 +28,6 @@
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
-# include "feature_def.h"
 # include "data_count_section.h"
 #endif
 
@@ -44,7 +43,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     };
 
     /// @brief Run wasm1 final checks and then verify the optional data count section.
-    /// @details If section 12 is present, its count must exactly match the parsed data section entry count.
+    /// @details Code-section opcode/index validation belongs to src/uwvm2/validation/standard/wasm1p1.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void define_final_check(
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<wasm1p1_final_check> final_adl,
@@ -64,11 +63,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         auto const& datacountsec{
             ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                 ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
+        auto const& datasec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>>(
+                module_storage.sections)};
         if(datacountsec.present)
         {
-            auto const& datasec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>>(
-                    module_storage.sections)};
             auto const actual_data_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(datasec.datas.size())};
             if(actual_data_count != datacountsec.count) [[unlikely]]
             {

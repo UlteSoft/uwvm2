@@ -51,11 +51,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     /// @brief type section storage
     /// @brief Function section storage
 
+    /// @warning Extension point: runtime final_* aliases must be audited whenever wasm_binfmt1_features gains a standard feature.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_function_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...>{}; }
 
     using wasm_binfmt1_final_function_type_t = decltype(get_final_function_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_value_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>{}; }
+
+    using wasm_binfmt1_final_value_type_t = decltype(get_final_value_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
     struct type_section_storage_t
     {
@@ -68,6 +75,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_code_t<Fs...>{}; }
 
     using wasm_binfmt1_final_wasm_code_t = decltype(get_final_wasm_code_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_wasm_const_expr_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...>{}; }
+
+    using wasm_binfmt1_final_wasm_const_expr_t = decltype(get_final_wasm_const_expr_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
     struct local_defined_function_storage_t
     {
@@ -110,6 +123,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_import_type_t = decltype(get_final_import_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    /// @warning Extension point: new import backends require target union members plus initializer/linker/compiler dispatch updates.
     enum class imported_function_link_kind : unsigned
     {
         unresolved,
@@ -190,10 +204,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     /// @brief Table section storage
 
+    /// @warning Extension point: new table element payload kinds require parser element handling, initializer writes, and compiler table access updates.
     enum class local_defined_table_elem_storage_type_t : unsigned
     {
         func_ref_imported,
         func_ref_defined,
+        /// @warning Extension point: externref/table-of-ref payloads must be added here when runtime table storage grows beyond function refs.
         /// @todo Reference Types
     };
 
@@ -205,6 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             imported_function_storage_t const* imported_ptr;
             local_defined_function_storage_t const* defined_ptr;
 
+            /// @warning Extension point: keep payload members synchronized with local_defined_table_elem_storage_type_t.
             /// @todo Reference Types
         };
 
@@ -310,6 +327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_memory_type_t = decltype(get_final_memory_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    /// @warning Extension point: memory64/multi-memory changes must audit effective limits, pointer sizes, allocator setup, and compiler memory operands.
     struct local_defined_memory_storage_t
     {
         // NOTE: `native_memory_t` is a real runtime object; its default constructor may allocate (e.g. mmap backend).
@@ -392,6 +410,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_local_global_type_t = decltype(get_final_local_global_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    /// @warning Extension point: new global payload categories must audit initializer const_expr evaluation and global.get/global.set runtime access.
     struct local_defined_global_storage_t
     {
         ::uwvm2::object::global::wasm_global_storage_t global{};
@@ -463,6 +482,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     /// @brief Element section storage
 
     // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
+    /// @warning Extension point: new element segment runtime states must be synchronized with parser flags and instantiation/drop operations.
     enum class wasm_element_segment_kind : ::std::uint_fast8_t
     {
         /// @brief Active segment: applied during instantiation (elem section in wasm1 MVP).
@@ -658,6 +678,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         // element
         ::uwvm2::utils::container::vector<local_defined_element_storage_t> local_defined_element_vec_storage{};
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> element_expr_funcidx_vec_storage{};
 
         // code
         ::uwvm2::utils::container::vector<local_defined_code_storage_t> local_defined_code_vec_storage{};
@@ -698,6 +719,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>
@@ -731,6 +754,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<

@@ -172,6 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     default:
                     {
                         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
+                        /// @warning Extension point: new binary-format versions require section-detail rendering here.
                         /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -268,6 +269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     default:
                     {
                         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
+                        /// @warning Extension point: new binary-format versions require section-detail rendering here.
                         /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -1418,6 +1420,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
             }
             [[unlikely]] default:
             {
+                /// @warning Extension point: new module/storage display modes require a section-detail branch here.
                 /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();

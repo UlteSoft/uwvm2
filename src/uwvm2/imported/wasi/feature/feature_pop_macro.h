@@ -22,5 +22,6 @@
 
 // #pragma once
 
+/// @warning Extension point: keep this synchronized with feature_push_macro.h when adding future WASI family macros.
 /// @todo add more features here
 #pragma pop_macro("UWVM_IMPORT_WASI")

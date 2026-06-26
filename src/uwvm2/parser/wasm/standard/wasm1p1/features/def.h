@@ -50,6 +50,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 
     /// @brief Runtime switches for independent WebAssembly 1.1 feature groups.
     /// @details The explicit_* fields record CLI ownership so the feature collection and its subfeatures can report conflicts deterministically.
+    /// @warning Extension point: every new wasm1.1 subfeature flag needs CLI ownership, feature conflict handling, parser gating, and ECO output.
     struct wasm_binfmt1p1_feature_parameter
     {
         bool enable_multi_value{};
@@ -93,6 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief Return whether a value type is legal under the currently enabled wasm1.1 subfeatures.
+    /// @warning Extension point: new value types must be mapped to the feature flag that enables them here.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr bool value_type_enabled(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type vt,
                                              ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
@@ -112,6 +114,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief Return whether a reference type is legal under the currently enabled wasm1.1 subfeatures.
+    /// @warning Extension point: new reference types must be gated here and kept consistent with table/global/element parsing.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr bool reference_type_enabled(::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type rt,
                                                  ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
@@ -130,6 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief Convert a reference type byte into the matching value-type enum used by shared parser storage.
+    /// @warning Extension point: new reference_type enumerators must be converted explicitly or validated before reaching shared storage.
     inline constexpr ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type
         to_value_type(::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type rt) noexcept
     {

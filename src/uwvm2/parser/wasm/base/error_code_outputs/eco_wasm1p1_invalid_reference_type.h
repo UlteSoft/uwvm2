@@ -22,6 +22,8 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
+#include "eco_wasm1p1_type_name.h"
+
 constexpr auto get_wasm1p1_subject_name{
     []<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) constexpr noexcept -> ::uwvm2::utils::container::basic_string_view<char_type2>
     {
@@ -75,6 +77,14 @@ constexpr auto get_wasm1p1_subject_name{
                 else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"table type"}; }
                 else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"table type"}; }
             }
+            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction:
+            {
+                if constexpr(::std::same_as<char_type2, char>) { return {"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"instruction"}; }
+            }
             case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null:
             {
                 if constexpr(::std::same_as<char_type2, char>) { return {"ref.null initializer"}; }
@@ -101,6 +111,7 @@ constexpr auto get_wasm1p1_subject_name{
             }
             [[unlikely]] default:
             {
+            /// @warning Extension point: new wasm1p1_error_subject values need invalid-reference ECO subject names here.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -139,9 +150,14 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              ": ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
+                                                             get_wasm1p1_type_name.template operator()<char>(
+                                                                 errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             " (",
+                                                             UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ".",
+                                                             ").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -162,9 +178,13 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      ": ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_LT_GREEN),
+                                                     get_wasm1p1_type_name.template operator()<char>(errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
+                                                     " (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_LT_GREEN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ".",
+                                                     ").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -193,9 +213,14 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L": ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
+                                                             get_wasm1p1_type_name.template operator()<wchar_t>(
+                                                                 errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             L" (",
+                                                             UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L".",
+                                                             L").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -216,9 +241,13 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L": ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_LT_GREEN),
+                                                     get_wasm1p1_type_name.template operator()<wchar_t>(errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
+                                                     L" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_LT_GREEN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L".",
+                                                     L").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -247,9 +276,14 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8": ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
+                                                             get_wasm1p1_type_name.template operator()<char8_t>(
+                                                                 errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u8" (",
+                                                             UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8".",
+                                                             u8").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -270,9 +304,13 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8": ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_LT_GREEN),
+                                                     get_wasm1p1_type_name.template operator()<char8_t>(errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
+                                                     u8" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_LT_GREEN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8".",
+                                                     u8").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -301,9 +339,14 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u": ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
+                                                             get_wasm1p1_type_name.template operator()<char16_t>(
+                                                                 errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             u" (",
+                                                             UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u".",
+                                                             u").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -324,9 +367,13 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u": ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_LT_GREEN),
+                                                     get_wasm1p1_type_name.template operator()<char16_t>(errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
+                                                     u" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_LT_GREEN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u".",
+                                                     u").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -355,9 +402,14 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U": ",
                                                              UWVM_WIN32_TEXTATTR_LT_GREEN,
+                                                             get_wasm1p1_type_name.template operator()<char32_t>(
+                                                                 errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                             UWVM_WIN32_TEXTATTR_WHITE,
+                                                             U" (",
+                                                             UWVM_WIN32_TEXTATTR_LT_GREEN,
                                                              ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U".",
+                                                             U").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -378,9 +430,13 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U": ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_LT_GREEN),
+                                                     get_wasm1p1_type_name.template operator()<char32_t>(errout.err.err_selectable.wasm1p1_reference_type.value),
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
+                                                     U" (",
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_LT_GREEN),
                                                      ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_reference_type.value),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U".",
+                                                     U").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }

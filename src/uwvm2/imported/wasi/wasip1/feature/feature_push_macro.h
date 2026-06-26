@@ -49,4 +49,5 @@
 # define UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
 #endif
 
+/// @warning Extension point: add new WASI Preview1 capability macros here and mirror the push/pop list.
 /// @todo add more features here

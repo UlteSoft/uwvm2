@@ -2045,10 +2045,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 }
                 break;
             }
+            /// @warning Extension point: new executable modes require dispatch, teardown, and diagnostics here.
             /// @todo add more modes here
             [[unlikely]] default:
             {
-                /// @warning Unhandled execute mode.  Add a dispatch branch before introducing a new executable mode.
+                /// @warning Extension point: unhandled execute mode; add a dispatch branch before introducing a new executable mode.
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif

@@ -44,6 +44,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::object::global
 {
+    /// @warning Extension point: new runtime global categories require storage, initializer, local_imported, compiler, and printable-name updates.
     enum class global_type : unsigned
     {
         wasm_i32,
@@ -51,10 +52,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         wasm_f32,
         wasm_f64,
         wasm_v128,
-#if 0
-        /// @todo wasm3.0
         wasm_ref
-#endif
     };
 
     inline constexpr ::uwvm2::utils::container::u8string_view get_global_type_name(global_type type) noexcept
@@ -81,7 +79,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
             {
                 return u8"v128";
             }
-            /// @todo wasm3.0
+            case global_type::wasm_ref:
+            {
+                return u8"ref";
+            }
             [[unlikely]] default:
             {
                 return u8"unknown";
@@ -89,6 +90,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         }
     }
 
+    /// @warning Extension point: keep this union synchronized with global_type and every parser value type that can appear in a global.
     union wasm_global_storage_u
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
@@ -96,10 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
         ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v128;
-#if 0
-        /// @todo wasm3.0
         ::uwvm2::object::global::wasm_global_ref_t ref;
-#endif
     };
 
     struct wasm_global_storage_t

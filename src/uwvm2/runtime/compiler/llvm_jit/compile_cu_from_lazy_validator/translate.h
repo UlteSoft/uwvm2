@@ -70,6 +70,7 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
@@ -103,6 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     // Parser-side module storage used by the standard validator when lazy validation is enabled.
     using parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     // Shared LLVM JIT metadata and option types from the eager "compile all" path.
     using full_function_symbol_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
@@ -335,6 +337,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Borrowed parser module required when `validation_mode` is `validate_on_lazy_compile`.
         parser_module_storage_t const* validator_module_storage{};
+        // Borrowed feature switches used when the parser produced `validator_module_storage`.
+        parser_feature_parameter_t const* validator_feature_parameter{};
 
         // Validation policy for lazy compilation.
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
@@ -513,6 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
                 if(options.validator_module_storage == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(options.validator_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 auto const import_func_count{curr_module.imported_function_vec_storage.size()};
                 auto const function_index{import_func_count + local_function_index};
@@ -521,12 +526,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
                 auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
-                ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                    *options.validator_module_storage,
-                                                                    function_index,
-                                                                    code_begin,
-                                                                    code_end,
-                                                                    err);
+                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                      *options.validator_module_storage,
+                                                                      function_index,
+                                                                      code_begin,
+                                                                      code_end,
+                                                                      err,
+                                                                      *options.validator_feature_parameter);
             }
         }
 

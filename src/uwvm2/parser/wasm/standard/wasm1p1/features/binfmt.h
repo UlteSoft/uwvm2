@@ -48,6 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 {
     /// @brief WebAssembly 1.1 feature pack layered on top of the wasm1 binary format.
     /// @details Replaces selected wasm1 storage/parser hooks and adds section 12 without registering a second binary-format handler.
+    /// @warning Extension point: every new wasm1p1 replacement hook must be registered here or downstream final_* aliases will silently use wasm1 storage.
     struct wasm1p1
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view feature_name{u8"WebAssembly Release 1.1 (Draft 2021-11-16)"};
@@ -69,6 +70,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         using global_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
             ::uwvm2::parser::wasm::standard::wasm1::type::global_type,
             ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type>;
+
+        using wasm_const_expr = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
+            ::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t,
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_storage_t>;
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         using data_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<

@@ -22,11 +22,20 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
+/// @warning Extension point: keep this helper synchronized with wasm_binfmt1p1_feature_parameter and feature-gated parser diagnostics.
 constexpr auto get_wasm1p1_feature_name{
     []<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature) constexpr noexcept -> ::uwvm2::utils::container::basic_string_view<char_type2>
     {
         switch(feature)
         {
+            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value:
+            {
+                if constexpr(::std::same_as<char_type2, char>) { return {"multi-value"}; }
+                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"multi-value"}; }
+                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"multi-value"}; }
+                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"multi-value"}; }
+                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"multi-value"}; }
+            }
             case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory:
             {
                 if constexpr(::std::same_as<char_type2, char>) { return {"bulk-memory"}; }
@@ -43,6 +52,22 @@ constexpr auto get_wasm1p1_feature_name{
                 else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"reference-types"}; }
                 else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"reference-types"}; }
             }
+            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::sign_extension:
+            {
+                if constexpr(::std::same_as<char_type2, char>) { return {"sign-extension"}; }
+                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"sign-extension"}; }
+                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"sign-extension"}; }
+                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"sign-extension"}; }
+                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"sign-extension"}; }
+            }
+            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int:
+            {
+                if constexpr(::std::same_as<char_type2, char>) { return {"nontrapping-float-to-int"}; }
+                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"nontrapping-float-to-int"}; }
+                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"nontrapping-float-to-int"}; }
+                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"nontrapping-float-to-int"}; }
+                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"nontrapping-float-to-int"}; }
+            }
             case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd:
             {
                 if constexpr(::std::same_as<char_type2, char>) { return {"simd"}; }
@@ -53,6 +78,7 @@ constexpr auto get_wasm1p1_feature_name{
             }
             [[unlikely]] default:
             {
+            /// @warning Extension point: reaching "unknown" here usually means a new wasm1p1 feature flag lacks ECO output.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -118,6 +144,14 @@ constexpr auto get_wasm1p1_subject_name{
                 else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"table type"}; }
                 else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"table type"}; }
             }
+            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction:
+            {
+                if constexpr(::std::same_as<char_type2, char>) { return {"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"instruction"}; }
+                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"instruction"}; }
+            }
             case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null:
             {
                 if constexpr(::std::same_as<char_type2, char>) { return {"ref.null initializer"}; }
@@ -144,6 +178,7 @@ constexpr auto get_wasm1p1_subject_name{
             }
             [[unlikely]] default:
             {
+            /// @warning Extension point: new wasm1p1_error_subject values need feature-required ECO subject names here.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();

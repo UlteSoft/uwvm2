@@ -305,9 +305,11 @@ namespace uwvm2::runtime::lib
         using local_imported_t = ::uwvm2::uwvm::wasm::type::local_imported_t;
         using preload_module_memory_attribute_t = ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t;
         using preload_memory_descriptor_t = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t;
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         using wasip1_env_type = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_env_type;
         using wasip1_module_override_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t;
         using wasip1_module_target_kind_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
+#endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
         using lazy_compile_scheduler_stats_snapshot_t = ::uwvm2::utils::thread::lazy_compile_scheduler_stats_snapshot;
@@ -6689,6 +6691,25 @@ namespace uwvm2::runtime::lib
 
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
             invoke_function();
+        }
+#else
+        [[nodiscard]] inline constexpr bool is_wasip1_import_visible_for_runtime_module_id(::std::size_t) noexcept { return true; }
+
+        inline constexpr void call_local_imported_with_wasip1_env(local_imported_t const& module,
+                                                                  ::std::size_t function_index,
+                                                                  ::std::byte* result_buffer,
+                                                                  ::std::byte* param_buffer,
+                                                                  ::std::size_t) noexcept
+        { module.call_func_index(function_index, result_buffer, param_buffer); }
+
+        inline constexpr void call_capi_with_wasip1_env(capi_function_t const& function,
+                                                        preload_module_memory_attribute_t const* preload_module_memory_attribute,
+                                                        ::std::byte* result_buffer,
+                                                        ::std::byte* param_buffer,
+                                                        ::std::size_t caller_module_id) noexcept
+        {
+            preload_call_context_guard preload_guard{preload_module_memory_attribute, ::std::addressof(function), caller_module_id};
+            function.func_ptr(result_buffer, param_buffer);
         }
 #endif
 

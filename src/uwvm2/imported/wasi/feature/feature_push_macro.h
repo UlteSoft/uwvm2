@@ -24,6 +24,7 @@
 
 // macro
 #include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+/// @warning Extension point: add future WASI family push headers here and mirror them in feature_pop_macro.h.
 /// @todo add wasip2, wasip3 ...
 
 /// @brief This option automatically excludes unsupported systems.
@@ -35,8 +36,10 @@
 #  define UWVM_IMPORT_WASI
 # endif
 #endif
+/// @warning Extension point: extend the aggregate UWVM_IMPORT_WASI switch when another WASI family becomes available.
 /// @todo add wasip2, wasip3 ...
 
 // macro
+/// @warning Extension point: add future WASI family pop headers here in reverse order of their push headers.
 /// @todo add wasip2, wasip3 ...
 #include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>

@@ -260,8 +260,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
     /// @brief WebAssembly 1.1 feature groups used by wasm1p1_feature_required.
     enum class wasm1p1_feature_kind : ::std::uint_least8_t
     {
+        multi_value,
         bulk_memory,
         reference_types,
+        sign_extension,
+        nontrapping_float_to_int,
         simd
     };
 
@@ -274,6 +277,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         element_kind,
         reference_type,
         table_type,
+        instruction,
         init_ref_null,
         init_ref_func,
         init_v128_const

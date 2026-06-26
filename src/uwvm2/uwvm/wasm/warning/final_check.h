@@ -104,6 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::warning
             }
         }
 
+        /// @warning Extension point: add new parser/runtime final-check warning passes here and wire them to warning-as-error policy.
         /// @todo add more final check warnings here
     }
 }
