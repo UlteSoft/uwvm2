@@ -323,7 +323,7 @@ inline constexpr bool batch_precise_scannable_no_error{
 	::fast_io::precise_reserve_scannable_no_error<char_type, T>};
 
 template <::std::integral char_type, typename Arg, typename... Args>
-inline constexpr precise_scan_run_result find_continuous_precise_scan_n()
+inline constexpr precise_scan_run_result find_continuous_precise_scan_n() noexcept
 {
 	if constexpr (::fast_io::details::decay::batch_precise_scannable_no_error<char_type, Arg>)
 	{
