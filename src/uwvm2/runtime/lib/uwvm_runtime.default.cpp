@@ -314,12 +314,15 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
         using lazy_compile_scheduler_stats_snapshot_t = ::uwvm2::utils::thread::lazy_compile_scheduler_stats_snapshot;
         using lazy_parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
+        using lazy_parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
         // Lazy validation requires parser-level module storage, while execution uses runtime storage. Resolve that parser view by
         // module name so both lazy backends validate against the same parsed module that produced the runtime module.
         struct compiled_module_record;
         [[nodiscard]] inline constexpr lazy_parser_module_storage_t const*
             find_lazy_validator_module_storage(::uwvm2::utils::container::u8string_view module_name) noexcept;
+        [[nodiscard]] inline constexpr lazy_parser_feature_parameter_t const*
+            find_lazy_validator_feature_parameter_storage(::uwvm2::utils::container::u8string_view module_name) noexcept;
         [[nodiscard]] inline constexpr ::fast_io::unix_timestamp lazy_clock_now() noexcept;
         [[nodiscard]] inline constexpr ::std::size_t lazy_total_function_count() noexcept;
         [[nodiscard]] inline constexpr ::std::size_t lazy_compiled_function_count() noexcept;
@@ -664,6 +667,22 @@ namespace uwvm2::runtime::lib
             auto const wf{am.module_storage_ptr.wf};
             if(wf == nullptr || wf->binfmt_ver != 1u) [[unlikely]] { return nullptr; }
             return ::std::addressof(wf->wasm_module_storage.wasm_binfmt_ver1_storage);
+        }
+
+        [[nodiscard]] inline constexpr lazy_parser_feature_parameter_t const*
+            find_lazy_validator_feature_parameter_storage(::uwvm2::utils::container::u8string_view module_name) noexcept
+        {
+            // Lazy wasm1p1 validation must use the same feature switches that were used when parsing this module.
+            auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+            if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { return nullptr; }
+
+            using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+            auto const& am{it->second};
+            if(am.type != module_type_t::exec_wasm && am.type != module_type_t::preloaded_wasm) [[unlikely]] { return nullptr; }
+
+            auto const wf{am.module_storage_ptr.wf};
+            if(wf == nullptr || wf->binfmt_ver != 1u) [[unlikely]] { return nullptr; }
+            return ::std::addressof(wf->wasm_parameter.binfmt1_para);
         }
 #endif
 
@@ -12706,8 +12725,9 @@ namespace uwvm2::runtime::lib
                 rec.lazy_compile_options.compile_options = opt;
                 rec.lazy_compile_options.validation_mode = lazy_validation_mode;
                 rec.lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
-                if(lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile && rec.lazy_compile_options.validator_module_storage == nullptr)
-                    [[unlikely]]
+                rec.lazy_compile_options.validator_feature_parameter = find_lazy_validator_feature_parameter_storage(rec.module_name);
+                if(lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
+                   (rec.lazy_compile_options.validator_module_storage == nullptr || rec.lazy_compile_options.validator_feature_parameter == nullptr)) [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
@@ -13095,8 +13115,10 @@ namespace uwvm2::runtime::lib
                 rec.llvm_jit_lazy_compile_options.jit_event_listener =
                     opt.emit_unwind_call_stack_frames ? ::std::addressof(get_uwvm_llvm_jit_debug_listener()) : nullptr;
                 rec.llvm_jit_lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
+                rec.llvm_jit_lazy_compile_options.validator_feature_parameter = find_lazy_validator_feature_parameter_storage(rec.module_name);
                 if(lazy_validation_mode == llvm_jit_lazy_validation_mode_t::validate_on_lazy_compile &&
-                   rec.llvm_jit_lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]
+                   (rec.llvm_jit_lazy_compile_options.validator_module_storage == nullptr ||
+                    rec.llvm_jit_lazy_compile_options.validator_feature_parameter == nullptr)) [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
@@ -13129,8 +13151,9 @@ namespace uwvm2::runtime::lib
                     rec.lazy_compile_options.compile_options = interpreter_opt;
                     rec.lazy_compile_options.validation_mode = interpreter_lazy_validation_mode;
                     rec.lazy_compile_options.validator_module_storage = rec.llvm_jit_lazy_compile_options.validator_module_storage;
+                    rec.lazy_compile_options.validator_feature_parameter = rec.llvm_jit_lazy_compile_options.validator_feature_parameter;
                     if(interpreter_lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
-                       rec.lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]
+                       (rec.lazy_compile_options.validator_module_storage == nullptr || rec.lazy_compile_options.validator_feature_parameter == nullptr)) [[unlikely]]
                     {
                         ::fast_io::fast_terminate();
                     }

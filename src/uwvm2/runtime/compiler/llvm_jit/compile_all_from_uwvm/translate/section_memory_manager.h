@@ -34,7 +34,7 @@
 #  include <llvm/Config/llvm-config.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 # endif
-# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
+# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<unwind.h>)
 #  include <unwind.h>
 extern "C" void __register_frame(void const*);
 extern "C" void __deregister_frame(void const*);
@@ -61,18 +61,18 @@ extern "C" void __deregister_frame(void const*);
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC 0
 #endif
 
-#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME")
-#undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
-# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME 1
+#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME")
+#undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
+#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<unwind.h>)
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME 1
 #else
-# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME 0
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME 0
 #endif
 
 namespace uwvm2::runtime::compiler::llvm_jit::details
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
     struct runtime_llvm_jit_eh_frame_record
     {
         ::std::uint8_t* addr{};
@@ -82,9 +82,10 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     template <typename Visit>
     inline constexpr void visit_runtime_llvm_jit_eh_frame_fdes(::std::uint8_t* addr, ::std::size_t size, Visit visit) noexcept
     {
-        // Darwin's unwinder registration entry points operate on individual FDE records rather than on the whole
-        // __eh_frame payload.  Walk the compact DWARF record stream defensively and skip CIE records, whose ID field is
-        // zero in the emitted section format used here.
+        // LLVM libunwind's dynamic registration entry points operate on individual FDE records rather than on the whole
+        // .eh_frame payload.  Walk the compact DWARF record stream defensively and skip CIE records, whose ID field is
+        // zero in the emitted section format used here.  Passing the whole section can make libunwind treat a CIE or the
+        // zero-length terminator as an FDE and reject the generated object.
         auto const end{addr + size};
         auto curr{addr};
         while(curr < end)
@@ -168,9 +169,9 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             // table driven through RUNTIME_FUNCTION entries and the UNWIND_INFO records they reference in .xdata, so
             // registration must go through RtlAddFunctionTable instead of __register_frame/libgcc-style APIs.
             static_cast<void>(register_win64_seh_function_table(addr, load_addr, size));
-# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
+# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
             static_cast<void>(load_addr);
-            // Apple libunwind accepts FDE pointers one at a time for JIT code.  Keep the original section range so the
+            // LLVM libunwind accepts FDE pointers one at a time for JIT code.  Keep the original section range so the
             // exact same FDE set can be deregistered before MCJIT releases the underlying memory.
             visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) constexpr noexcept { __register_frame(fde); });
             eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
@@ -186,7 +187,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             // .pdata storage can disappear, otherwise a later stack walk may dereference stale unwind metadata.
             for(auto const& record: win64_seh_records_) { static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table)); }
             win64_seh_records_.clear();
-# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
+# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
             for(auto const& frame: eh_frame_records_)
             {
                 visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) constexpr noexcept { __deregister_frame(fde); });
@@ -265,13 +266,13 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         inline constexpr void record_win64_loaded_section(::std::uint8_t*, ::std::uintptr_t) noexcept {}
 # endif
 
-# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
         ::uwvm2::utils::container::vector<runtime_llvm_jit_eh_frame_record> eh_frame_records_{};
 # endif
     };
 #endif
 }  // namespace uwvm2::runtime::compiler::llvm_jit::details
 
-#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_APPLE_EH_FRAME")
+#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH")
