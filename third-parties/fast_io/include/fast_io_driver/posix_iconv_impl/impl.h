@@ -322,6 +322,13 @@ inline ::std::size_t print_reserve_size(io_reserve_type_t<char_type, iconv_code_
 }
 
 template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, iconv_code_cvt_t<io_scatter_t>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
+}
+
+template <::std::integral char_type>
 inline Iter print_reserve_define(io_reserve_type_t<char_type, iconv_code_cvt_t<io_scatter_t>>, Iter iter,
 								 iconv_code_cvt_t<io_scatter_t> v) noexcept
 {

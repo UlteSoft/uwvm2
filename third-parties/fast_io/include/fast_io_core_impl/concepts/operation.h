@@ -125,6 +125,20 @@ template <::std::size_t>
 struct reserve_static_stack_size_constant
 {};
 
+template <::std::integral char_type>
+inline constexpr ::std::size_t dynamic_reserve_default_static_stack_size() noexcept
+{
+	constexpr ::std::size_t bytes{4096u};
+	if constexpr (sizeof(char_type) < bytes)
+	{
+		return bytes / sizeof(char_type);
+	}
+	else
+	{
+		return 1u;
+	}
+}
+
 } // namespace details
 
 /// @brief      dynamic_reserve_with_possible_static_stack_size

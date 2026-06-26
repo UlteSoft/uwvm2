@@ -572,6 +572,15 @@ print_reserve_size(io_reserve_type_t<char_type, ::fast_io::manipulators::hash_di
 	}
 }
 
+template <::std::integral char_type, ::fast_io::manipulators::digest_format d,
+		  ::fast_io::manipulators::runtime_size_crypto_hash_context T>
+	requires(static_cast<::std::size_t>(d) < static_cast<::std::size_t>(3))
+inline constexpr ::std::size_t print_reserve_static_stack_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::hash_digest_t<d, T const &>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
+}
+
 template <::fast_io::manipulators::digest_format d, ::fast_io::manipulators::crypto_hash_context T,
 		  ::std::integral char_type>
 inline constexpr char_type *

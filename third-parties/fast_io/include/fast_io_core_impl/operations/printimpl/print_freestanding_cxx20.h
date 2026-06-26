@@ -233,12 +233,7 @@ inline auto prrsvsct_byte_common_impl(io_scatter_t *pscatters, char_type *buffer
 
 template <bool line = false, typename output, typename T>
 	requires(::std::is_trivially_copyable_v<output> && ::std::is_trivially_copyable_v<T>)
-inline constexpr void pr
-template <typename T>
-struct parameter
-{
-	using manip_tag = manip_tag_t;
-	T reference;int_control_single(output outstm, T t)
+inline constexpr void print_control_single(output outstm, T t)
 {
 	using char_type = typename output::output_char_type;
 	using value_type = ::std::remove_cvref_t<T>;
