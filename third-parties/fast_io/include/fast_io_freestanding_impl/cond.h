@@ -105,7 +105,134 @@ concept cond_transferable_value = ::std::is_trivially_copyable_v<::fast_io::mani
 								  sizeof(::fast_io::manipulators::condition<T1, T2>) <= (sizeof(::std::size_t) * 2)
 #endif
 	;
+
+template <::std::integral char_type, typename T1, typename T2>
+struct cond_print_context
+{
+	using context_type1 =
+		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, T1>))>::type;
+	using context_type2 =
+		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, T2>))>::type;
+	context_type1 state1;
+	context_type2 state2;
+
+	inline constexpr context_print_result<char_type *>
+	print_context_define(::fast_io::manipulators::condition<T1, T2> c, char_type *begin, char_type *end)
+	{
+		if (c.pred)
+		{
+			return state1.print_context_define(c.t1, begin, end);
+		}
+		else
+		{
+			return state2.print_context_define(c.t2, begin, end);
+		}
+	}
+};
+
+template <::std::integral char_type, typename T1>
+struct cond_print_context_first
+{
+	using context_type1 =
+		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, T1>))>::type;
+	context_type1 state1;
+
+	inline constexpr context_print_result<char_type *>
+	print_context_define(::fast_io::manipulators::condition<T1, ::fast_io::io_null_t> c, char_type *begin,
+						 char_type *end)
+	{
+		if (c.pred)
+		{
+			return state1.print_context_define(c.t1, begin, end);
+		}
+		else
+		{
+			return {begin, true};
+		}
+	}
+};
+
+template <::std::integral char_type, typename T2>
+struct cond_print_context_second
+{
+	using context_type2 =
+		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, T2>))>::type;
+	context_type2 state2;
+
+	inline constexpr context_print_result<char_type *>
+	print_context_define(::fast_io::manipulators::condition<::fast_io::io_null_t, T2> c, char_type *begin,
+						 char_type *end)
+	{
+		if (!c.pred)
+		{
+			return state2.print_context_define(c.t2, begin, end);
+		}
+		else
+		{
+			return {begin, true};
+		}
+	}
+};
 } // namespace details
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires(context_printable<char_type, T1> && context_printable<char_type, T2>)
+inline constexpr auto
+print_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, T2>>) noexcept
+{
+	return io_type_t<::fast_io::details::cond_print_context<char_type, T1, T2>>{};
+}
+
+template <::std::integral char_type, typename T1>
+	requires(context_printable<char_type, T1>)
+inline constexpr auto
+print_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, ::fast_io::io_null_t>>) noexcept
+{
+	return io_type_t<::fast_io::details::cond_print_context_first<char_type, T1>>{};
+}
+
+template <::std::integral char_type, typename T2>
+	requires(context_printable<char_type, T2>)
+inline constexpr auto
+print_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::condition<::fast_io::io_null_t, T2>>) noexcept
+{
+	return io_type_t<::fast_io::details::cond_print_context_second<char_type, T2>>{};
+}
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires(context_printable_with_static_buffer_size<char_type, T1> &&
+			 context_printable_with_static_buffer_size<char_type, T2>)
+inline constexpr ::std::size_t
+print_context_static_buffer_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, T2>>) noexcept
+{
+	constexpr ::std::size_t s1{print_context_static_buffer_size(io_reserve_type<char_type, T1>)};
+	constexpr ::std::size_t s2{print_context_static_buffer_size(io_reserve_type<char_type, T2>)};
+	if constexpr (s1 < s2)
+	{
+		return s2;
+	}
+	else
+	{
+		return s1;
+	}
+}
+
+template <::std::integral char_type, typename T1>
+	requires(context_printable_with_static_buffer_size<char_type, T1>)
+inline constexpr ::std::size_t print_context_static_buffer_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::condition<T1, ::fast_io::io_null_t>>) noexcept
+{
+	return print_context_static_buffer_size(io_reserve_type<char_type, T1>);
+}
+
+template <::std::integral char_type, typename T2>
+	requires(context_printable_with_static_buffer_size<char_type, T2>)
+inline constexpr ::std::size_t print_context_static_buffer_size(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::condition<::fast_io::io_null_t, T2>>) noexcept
+{
+	return print_context_static_buffer_size(io_reserve_type<char_type, T2>);
+}
 
 template <::std::integral char_type, typename T1, typename T2>
 	requires(reserve_printable<char_type, T1> && reserve_printable<char_type, T2>)
