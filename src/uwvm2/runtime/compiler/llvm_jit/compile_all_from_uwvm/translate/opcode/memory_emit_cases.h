@@ -494,8 +494,7 @@ case wasm1_code::memory_size:
 {
     ++code_curr;
 
-    validation_module_traits_t::wasm_u32 memory_index{};
-    if(!parse_wasm_leb128_immediate(code_curr, code_end, memory_index) || memory_index != 0u || !emit_memory_size_call()) [[unlikely]] { return result; }
+    if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_size_call()) [[unlikely]] { return result; }
     break;
 }
 
@@ -508,7 +507,6 @@ case wasm1_code::memory_grow:
 {
     ++code_curr;
 
-    validation_module_traits_t::wasm_u32 memory_index{};
-    if(!parse_wasm_leb128_immediate(code_curr, code_end, memory_index) || memory_index != 0u || !emit_memory_grow_call()) [[unlikely]] { return result; }
+    if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_grow_call()) [[unlikely]] { return result; }
     break;
 }
