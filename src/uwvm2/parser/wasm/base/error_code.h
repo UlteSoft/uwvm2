@@ -359,8 +359,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         wasm1p1_feature_required_t wasm1p1_feature_required;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_t> && ::std::is_trivially_destructible_v<wasm1p1_feature_required_t>);
         wasm1p1_data_count_mismatch_t wasm1p1_data_count_mismatch;
-        static_assert(::std::is_trivially_copyable_v<wasm1p1_data_count_mismatch_t> &&
-                      ::std::is_trivially_destructible_v<wasm1p1_data_count_mismatch_t>);
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_data_count_mismatch_t> && ::std::is_trivially_destructible_v<wasm1p1_data_count_mismatch_t>);
         wasm1p1_reference_type_t wasm1p1_reference_type;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_reference_type_t> && ::std::is_trivially_destructible_v<wasm1p1_reference_type_t>);
         wasm1p1_reference_type_mismatch_t wasm1p1_reference_type_mismatch;

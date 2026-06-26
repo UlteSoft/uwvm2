@@ -819,7 +819,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
                 [[unlikely]] default:
                 {
-                    /// @warning Extension point: new global const-expression opcodes need storage, type checking, and initializer evaluation before this fallback.
+                    /// @warning Extension point: new global const-expression opcodes need storage, type checking, and initializer evaluation before this
+                    /// fallback.
                     err.err_curr = section_curr;
                     err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_instruction;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);

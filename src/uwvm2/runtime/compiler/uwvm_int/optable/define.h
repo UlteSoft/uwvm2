@@ -55,9 +55,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
     struct uwvm_interpreter_function_operands_t
-    {
-        ::uwvm2::utils::container::vector<::std::byte> operands{};
-    };
+    { ::uwvm2::utils::container::vector<::std::byte> operands{}; };
 
     struct local_func_storage_t
     {

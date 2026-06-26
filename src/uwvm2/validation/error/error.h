@@ -128,14 +128,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     };
 
     struct select_cond_type_not_i32_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type; };
 
     struct if_cond_type_not_i32_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type; };
 
     struct if_then_result_mismatch_err_t
     {
@@ -222,9 +218,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     };
 
     struct immutable_global_set_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index; };
 
     struct global_variable_type_mismatch_err_t
     {
@@ -254,9 +248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     };
 
     struct not_local_function_err_t
-    {
-        ::std::size_t function_index;
-    };
+    { ::std::size_t function_index; };
 
     struct invalid_function_index_err_t
     {
@@ -284,14 +276,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     };
 
     struct memory_grow_delta_type_not_i32_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::value_type delta_type;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::value_type delta_type; };
 
     struct invalid_const_immediate_err_t
-    {
-        ::uwvm2::utils::container::u8string_view op_code_name;
-    };
+    { ::uwvm2::utils::container::u8string_view op_code_name; };
 
     struct numeric_operand_type_mismatch_err_t
     {
@@ -320,14 +308,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     };
 
     struct wasm1p1_undeclared_ref_func_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 function_index;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 function_index; };
 
     struct wasm1p1_invalid_reference_type_err_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte value;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte value; };
 
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
@@ -427,15 +411,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
                       ::std::is_trivially_destructible_v<numeric_operand_type_mismatch_err_t>);
 
         wasm1p1_feature_required_err_t wasm1p1_feature_required;
-        static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_err_t> &&
-                      ::std::is_trivially_destructible_v<wasm1p1_feature_required_err_t>);
+        static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_err_t> && ::std::is_trivially_destructible_v<wasm1p1_feature_required_err_t>);
 
         illegal_data_index_err_t illegal_data_index;
         static_assert(::std::is_trivially_copyable_v<illegal_data_index_err_t> && ::std::is_trivially_destructible_v<illegal_data_index_err_t>);
 
         illegal_element_index_err_t illegal_element_index;
-        static_assert(::std::is_trivially_copyable_v<illegal_element_index_err_t> &&
-                      ::std::is_trivially_destructible_v<illegal_element_index_err_t>);
+        static_assert(::std::is_trivially_copyable_v<illegal_element_index_err_t> && ::std::is_trivially_destructible_v<illegal_element_index_err_t>);
 
         wasm1p1_undeclared_ref_func_err_t wasm1p1_undeclared_ref_func;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_undeclared_ref_func_err_t> &&

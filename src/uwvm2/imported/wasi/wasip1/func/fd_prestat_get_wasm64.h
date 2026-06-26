@@ -83,9 +83,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         union wasi_prestat_wasm64_u
         {
             struct wasi_prestat_wasm64_u_dir_t
-            {
-                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t pr_name_len;
-            } dir;
+            { ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t pr_name_len; } dir;
         } u;
     };
 

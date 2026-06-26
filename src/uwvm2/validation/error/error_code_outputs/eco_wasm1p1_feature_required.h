@@ -25,175 +25,175 @@
 auto const& wfr{errout.err.err_selectable.wasm1p1_feature_required};
 
 /// @warning Extension point: keep this helper synchronized with wasm_binfmt1p1_feature_parameter and feature-gated validation diagnostics.
-constexpr auto get_wasm1p1_feature_name{
-    []<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature) constexpr noexcept -> ::uwvm2::utils::container::basic_string_view<char_type2>
-    {
-        switch(feature)
-        {
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"multi-value"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"multi-value"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"multi-value"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"multi-value"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"multi-value"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"bulk-memory"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"bulk-memory"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"bulk-memory"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"bulk-memory"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"bulk-memory"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"reference-types"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"reference-types"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"reference-types"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"reference-types"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"reference-types"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::sign_extension:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"sign-extension"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"sign-extension"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"sign-extension"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"sign-extension"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"sign-extension"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"nontrapping-float-to-int"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"nontrapping-float-to-int"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"nontrapping-float-to-int"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"nontrapping-float-to-int"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"nontrapping-float-to-int"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"simd"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"simd"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"simd"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"simd"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"simd"}; }
-            }
-            [[unlikely]] default:
-            {
+constexpr auto get_wasm1p1_feature_name{[]<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature) constexpr noexcept
+                                            -> ::uwvm2::utils::container::basic_string_view<char_type2>
+                                        {
+                                            switch(feature)
+                                            {
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"multi-value"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"multi-value"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"multi-value"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"multi-value"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"multi-value"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"bulk-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"bulk-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"bulk-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"bulk-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"bulk-memory"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"reference-types"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"reference-types"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"reference-types"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"reference-types"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"reference-types"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::sign_extension:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"sign-extension"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"sign-extension"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"sign-extension"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"sign-extension"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"sign-extension"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"nontrapping-float-to-int"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"nontrapping-float-to-int"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"nontrapping-float-to-int"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"nontrapping-float-to-int"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"nontrapping-float-to-int"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"simd"}; }
+                                                }
+                                                [[unlikely]] default:
+                                                {
             /// @warning Extension point: reaching "unknown" here usually means a new wasm1p1 feature flag lacks ECO output.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                if constexpr(::std::same_as<char_type2, char>) { return {"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"unknown"}; }
-            }
-        }
-    }};
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"unknown"}; }
+                                                }
+                                            }
+                                        }};
 
-constexpr auto get_wasm1p1_subject_name{
-    []<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) constexpr noexcept -> ::uwvm2::utils::container::basic_string_view<char_type2>
-    {
-        switch(subject)
-        {
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_count_section:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"data count section"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"data count section"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"data count section"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"data count section"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"data count section"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"element segment"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"element segment"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"element segment"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"element segment"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"element segment"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"data segment"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"data segment"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"data segment"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"data segment"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"data segment"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_kind:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"element kind"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"element kind"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"element kind"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"element kind"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"element kind"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"reference type"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"reference type"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"reference type"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"reference type"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"reference type"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::table_type:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"table type"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"table type"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"table type"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"table type"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"table type"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"instruction"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"instruction"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"instruction"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"instruction"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"instruction"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"ref.null initializer"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"ref.null initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"ref.null initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"ref.null initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"ref.null initializer"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_func:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"ref.func initializer"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"ref.func initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"ref.func initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"ref.func initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"ref.func initializer"}; }
-            }
-            case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_v128_const:
-            {
-                if constexpr(::std::same_as<char_type2, char>) { return {"v128.const initializer"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"v128.const initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"v128.const initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"v128.const initializer"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"v128.const initializer"}; }
-            }
-            [[unlikely]] default:
-            {
+constexpr auto get_wasm1p1_subject_name{[]<::std::integral char_type2>(::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) constexpr noexcept
+                                            -> ::uwvm2::utils::container::basic_string_view<char_type2>
+                                        {
+                                            switch(subject)
+                                            {
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_count_section:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"data count section"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"data count section"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"data count section"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"data count section"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"data count section"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"element segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"element segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"element segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"element segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"element segment"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"data segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"data segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"data segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"data segment"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"data segment"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_kind:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"element kind"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"element kind"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"element kind"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"element kind"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"element kind"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"reference type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"reference type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"reference type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"reference type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"reference type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::table_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"table type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"table type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"table type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"table type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"table type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"instruction"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"instruction"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"instruction"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"instruction"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"instruction"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"ref.null initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"ref.null initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"ref.null initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"ref.null initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"ref.null initializer"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_func:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"ref.func initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"ref.func initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"ref.func initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"ref.func initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"ref.func initializer"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_v128_const:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"v128.const initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"v128.const initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"v128.const initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"v128.const initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"v128.const initializer"}; }
+                                                }
+                                                [[unlikely]] default:
+                                                {
             /// @warning Extension point: new wasm1p1_error_subject values need feature-required ECO subject names here.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                if constexpr(::std::same_as<char_type2, char>) { return {"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"unknown"}; }
-                else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"unknown"}; }
-            }
-        }
-    }};
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"unknown"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"unknown"}; }
+                                                }
+                                            }
+                                        }};
 
 if constexpr(::std::same_as<char_type, char>)
 {

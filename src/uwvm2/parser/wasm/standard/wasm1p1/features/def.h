@@ -86,8 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 
     /// @brief Get the mutable wasm1.1 feature parameter from a parser feature-parameter tuple.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline constexpr wasm_binfmt1p1_feature_parameter& get_wasm1p1_parameter(
-        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...>& fs_para) noexcept
+    inline constexpr wasm_binfmt1p1_feature_parameter& get_wasm1p1_parameter(::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> & fs_para) noexcept
     {
         static_assert((::std::same_as<wasm1p1, Fs> || ...), "wasm1p1 parameter requested without wasm1p1 in the feature set");
         return ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(fs_para);
@@ -134,8 +133,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 
     /// @brief Convert a reference type byte into the matching value-type enum used by shared parser storage.
     /// @warning Extension point: new reference_type enumerators must be converted explicitly or validated before reaching shared storage.
-    inline constexpr ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type
-        to_value_type(::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type rt) noexcept
+    inline constexpr ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type to_value_type(
+        ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type rt) noexcept
     {
         using value_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
         using reference_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type;

@@ -1021,8 +1021,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     /// @brief Detect whether exactly one feature parameter can runtime-control the MVP single-table restriction.
     /// @details This lets an extension compile multi-table storage while preserving wasm1 checks until the feature flag is enabled.
     template <typename... Para>
-    inline consteval bool has_feature_parameter_controllable_allow_multi_table_from_paras_parameters(
-        ::uwvm2::utils::container::tuple<Para...> const&) noexcept
+    inline consteval bool has_feature_parameter_controllable_allow_multi_table_from_paras_parameters(::uwvm2::utils::container::tuple<Para...> const&) noexcept
     {
         bool has{};
 

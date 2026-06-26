@@ -26,8 +26,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::warning
     /// @details Data count consistency is a parser final-check invariant, so this section has no runtime warning state to collect.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void show_wasm_section_warning(
-        ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>,
+        ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>,
         [[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_file_t const& wasm,
         [[maybe_unused]] ::uwvm2::uwvm::wasm::warning::binfmt_ver1_warning_storage_t& warn_storage) noexcept
     {

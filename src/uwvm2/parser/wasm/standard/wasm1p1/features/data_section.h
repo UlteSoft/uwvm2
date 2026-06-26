@@ -44,7 +44,6 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
     namespace wasm1p1_data_details
@@ -154,8 +153,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // [               safe               ] unsafe (could be the section_end)
                         //                                      ^^ section_curr
                         expr.opcodes.reserve(1uz);
-                        expr.opcodes.emplace_back_unchecked(::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.i32 = value},
-                                                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const);
+                        expr.opcodes.emplace_back_unchecked(
+                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.i32 = value},
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const);
                         break;
                     }
                     case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(

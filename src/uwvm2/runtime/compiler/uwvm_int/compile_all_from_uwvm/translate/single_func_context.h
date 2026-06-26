@@ -28,9 +28,7 @@ struct block_result_type
 };
 
 struct operand_stack_storage_t
-{
-    wasm_value_type type{};
-};
+{ wasm_value_type type{}; };
 
 struct block_t
 {

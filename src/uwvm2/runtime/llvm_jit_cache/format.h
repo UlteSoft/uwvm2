@@ -107,11 +107,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
     struct cache_policy
     {
-        bool enable{true};                                                 // A single switch keeps all cache I/O opt-in at call sites.
-        bool generate_signature{true};                                     // Writers sign by default so later runs can detect tampering.
-        bool verify_signature{true};                                       // Readers verify by default because cached code is executable native code.
-        compression_kind compression{compression_kind::uwvm_native_lz};    // Native-LZ is the default balance for object-file-like byte streams.
-        ::std::size_t max_object_bytes{512uz * 1024uz * 1024uz};           // The limit bounds memory use before allocation or decompression.
+        bool enable{true};                                               // A single switch keeps all cache I/O opt-in at call sites.
+        bool generate_signature{true};                                   // Writers sign by default so later runs can detect tampering.
+        bool verify_signature{true};                                     // Readers verify by default because cached code is executable native code.
+        compression_kind compression{compression_kind::uwvm_native_lz};  // Native-LZ is the default balance for object-file-like byte streams.
+        ::std::size_t max_object_bytes{512uz * 1024uz * 1024uz};         // The limit bounds memory use before allocation or decompression.
     };
 
     struct cache_context
@@ -125,30 +125,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::u8string uwvm_abi{};        // Runtime ABI changes invalidate calls, relocations, and imported symbols.
         ::uwvm2::utils::container::u8string codegen_policy{};  // Optimization policy participates because it affects emitted native code.
         ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> signature_seed{};  // The seed binds signatures to this cache identity.
-        bool has_signature_seed{};                            // A missing seed disables signing/verification instead of producing weak output.
-        bool cache_key_is_complete{};                         // Complete keys skip module hashing when the caller already supplied full identity.
+        bool has_signature_seed{};     // A missing seed disables signing/verification instead of producing weak output.
+        bool cache_key_is_complete{};  // Complete keys skip module hashing when the caller already supplied full identity.
     };
 
     struct cache_load_result
     {
-        cache_status status{cache_status::disabled};                    // Callers branch on status rather than exceptions in the JIT hot path.
-        ::uwvm2::utils::container::vector<::std::byte> object{};        // The object bytes are owned after load so LLVM can consume a stable buffer.
-        bool signature_verified{};                                      // Logging exposes whether the hit passed trust checks.
-        bool isa_matched{};                                             // Diagnostics can distinguish target misses from later context misses.
+        cache_status status{cache_status::disabled};              // Callers branch on status rather than exceptions in the JIT hot path.
+        ::uwvm2::utils::container::vector<::std::byte> object{};  // The object bytes are owned after load so LLVM can consume a stable buffer.
+        bool signature_verified{};                                // Logging exposes whether the hit passed trust checks.
+        bool isa_matched{};                                       // Diagnostics can distinguish target misses from later context misses.
     };
 
     struct cache_fixed_header
     {
-        ::std::byte magic[8]{};                            // Magic bytes make accidental file collisions cheap to reject.
-        ::std::uint_least32_t version{};                   // Versioning lets readers fail closed when the binary contract changes.
-        ::std::uint_least32_t fixed_header_size{};         // The size is stored to reserve a clear path for future fixed-header extensions.
-        ::std::uint_least32_t compression{};               // Codec choice is authenticated as part of the header and checked before decode.
-        ::std::uint_least32_t signature{};                 // Signature kind is explicit so unsigned and signed blobs are unambiguous.
-        ::std::uint_least64_t uncompressed_size{};         // Expected size bounds allocations and verifies decompressor output exactly.
-        ::std::uint_least64_t payload_size{};              // Payload size separates the byte stream from trailing garbage or truncation.
-        ::std::uint_least64_t isa_metadata_size{};         // ISA metadata is length-delimited to support byte-for-byte equality checks.
-        ::std::uint_least64_t context_metadata_size{};     // Context metadata is kept separate from ISA metadata for better diagnostics.
-        ::std::uint_least64_t signature_size{};            // Signature size is validated before cryptographic verification.
+        ::std::byte magic[8]{};                         // Magic bytes make accidental file collisions cheap to reject.
+        ::std::uint_least32_t version{};                // Versioning lets readers fail closed when the binary contract changes.
+        ::std::uint_least32_t fixed_header_size{};      // The size is stored to reserve a clear path for future fixed-header extensions.
+        ::std::uint_least32_t compression{};            // Codec choice is authenticated as part of the header and checked before decode.
+        ::std::uint_least32_t signature{};              // Signature kind is explicit so unsigned and signed blobs are unambiguous.
+        ::std::uint_least64_t uncompressed_size{};      // Expected size bounds allocations and verifies decompressor output exactly.
+        ::std::uint_least64_t payload_size{};           // Payload size separates the byte stream from trailing garbage or truncation.
+        ::std::uint_least64_t isa_metadata_size{};      // ISA metadata is length-delimited to support byte-for-byte equality checks.
+        ::std::uint_least64_t context_metadata_size{};  // Context metadata is kept separate from ISA metadata for better diagnostics.
+        ::std::uint_least64_t signature_size{};         // Signature size is validated before cryptographic verification.
     };
 
     struct cache_blob_view
@@ -177,8 +177,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
     namespace details
     {
-        inline constexpr ::std::size_t uint_least64_leb128_buffer_size{
-            ((::std::numeric_limits<unsigned char>::digits * sizeof(::std::uint_least64_t)) + 6uz) / 7uz};
+        inline constexpr ::std::size_t uint_least64_leb128_buffer_size{((::std::numeric_limits<unsigned char>::digits * sizeof(::std::uint_least64_t)) + 6uz) /
+                                                                       7uz};
         static_assert(uint_least64_leb128_buffer_size >= 10uz);
 
         // LEB128 keeps metadata compact while preserving an unambiguous byte representation for hashes and signatures.
@@ -189,12 +189,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             return n;
         }
 
-        [[nodiscard]] inline constexpr ::std::size_t key_value_size(::uwvm2::utils::container::u8string_view key,
-                                                                    ::std::size_t value_size) noexcept
+        [[nodiscard]] inline constexpr ::std::size_t key_value_size(::uwvm2::utils::container::u8string_view key, ::std::size_t value_size) noexcept
         {
             // The exact reserve size avoids reallocations while building metadata in the JIT path.
-            return uleb128_size(static_cast<::std::uint_least64_t>(key.size())) + key.size() +
-                   uleb128_size(static_cast<::std::uint_least64_t>(value_size)) + value_size;
+            return uleb128_size(static_cast<::std::uint_least64_t>(key.size())) + key.size() + uleb128_size(static_cast<::std::uint_least64_t>(value_size)) +
+                   value_size;
         }
 
         inline constexpr void append_bytes(::uwvm2::utils::container::vector<::std::byte>& out, ::std::byte const* first, ::std::byte const* last) noexcept

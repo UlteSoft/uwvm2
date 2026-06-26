@@ -100,7 +100,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     }
 
     /// @brief wasm1.1 global type with extended value-type support.
-    /// @warning Extension point: new global value types must be reflected in const_expr storage, runtime global storage, initializer, local_imported, and ECO output.
+    /// @warning Extension point: new global value types must be reflected in const_expr storage, runtime global storage, initializer, local_imported, and ECO
+    /// output.
     struct global_type
     {
         ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type type{};
@@ -200,8 +201,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
         inline static constexpr bool value = true;
     };
 
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
-                  ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_t>);
+    static_assert(
+        ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_t>);
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features

@@ -39,10 +39,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 {
-    inline constexpr ::std::size_t default_max_data_count_sec_count{
-        ::uwvm2::parser::wasm::standard::wasm1::features::default_max_data_sec_entries};
-    inline constexpr ::std::size_t default_max_elem_sec_expr{
-        ::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_funcidx};
+    inline constexpr ::std::size_t default_max_data_count_sec_count{::uwvm2::parser::wasm::standard::wasm1::features::default_max_data_sec_entries};
+    inline constexpr ::std::size_t default_max_elem_sec_expr{::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_funcidx};
 
     static_assert(default_max_data_count_sec_count == ::uwvm2::parser::wasm::standard::wasm1::features::default_max_data_sec_entries);
     static_assert(default_max_elem_sec_expr == ::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_funcidx);

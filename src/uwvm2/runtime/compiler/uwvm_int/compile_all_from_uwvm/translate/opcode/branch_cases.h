@@ -97,8 +97,8 @@ case wasm1_code::br:
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
             // Extra-heavy: mega-fuse the full `test7`-style i32 sum loop into a single opfunc that keeps
             // `i/sum` in registers and performs at most one bounds check per slot.
-            if(runtime_uwvm_int_opcode_conbination_extra_enabled && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-               target_frame.wasm_code_curr_at_start_label != nullptr)
+            if(runtime_uwvm_int_opcode_conbination_extra_enabled && target_frame.type == block_type::loop && label_index_uz == 0uz &&
+               curr_size == target_base && target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 bool match_ok{true};
                 if constexpr(stacktop_enabled) { match_ok = (stacktop_cache_count == 0uz); }
@@ -222,8 +222,8 @@ case wasm1_code::br:
             }
 
             // Extra-heavy: mega-fuse `micro/loop_i64.wasm` hot loop into one opfunc dispatch.
-            if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-               target_frame.wasm_code_curr_at_start_label != nullptr)
+            if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop &&
+               label_index_uz == 0uz && curr_size == target_base && target_frame.wasm_code_curr_at_start_label != nullptr)
             {
                 using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
 
@@ -367,8 +367,8 @@ case wasm1_code::br:
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/round_f64_dense.wasm` hot loop into one opfunc dispatch.
-                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop &&
+                   label_index_uz == 0uz && curr_size == target_base && target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
                     using wasm_u64 = ::std::uint_least64_t;
@@ -530,8 +530,8 @@ case wasm1_code::br:
             if constexpr(CompileOption.is_tail_call)
             {
                 // Extra-heavy: mega-fuse `micro/loop_f64.wasm` hot loop into one opfunc dispatch.
-                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop &&
+                   label_index_uz == 0uz && curr_size == target_base && target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
                     using wasm_u64 = ::std::uint_least64_t;
@@ -666,8 +666,8 @@ case wasm1_code::br:
             // Extra-heavy: mega-fuse `test10` hot affine inv-square f32 loop.
             if constexpr(CompileOption.is_tail_call)
             {
-                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
-                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                if(runtime_uwvm_int_opcode_conbination_extra_enabled && !fused_extra_heavy_loop_run && target_frame.type == block_type::loop &&
+                   label_index_uz == 0uz && curr_size == target_base && target_frame.wasm_code_curr_at_start_label != nullptr)
                 {
                     bool match_ok{true};
                     if constexpr(stacktop_enabled) { match_ok = (stacktop_cache_count == 0uz); }
@@ -829,13 +829,10 @@ case wasm1_code::br:
 
                     auto const loop_body_begin{target_frame.wasm_code_curr_at_start_label};
                     auto const loop_body_end{op_begin};
-                    auto const body_wasm_bytes{
-                        loop_body_end > loop_body_begin ? static_cast<::std::size_t>(loop_body_end - loop_body_begin) : 0uz};
+                    auto const body_wasm_bytes{loop_body_end > loop_body_begin ? static_cast<::std::size_t>(loop_body_end - loop_body_begin) : 0uz};
 
                     auto const log_loop_unwind_reject{
-                        [&](::uwvm2::utils::container::u8string_view reason,
-                            ::std::size_t period,
-                            ::std::size_t unroll_count) constexpr noexcept
+                        [&](::uwvm2::utils::container::u8string_view reason, ::std::size_t period, ::std::size_t unroll_count) constexpr noexcept
                         {
                             if(runtime_log_on) [[unlikely]]
                             {
@@ -873,33 +870,18 @@ case wasm1_code::br:
                             }
                         }};
 
-                    if(!runtime_uwvm_int_loop_unwind_enabled) [[unlikely]]
-                    {
-                        log_loop_unwind_reject(u8"runtime_disabled", 0uz, 0uz);
-                    }
-                    else if(is_polymorphic) [[unlikely]]
-                    {
-                        log_loop_unwind_reject(u8"polymorphic", 0uz, 0uz);
-                    }
-                    else if(body_wasm_bytes == 0uz) [[unlikely]]
-                    {
-                        log_loop_unwind_reject(u8"empty_body", 0uz, 0uz);
-                    }
+                    if(!runtime_uwvm_int_loop_unwind_enabled) [[unlikely]] { log_loop_unwind_reject(u8"runtime_disabled", 0uz, 0uz); }
+                    else if(is_polymorphic) [[unlikely]] { log_loop_unwind_reject(u8"polymorphic", 0uz, 0uz); }
+                    else if(body_wasm_bytes == 0uz) [[unlikely]] { log_loop_unwind_reject(u8"empty_body", 0uz, 0uz); }
                     else if constexpr(!(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported))
                     {
                         log_loop_unwind_reject(u8"unsupported_stacktop", 0uz, 0uz);
                     }
-                    else if(stacktop_cache_count == 0uz)
-                    {
-                        log_loop_unwind_reject(u8"empty_cache", 0uz, 0uz);
-                    }
+                    else if(stacktop_cache_count == 0uz) { log_loop_unwind_reject(u8"empty_cache", 0uz, 0uz); }
                     else
                     {
                         auto const period{loop_unwind_currpos_period()};
-                        if(period <= 1uz)
-                        {
-                            log_loop_unwind_reject(u8"period_one", period, 1uz);
-                        }
+                        if(period <= 1uz) { log_loop_unwind_reject(u8"period_one", period, 1uz); }
                         else
                         {
                             constexpr ::std::size_t max_loop_unwind_unroll_count{9uz};
@@ -908,10 +890,7 @@ case wasm1_code::br:
                             if(size_limited_count > max_loop_unwind_unroll_count) { size_limited_count = max_loop_unwind_unroll_count; }
 
                             auto unroll_count{period < size_limited_count ? period : size_limited_count};
-                            if(unroll_count < 2uz)
-                            {
-                                log_loop_unwind_reject(u8"size_limit", period, unroll_count);
-                            }
+                            if(unroll_count < 2uz) { log_loop_unwind_reject(u8"size_limit", period, unroll_count); }
                             else
                             {
                                 if(runtime_log_on) [[unlikely]]

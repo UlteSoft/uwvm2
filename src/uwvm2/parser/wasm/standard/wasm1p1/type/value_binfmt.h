@@ -80,7 +80,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     /// @brief      Value Types
     /// @details    Value types are encoded with their respective encoding as a number type or reference type.
     /// @details    Extends wasm1's value_type
-    /// @warning    Extension point: new value types must be mirrored in validity checks, printable names, parser feature gates, runtime storage, and ECO output.
+    /// @warning    Extension point: new value types must be mirrored in validity checks, printable names, parser feature gates, runtime storage, and ECO
+    /// output.
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 5.3.4
     enum class value_type : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte
     {

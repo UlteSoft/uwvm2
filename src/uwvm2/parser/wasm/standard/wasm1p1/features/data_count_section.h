@@ -47,15 +47,13 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 {
     /// @brief Parse and validate the wasm1.1 data count section payload.
     /// @details The payload is exactly one u32 LEB128 and is accepted only when the bulk-memory feature is enabled.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void handle_binfmt_ver1_extensible_section_define(
-        ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>,
+        ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>,
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> & module_storage,
         ::std::byte const* const section_begin,
         ::std::byte const* const section_end,
@@ -161,7 +159,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 
         datacountsec.count = count;
     }
-
 }
 
 #ifndef UWVM_MODULE

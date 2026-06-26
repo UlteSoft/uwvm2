@@ -910,9 +910,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // For wasm1 table/data offsets, the expression must evaluate to an i32, so we best-effort decode:
         // - i32.const
         // - global.get (only after import-linking, see `try_eval_wasm1_const_expr_offset_after_linking`)
-        inline constexpr void
-            try_eval_wasm1_const_expr_offset(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr /* [adl] */,
-                                             ::std::uint_least64_t& out) noexcept
+        inline constexpr void try_eval_wasm1_const_expr_offset(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr /* [adl] */,
+                                                               ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz) [[unlikely]]
             {
@@ -1191,10 +1190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             if(expr.opcodes.size() != 1uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             auto const& op{expr.opcodes.front_unchecked()};
-            if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD0u))
-            {
-                return wasm_ref_null_funcidx_sentinel;
-            }
+            if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD0u)) { return wasm_ref_null_funcidx_sentinel; }
             if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD2u)) { return op.storage.ref_func_idx; }
             if(op.opcode != ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -1226,8 +1222,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             switch(resolved_global->storage.ref.kind)
             {
                 case ::uwvm2::object::global::wasm_ref_kind::wasm_null: return wasm_ref_null_funcidx_sentinel;
-                case ::uwvm2::object::global::wasm_ref_kind::wasm_func: return resolved_global->storage.ref.storage.func_idx;
-                [[unlikely]] default: ::fast_io::fast_terminate();
+                case ::uwvm2::object::global::wasm_ref_kind::wasm_func:
+                    return resolved_global->storage.ref.storage.func_idx;
+                [[unlikely]] default:
+                    ::fast_io::fast_terminate();
             }
         }
 
@@ -1238,10 +1236,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 if(elem_seg.element_type_ptr == nullptr) [[unlikely]] { continue; }
                 auto const curr_expr_count{elem_seg.element_type_ptr->storage.segment.vec_expr.size()};
-                if(curr_expr_count > ::std::numeric_limits<::std::size_t>::max() - total_expr_count) [[unlikely]]
-                {
-                    ::fast_io::fast_terminate();
-                }
+                if(curr_expr_count > ::std::numeric_limits<::std::size_t>::max() - total_expr_count) [[unlikely]] { ::fast_io::fast_terminate(); }
                 total_expr_count += curr_expr_count;
             }
 
@@ -2488,10 +2483,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline constexpr void
-            try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
-                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
-                                                           ::std::uint_least64_t& out) noexcept
+        inline constexpr void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
+                                                                             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
+                                                                             ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz)
             {
@@ -2523,23 +2517,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 auto const all_global_count{imported_global_count + local_global_count};
                 if(idx >= all_global_count) [[unlikely]]
                 {
-                    ::fast_io::io::perr(
-                        ::uwvm2::uwvm::io::u8log_output,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                        u8"uwvm: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                        u8"[fatal] ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8"initializer: Constant expression offset global index is out of bounds: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                        idx,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8" >= ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                        all_global_count,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8".\n\n",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Constant expression offset global index is out of bounds: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        idx,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" >= ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        all_global_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
 

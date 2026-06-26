@@ -74,14 +74,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
     };
 
     struct wasm_funcref_t
-    {
-        ::uwvm2::object::global::wasm_global_ref_t ref;
-    };
+    { ::uwvm2::object::global::wasm_global_ref_t ref; };
 
     struct wasm_externref_t
-    {
-        ::uwvm2::object::global::wasm_global_ref_t ref;
-    };
+    { ::uwvm2::object::global::wasm_global_ref_t ref; };
 
     static_assert(sizeof(wasm_funcref_t) == sizeof(wasm_global_ref_t));
     static_assert(sizeof(wasm_externref_t) == sizeof(wasm_global_ref_t));

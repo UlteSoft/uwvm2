@@ -316,7 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [... prefix para_len ... para_begin ... res_len (para_end) ... res_begin ...] prefix (res_end) ...
             // [                           safe                                            ] unsafe (could be the section_end)
             //                                                                ^^ section_curr
-            
+
             // The length check above proves [section_curr, section_curr + result_len) is safe inside the current section.
 
             // set parameters

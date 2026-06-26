@@ -47,9 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::table
     };
 
     union wasm_table_storage_u
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_ref_func_idx;
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_ref_func_idx; };
 
     struct wasm_table_storage_t
     {

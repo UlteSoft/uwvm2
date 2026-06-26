@@ -182,8 +182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
     namespace details
     {
-        inline constexpr auto ref_func_opcode{
-            static_cast<wasm1_code>(static_cast<wasm_byte>(wasm1p1_code::ref_func))};
+        inline constexpr auto ref_func_opcode{static_cast<wasm1_code>(static_cast<wasm_byte>(wasm1p1_code::ref_func))};
 
         [[noreturn]] inline constexpr void fail_feature_required(::std::byte const* const op_begin,
                                                                  ::uwvm2::validation::error::code_validation_error_impl& err,
@@ -260,12 +259,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
             //                 ^^ code_curr
         }
 
-        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte read_u8(
-            ::std::byte const*& code_curr,
-            ::std::byte const* const code_end,
-            ::std::byte const* const op_begin,
-            ::uwvm2::validation::error::code_validation_error_impl& err,
-            ::uwvm2::utils::container::u8string_view op_name) UWVM_THROWS
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte read_u8(::std::byte const*& code_curr,
+                                                                                         ::std::byte const* const code_end,
+                                                                                         ::std::byte const* const op_begin,
+                                                                                         ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                                                         ::uwvm2::utils::container::u8string_view op_name) UWVM_THROWS
         {
             auto const imm_pos{code_curr};
             skip_bytes(code_curr, code_end, op_begin, 1uz, err, op_name);
@@ -285,9 +283,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         }
 
         template <typename ConstExpr>
-        inline constexpr void collect_const_expr_refs(
-            ConstExpr const& expr,
-            ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>& refs)
+        inline constexpr void collect_const_expr_refs(ConstExpr const& expr,
+                                                      ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>& refs)
         {
             for(auto const& op: expr.opcodes)
             {
@@ -296,26 +293,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void collect_declared_refs(
-            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-            ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>& refs)
+        inline constexpr void
+            collect_declared_refs(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+                                  ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>& refs)
         {
-            auto const& exportsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                    ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& exportsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(module_storage.sections)};
             for(auto const& exp: exportsec.exports)
             {
-                if(exp.exports.type == ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func) { append_unique_ref(refs, exp.exports.storage.func_idx); }
+                if(exp.exports.type == ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func)
+                {
+                    append_unique_ref(refs, exp.exports.storage.func_idx);
+                }
             }
 
-            auto const& globalsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                    ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>>(module_storage.sections)};
             for(auto const& global: globalsec.local_globals) { collect_const_expr_refs(global.expr, refs); }
 
-            auto const& elemsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                    ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>>(module_storage.sections)};
             for(auto const& elem: elemsec.elems)
             {
                 auto const& segment{elem.storage.segment};
@@ -432,9 +429,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         // all_memory_count never overflow and never exceed the max of u32 (validated by parser limits)
         auto const all_memory_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_memory_count + local_memory_count)};
 
-        auto const& datacountsec{
-            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
+        auto const& datacountsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
 
         auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
 
@@ -458,33 +454,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         static constexpr value_type_enum f32_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)};
         static constexpr value_type_enum f64_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
         static constexpr value_type_enum v128_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
-        static constexpr value_type_enum funcref_result_arr[1u]{static_cast<value_type_enum>(
-            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)};
-        static constexpr value_type_enum externref_result_arr[1u]{static_cast<value_type_enum>(
-            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref)};
+        static constexpr value_type_enum funcref_result_arr[1u]{
+            static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)};
+        static constexpr value_type_enum externref_result_arr[1u]{
+            static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref)};
         static constexpr value_type_enum i32_v128_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32),
-                                                               static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
-        static constexpr value_type_enum v128_i32_operands[2u]{static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                               static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)};
-        static constexpr value_type_enum v128_i64_operands[2u]{static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                               static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)};
-        static constexpr value_type_enum v128_f32_operands[2u]{static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                               static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)};
-        static constexpr value_type_enum v128_f64_operands[2u]{static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                               static_cast<value_type_enum>(
-                                                                   ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
-        static constexpr value_type_enum v128_v128_operands[2u]{static_cast<value_type_enum>(
-                                                                    ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                                static_cast<value_type_enum>(
-                                                                    ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
+                                                               static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
+        static constexpr value_type_enum v128_i32_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                               static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)};
+        static constexpr value_type_enum v128_i64_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                               static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)};
+        static constexpr value_type_enum v128_f32_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                               static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)};
+        static constexpr value_type_enum v128_f64_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                               static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
+        static constexpr value_type_enum v128_v128_operands[2u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                                static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
 
         // function block (label/result type is the function result)
         control_flow_stack.push_back({.label = curr_func_type.result,
@@ -616,8 +601,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(vt)) [[unlikely]]
                 {
                     err.err_curr = op_begin;
-                    err.err_selectable.wasm1p1_invalid_reference_type.value =
-                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(type);
+                    err.err_selectable.wasm1p1_invalid_reference_type.value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(type);
                     err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
@@ -627,11 +611,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     auto const feature{vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128
                                            ? ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd
                                            : ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types};
-                    details::fail_feature_required(op_begin,
-                                                   err,
-                                                   static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(type),
-                                                   feature,
-                                                   subject);
+                    details::fail_feature_required(op_begin, err, static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(type), feature, subject);
                 }
             }};
 
@@ -642,8 +622,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         };
 
         auto const parse_block_type{
-            [&](::std::byte const* op_begin,
-                [[maybe_unused]] ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS -> block_signature_t
+            [&](::std::byte const* op_begin, [[maybe_unused]] ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS -> block_signature_t
             {
                 if(code_curr == code_end) [[unlikely]]
                 {
@@ -657,8 +636,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 //        ^^ code_curr
 
                 auto const blocktype_begin{code_curr};
-                auto const blocktype{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>(
-                    code_curr, code_end, op_begin, err, u8"blocktype")};
+                auto const blocktype{
+                    details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>(code_curr, code_end, op_begin, err, u8"blocktype")};
                 auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
 
                 // op_name blocktype ...
@@ -672,8 +651,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte first_blocktype_byte{};
                     ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
 #if CHAR_BIT > 8
-                    first_blocktype_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
-                        static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+                    first_blocktype_byte =
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
 #endif
                     err.err_curr = op_begin;
                     err.err_selectable.u8 = first_blocktype_byte;
@@ -689,19 +668,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
                     case -1:
                     {
-                        return {.result = {i32_result_arr, i32_result_arr + 1u}};
+                        return {
+                            .result = {i32_result_arr, i32_result_arr + 1u}
+                        };
                     }
                     case -2:
                     {
-                        return {.result = {i64_result_arr, i64_result_arr + 1u}};
+                        return {
+                            .result = {i64_result_arr, i64_result_arr + 1u}
+                        };
                     }
                     case -3:
                     {
-                        return {.result = {f32_result_arr, f32_result_arr + 1u}};
+                        return {
+                            .result = {f32_result_arr, f32_result_arr + 1u}
+                        };
                     }
                     case -4:
                     {
-                        return {.result = {f64_result_arr, f64_result_arr + 1u}};
+                        return {
+                            .result = {f64_result_arr, f64_result_arr + 1u}
+                        };
                     }
                     case -5:
                     {
@@ -709,7 +696,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             op_begin,
                             static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
                             ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
-                        return {.result = {v128_result_arr, v128_result_arr + 1u}};
+                        return {
+                            .result = {v128_result_arr, v128_result_arr + 1u}
+                        };
                     }
                     case -16:
                     {
@@ -717,7 +706,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             op_begin,
                             static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref),
                             ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
-                        return {.result = {funcref_result_arr, funcref_result_arr + 1u}};
+                        return {
+                            .result = {funcref_result_arr, funcref_result_arr + 1u}
+                        };
                     }
                     case -17:
                     {
@@ -725,7 +716,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             op_begin,
                             static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref),
                             ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
-                        return {.result = {externref_result_arr, externref_result_arr + 1u}};
+                        return {
+                            .result = {externref_result_arr, externref_result_arr + 1u}
+                        };
                     }
                     default:
                     {
@@ -764,8 +757,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte first_blocktype_byte{};
                 ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
 #if CHAR_BIT > 8
-                first_blocktype_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
-                    static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+                first_blocktype_byte =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
 #endif
                 err.err_curr = op_begin;
                 err.err_selectable.u8 = first_blocktype_byte;
@@ -773,28 +766,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }};
 
-        auto const enter_control_frame{
-            [&](::std::byte const* op_begin,
-                ::uwvm2::utils::container::u8string_view op_name,
-                block_type type,
-                block_signature_t signature) constexpr UWVM_THROWS
-            {
-                pop_expected_operands(op_begin, op_name, signature.start);
+        auto const enter_control_frame{[&](::std::byte const* op_begin,
+                                           ::uwvm2::utils::container::u8string_view op_name,
+                                           block_type type,
+                                           block_signature_t signature) constexpr UWVM_THROWS
+                                       {
+                                           pop_expected_operands(op_begin, op_name, signature.start);
 
-                auto const base{operand_stack.size()};
-                auto const label{type == block_type::loop ? signature.start : signature.result};
-                control_flow_stack.push_back({.label = label,
-                                              .start = signature.start,
-                                              .result = signature.result,
-                                              .operand_stack_base = base,
-                                              .type = type,
-                                              .polymorphic_base = is_polymorphic,
-                                              .then_polymorphic_end = false});
-                push_value_types(signature.start);
+                                           auto const base{operand_stack.size()};
+                                           auto const label{type == block_type::loop ? signature.start : signature.result};
+                                           control_flow_stack.push_back({.label = label,
+                                                                         .start = signature.start,
+                                                                         .result = signature.result,
+                                                                         .operand_stack_base = base,
+                                                                         .type = type,
+                                                                         .polymorphic_base = is_polymorphic,
+                                                                         .then_polymorphic_end = false});
+                                           push_value_types(signature.start);
 
-                // Stack-polymorphism is scoped to the current control frame only.
-                is_polymorphic = false;
-            }};
+                                           // Stack-polymorphism is scoped to the current control frame only.
+                                           is_polymorphic = false;
+                                       }};
 
         auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view op_name,
                                               curr_operand_stack_value_type expected_operand_type,
@@ -1046,18 +1038,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                           }
                                       }};
 
-        auto const check_data_index{
-            [&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_index) constexpr UWVM_THROWS
-            {
-                if(!datacountsec.present || data_index >= datacountsec.count) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.illegal_data_index.data_index = data_index;
-                    err.err_selectable.illegal_data_index.all_data_count = datacountsec.present ? datacountsec.count : 0u;
-                    err.err_code = code_validation_error_code::illegal_data_index;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-            }};
+        auto const check_data_index{[&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_index) constexpr UWVM_THROWS
+                                    {
+                                        if(!datacountsec.present || data_index >= datacountsec.count) [[unlikely]]
+                                        {
+                                            err.err_curr = op_begin;
+                                            err.err_selectable.illegal_data_index.data_index = data_index;
+                                            err.err_selectable.illegal_data_index.all_data_count = datacountsec.present ? datacountsec.count : 0u;
+                                            err.err_code = code_validation_error_code::illegal_data_index;
+                                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                        }
+                                    }};
 
         auto const check_element_index{
             [&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 element_index) constexpr UWVM_THROWS
@@ -1073,43 +1064,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
             }};
 
-        auto const check_table_index{
-            [&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index) constexpr UWVM_THROWS
-            {
-                if(table_index >= all_table_count) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.illegal_table_index.table_index = table_index;
-                    err.err_selectable.illegal_table_index.all_table_count = all_table_count;
-                    err.err_code = code_validation_error_code::illegal_table_index;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-            }};
+        auto const check_table_index{[&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index) constexpr UWVM_THROWS
+                                     {
+                                         if(table_index >= all_table_count) [[unlikely]]
+                                         {
+                                             err.err_curr = op_begin;
+                                             err.err_selectable.illegal_table_index.table_index = table_index;
+                                             err.err_selectable.illegal_table_index.all_table_count = all_table_count;
+                                             err.err_code = code_validation_error_code::illegal_table_index;
+                                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                         }
+                                     }};
 
-        auto const check_memory_index_zero{
-            [&](::std::byte const* op_begin,
-                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_index,
-                ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-            {
-                if(all_memory_count == 0u) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.no_memory.op_code_name = op_name;
-                    err.err_selectable.no_memory.align = 0u;
-                    err.err_selectable.no_memory.offset = 0u;
-                    err.err_code = code_validation_error_code::no_memory;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+        auto const check_memory_index_zero{[&](::std::byte const* op_begin,
+                                               ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_index,
+                                               ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                           {
+                                               if(all_memory_count == 0u) [[unlikely]]
+                                               {
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.no_memory.op_code_name = op_name;
+                                                   err.err_selectable.no_memory.align = 0u;
+                                                   err.err_selectable.no_memory.offset = 0u;
+                                                   err.err_code = code_validation_error_code::no_memory;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }
 
-                if(memory_index != 0u) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.illegal_memory_index.memory_index = memory_index;
-                    err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
-                    err.err_code = code_validation_error_code::illegal_memory_index;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-            }};
+                                               if(memory_index != 0u) [[unlikely]]
+                                               {
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.illegal_memory_index.memory_index = memory_index;
+                                                   err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
+                                                   err.err_code = code_validation_error_code::illegal_memory_index;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }
+                                           }};
 
         auto const get_table_value_type{
             [&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index) constexpr noexcept -> curr_operand_stack_value_type
@@ -1171,27 +1160,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 pop_available_concrete_operands(count);
             }};
 
-        auto const validate_numeric_unary_stack_effect{
-            [&](::std::byte const* op_begin,
-                ::uwvm2::utils::container::u8string_view op_name,
-                curr_operand_stack_value_type expected_operand_type,
-                curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
-            {
-                if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, 1uz); }
+        auto const validate_numeric_unary_stack_effect{[&](::std::byte const* op_begin,
+                                                           ::uwvm2::utils::container::u8string_view op_name,
+                                                           curr_operand_stack_value_type expected_operand_type,
+                                                           curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
+                                                       {
+                                                           if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
+                                                           {
+                                                               report_operand_stack_underflow(op_begin, op_name, 1uz);
+                                                           }
 
-                auto const operand{try_pop_concrete_operand()};
-                if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                    err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
-                    err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
-                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                                           auto const operand{try_pop_concrete_operand()};
+                                                           if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
+                                                           {
+                                                               err.err_curr = op_begin;
+                                                               err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                               err.err_selectable.numeric_operand_type_mismatch.expected_type =
+                                                                   to_wasm1_value_type(expected_operand_type);
+                                                               err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
+                                                               err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                                           }
 
-                operand_stack.push_back({result_type});
-            }};
+                                                           operand_stack.push_back({result_type});
+                                                       }};
 
         // [before_section ... ] | opbase opextent
         // [        safe       ] | unsafe (could be the section_end)
@@ -1933,9 +1925,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                               }};
 
                     struct get_sig_result_t
-                    {
-                        block_result_type<Fs...> types{};
-                    };
+                    { block_result_type<Fs...> types{}; };
 
                     auto const get_sig{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr noexcept
                                        {
@@ -2376,9 +2366,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
-                        err.err_selectable.br_value_type_mismatch.expected_type =
-                            to_wasm1_value_type(static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref));
+                        err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(
+                            static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref));
                         err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(get_table_value_type(table_index));
                         err.err_code = code_validation_error_code::br_value_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -2467,8 +2456,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                     }
 
-                    auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"table.get")};
+                    auto const table_index{
+                        details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"table.get")};
                     check_table_index(op_begin, table_index);
 
                     validate_i32_operands(op_begin, u8"table.get", 1uz);
@@ -2503,8 +2492,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                     }
 
-                    auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"table.set")};
+                    auto const table_index{
+                        details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"table.set")};
                     check_table_index(op_begin, table_index);
                     auto const table_type{get_table_value_type(table_index)};
 
@@ -2673,8 +2662,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                     }
 
-                    auto const result_type_count{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"select.result_types")};
+                    auto const result_type_count{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                              code_end,
+                                                                                                                              op_begin,
+                                                                                                                              err,
+                                                                                                                              u8"select.result_types")};
                     if(result_type_count != 1u) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, u8"select.result_types"); }
 
                     auto const result_type_byte{details::read_u8(code_curr, code_end, op_begin, err, u8"select.result_type")};
@@ -4420,11 +4412,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_func);
                     }
 
-                    auto const func_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"ref.func")};
+                    auto const func_index{
+                        details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"ref.func")};
                     check_ref_func_index(op_begin, func_index);
-                    operand_stack.push_back(
-                        {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)});
+                    operand_stack.push_back({static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)});
                     break;
                 }
                 case opcode_byte(wasm1p1_code::numeric_prefix):
@@ -4440,8 +4431,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [safe] unsafe (could be the section_end)
                     //        ^^ code_curr
 
-                    auto const subopcode{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"numeric_prefix")};
+                    auto const subopcode{
+                        details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"numeric_prefix")};
                     auto const numeric_code{static_cast<wasm1p1_numeric_code>(subopcode)};
 
                     switch(numeric_code)
@@ -4456,7 +4447,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i32.trunc_sat_f32_s", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i32.trunc_sat_f32_s",
+                                                                curr_operand_stack_value_type::f32,
+                                                                curr_operand_stack_value_type::i32);
                             break;
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f32_u:
@@ -4469,7 +4463,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i32.trunc_sat_f32_u", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i32.trunc_sat_f32_u",
+                                                                curr_operand_stack_value_type::f32,
+                                                                curr_operand_stack_value_type::i32);
                             break;
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f64_s:
@@ -4482,7 +4479,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i32.trunc_sat_f64_s", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i32.trunc_sat_f64_s",
+                                                                curr_operand_stack_value_type::f64,
+                                                                curr_operand_stack_value_type::i32);
                             break;
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f64_u:
@@ -4495,7 +4495,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i32.trunc_sat_f64_u", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i32.trunc_sat_f64_u",
+                                                                curr_operand_stack_value_type::f64,
+                                                                curr_operand_stack_value_type::i32);
                             break;
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f32_s:
@@ -4508,7 +4511,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i64.trunc_sat_f32_s", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i64);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i64.trunc_sat_f32_s",
+                                                                curr_operand_stack_value_type::f32,
+                                                                curr_operand_stack_value_type::i64);
                             break;
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f32_u:
@@ -4521,7 +4527,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i64.trunc_sat_f32_u", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i64);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i64.trunc_sat_f32_u",
+                                                                curr_operand_stack_value_type::f32,
+                                                                curr_operand_stack_value_type::i64);
                             break;
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
@@ -4534,7 +4543,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i64.trunc_sat_f64_s", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i64);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i64.trunc_sat_f64_s",
+                                                                curr_operand_stack_value_type::f64,
+                                                                curr_operand_stack_value_type::i64);
                             break;
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
@@ -4547,7 +4559,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            validate_numeric_unary_stack_effect(op_begin, u8"i64.trunc_sat_f64_u", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i64);
+                            validate_numeric_unary_stack_effect(op_begin,
+                                                                u8"i64.trunc_sat_f64_u",
+                                                                curr_operand_stack_value_type::f64,
+                                                                curr_operand_stack_value_type::i64);
                             break;
                         }
                         case wasm1p1_numeric_code::memory_init:
@@ -4560,8 +4575,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
                             }
-                            auto const data_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"memory.init.dataidx")};
+                            auto const data_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                               code_end,
+                                                                                                                               op_begin,
+                                                                                                                               err,
+                                                                                                                               u8"memory.init.dataidx")};
                             check_data_index(op_begin, data_index);
                             auto const memory_index{details::read_u8(code_curr, code_end, op_begin, err, u8"memory.init.memidx")};
                             check_memory_index_zero(op_begin, memory_index, u8"memory.init");
@@ -4578,8 +4596,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
                             }
-                            auto const data_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"data.drop")};
+                            auto const data_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                               code_end,
+                                                                                                                               op_begin,
+                                                                                                                               err,
+                                                                                                                               u8"data.drop")};
                             check_data_index(op_begin, data_index);
                             break;
                         }
@@ -4625,15 +4646,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment);
                             }
-                            auto const element_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.init.elemidx")};
+                            auto const element_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                  code_end,
+                                                                                                                                  op_begin,
+                                                                                                                                  err,
+                                                                                                                                  u8"table.init.elemidx")};
                             check_element_index(op_begin, element_index);
-                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.init.tableidx")};
+                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                code_end,
+                                                                                                                                op_begin,
+                                                                                                                                err,
+                                                                                                                                u8"table.init.tableidx")};
                             check_table_index(op_begin, table_index);
 
-                            auto const element_value_type{static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(
+                            auto const element_value_type{
+                                static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(
                                     elemsec.elems.index_unchecked(element_index).storage.segment.reftype))};
                             auto const table_value_type{get_table_value_type(table_index)};
                             if(element_value_type != table_value_type) [[unlikely]]
@@ -4659,8 +4686,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment);
                             }
-                            auto const element_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"elem.drop")};
+                            auto const element_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                  code_end,
+                                                                                                                                  op_begin,
+                                                                                                                                  err,
+                                                                                                                                  u8"elem.drop")};
                             check_element_index(op_begin, element_index);
                             break;
                         }
@@ -4674,11 +4704,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            auto const dst_table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.copy.dst")};
+                            auto const dst_table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                    code_end,
+                                                                                                                                    op_begin,
+                                                                                                                                    err,
+                                                                                                                                    u8"table.copy.dst")};
                             check_table_index(op_begin, dst_table_index);
-                            auto const src_table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.copy.src")};
+                            auto const src_table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                    code_end,
+                                                                                                                                    op_begin,
+                                                                                                                                    err,
+                                                                                                                                    u8"table.copy.src")};
                             check_table_index(op_begin, src_table_index);
 
                             auto const dst_type{get_table_value_type(dst_table_index)};
@@ -4706,12 +4742,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.grow")};
+                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                code_end,
+                                                                                                                                op_begin,
+                                                                                                                                err,
+                                                                                                                                u8"table.grow")};
                             check_table_index(op_begin, table_index);
                             auto const table_type{get_table_value_type(table_index)};
 
-                            if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.grow", 2uz); }
+                            if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
+                            {
+                                report_operand_stack_underflow(op_begin, u8"table.grow", 2uz);
+                            }
 
                             auto const delta{try_pop_concrete_operand()};
                             if(delta.from_stack && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
@@ -4748,8 +4790,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.size")};
+                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                code_end,
+                                                                                                                                op_begin,
+                                                                                                                                err,
+                                                                                                                                u8"table.size")};
                             check_table_index(op_begin, table_index);
                             operand_stack.push_back({curr_operand_stack_value_type::i32});
                             break;
@@ -4764,12 +4809,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                                                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
-                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"table.fill")};
+                            auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                                code_end,
+                                                                                                                                op_begin,
+                                                                                                                                err,
+                                                                                                                                u8"table.fill")};
                             check_table_index(op_begin, table_index);
                             auto const table_type{get_table_value_type(table_index)};
 
-                            if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.fill", 3uz); }
+                            if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]]
+                            {
+                                report_operand_stack_underflow(op_begin, u8"table.fill", 3uz);
+                            }
 
                             auto const len{try_pop_concrete_operand()};
                             if(len.from_stack && len.type != curr_operand_stack_value_type::i32) [[unlikely]]
@@ -4839,18 +4890,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_v128_const);
                     }
 
-                    auto const simd_subopcode{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                        code_curr, code_end, op_begin, err, u8"simd")};
+                    auto const simd_subopcode{
+                        details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"simd")};
                     auto const simd_code{static_cast<wasm1p1_simd_code>(simd_subopcode)};
 
                     auto const validate_simd_memarg{
                         [&](::uwvm2::utils::container::u8string_view op_name,
                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 max_align) constexpr UWVM_THROWS
                         {
-                            auto const align{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"simd.memarg.align")};
-                            auto const offset{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
-                                code_curr, code_end, op_begin, err, u8"simd.memarg.offset")};
+                            auto const align{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                          code_end,
+                                                                                                                          op_begin,
+                                                                                                                          err,
+                                                                                                                          u8"simd.memarg.align")};
+                            auto const offset{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
+                                                                                                                           code_end,
+                                                                                                                           op_begin,
+                                                                                                                           err,
+                                                                                                                           u8"simd.memarg.offset")};
 
                             if(all_memory_count == 0u) [[unlikely]]
                             {
@@ -4873,54 +4930,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
                         }};
 
-                    auto const check_lane_index{
-                        [&](::uwvm2::utils::container::u8string_view op_name,
-                            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte lane,
-                            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte lane_count) constexpr UWVM_THROWS
-                        {
-                            if(lane >= lane_count) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, op_name); }
-                        }};
+                    auto const check_lane_index{[&](::uwvm2::utils::container::u8string_view op_name,
+                                                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte lane,
+                                                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte lane_count) constexpr UWVM_THROWS
+                                                {
+                                                    if(lane >= lane_count) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, op_name); }
+                                                }};
 
-                    auto const simd_v128_type{
-                        static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
+                    auto const simd_v128_type{static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)};
                     curr_operand_stack_value_type v128_v128_v128_operands[3]{simd_v128_type, simd_v128_type, simd_v128_type};
 
                     auto const push_simd_v128{[&]() constexpr { operand_stack.push_back({simd_v128_type}); }};
 
-                    auto const validate_simd_unary_v128{
-                        [&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-                        {
-                            pop_expected_operands(op_begin, op_name, {v128_result_arr, v128_result_arr + 1u});
-                            push_simd_v128();
-                        }};
+                    auto const validate_simd_unary_v128{[&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                                        {
+                                                            pop_expected_operands(op_begin, op_name, {v128_result_arr, v128_result_arr + 1u});
+                                                            push_simd_v128();
+                                                        }};
 
-                    auto const validate_simd_binary_v128{
-                        [&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-                        {
-                            pop_expected_operands(op_begin, op_name, {v128_v128_operands, v128_v128_operands + 2u});
-                            push_simd_v128();
-                        }};
+                    auto const validate_simd_binary_v128{[&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                                         {
+                                                             pop_expected_operands(op_begin, op_name, {v128_v128_operands, v128_v128_operands + 2u});
+                                                             push_simd_v128();
+                                                         }};
 
-                    auto const validate_simd_ternary_v128{
-                        [&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-                        {
-                            pop_expected_operands(op_begin, op_name, {v128_v128_v128_operands, v128_v128_v128_operands + 3u});
-                            push_simd_v128();
-                        }};
+                    auto const validate_simd_ternary_v128{[&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                                          {
+                                                              pop_expected_operands(op_begin, op_name, {v128_v128_v128_operands, v128_v128_v128_operands + 3u});
+                                                              push_simd_v128();
+                                                          }};
 
-                    auto const validate_simd_test_v128{
-                        [&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-                        {
-                            pop_expected_operands(op_begin, op_name, {v128_result_arr, v128_result_arr + 1u});
-                            operand_stack.push_back({curr_operand_stack_value_type::i32});
-                        }};
+                    auto const validate_simd_test_v128{[&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                                       {
+                                                           pop_expected_operands(op_begin, op_name, {v128_result_arr, v128_result_arr + 1u});
+                                                           operand_stack.push_back({curr_operand_stack_value_type::i32});
+                                                       }};
 
-                    auto const validate_simd_shift_v128{
-                        [&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
-                        {
-                            pop_expected_operands(op_begin, op_name, {v128_i32_operands, v128_i32_operands + 2u});
-                            push_simd_v128();
-                        }};
+                    auto const validate_simd_shift_v128{[&](::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+                                                        {
+                                                            pop_expected_operands(op_begin, op_name, {v128_i32_operands, v128_i32_operands + 2u});
+                                                            push_simd_v128();
+                                                        }};
 
                     auto const validate_simd_splat{
                         [&](::uwvm2::utils::container::u8string_view op_name, curr_operand_stack_value_type scalar_type) constexpr UWVM_THROWS
@@ -4932,8 +4982,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             validate_simd_memarg(u8"v128.load", 4u);
                             validate_i32_operands(op_begin, u8"v128.load", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load8x8_s: [[fallthrough]];
@@ -4941,8 +4991,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             validate_simd_memarg(u8"v128.load8x8", 3u);
                             validate_i32_operands(op_begin, u8"v128.load8x8", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load16x4_s: [[fallthrough]];
@@ -4950,8 +5000,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             validate_simd_memarg(u8"v128.load16x4", 3u);
                             validate_i32_operands(op_begin, u8"v128.load16x4", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load32x2_s: [[fallthrough]];
@@ -4959,40 +5009,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             validate_simd_memarg(u8"v128.load32x2", 3u);
                             validate_i32_operands(op_begin, u8"v128.load32x2", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load8_splat:
                         {
                             validate_simd_memarg(u8"v128.load8_splat", 0u);
                             validate_i32_operands(op_begin, u8"v128.load8_splat", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load16_splat:
                         {
                             validate_simd_memarg(u8"v128.load16_splat", 1u);
                             validate_i32_operands(op_begin, u8"v128.load16_splat", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load32_splat:
                         {
                             validate_simd_memarg(u8"v128.load32_splat", 2u);
                             validate_i32_operands(op_begin, u8"v128.load32_splat", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load64_splat:
                         {
                             validate_simd_memarg(u8"v128.load64_splat", 3u);
                             validate_i32_operands(op_begin, u8"v128.load64_splat", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_store:
@@ -5004,8 +5054,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         case wasm1p1_simd_code::v128_const:
                         {
                             details::skip_bytes(code_curr, code_end, op_begin, 16uz, err, u8"v128.const");
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::i8x16_shuffle:
@@ -5016,8 +5066,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                 if(lane >= 32u) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, u8"i8x16.shuffle"); }
                             }
                             pop_expected_operands(op_begin, u8"i8x16.shuffle", {v128_v128_operands, v128_v128_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::i8x16_swizzle:
@@ -5069,8 +5119,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"i8x16.replace_lane")};
                             check_lane_index(u8"i8x16.replace_lane", lane, 16u);
                             pop_expected_operands(op_begin, u8"i8x16.replace_lane", {v128_i32_operands, v128_i32_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::i16x8_extract_lane_s: [[fallthrough]];
@@ -5087,8 +5137,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"i16x8.replace_lane")};
                             check_lane_index(u8"i16x8.replace_lane", lane, 8u);
                             pop_expected_operands(op_begin, u8"i16x8.replace_lane", {v128_i32_operands, v128_i32_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::i32x4_extract_lane:
@@ -5104,8 +5154,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"i32x4.replace_lane")};
                             check_lane_index(u8"i32x4.replace_lane", lane, 4u);
                             pop_expected_operands(op_begin, u8"i32x4.replace_lane", {v128_i32_operands, v128_i32_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::i64x2_extract_lane:
@@ -5121,8 +5171,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"i64x2.replace_lane")};
                             check_lane_index(u8"i64x2.replace_lane", lane, 2u);
                             pop_expected_operands(op_begin, u8"i64x2.replace_lane", {v128_i64_operands, v128_i64_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::f32x4_extract_lane:
@@ -5138,8 +5188,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"f32x4.replace_lane")};
                             check_lane_index(u8"f32x4.replace_lane", lane, 4u);
                             pop_expected_operands(op_begin, u8"f32x4.replace_lane", {v128_f32_operands, v128_f32_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::f64x2_extract_lane:
@@ -5155,8 +5205,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"f64x2.replace_lane")};
                             check_lane_index(u8"f64x2.replace_lane", lane, 2u);
                             pop_expected_operands(op_begin, u8"f64x2.replace_lane", {v128_f64_operands, v128_f64_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load8_lane: [[fallthrough]];
@@ -5176,8 +5226,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                      : 2u};
                             check_lane_index(u8"v128.load_lane", lane, static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(lane_count));
                             pop_expected_operands(op_begin, u8"v128.load_lane", {i32_v128_operands, i32_v128_operands + 2u});
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_store8_lane: [[fallthrough]];
@@ -5203,16 +5253,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             validate_simd_memarg(u8"v128.load32_zero", 2u);
                             validate_i32_operands(op_begin, u8"v128.load32_zero", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::v128_load64_zero:
                         {
                             validate_simd_memarg(u8"v128.load64_zero", 3u);
                             validate_i32_operands(op_begin, u8"v128.load64_zero", 1uz);
-                            operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
+                            operand_stack.push_back(
+                                {static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});
                             break;
                         }
                         case wasm1p1_simd_code::f32x4_demote_f64x2_zero:

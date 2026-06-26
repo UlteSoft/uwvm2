@@ -45,12 +45,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     /// @brief Run wasm1 final checks and then verify the optional data count section.
     /// @details Code-section opcode/index validation belongs to src/uwvm2/validation/standard/wasm1p1.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline constexpr void define_final_check(
-        [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<wasm1p1_final_check> final_adl,
-        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> & module_storage,
-        ::std::byte const* const module_end,
-        ::uwvm2::parser::wasm::base::error_impl& err,
-        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
+    inline constexpr void define_final_check([[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<wasm1p1_final_check> final_adl,
+                                             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> & module_storage,
+                                             ::std::byte const* const module_end,
+                                             ::uwvm2::parser::wasm::base::error_impl& err,
+                                             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
     {
         // Reuse the wasm1 final check first; it verifies func/code cardinality and is independent of the extra 1.1 section.
         ::uwvm2::parser::wasm::standard::wasm1::features::define_final_check(
@@ -60,12 +59,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
             err,
             fs_para);
 
-        auto const& datacountsec{
-            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
-        auto const& datasec{
-            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>>(
-                module_storage.sections)};
+        auto const& datacountsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
+        auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>>(module_storage.sections)};
         if(datacountsec.present)
         {
             auto const actual_data_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(datasec.datas.size())};

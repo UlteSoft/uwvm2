@@ -53,10 +53,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # else
     UWVM_GNU_COLD inline constexpr
 # endif
-        ::uwvm2::utils::cmdline::parameter_return_type runtime_llvm_jit_cache_path_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
-                                                                                                para_begin,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type runtime_llvm_jit_cache_path_callback(
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         constexpr auto print_usage_error{
             []() constexpr noexcept

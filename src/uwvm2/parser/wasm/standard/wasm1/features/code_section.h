@@ -94,10 +94,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     /// @brief Check whether a code-section local value type is enabled for the current feature parameter set.
     /// @details Prefer the extension-aware hook when present; otherwise fall back to the original wasm1 two-argument hook.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline constexpr bool check_codesec_value_type(
-        ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<code_section_storage_t<Fs...>> sec_adl,
-        ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
-        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
+    inline constexpr bool check_codesec_value_type(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<code_section_storage_t<Fs...>> sec_adl,
+                                                   ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
+                                                   ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
     {
         if constexpr(has_check_codesec_value_type_with_feature_parameter<Fs...>)
         {
@@ -297,7 +296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [ ... body_size ...] local_count(code_body_begin) ... ...] (code_body_end)
             // [        safe      ]        .....                        ] unsafe (could be the section_end)
             //                      ^^ section_curr
-            
+
             // The length check above proves [section_curr, section_curr + body_size) is safe inside the current section.
             // Pointer storage: code_begin records the beginning of the checked code body range.
             code.body.code_begin = reinterpret_cast<wasm_byte_const_may_alias_ptr>(section_curr);

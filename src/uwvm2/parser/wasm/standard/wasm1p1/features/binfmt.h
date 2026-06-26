@@ -59,39 +59,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         inline static constexpr bool allow_multi_result_vector{true};
         inline static constexpr bool allow_multi_table{true};
 
-        using value_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::type::value_type,
-            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>;
+        using value_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::value_type,
+                                                                                     ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>;
 
-        using table_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::type::table_type,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::table_type>;
+        using table_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::table_type,
+                                                                                     ::uwvm2::parser::wasm::standard::wasm1p1::features::table_type>;
 
-        using global_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::type::global_type,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type>;
+        using global_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::global_type,
+                                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type>;
 
-        using wasm_const_expr = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_storage_t>;
+        using wasm_const_expr =
+            ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t,
+                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_storage_t>;
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        using data_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_data_t<Fs...>,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_data_t<Fs...>>;
+        using data_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::features::wasm1_data_t<Fs...>,
+                                                                                    ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_data_t<Fs...>>;
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        using element_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_element_t<Fs...>,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_t<Fs...>>;
+        using element_type =
+            ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::features::wasm1_element_t<Fs...>,
+                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_t<Fs...>>;
 
-        using final_check = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_final_check,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_final_check>;
+        using final_check = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::features::wasm1_final_check,
+                                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_final_check>;
 
-        using section_sequential_packer = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
-            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_sequence_storage_t,
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_sequence_storage_t>;
+        using section_sequential_packer =
+            ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::features::wasm1_sequence_storage_t,
+                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_sequence_storage_t>;
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         using binfmt_ver1_section_type =

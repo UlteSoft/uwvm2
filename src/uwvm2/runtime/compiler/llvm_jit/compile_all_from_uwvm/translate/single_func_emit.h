@@ -512,7 +512,7 @@ inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& fun
 {
     apply_llvm_jit_platform_function_attrs(function);
     apply_llvm_jit_semantic_function_attrs(function);
-#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                               \
     (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
     // Win64 trap bridges always pass explicit generated-frame context via read_register.  LLVM rejects reading the
     // architectural frame pointer from a function where that register remains allocatable, so every generated caller
@@ -599,10 +599,7 @@ inline constexpr void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, :
 {
     call_inst.setCallingConv(calling_conv);
 #if defined(__i386__) || defined(_M_IX86)
-    if(calling_conv == ::llvm::CallingConv::X86_FastCall)
-    {
-        apply_llvm_jit_i386_fastcall_param_attrs(call_inst);
-    }
+    if(calling_conv == ::llvm::CallingConv::X86_FastCall) { apply_llvm_jit_i386_fastcall_param_attrs(call_inst); }
 #endif
 }
 
@@ -774,7 +771,7 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     // Windows unwind state is reconstructed from a CONTEXT record, not from a DWARF cursor.  When a generated Wasm
     // frame calls into the C++ trap helper, the helper's own frame is already a different ABI boundary, so the generated
     // caller must pass its live frame/stack pointer values explicitly.
-#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                             \
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                                               \
     (defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
     return true;
 #else
@@ -3909,8 +3906,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
             // the core to run normal local initialization instead of OSR local restore.
             for(auto& arg: public_function->args()) { core_arguments.push_back(::std::addressof(arg)); }
 
-            auto core_call{
-                apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
+            auto core_call{apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
             if(state.emit_call_stack_frames && !emit_runtime_local_func_llvm_jit_call_stack_pop(public_builder)) [[unlikely]] { return false; }
 
             if(public_function->getReturnType()->isVoidTy()) { public_builder.CreateRetVoid(); }
@@ -4058,8 +4054,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                     core_arguments.push_back(::llvm::Constant::getNullValue(llvm_param_type));
                 }
 
-                auto core_call{
-                    apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
+                auto core_call{apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, {core_arguments.data(), core_arguments.size()}))};
                 if(abi_layout.result_count == 1uz)
                 {
                     auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
@@ -4227,8 +4222,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 param_offset += abi_size;
             }
 
-            auto typed_call{
-                apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, {call_arguments.data(), call_arguments.size()}))};
+            auto typed_call{apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, {call_arguments.data(), call_arguments.size()}))};
             if(abi_layout.result_count == 1uz)
             {
                 // Store the typed return value back into the caller-provided raw result buffer, completing the raw ABI
@@ -5638,8 +5632,11 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
         if(lazy_target_result.valid) { return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, lazy_target_result.result_value); }
     }
 
-    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(
-        state, *runtime_module_ptr, func_index, *callee_type_ptr, {prepared_call.arguments.data(), prepared_call.arguments.size()})};
+    auto call_value{emit_runtime_local_func_llvm_jit_direct_wasm_call_value(state,
+                                                                            *runtime_module_ptr,
+                                                                            func_index,
+                                                                            *callee_type_ptr,
+                                                                            {prepared_call.arguments.data(), prepared_call.arguments.size()})};
     if(call_value == nullptr) [[unlikely]] { return false; }
     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
 }

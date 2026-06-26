@@ -41,9 +41,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     {
         // Index is the section id; value is the canonical order. 0 keeps custom sections free-positioned.
         // WebAssembly 1.1 inserts data count (id 12) between element and code.
-        inline static constexpr ::uwvm2::utils::container::array<::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t, 13uz>
-            section_id_sequential_mapping_table{{
-                0u,   // custom
+        inline static constexpr ::uwvm2::utils::container::array<::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t, 13uz> section_id_sequential_mapping_table{
+            {
+             0u,   // custom
                 1u,   // type
                 2u,   // import
                 3u,   // function
@@ -56,7 +56,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                 11u,  // code
                 12u,  // data
                 10u   // data count
-            }};
+            }
+        };
 
         inline static constexpr ::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t custom_name_order{
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_order_add_or_overflow_die_chain(12u, 1u)};

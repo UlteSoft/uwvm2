@@ -131,9 +131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::eventtype_t type;
 
         union wasi_event_u
-        {
-            wasi_event_fd_readwrite_t fd_readwrite;
-        } u;
+        { wasi_event_fd_readwrite_t fd_readwrite; } u;
     };
 
     inline constexpr ::std::size_t size_of_wasi_event_t{32uz};
@@ -164,9 +162,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     struct alignas(4uz) wasi_subscription_fd_readwrite_t
-    {
-        ::uwvm2::imported::wasi::wasip1::abi::fd_t file_descriptor;
-    };
+    { ::uwvm2::imported::wasi::wasip1::abi::fd_t file_descriptor; };
 
     inline constexpr ::std::size_t size_of_wasi_subscription_fd_readwrite_t{4uz};
 
