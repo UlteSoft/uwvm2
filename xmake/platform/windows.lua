@@ -29,7 +29,7 @@ function windows_target()
             add_cxflags("-fno-ident") -- also strip ident data
         end
         
-        local static_link = get_config("static")
+        local static_link = uwvm_static_mode_is_compiler()
 
         if is_mode("debug") then    
             if static_link then	
@@ -93,7 +93,7 @@ function windows_target()
     
         add_cxflags("-GR-") -- disable rtti
     
-        local static_link = get_config("static")
+        local static_link = uwvm_static_mode_is_compiler()
     
         if is_mode("debug") then
             add_cxflags("-GS") -- enable buffer overflow check

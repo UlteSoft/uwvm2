@@ -1,3 +1,8 @@
+function uwvm_static_mode_is_compiler()
+    local static_mode = get_config("static")
+    return static_mode == true or static_mode == "true" or static_mode == "compiler"
+end
+
 includes("windows.lua")
 includes("mingw.lua")
 includes("linux.lua")

@@ -42,8 +42,7 @@ function cygwin_target()
         set_extension(".exe")
     end
 
-    local static_link = get_config("static")
-    if static_link then	
+    if uwvm_static_mode_is_compiler() then
         add_ldflags("-static", {force = true})
     end
 

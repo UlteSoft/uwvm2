@@ -31,8 +31,7 @@ function darwin_target()
         add_cxflags("-fno-ident") -- also strip ident data
     end
 
-    local static_link = get_config("static")
-    if static_link then	
+    if uwvm_static_mode_is_compiler() then
         add_ldflags("-static", {force = true})
     end
 
