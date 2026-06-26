@@ -37,6 +37,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::opcode
         // Parametric instructions
         select_t = 0x1c,
 
+        // Table instructions
+        table_get = 0x25,
+        table_set = 0x26,
+
         // Sign-extension instructions
         i32_extend8_s = 0xc0,
         i32_extend16_s = 0xc1,

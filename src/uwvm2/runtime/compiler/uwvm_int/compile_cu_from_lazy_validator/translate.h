@@ -335,6 +335,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             code_curr += bytes;
         }
 
+        inline constexpr void skip_reserved_memory_index_byte(::std::byte const*& code_curr,
+                                                              ::std::byte const* code_end,
+                                                              ::std::byte const* op_begin,
+                                                              ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            if(code_curr == code_end) [[unlikely]]
+            {
+                fail_lazy_split(op_begin, code_validation_error_code::invalid_memory_index, err, ::fast_io::parse_code::end_of_file);
+            }
+            ++code_curr;
+        }
+
         inline constexpr ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
                                                              ::std::size_t function_index,
                                                              ::std::size_t local_function_index,
@@ -616,7 +628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 case wasm1_code::memory_size:
                 case wasm1_code::memory_grow:
                 {
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_memory_index, err);
+                    skip_reserved_memory_index_byte(code_curr, code_end, op_begin, err);
                     return;
                 }
                 case wasm1_code::i32_const:

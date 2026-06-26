@@ -559,11 +559,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                return vt == value_type::funcref || vt == value_type::externref;
                                            }};
 
-        auto const is_wasm1_numeric_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> bool
-                                               {
-                                                   return type == curr_operand_stack_value_type::i32 || type == curr_operand_stack_value_type::i64 ||
-                                                          type == curr_operand_stack_value_type::f32 || type == curr_operand_stack_value_type::f64;
-                                               }};
+        auto const is_untyped_select_value_type{[&](curr_operand_stack_value_type type) constexpr noexcept -> bool
+                                                {
+                                                    if(type == curr_operand_stack_value_type::i32 || type == curr_operand_stack_value_type::i64 ||
+                                                       type == curr_operand_stack_value_type::f32 || type == curr_operand_stack_value_type::f64)
+                                                    {
+                                                        return true;
+                                                    }
+
+                                                    auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type)};
+                                                    return vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128 && wasm1p1_para.enable_simd;
+                                                }};
 
         auto const push_value_types{[&](block_result_type<Fs...> types) constexpr
                                     {
@@ -653,12 +659,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 auto const blocktype_begin{code_curr};
                 auto const blocktype{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>(
                     code_curr, code_end, op_begin, err, u8"blocktype")};
+                auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
 
                 // op_name blocktype ...
                 // [safe ] unsafe (could be the section_end)
                 //        ^^ blocktype_begin
 
-                // read_leb128 moved code_curr only after proving the whole blocktype immediate safe.
+                // read_leb128 moved code_curr only after proving the whole blocktype immediate safe. A wasm1.1 blocktype is
+                // encoded as s33, so the binary encoding may occupy at most 5 bytes.
+                if(blocktype_encoded_size > 5uz) [[unlikely]]
+                {
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte first_blocktype_byte{};
+                    ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
+#if CHAR_BIT > 8
+                    first_blocktype_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                        static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+#endif
+                    err.err_curr = op_begin;
+                    err.err_selectable.u8 = first_blocktype_byte;
+                    err.err_code = code_validation_error_code::illegal_block_type;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
 
                 switch(blocktype)
                 {
@@ -2419,6 +2440,100 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     break;
                 }
+                case opcode_byte(wasm1p1_code::table_get):
+                {
+                    // table.get tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // table.get tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // table.get tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    {
+                        details::fail_feature_required(op_begin,
+                                                       err,
+                                                       opcode_u32(wasm1p1_code::table_get),
+                                                       ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                       ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+
+                    auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        code_curr, code_end, op_begin, err, u8"table.get")};
+                    check_table_index(op_begin, table_index);
+
+                    validate_i32_operands(op_begin, u8"table.get", 1uz);
+                    operand_stack.push_back({get_table_value_type(table_index)});
+
+                    break;
+                }
+                case opcode_byte(wasm1p1_code::table_set):
+                {
+                    // table.set tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // table.set tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // table.set tableidx ...
+                    // [safe   ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    {
+                        details::fail_feature_required(op_begin,
+                                                       err,
+                                                       opcode_u32(wasm1p1_code::table_set),
+                                                       ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                       ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+
+                    auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        code_curr, code_end, op_begin, err, u8"table.set")};
+                    check_table_index(op_begin, table_index);
+                    auto const table_type{get_table_value_type(table_index)};
+
+                    if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
+
+                    auto const value{try_pop_concrete_operand()};
+                    if(value.from_stack && value.type != table_type) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.set";
+                        err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(table_type);
+                        err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
+                        err.err_code = code_validation_error_code::br_value_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    auto const index{try_pop_concrete_operand()};
+                    if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.set";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(index.type);
+                        err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    break;
+                }
                 case static_cast<wasm_byte>(wasm1_code::drop):
                 {
                     // drop   ...
@@ -2517,7 +2632,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const select_value_type{v1_from_stack ? v1_type : v2_type};
-                    if((v1_from_stack || v2_from_stack) && !is_wasm1_numeric_value_type(select_value_type)) [[unlikely]]
+                    if((v1_from_stack || v2_from_stack) && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
@@ -3224,45 +3339,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    // In the Wasm MVP binary format, `memory.size` carries a reserved memory index
-                    // immediate that must decode to memory index 0. This immediate is still encoded
-                    // as an unsigned LEB128 integer, not as a raw fixed byte.
-                    //
-                    // That distinction matters for validation strictness: the validator must reject
-                    // malformed LEB128, but it must not incorrectly require the canonical single-byte
-                    // encoding `0x00`. Per the W3C binary integer rules, trailing-zero forms that are
-                    // still well-formed LEB128 within the width bounds remain valid encodings of zero.
-                    // Therefore the correct MVP check here is:
-                    //   1. decode the immediate as `u32` LEB128,
-                    //   2. reject malformed encodings as `invalid_memory_index`,
-                    //   3. reject decoded non-zero values as `illegal_memory_index`.
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP/wasm1.1 binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // MVP only defines memory 0 here. The binary encoding may use any well-formed
-                    // LEB128 representation whose decoded value is zero; the semantic constraint is
-                    // on the decoded memidx, not on the byte sequence being exactly `0x00`.
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -3305,37 +3406,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    // `memory.grow` follows the same MVP rule as `memory.size`: the immediate is a
-                    // reserved memidx encoded as unsigned LEB128 and it must decode to zero.
-                    //
-                    // We intentionally validate the decoded value instead of hard-coding a literal
-                    // single-byte check, because well-formed non-canonical zero encodings are still
-                    // accepted by the Wasm binary integer grammar.
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP/wasm1.1 binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // As above, this is a decoded-value check, not a raw-byte check.
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -4915,7 +5010,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_simd_code::i8x16_shuffle:
                         {
-                            details::skip_bytes(code_curr, code_end, op_begin, 16uz, err, u8"i8x16.shuffle");
+                            for(::std::size_t lane_index{}; lane_index != 16uz; ++lane_index)
+                            {
+                                auto const lane{details::read_u8(code_curr, code_end, op_begin, err, u8"i8x16.shuffle")};
+                                if(lane >= 32u) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, u8"i8x16.shuffle"); }
+                            }
                             pop_expected_operands(op_begin, u8"i8x16.shuffle", {v128_v128_operands, v128_v128_operands + 2u});
                             operand_stack.push_back({static_cast<curr_operand_stack_value_type>(
                                 ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)});

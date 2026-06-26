@@ -3060,6 +3060,16 @@ template <typename Immediate>
     return true;
 }
 
+// Parse the MVP reserved memory index byte used by memory.size and memory.grow.
+[[nodiscard]] inline constexpr bool parse_wasm_reserved_zero_byte(::std::byte const*& code_curr, ::std::byte const* code_end) noexcept
+{
+    if(code_curr == code_end) [[unlikely]] { return false; }
+
+    auto const immediate{::std::to_integer<::std::uint_least8_t>(*code_curr)};
+    ++code_curr;
+    return immediate == 0u;
+}
+
 // Parse a fixed-width little-endian immediate, used by f32.const and f64.const.
 template <typename UInt>
 [[nodiscard]] inline constexpr bool parse_wasm_little_endian_immediate(::std::byte const*& code_curr, ::std::byte const* code_end, UInt& immediate) noexcept
@@ -3322,8 +3332,7 @@ struct llvm_jit_branch_target_t
         case wasm1_code::memory_grow:
         {
             ++code_curr;
-            validation_module_traits_t::wasm_u32 memidx{};
-            return parse_wasm_leb128_immediate(code_curr, code_end, memidx);
+            return parse_wasm_reserved_zero_byte(code_curr, code_end);
         }
         [[unlikely]] default:
         {

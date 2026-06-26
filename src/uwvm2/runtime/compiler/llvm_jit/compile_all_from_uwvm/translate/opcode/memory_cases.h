@@ -437,10 +437,8 @@ case wasm1_code::i64_store32:
 }
 
 // memory.size
-// Stack effect: () -> (i32 current_pages).  WebAssembly 1.0/MVP still encodes a memory index
-// immediate; this validator decodes it as LEB128, requires the decoded value to be zero, and then
-// pushes the current page-count result type.  Multi-memory will relax the zero restriction, and
-// memory64 must revisit the result type.
+// Stack effect: () -> (i32 current_pages).  WebAssembly 1.0/MVP encodes a reserved literal
+// `0x00` byte after this opcode; multi-memory will replace that byte with a real memory index.
 case wasm1_code::memory_size:
 {
     // memory.size memidx ...
@@ -459,39 +457,32 @@ case wasm1_code::memory_size:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // WebAssembly 1.0/MVP keeps `memory.size` on memory 0 only, but the immediate is still represented as an unsigned
-    // LEB128 memory index in the binary stream. The correct validation contract is to decode first and then require the
-    // decoded value to be zero.  Future multi-memory support should replace this with selected-memory existence/type
-    // validation instead of removing the decode step.
-    //
-    // This compiler-integrated validator intentionally mirrors the standalone validator so both
-    // paths accept the same set of well-formed MVP binaries, including non-canonical zero LEB128
-    // encodings that remain valid under the W3C integer grammar.
-    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                            ::fast_io::mnp::leb128_get(memidx))};
-    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+    if(code_curr == code_end) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
     // memory.size memidx ...
-    // [ safe           ] unsafe (could be the section_end)
+    // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+    auto const memidx_pos{code_curr};
+    ++code_curr;
 
     // memory.size memidx ...
-    // [ safe           ] unsafe (could be the section_end)
-    //                    ^^ code_curr
+    // [ safe    ] unsafe (could be the section_end)
+    //              ^^ code_curr
 
-    // Enforce the MVP semantic restriction on the decoded memidx value.
+    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+    memidx =
+        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;
@@ -525,7 +516,7 @@ case wasm1_code::memory_size:
 
 // memory.grow
 // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1).  The immediate follows the
-// same WebAssembly 1.0/MVP memory-index rule as `memory.size`, and the delta operand must be i32.
+// same WebAssembly 1.0/MVP reserved zero-byte rule as `memory.size`, and the delta operand must be i32.
 // Multi-memory must select the requested memory; memory64 must revisit the delta/result types.
 case wasm1_code::memory_grow:
 {
@@ -545,34 +536,32 @@ case wasm1_code::memory_grow:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // `memory.grow` uses the same WebAssembly 1.0/MVP reserved memidx rule. Keep this logic aligned with the standard
-    // validator: malformed LEB128 is invalid encoding; well-formed non-zero memidx is illegal MVP use.  Future
-    // multi-memory support must turn this into selected-memory validation and pass the chosen index to the emitter.
-    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                            ::fast_io::mnp::leb128_get(memidx))};
-    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+    if(code_curr == code_end) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
     // memory.grow memidx ...
-    // [        safe    ] unsafe (could be the section_end)
+    // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+    auto const memidx_pos{code_curr};
+    ++code_curr;
 
     // memory.grow memidx ...
-    // [        safe    ] unsafe (could be the section_end)
-    //                    ^^ code_curr
+    // [ safe    ] unsafe (could be the section_end)
+    //              ^^ code_curr
 
-    // Enforce the MVP semantic restriction on the decoded memidx value.
+    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+    memidx =
+        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;

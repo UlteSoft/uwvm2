@@ -175,6 +175,50 @@ namespace test
         return mod;
     }
 
+    [[nodiscard]] inline u8string build_multi_result_type_module() noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string payload;
+        append_uleb128(payload, 1u);
+        append_byte(payload, 0x60u);
+        append_uleb128(payload, 0u);
+        append_uleb128(payload, 2u);
+        append_byte(payload, 0x7Fu);
+        append_byte(payload, 0x7Eu);
+        append_section_with_payload(mod, 1u, payload);
+        return mod;
+    }
+
+    [[nodiscard]] inline u8string build_two_table_module() noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string payload;
+        append_uleb128(payload, 2u);
+        append_byte(payload, 0x70u);
+        append_byte(payload, 0x00u);
+        append_uleb128(payload, 1u);
+        append_byte(payload, 0x70u);
+        append_byte(payload, 0x00u);
+        append_uleb128(payload, 1u);
+        append_section_with_payload(mod, 4u, payload);
+        return mod;
+    }
+
+    [[nodiscard]] inline u8string build_data_count_zero_module() noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string payload;
+        append_uleb128(payload, 0u);
+        append_section_with_payload(mod, 12u, payload);
+        return mod;
+    }
+
     [[noreturn]] inline void fail(char const* msg)
     {
         ::fast_io::io::perrln("wasm1p1_parser_section_details: ", ::fast_io::mnp::os_c_str(msg));
@@ -240,6 +284,93 @@ namespace test
         p1_para.controllable_allow_multi_result_vector = false;
         p1_para.controllable_allow_multi_table = false;
     }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline void parse_module(u8string const& wasm, ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para)
+    {
+        auto const* const begin{reinterpret_cast<::std::byte const*>(wasm.data())};
+        auto const* const end{begin + wasm.size()};
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        static_cast<void>(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Fs...>(begin, end, err, fs_para));
+    }
+
+#ifdef UWVM_CPP_EXCEPTIONS
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline void expect_parse_error(u8string const& wasm,
+                                   ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                   ::uwvm2::parser::wasm::base::wasm_parse_error_code expected,
+                                   char const* label)
+    {
+        auto const* const begin{reinterpret_cast<::std::byte const*>(wasm.data())};
+        auto const* const end{begin + wasm.size()};
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        try
+        {
+            static_cast<void>(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Fs...>(begin, end, err, fs_para));
+            fail(label);
+        }
+        catch(::fast_io::error const&)
+        {
+        }
+
+        if(err.err_code != expected) [[unlikely]] { fail(label); }
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline void expect_parse_success(u8string const& wasm,
+                                     ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                     char const* label)
+    {
+        try
+        {
+            parse_module<Fs...>(wasm, fs_para);
+        }
+        catch(::fast_io::error const&)
+        {
+            fail(label);
+        }
+    }
+
+    inline void test_default_mvp_feature_rejections()
+    {
+        using wasm1 = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+        using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
+        using error_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code;
+        using feature_para_t = ::uwvm2::parser::wasm::concepts::feature_parameter_t<wasm1, wasm1p1>;
+
+        auto multi_result_module{build_multi_result_type_module()};
+        feature_para_t default_multi_para{};
+        expect_parse_error<wasm1, wasm1p1>(
+            multi_result_module, default_multi_para, error_code::wasm1_not_allow_multi_value, "default parser accepted multi-result type");
+
+        feature_para_t multi_value_para{};
+        auto& multi_value_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(multi_value_para)};
+        multi_value_p1.enable_multi_value = true;
+        multi_value_p1.controllable_allow_multi_result_vector = false;
+        expect_parse_success<wasm1, wasm1p1>(multi_result_module, multi_value_para, "multi-value parser switch did not allow multi-result type");
+
+        auto two_table_module{build_two_table_module()};
+        feature_para_t default_table_para{};
+        expect_parse_error<wasm1, wasm1p1>(
+            two_table_module, default_table_para, error_code::wasm1_not_allow_multi_table, "default parser accepted multiple tables");
+
+        feature_para_t reference_types_para{};
+        auto& reference_types_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(reference_types_para)};
+        reference_types_p1.enable_reference_types = true;
+        reference_types_p1.controllable_allow_multi_table = false;
+        expect_parse_success<wasm1, wasm1p1>(two_table_module, reference_types_para, "reference-types parser switch did not allow multiple tables");
+
+        auto data_count_module{build_data_count_zero_module()};
+        feature_para_t default_bulk_para{};
+        expect_parse_error<wasm1, wasm1p1>(
+            data_count_module, default_bulk_para, error_code::wasm1p1_feature_required, "default parser accepted data-count section");
+
+        feature_para_t bulk_memory_para{};
+        auto& bulk_memory_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(bulk_memory_para)};
+        bulk_memory_p1.enable_bulk_memory = true;
+        expect_parse_success<wasm1, wasm1p1>(data_count_module, bulk_memory_para, "bulk-memory parser switch did not allow data-count section");
+    }
+#endif
 }  // namespace test
 
 int main()
@@ -309,6 +440,8 @@ int main()
     test::assert_printable_all_chars(section_details(datasec, module_storage.sections));
 
 #ifdef UWVM_CPP_EXCEPTIONS
+    test::test_default_mvp_feature_rejections();
+
     {
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<wasm1, wasm1p1> limited_para{};
         test::enable_all_wasm1p1_features(limited_para);
