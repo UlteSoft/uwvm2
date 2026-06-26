@@ -125,14 +125,14 @@ Enables/disables link-time optimization (LTO) policy in release-like modes (`rel
 - **Example:**
   - `xmake f --enable-lto=n`
 
-### `--static=[y|n]`
+### `--static=[none|non-system|compiler]`
 
-Enables static linking by adding `-static` at link time (where supported).
+Selects the static linking policy.
 
-- **Default:** `n`
+- **Default:** `none`
 - **Impact:** Produces more self-contained binaries but can significantly increase size and may be incompatible with some platforms/toolchains (e.g. macOS generally does not support fully static system linking in the same way as Linux).
 - **Example:**
-  - `xmake f --static=y`
+  - `xmake f --static=compiler`
 
 ### `--use-llvm-compiler=[y|n]`
 

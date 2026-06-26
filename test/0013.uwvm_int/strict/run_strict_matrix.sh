@@ -66,7 +66,7 @@ COMMON_F_FLAGS=(
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=n
+  --static=none
   --enable-int=uwvm-int
 )
 

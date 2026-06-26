@@ -117,7 +117,7 @@ Additionally, running on Windows 9x may require extra prerequisite components (d
 https://github.com/UlteSoft/uwvm2-prerequisites/tree/master/win95
 
 ## Note
-If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=y` for static linking will resolve the issue.
+If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=compiler` for static linking will resolve the issue.
 
 ```
 =================================================================
