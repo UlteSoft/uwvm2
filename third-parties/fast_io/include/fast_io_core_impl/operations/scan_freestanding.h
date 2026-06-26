@@ -374,6 +374,38 @@ inline constexpr char_type const *scan_n_precise_reserve_no_error(char_type cons
 	}
 }
 
+struct precise_scan_may_error_result
+{
+	bool handled{};
+	bool success{};
+};
+
+template <typename input, typename T>
+[[nodiscard]] inline constexpr precise_scan_may_error_result scan_precise_reserve_may_error_in_buffer_impl(input in, T t)
+{
+	using char_type = typename input::input_char_type;
+	constexpr ::std::size_t n{scan_precise_reserve_size(::fast_io::io_reserve_type<char_type, T>)};
+	auto curr_ptr{ibuffer_curr(in)};
+	char_type const *curr{curr_ptr};
+	char_type const *end{ibuffer_end(in)};
+	::std::size_t const diff{static_cast<::std::size_t>(end - curr)};
+	if (diff < n) [[unlikely]]
+	{
+		return {};
+	}
+	auto ret{scan_precise_reserve_define(::fast_io::io_reserve_type<char_type, T>, curr, t)};
+	if (ret != ::fast_io::parse_code::ok)
+	{
+		if (ret == ::fast_io::parse_code::end_of_file)
+		{
+			return {true, false};
+		}
+		throw_parse_code(ret);
+	}
+	ibuffer_set_curr(in, curr_ptr + n);
+	return {true, true};
+}
+
 template <typename input, ::std::size_t skippings = 0>
 [[nodiscard]] inline constexpr bool scan_controls_impl(input) noexcept
 {
@@ -432,6 +464,27 @@ template <typename input, ::std::size_t skippings = 0, typename T, typename... A
 				else
 				{
 					return ::fast_io::details::decay::scan_controls_impl<input, res.position - 1u>(in, args...);
+				}
+			}
+		}
+		else if constexpr (::fast_io::precise_reserve_scannable<char_type, T> &&
+						   !::fast_io::precise_reserve_scannable_no_error<char_type, T>)
+		{
+			auto may_error_result{
+				::fast_io::details::decay::scan_precise_reserve_may_error_in_buffer_impl(in, t)};
+			if (may_error_result.handled)
+			{
+				if (!may_error_result.success)
+				{
+					return false;
+				}
+				if constexpr (sizeof...(Args) == 0)
+				{
+					return true;
+				}
+				else
+				{
+					return ::fast_io::details::decay::scan_controls_impl(in, args...);
 				}
 			}
 		}
