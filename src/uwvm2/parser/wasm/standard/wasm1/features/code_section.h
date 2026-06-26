@@ -81,6 +81,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::is_valid_value_type(value_type); }
 
+    /// @brief Detect a feature-aware code-section value-type checker.
+    /// @details Extension features use this differently named hook so the MVP two-argument ADL hook remains unambiguous.
+    template <typename... Fs>
+    concept has_check_codesec_value_type_with_feature_parameter =
+        requires(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<code_section_storage_t<Fs...>> sec_adl,
+                 ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
+                 ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) {
+            { define_check_codesec_value_type_with_feature_parameter(sec_adl, value_type, fs_para) } -> ::std::same_as<bool>;
+        };
+
+    /// @brief Check whether a code-section local value type is enabled for the current feature parameter set.
+    /// @details Prefer the extension-aware hook when present; otherwise fall back to the original wasm1 two-argument hook.
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr bool check_codesec_value_type(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<code_section_storage_t<Fs...>> sec_adl,
+                                                   ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
+                                                   ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
+    {
+        if constexpr(has_check_codesec_value_type_with_feature_parameter<Fs...>)
+        {
+            return define_check_codesec_value_type_with_feature_parameter(sec_adl, value_type, fs_para);
+        }
+        else
+        {
+            static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_check_codesec_value_type<Fs...>,
+                          "define_check_codesec_value_type(...) not found");
+            return define_check_codesec_value_type(sec_adl, value_type);
+        }
+    }
+
     /// @brief Define the handler function for code_section
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void handle_binfmt_ver1_extensible_section_define(
@@ -96,8 +125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse code section (id: 10)"};
 #endif
-        // Note that section_begin may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // section_begin may equal section_end; parse_by_scan below bounds-checks the code count against section_end.
 
         // get code_section_storage_t from storages
         auto& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<code_section_storage_t<Fs...>>(module_storage.sections)};
@@ -179,7 +207,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // There is no need to check code_count > sz max here, as it automatically satisfies the condition since it matches the function size.
         codesec.codes.reserve(static_cast<::std::size_t>(code_count));
 
-        section_curr = reinterpret_cast<::std::byte const*>(code_count_next);  // never out of bounds
+        // parse_by_scan succeeded, so [section_curr, code_count_next) is now proven safe and code_count_next is inside [section_curr, section_end].
+        // Proof view before moving section_curr: section_curr still points at the code count, and code_count_next marks the first code body.
+        // Pointer move: advance section_curr to the first code body, or to section_end when the code vector is empty.
+        section_curr = reinterpret_cast<::std::byte const*>(code_count_next);
 
         // [before_section ... | code_count ...] code1 ...
         // [                 safe              ] unsafe (could be the section_end)
@@ -244,12 +275,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
 
+            // parse_by_scan succeeded, so [section_curr, body_size_next) is now proven safe and body_size_next is inside [section_curr, section_end].
+            // Proof view before moving section_curr: section_curr still points at the body size, and body_size_next marks the code body start.
+            // Pointer move: advance section_curr to the first byte of the code body.
             section_curr = reinterpret_cast<::std::byte const*>(body_size_next);
 
             // [ ... body_size ...] local_count(code_body_begin) ... ...
             // [        safe      ] unsafe (could be the section_end)
             //                      ^^ section_curr
 
+            // section_curr was produced by parse_by_scan inside [section_begin, section_end], so this subtraction is in range.
             if(static_cast<::std::size_t>(section_end - section_curr) < static_cast<::std::size_t>(body_size)) [[unlikely]]
             {
                 err.err_curr = section_curr;
@@ -262,13 +297,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [        safe      ]        .....                        ] unsafe (could be the section_end)
             //                      ^^ section_curr
 
+            // The length check above proves [section_curr, section_curr + body_size) is safe inside the current section.
+            // Pointer storage: code_begin records the beginning of the checked code body range.
             code.body.code_begin = reinterpret_cast<wasm_byte_const_may_alias_ptr>(section_curr);
 
             // [ ... body_size ...] local_count(code_body_begin) ... ...] (code_body_end)
             // [        safe      ]        .....                        ] unsafe (could be the section_end)
             //                      ^^ code.body.code_begin
 
-            // Subsequent boundary adjustments section_end to code_end
+            // Pointer calculation: body_size bytes were proven safe above, so section_curr + body_size stays inside [section_curr, section_end].
             auto const code_end{section_curr + body_size};
 
             // Prefetching makes the next round of processing faster
@@ -276,6 +313,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                             ::uwvm2::utils::intrinsics::universal::pfc_level::L2,
                                                             ::uwvm2::utils::intrinsics::universal::ret_policy::keep>(code_end);
 
+            // Pointer storage: code_end records the one-past-end pointer of the checked code body range.
             code.body.code_end = reinterpret_cast<wasm_byte_const_may_alias_ptr>(code_end);
 
             // [ ... body_size ...] local_count(code_body_begin) ... ...] (code_body_end)
@@ -330,6 +368,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             code.locals.reserve(static_cast<::std::size_t>(local_count));
 
+            // parse_by_scan succeeded, so [section_curr, local_count_next) is now proven safe and local_count_next is inside [section_curr, code_end].
+            // Proof view before moving section_curr: section_curr still points at the local count, and local_count_next marks the local declarations.
+            // Pointer move: advance section_curr to the first local declaration, or to the expression when the local vector is empty.
             section_curr = reinterpret_cast<::std::byte const*>(local_count_next);
 
             // [ ... body_size ... local_count(code_body_begin) ...] clocal_n ... clocal_type next_clocal_n ... code ...]
@@ -399,6 +440,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                 fle.count = clocal_n;
 
+                // parse_by_scan succeeded, so [section_curr, clocal_n_next) is now proven safe and clocal_n_next is inside [section_curr, code_end].
+                // Proof view before moving section_curr: section_curr still points at the local run count, and clocal_n_next marks the local type.
+                // Pointer move: advance section_curr to the one-byte local type.
                 section_curr = reinterpret_cast<::std::byte const*>(clocal_n_next);
 
                 // [ ... body_size ... local_count(code_body_begin) ... clocal_n ...] clocal_type next_clocal_n ... code ...]
@@ -424,8 +468,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 static_assert(sizeof(fvt) == 1uz);
 
                 // check fvt
-                static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_check_codesec_value_type<Fs...>);
-                if(!define_check_codesec_value_type(sec_adl, fvt)) [[unlikely]]
+                // section_curr != code_end above proves the one-byte local type read is inside the current code body.
+                // check_codesec_value_type only validates the byte value against the active feature parameters.
+                if(!check_codesec_value_type(sec_adl, fvt, fs_para)) [[unlikely]]
                 {
                     err.err_curr = section_curr;
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(
@@ -436,6 +481,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                 fle.type = fvt;
 
+                // section_curr points at the one-byte local type already proven safe by section_curr != code_end and validated above.
+                // Pointer move: advance to the next local declaration or the expression body.
                 ++section_curr;
 
                 // [ ... body_size ... local_count(code_body_begin) ... clocal_n ... clocal_type] next_clocal_n ... code ...]
@@ -447,6 +494,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             code.all_local_count = all_clocal_counter;
 
+            // Pointer storage: expr_begin records the first byte after the checked local declaration sequence.
             code.body.expr_begin = reinterpret_cast<wasm_byte_const_may_alias_ptr>(section_curr);
 
             // [ ...] [(expr_begin) ...] (code_end)
@@ -482,6 +530,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             // Parsing of the expression will be completed later.
 
+            // code_end is the one-past-end pointer of the checked code body range.
+            // Pointer move: advance section_curr to the next code body or section_end.
             section_curr = reinterpret_cast<::std::byte const*>(code_end);
 
             // Subsequent boundary adjustments code_end to section_end

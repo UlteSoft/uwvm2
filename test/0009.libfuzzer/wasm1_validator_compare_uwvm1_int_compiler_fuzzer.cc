@@ -144,10 +144,23 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         // Resource guards for fuzzing: a valid wasm can still request enormous initial table/memory sizes.
         // Building the runtime record would then attempt huge allocations and OOM the fuzzer process.
         {
-            auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Feature>>(rt_parsed_module_storage.sections)};
-            auto const& memorysec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Feature>>(rt_parsed_module_storage.sections)};
+            constexpr auto get_tablesec_from_features_tuple{
+                []<::uwvm2::parser::wasm::concepts::wasm_feature... Fs>(auto const& section,
+                                                                         ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                {
+                    return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>>(section);
+                }};
+            constexpr auto get_memorysec_from_features_tuple{
+                []<::uwvm2::parser::wasm::concepts::wasm_feature... Fs>(auto const& section,
+                                                                         ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                {
+                    return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>>(section);
+                }};
+
+            auto const& tablesec{get_tablesec_from_features_tuple(rt_parsed_module_storage.sections, ::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features)};
+            auto const& memorysec{get_memorysec_from_features_tuple(rt_parsed_module_storage.sections, ::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features)};
 
             constexpr ::std::size_t max_table_min_elems{65536uz};
             constexpr ::std::size_t max_memory_min_pages{256uz};  // 256 * 64KiB = 16MiB

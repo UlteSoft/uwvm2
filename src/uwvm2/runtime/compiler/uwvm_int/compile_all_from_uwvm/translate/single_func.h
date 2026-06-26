@@ -383,7 +383,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
 
         // Call-info needs final local function storage and aggregated frame limits, so it is included
         // only after the serial translation path has finished all bodies.
-        using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+        using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
 
 #include "single_func_call_info.h"
 
@@ -431,7 +431,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
     // derived from fully materialized local function records.
     details::aggregate_local_function_storage(storage);
 
-    using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
 
 #include "single_func_call_info.h"
 

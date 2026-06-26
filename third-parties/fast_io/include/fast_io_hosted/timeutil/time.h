@@ -954,6 +954,11 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char, win32_
 	return tzt.tz_name_len;
 }
 
+inline constexpr ::std::size_t print_reserve_static_stack_size(io_reserve_type_t<char, win32_timezone_t>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char>();
+}
+
 namespace details
 {
 

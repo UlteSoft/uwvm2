@@ -1,6 +1,7 @@
 // Floating-point arithmetic and conversion opcodes rely on typed helpers to preserve WebAssembly
 // details such as NaN propagation, signed zero, trapping float-to-int conversions, and bit-exact
 // reinterpretation. The translator comments focus on why stack and combine state is handled here.
+/// @warning Extension point: new conversion/nontrapping/SIMD float opcodes need validation, trap semantics, and opfunc emission here.
 case wasm1_code::f32_abs:
 {
     // Simple unary f32 ops keep stack depth unchanged. When the operand is a pending local.get, a

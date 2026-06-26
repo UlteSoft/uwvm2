@@ -70,6 +70,7 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
@@ -103,6 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     // Parser-side module storage used by the standard validator when lazy validation is enabled.
     using parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     // Shared LLVM JIT metadata and option types from the eager "compile all" path.
     using full_function_symbol_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
@@ -169,8 +171,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
-        lazy_local_function_wasm_code_hash(runtime_module_storage_t const& curr_module, ::std::size_t local_function_index) noexcept
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string lazy_local_function_wasm_code_hash(runtime_module_storage_t const& curr_module,
+                                                                                                          ::std::size_t local_function_index) noexcept
     {
         if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]]
         {
@@ -335,6 +337,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Borrowed parser module required when `validation_mode` is `validate_on_lazy_compile`.
         parser_module_storage_t const* validator_module_storage{};
+        // Borrowed feature switches used when the parser produced `validator_module_storage`.
+        parser_feature_parameter_t const* validator_feature_parameter{};
 
         // Validation policy for lazy compilation.
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
@@ -378,11 +382,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     {
         inline void set_llvm_module_target_triple_from_machine(::llvm::Module& module, ::llvm::TargetMachine const& target_machine)
         {
-#  if LLVM_VERSION_MAJOR >= 21
+# if LLVM_VERSION_MAJOR >= 21
             module.setTargetTriple(target_machine.getTargetTriple());
-#  else
+# else
             module.setTargetTriple(target_machine.getTargetTriple().str());
-#  endif
+# endif
         }
 
         // Serializes LLVM MCJIT materialization and publication.  LLVM global initialization, MCJIT object finalization,
@@ -513,6 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
                 if(options.validator_module_storage == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(options.validator_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 auto const import_func_count{curr_module.imported_function_vec_storage.size()};
                 auto const function_index{import_func_count + local_function_index};
@@ -521,12 +526,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
                 auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
-                ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                    *options.validator_module_storage,
-                                                                    function_index,
-                                                                    code_begin,
-                                                                    code_end,
-                                                                    err);
+                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                      *options.validator_module_storage,
+                                                                      function_index,
+                                                                      code_begin,
+                                                                      code_end,
+                                                                      err,
+                                                                      *options.validator_feature_parameter);
             }
         }
 
@@ -833,8 +839,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     all_details::validation_module_traits_t::wasm_u32 type_index{};
                     all_details::validation_module_traits_t::wasm_u32 table_index{};
                     if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, type_index) ||
-                       !all_details::parse_wasm_leb128_immediate(code_curr, code_end, table_index))
-                        [[unlikely]]
+                       !all_details::parse_wasm_leb128_immediate(code_curr, code_end, table_index)) [[unlikely]]
                     {
                         return false;
                     }
@@ -961,20 +966,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             {
                 llvm_jit_cache_key = ::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"lazy-single");
                 ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", curr_module.module_name);
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                    llvm_jit_cache_key, u8"local-fn", static_cast<::std::uint_least64_t>(local_function_index));
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_key,
+                                                                                      u8"local-fn",
+                                                                                      static_cast<::std::uint_least64_t>(local_function_index));
                 auto wasm_code_hash{lazy_local_function_wasm_code_hash(curr_module, local_function_index)};
                 ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"wasm-code-hash", wasm_code_hash);
             }
             ::uwvm2::utils::container::u8string llvm_jit_cache_codegen_policy{};
             {
                 llvm_jit_cache_codegen_policy = ::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"codegen-policy");
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
-                    llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-single");
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                    llvm_jit_cache_codegen_policy, u8"codegen-opt-level", static_cast<::std::uint_least64_t>(options.codegen_opt_level));
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
-                    llvm_jit_cache_codegen_policy, u8"validation-mode", lazy_validation_mode_name(options.validation_mode));
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-single");
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_codegen_policy,
+                                                                                      u8"codegen-opt-level",
+                                                                                      static_cast<::std::uint_least64_t>(options.codegen_opt_level));
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy,
+                                                                                  u8"validation-mode",
+                                                                                  lazy_validation_mode_name(options.validation_mode));
                 append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
@@ -982,10 +989,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
             llvm_jit_cache_context.cache_key_is_complete = true;
-            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
-                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
-            
-                auto raw_engine{
+            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
+                                                                                          ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+
+            auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
@@ -1120,8 +1127,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     auto const local_function_index{local_function_indices.index_unchecked(0uz)};
                     llvm_jit_cache_key = ::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"lazy-single");
                     ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", curr_module.module_name);
-                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                        llvm_jit_cache_key, u8"local-fn", static_cast<::std::uint_least64_t>(local_function_index));
+                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_key,
+                                                                                          u8"local-fn",
+                                                                                          static_cast<::std::uint_least64_t>(local_function_index));
                     auto wasm_code_hash{lazy_local_function_wasm_code_hash(curr_module, local_function_index)};
                     ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"wasm-code-hash", wasm_code_hash);
                 }
@@ -1129,12 +1137,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 {
                     llvm_jit_cache_key = ::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"lazy-group");
                     ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", curr_module.module_name);
-                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                        llvm_jit_cache_key, u8"local-fn-count", static_cast<::std::uint_least64_t>(local_function_indices.size()));
+                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_key,
+                                                                                          u8"local-fn-count",
+                                                                                          static_cast<::std::uint_least64_t>(local_function_indices.size()));
                     for(auto const local_function_index: local_function_indices)
                     {
-                        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                            llvm_jit_cache_key, u8"local-fn", static_cast<::std::uint_least64_t>(local_function_index));
+                        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_key,
+                                                                                              u8"local-fn",
+                                                                                              static_cast<::std::uint_least64_t>(local_function_index));
                         auto wasm_code_hash{lazy_local_function_wasm_code_hash(curr_module, local_function_index)};
                         ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"wasm-code-hash", wasm_code_hash);
                     }
@@ -1146,18 +1156,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 llvm_jit_cache_codegen_policy = ::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"codegen-policy");
                 if(single_cache_unit)
                 {
-                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
-                        llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-single");
+                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-single");
                 }
                 else
                 {
-                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
-                        llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-group");
+                    ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"cache-unit", u8"lazy-group");
                 }
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
-                    llvm_jit_cache_codegen_policy, u8"codegen-opt-level", static_cast<::std::uint_least64_t>(options.codegen_opt_level));
-                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
-                    llvm_jit_cache_codegen_policy, u8"validation-mode", lazy_validation_mode_name(options.validation_mode));
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(llvm_jit_cache_codegen_policy,
+                                                                                      u8"codegen-opt-level",
+                                                                                      static_cast<::std::uint_least64_t>(options.codegen_opt_level));
+                ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy,
+                                                                                  u8"validation-mode",
+                                                                                  lazy_validation_mode_name(options.validation_mode));
                 append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
@@ -1165,10 +1175,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
             llvm_jit_cache_context.cache_key_is_complete = true;
-            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{
-                ::std::move(llvm_jit_cache_context), ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
-            
-                auto raw_engine{
+            ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
+                                                                                          ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+
+            auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
@@ -1182,7 +1192,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
-            
+
             engine->setObjectCache(::std::addressof(llvm_jit_object_cache));
             if(options.jit_event_listener != nullptr)
             {

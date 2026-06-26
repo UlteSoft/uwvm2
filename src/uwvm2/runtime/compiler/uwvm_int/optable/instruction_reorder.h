@@ -133,9 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr void store_local(::std::byte* local_base, local_offset_t off, T v) noexcept
-        {
-            ::std::memcpy(local_base + off, ::std::addressof(v), sizeof(v));
-        }
+        { ::std::memcpy(local_base + off, ::std::addressof(v), sizeof(v)); }
 
         template <numeric_details::int_binop Op>
         inline consteval bool is_supported_integer_reduce_op() noexcept
@@ -180,7 +178,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 case int_expr_binop::shr_s: return numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, IntT, UIntT>(lhs, rhs);
                 case int_expr_binop::shr_u: return numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, IntT, UIntT>(lhs, rhs);
                 case int_expr_binop::rotl: return numeric_details::eval_int_binop<numeric_details::int_binop::rotl, IntT, UIntT>(lhs, rhs);
-                case int_expr_binop::rotr: return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs);
+                case int_expr_binop::rotr:
+                    return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs);
                 [[unlikely]] default:
                 {
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -195,46 +194,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr IntT eval_int_expr_binop_constexpr(IntT lhs, IntT rhs) UWVM_THROWS
         {
             if constexpr(Op == int_expr_binop::add) { return numeric_details::eval_int_binop<numeric_details::int_binop::add, IntT, UIntT>(lhs, rhs); }
-            else if constexpr(Op == int_expr_binop::sub)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::sub, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::mul)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::mul, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::and_)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::and_, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::or_)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::or_, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::xor_)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::xor_, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::shl)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::shl, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::shr_s)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::shr_u)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::rotl)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::rotl, IntT, UIntT>(lhs, rhs);
-            }
-            else if constexpr(Op == int_expr_binop::rotr)
-            {
-                return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs);
-            }
+            else if constexpr(Op == int_expr_binop::sub) { return numeric_details::eval_int_binop<numeric_details::int_binop::sub, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::mul) { return numeric_details::eval_int_binop<numeric_details::int_binop::mul, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::and_) { return numeric_details::eval_int_binop<numeric_details::int_binop::and_, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::or_) { return numeric_details::eval_int_binop<numeric_details::int_binop::or_, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::xor_) { return numeric_details::eval_int_binop<numeric_details::int_binop::xor_, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::shl) { return numeric_details::eval_int_binop<numeric_details::int_binop::shl, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::shr_s) { return numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::shr_u) { return numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::rotl) { return numeric_details::eval_int_binop<numeric_details::int_binop::rotl, IntT, UIntT>(lhs, rhs); }
+            else if constexpr(Op == int_expr_binop::rotr) { return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs); }
             else
             {
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -256,7 +225,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     auto const off{read_imm<local_offset_t>(ip)};
                     return load_local<IntT>(local_base, off);
                 }
-                case int_expr_operand_kind::imm: return read_imm<IntT>(ip);
+                case int_expr_operand_kind::imm:
+                    return read_imm<IntT>(ip);
                 [[unlikely]] default:
                 {
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -348,7 +318,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeRef>
-        UWVM_ALWAYS_INLINE inline constexpr void preload_localget_to_operand_memory(::std::byte const*& ip, ::std::byte* local_base, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void
+            preload_localget_to_operand_memory(::std::byte const*& ip, ::std::byte* local_base, TypeRef&... typeref) noexcept
         {
             for(::std::size_t i{}; i != LocalCount; ++i)
             {
@@ -415,10 +386,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         if constexpr(instruction_reorder_details::stacktop_enabled_for<CompileOption, LocalT>())
         {
-            instruction_reorder_details::preload_localget_to_stacktop<CompileOption, LocalT, curr_stack_top, 0uz, LocalCount>(
-                type...[0],
-                type...[2u],
-                type...);
+            instruction_reorder_details::preload_localget_to_stacktop<CompileOption, LocalT, curr_stack_top, 0uz, LocalCount>(type...[0], type...[2u], type...);
         }
         else
         {
@@ -433,7 +401,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief Byref variant of @ref uwvmint_reorder_preload_nlocalget.
     template <uwvm_interpreter_translate_option_t CompileOption, typename LocalT, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_preload_nlocalget(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_preload_nlocalget(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(LocalCount >= 2uz);
         static_assert(LocalCount <= 8uz);
@@ -512,7 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t LocalCount,
               uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_reduce_nlocalget(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_reduce_nlocalget(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
         static_assert(LocalCount >= 3uz);
@@ -609,7 +577,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               bool KeepResult,
               uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_reduce_nlocalget_local_update(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_reduce_nlocalget_local_update(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
         static_assert(LocalCount >= 3uz);
@@ -687,13 +655,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     /// @brief Byref variant of @ref uwvmint_reorder_int_expr_fold.
-    template <uwvm_interpreter_translate_option_t CompileOption,
-              typename IntT,
-              typename UIntT,
-              ::std::size_t StepCount,
-              uwvm_int_stack_top_type... TypeRef>
+    template <uwvm_interpreter_translate_option_t CompileOption, typename IntT, typename UIntT, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_expr_fold(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_expr_fold(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(StepCount >= 3uz);
         static_assert(StepCount <= 8uz);
@@ -769,7 +733,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               bool KeepResult,
               uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_expr_local_update(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_expr_local_update(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(StepCount >= 3uz);
         static_assert(StepCount <= 8uz);
@@ -841,7 +805,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               bool KeepResult,
               uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_const_binop_local_update(TypeRef&... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_reorder_int_const_binop_local_update(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 3uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -875,15 +839,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-                {
-                    return uwvmint_reorder_preload_nlocalget<Opt, LocalT, LocalCount, Pos, Type...>;
-                }
+                { return uwvmint_reorder_preload_nlocalget<Opt, LocalT, LocalCount, Pos, Type...>; }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
-                {
-                    return uwvmint_reorder_preload_nlocalget<Opt, LocalT, LocalCount, Type...>;
-                }
+                { return uwvmint_reorder_preload_nlocalget<Opt, LocalT, LocalCount, Type...>; }
             };
 
             template <numeric_details::int_binop Op, ::std::size_t LocalCount>
@@ -947,25 +907,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_reduce_nlocalget_local_update<Opt,
-                                                                              instruction_reorder_details::wasm_i32,
-                                                                              instruction_reorder_details::wasm_u32,
-                                                                              Op,
-                                                                              LocalCount,
-                                                                              KeepResult,
-                                                                              Pos,
-                                                                              Type...>;
+                                                                             instruction_reorder_details::wasm_i32,
+                                                                             instruction_reorder_details::wasm_u32,
+                                                                             Op,
+                                                                             LocalCount,
+                                                                             KeepResult,
+                                                                             Pos,
+                                                                             Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_reduce_nlocalget_local_update<Opt,
-                                                                              instruction_reorder_details::wasm_i32,
-                                                                              instruction_reorder_details::wasm_u32,
-                                                                              Op,
-                                                                              LocalCount,
-                                                                              KeepResult,
-                                                                              Type...>;
+                                                                             instruction_reorder_details::wasm_i32,
+                                                                             instruction_reorder_details::wasm_u32,
+                                                                             Op,
+                                                                             LocalCount,
+                                                                             KeepResult,
+                                                                             Type...>;
                 }
             };
 
@@ -976,25 +936,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_reduce_nlocalget_local_update<Opt,
-                                                                              instruction_reorder_details::wasm_i64,
-                                                                              instruction_reorder_details::wasm_u64,
-                                                                              Op,
-                                                                              LocalCount,
-                                                                              KeepResult,
-                                                                              Pos,
-                                                                              Type...>;
+                                                                             instruction_reorder_details::wasm_i64,
+                                                                             instruction_reorder_details::wasm_u64,
+                                                                             Op,
+                                                                             LocalCount,
+                                                                             KeepResult,
+                                                                             Pos,
+                                                                             Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_reduce_nlocalget_local_update<Opt,
-                                                                              instruction_reorder_details::wasm_i64,
-                                                                              instruction_reorder_details::wasm_u64,
-                                                                              Op,
-                                                                              LocalCount,
-                                                                              KeepResult,
-                                                                              Type...>;
+                                                                             instruction_reorder_details::wasm_i64,
+                                                                             instruction_reorder_details::wasm_u64,
+                                                                             Op,
+                                                                             LocalCount,
+                                                                             KeepResult,
+                                                                             Type...>;
                 }
             };
 
@@ -1014,13 +974,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
-                {
-                    return uwvmint_reorder_int_expr_fold<Opt,
-                                                         instruction_reorder_details::wasm_i32,
-                                                         instruction_reorder_details::wasm_u32,
-                                                         StepCount,
-                                                         Type...>;
-                }
+                { return uwvmint_reorder_int_expr_fold<Opt, instruction_reorder_details::wasm_i32, instruction_reorder_details::wasm_u32, StepCount, Type...>; }
             };
 
             template <::std::size_t StepCount>
@@ -1039,13 +993,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
-                {
-                    return uwvmint_reorder_int_expr_fold<Opt,
-                                                         instruction_reorder_details::wasm_i64,
-                                                         instruction_reorder_details::wasm_u64,
-                                                         StepCount,
-                                                         Type...>;
-                }
+                { return uwvmint_reorder_int_expr_fold<Opt, instruction_reorder_details::wasm_i64, instruction_reorder_details::wasm_u64, StepCount, Type...>; }
             };
 
             template <::std::size_t StepCount, bool KeepResult>
@@ -1055,23 +1003,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_expr_local_update<Opt,
-                                                                  instruction_reorder_details::wasm_i32,
-                                                                  instruction_reorder_details::wasm_u32,
-                                                                  StepCount,
-                                                                  KeepResult,
-                                                                  Pos,
-                                                                  Type...>;
+                                                                 instruction_reorder_details::wasm_i32,
+                                                                 instruction_reorder_details::wasm_u32,
+                                                                 StepCount,
+                                                                 KeepResult,
+                                                                 Pos,
+                                                                 Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_expr_local_update<Opt,
-                                                                  instruction_reorder_details::wasm_i32,
-                                                                  instruction_reorder_details::wasm_u32,
-                                                                  StepCount,
-                                                                  KeepResult,
-                                                                  Type...>;
+                                                                 instruction_reorder_details::wasm_i32,
+                                                                 instruction_reorder_details::wasm_u32,
+                                                                 StepCount,
+                                                                 KeepResult,
+                                                                 Type...>;
                 }
             };
 
@@ -1082,23 +1030,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_expr_local_update<Opt,
-                                                                  instruction_reorder_details::wasm_i64,
-                                                                  instruction_reorder_details::wasm_u64,
-                                                                  StepCount,
-                                                                  KeepResult,
-                                                                  Pos,
-                                                                  Type...>;
+                                                                 instruction_reorder_details::wasm_i64,
+                                                                 instruction_reorder_details::wasm_u64,
+                                                                 StepCount,
+                                                                 KeepResult,
+                                                                 Pos,
+                                                                 Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_expr_local_update<Opt,
-                                                                  instruction_reorder_details::wasm_i64,
-                                                                  instruction_reorder_details::wasm_u64,
-                                                                  StepCount,
-                                                                  KeepResult,
-                                                                  Type...>;
+                                                                 instruction_reorder_details::wasm_i64,
+                                                                 instruction_reorder_details::wasm_u64,
+                                                                 StepCount,
+                                                                 KeepResult,
+                                                                 Type...>;
                 }
             };
 
@@ -1109,23 +1057,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_const_binop_local_update<Opt,
-                                                                         instruction_reorder_details::wasm_i32,
-                                                                         instruction_reorder_details::wasm_u32,
-                                                                         Op,
-                                                                         KeepResult,
-                                                                         Pos,
-                                                                         Type...>;
+                                                                        instruction_reorder_details::wasm_i32,
+                                                                        instruction_reorder_details::wasm_u32,
+                                                                        Op,
+                                                                        KeepResult,
+                                                                        Pos,
+                                                                        Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_const_binop_local_update<Opt,
-                                                                         instruction_reorder_details::wasm_i32,
-                                                                         instruction_reorder_details::wasm_u32,
-                                                                         Op,
-                                                                         KeepResult,
-                                                                         Type...>;
+                                                                        instruction_reorder_details::wasm_i32,
+                                                                        instruction_reorder_details::wasm_u32,
+                                                                        Op,
+                                                                        KeepResult,
+                                                                        Type...>;
                 }
             };
 
@@ -1136,23 +1084,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
                     return uwvmint_reorder_int_const_binop_local_update<Opt,
-                                                                         instruction_reorder_details::wasm_i64,
-                                                                         instruction_reorder_details::wasm_u64,
-                                                                         Op,
-                                                                         KeepResult,
-                                                                         Pos,
-                                                                         Type...>;
+                                                                        instruction_reorder_details::wasm_i64,
+                                                                        instruction_reorder_details::wasm_u64,
+                                                                        Op,
+                                                                        KeepResult,
+                                                                        Pos,
+                                                                        Type...>;
                 }
 
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 {
                     return uwvmint_reorder_int_const_binop_local_update<Opt,
-                                                                         instruction_reorder_details::wasm_i64,
-                                                                         instruction_reorder_details::wasm_u64,
-                                                                         Op,
-                                                                         KeepResult,
-                                                                         Type...>;
+                                                                        instruction_reorder_details::wasm_i64,
+                                                                        instruction_reorder_details::wasm_u64,
+                                                                        Op,
+                                                                        KeepResult,
+                                                                        Type...>;
                 }
             };
 
@@ -1203,8 +1151,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<
@@ -1217,15 +1165,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::preload_nlocalget_op<instruction_reorder_details::wasm_i32, LocalCount>::template fptr_byref<CompileOption, Type...>();
@@ -1233,15 +1180,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<
@@ -1254,15 +1200,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::preload_nlocalget_op<instruction_reorder_details::wasm_i64, LocalCount>::template fptr_byref<CompileOption, Type...>();
@@ -1270,15 +1215,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_f32_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_f32_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<
@@ -1291,15 +1235,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_f32_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_f32_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_f32_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::preload_nlocalget_op<instruction_reorder_details::wasm_f32, LocalCount>::template fptr_byref<CompileOption, Type...>();
@@ -1307,15 +1250,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_f32_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_f64_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_f64_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<
@@ -1328,15 +1270,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_f64_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_f64_preload_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_f64_preload_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(LocalCount >= 2uz && LocalCount <= 8uz);
             return reorder_details::preload_nlocalget_op<instruction_reorder_details::wasm_f64, LocalCount>::template fptr_byref<CompileOption, Type...>();
@@ -1344,15 +1285,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t LocalCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_f64_preload_nlocalget_fptr<CompileOption, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1368,15 +1308,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1388,15 +1327,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1412,15 +1350,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1432,18 +1369,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1459,18 +1392,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1482,18 +1412,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_local_set_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1509,18 +1436,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1532,18 +1456,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_reduce_nlocalget_local_tee_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1559,18 +1480,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1582,18 +1500,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_local_set_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1609,18 +1524,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
-        template <uwvm_interpreter_translate_option_t CompileOption,
-                  numeric_details::int_binop Op,
-                  ::std::size_t LocalCount,
-                  uwvm_int_stack_top_type... Type>
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, ::std::size_t LocalCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(instruction_reorder_details::is_supported_integer_reduce_op<Op>());
             static_assert(LocalCount >= 3uz && LocalCount <= 8uz);
@@ -1632,15 +1544,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t LocalCount,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto
+            get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_reduce_nlocalget_local_tee_fptr<CompileOption, Op, LocalCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_expr_fold_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_expr_fold_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1652,15 +1563,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_fold_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_expr_fold_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_expr_fold_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i32_expr_fold_op<StepCount>::template fptr_byref<CompileOption, Type...>();
@@ -1668,15 +1577,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_fold_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_expr_fold_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_expr_fold_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1688,15 +1595,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_fold_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_expr_fold_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_expr_fold_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i64_expr_fold_op<StepCount>::template fptr_byref<CompileOption, Type...>();
@@ -1704,15 +1609,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_fold_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_expr_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_expr_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1724,15 +1628,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_local_set_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_expr_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_expr_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i32_expr_local_update_op<StepCount, false>::template fptr_byref<CompileOption, Type...>();
@@ -1740,15 +1643,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_local_set_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_expr_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_expr_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1760,15 +1662,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_local_tee_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_expr_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_expr_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i32_expr_local_update_op<StepCount, true>::template fptr_byref<CompileOption, Type...>();
@@ -1776,15 +1677,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_expr_local_tee_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_expr_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_expr_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1796,15 +1696,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_local_set_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_expr_local_set_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_expr_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i64_expr_local_update_op<StepCount, false>::template fptr_byref<CompileOption, Type...>();
@@ -1812,15 +1711,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_local_set_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_expr_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_expr_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
@@ -1832,15 +1730,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_local_tee_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_expr_local_tee_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_expr_local_tee_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         {
             static_assert(StepCount >= 3uz && StepCount <= 8uz);
             return reorder_details::i64_expr_local_update_op<StepCount, true>::template fptr_byref<CompileOption, Type...>();
@@ -1848,9 +1745,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StepCount, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_expr_local_tee_fptr<CompileOption, StepCount, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1858,8 +1754,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i32_const_binop_local_update_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i32_const_binop_local_update_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
                                                                             CompileOption.i32_stack_top_begin_pos,
@@ -1873,9 +1769,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1883,8 +1778,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i32_const_binop_local_update_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i32_const_binop_local_update_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return reorder_details::i32_const_binop_local_update_op<Op, KeepResult>::template fptr_byref<CompileOption, Type...>(); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1892,9 +1787,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i32_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1902,8 +1796,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_reorder_i64_const_binop_local_update_fptr(
-            uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_reorder_i64_const_binop_local_update_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             return reorder_details::select_stacktop_fptr_or_default_reorder<CompileOption,
                                                                             CompileOption.i64_stack_top_begin_pos,
@@ -1917,9 +1811,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1927,8 +1820,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_reorder_i64_const_binop_local_update_fptr(
-            uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_reorder_i64_const_binop_local_update_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return reorder_details::i64_const_binop_local_update_op<Op, KeepResult>::template fptr_byref<CompileOption, Type...>(); }
 
         template <uwvm_interpreter_translate_option_t CompileOption,
@@ -1936,9 +1829,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool KeepResult,
                   uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(
-            uwvm_interpreter_stacktop_currpos_t const& curr,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        inline constexpr auto get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_reorder_i64_const_binop_local_update_fptr<CompileOption, Op, KeepResult, TypeInTuple...>(curr); }
     }  // namespace translate
 

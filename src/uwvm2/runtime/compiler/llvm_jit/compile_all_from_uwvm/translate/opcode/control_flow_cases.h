@@ -349,7 +349,7 @@ case wasm1_code::if_:
     if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
+        err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_diagnostic_value_type(cond.type);
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_cond_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }

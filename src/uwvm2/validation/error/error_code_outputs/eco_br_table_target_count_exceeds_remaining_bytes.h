@@ -5,9 +5,9 @@
  *************************************************************/
 
 /**
- * @author      Codex
+ * @author      MacroModel
  * @version     2.0.0
- * @date        2026-04-02
+ * @date        2026-06-26
  * @copyright   APL-2.0 License
  */
 

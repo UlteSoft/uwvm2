@@ -1,6 +1,7 @@
 // Variable opcode translation keeps the validated Wasm local/global model synchronized with the
 // interpreter bytecode model. Most of the code below exists to explain when a stack value can be
 // delayed, fused, or read directly from storage without violating Wasm's typed stack semantics.
+/// @warning Extension point: new local/global value categories require local frame layout, stack-top cache, global storage, and opfunc support here.
 case wasm1_code::local_get:
 {
     // `local.get` is both a semantic stack push and the most common seed for later fusions.
@@ -65,7 +66,7 @@ case wasm1_code::local_get:
        (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64 ||
         curr_local_type == curr_operand_stack_value_type::f64))
     {
-        wasm1_code const add_op{curr_local_type == curr_operand_stack_value_type::i32   ? wasm1_code::i32_add
+        wasm1_code const add_op{curr_local_type == curr_operand_stack_value_type::i32 ? wasm1_code::i32_add
                                 : curr_local_type == curr_operand_stack_value_type::i64 ? wasm1_code::i64_add
                                                                                         : wasm1_code::f64_add};
 
@@ -216,8 +217,7 @@ case wasm1_code::local_get:
         instruction_reorder_follow_is_local_get ||
         (curr_local_type == curr_operand_stack_value_type::i32 && instruction_reorder_has_follow_op &&
          instruction_reorder_follow_op == wasm1_code::i32_const) ||
-        (curr_local_type == curr_operand_stack_value_type::i64 && instruction_reorder_has_follow_op &&
-         instruction_reorder_follow_op == wasm1_code::i64_const)};
+        (curr_local_type == curr_operand_stack_value_type::i64 && instruction_reorder_has_follow_op && instruction_reorder_follow_op == wasm1_code::i64_const)};
 
     if(instruction_reorder_runtime_candidate && instruction_reorder_follow_is_typed_int_operand &&
        (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64))
@@ -225,84 +225,94 @@ case wasm1_code::local_get:
         namespace reorder_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
         using reorder_int_binop = reorder_optable::numeric_details::int_binop;
 
-        auto const decode_reorder_reduce_op{
-            [](curr_operand_stack_value_type vt, wasm1_code op, reorder_int_binop& out) constexpr noexcept -> bool
-            {
-                if(vt == curr_operand_stack_value_type::i32)
-                {
-                    switch(op)
-                    {
-                        case wasm1_code::i32_add: out = reorder_int_binop::add; return true;
-                        case wasm1_code::i32_mul: out = reorder_int_binop::mul; return true;
-                        case wasm1_code::i32_and: out = reorder_int_binop::and_; return true;
-                        case wasm1_code::i32_or: out = reorder_int_binop::or_; return true;
-                        case wasm1_code::i32_xor: out = reorder_int_binop::xor_; return true;
-                        [[unlikely]] default: return false;
-                    }
-                }
+        auto const decode_reorder_reduce_op{[](curr_operand_stack_value_type vt, wasm1_code op, reorder_int_binop& out) constexpr noexcept -> bool
+                                            {
+                                                if(vt == curr_operand_stack_value_type::i32)
+                                                {
+                                                    switch(op)
+                                                    {
+                                                        case wasm1_code::i32_add: out = reorder_int_binop::add; return true;
+                                                        case wasm1_code::i32_mul: out = reorder_int_binop::mul; return true;
+                                                        case wasm1_code::i32_and: out = reorder_int_binop::and_; return true;
+                                                        case wasm1_code::i32_or: out = reorder_int_binop::or_; return true;
+                                                        case wasm1_code::i32_xor:
+                                                            out = reorder_int_binop::xor_;
+                                                            return true;
+                                                        [[unlikely]] default:
+                                                            return false;
+                                                    }
+                                                }
 
-                if(vt == curr_operand_stack_value_type::i64)
-                {
-                    switch(op)
-                    {
-                        case wasm1_code::i64_add: out = reorder_int_binop::add; return true;
-                        case wasm1_code::i64_mul: out = reorder_int_binop::mul; return true;
-                        case wasm1_code::i64_and: out = reorder_int_binop::and_; return true;
-                        case wasm1_code::i64_or: out = reorder_int_binop::or_; return true;
-                        case wasm1_code::i64_xor: out = reorder_int_binop::xor_; return true;
-                        [[unlikely]] default: return false;
-                    }
-                }
+                                                if(vt == curr_operand_stack_value_type::i64)
+                                                {
+                                                    switch(op)
+                                                    {
+                                                        case wasm1_code::i64_add: out = reorder_int_binop::add; return true;
+                                                        case wasm1_code::i64_mul: out = reorder_int_binop::mul; return true;
+                                                        case wasm1_code::i64_and: out = reorder_int_binop::and_; return true;
+                                                        case wasm1_code::i64_or: out = reorder_int_binop::or_; return true;
+                                                        case wasm1_code::i64_xor:
+                                                            out = reorder_int_binop::xor_;
+                                                            return true;
+                                                        [[unlikely]] default:
+                                                            return false;
+                                                    }
+                                                }
 
-                return false;
-            }};
+                                                return false;
+                                            }};
 
         using reorder_expr_binop = reorder_optable::instruction_reorder_details::int_expr_binop;
         using reorder_expr_operand_kind = reorder_optable::instruction_reorder_details::int_expr_operand_kind;
 
-        auto const decode_reorder_expr_op{
-            [](curr_operand_stack_value_type vt, wasm1_code op, reorder_expr_binop& out) constexpr noexcept -> bool
-            {
-                if(vt == curr_operand_stack_value_type::i32)
-                {
-                    switch(op)
-                    {
-                        case wasm1_code::i32_add: out = reorder_expr_binop::add; return true;
-                        case wasm1_code::i32_sub: out = reorder_expr_binop::sub; return true;
-                        case wasm1_code::i32_mul: out = reorder_expr_binop::mul; return true;
-                        case wasm1_code::i32_and: out = reorder_expr_binop::and_; return true;
-                        case wasm1_code::i32_or: out = reorder_expr_binop::or_; return true;
-                        case wasm1_code::i32_xor: out = reorder_expr_binop::xor_; return true;
-                        case wasm1_code::i32_shl: out = reorder_expr_binop::shl; return true;
-                        case wasm1_code::i32_shr_s: out = reorder_expr_binop::shr_s; return true;
-                        case wasm1_code::i32_shr_u: out = reorder_expr_binop::shr_u; return true;
-                        case wasm1_code::i32_rotl: out = reorder_expr_binop::rotl; return true;
-                        case wasm1_code::i32_rotr: out = reorder_expr_binop::rotr; return true;
-                        [[unlikely]] default: return false;
-                    }
-                }
+        auto const decode_reorder_expr_op{[](curr_operand_stack_value_type vt, wasm1_code op, reorder_expr_binop& out) constexpr noexcept -> bool
+                                          {
+                                              if(vt == curr_operand_stack_value_type::i32)
+                                              {
+                                                  switch(op)
+                                                  {
+                                                      case wasm1_code::i32_add: out = reorder_expr_binop::add; return true;
+                                                      case wasm1_code::i32_sub: out = reorder_expr_binop::sub; return true;
+                                                      case wasm1_code::i32_mul: out = reorder_expr_binop::mul; return true;
+                                                      case wasm1_code::i32_and: out = reorder_expr_binop::and_; return true;
+                                                      case wasm1_code::i32_or: out = reorder_expr_binop::or_; return true;
+                                                      case wasm1_code::i32_xor: out = reorder_expr_binop::xor_; return true;
+                                                      case wasm1_code::i32_shl: out = reorder_expr_binop::shl; return true;
+                                                      case wasm1_code::i32_shr_s: out = reorder_expr_binop::shr_s; return true;
+                                                      case wasm1_code::i32_shr_u: out = reorder_expr_binop::shr_u; return true;
+                                                      case wasm1_code::i32_rotl: out = reorder_expr_binop::rotl; return true;
+                                                      case wasm1_code::i32_rotr:
+                                                          out = reorder_expr_binop::rotr;
+                                                          return true;
+                                                      [[unlikely]] default:
+                                                          return false;
+                                                  }
+                                              }
 
-                if(vt == curr_operand_stack_value_type::i64)
-                {
-                    switch(op)
-                    {
-                        case wasm1_code::i64_add: out = reorder_expr_binop::add; return true;
-                        case wasm1_code::i64_sub: out = reorder_expr_binop::sub; return true;
-                        case wasm1_code::i64_mul: out = reorder_expr_binop::mul; return true;
-                        case wasm1_code::i64_and: out = reorder_expr_binop::and_; return true;
-                        case wasm1_code::i64_or: out = reorder_expr_binop::or_; return true;
-                        case wasm1_code::i64_xor: out = reorder_expr_binop::xor_; return true;
-                        case wasm1_code::i64_shl: out = reorder_expr_binop::shl; return true;
-                        case wasm1_code::i64_shr_s: out = reorder_expr_binop::shr_s; return true;
-                        case wasm1_code::i64_shr_u: out = reorder_expr_binop::shr_u; return true;
-                        case wasm1_code::i64_rotl: out = reorder_expr_binop::rotl; return true;
-                        case wasm1_code::i64_rotr: out = reorder_expr_binop::rotr; return true;
-                        [[unlikely]] default: return false;
-                    }
-                }
+                                              if(vt == curr_operand_stack_value_type::i64)
+                                              {
+                                                  switch(op)
+                                                  {
+                                                      case wasm1_code::i64_add: out = reorder_expr_binop::add; return true;
+                                                      case wasm1_code::i64_sub: out = reorder_expr_binop::sub; return true;
+                                                      case wasm1_code::i64_mul: out = reorder_expr_binop::mul; return true;
+                                                      case wasm1_code::i64_and: out = reorder_expr_binop::and_; return true;
+                                                      case wasm1_code::i64_or: out = reorder_expr_binop::or_; return true;
+                                                      case wasm1_code::i64_xor: out = reorder_expr_binop::xor_; return true;
+                                                      case wasm1_code::i64_shl: out = reorder_expr_binop::shl; return true;
+                                                      case wasm1_code::i64_shr_s: out = reorder_expr_binop::shr_s; return true;
+                                                      case wasm1_code::i64_shr_u: out = reorder_expr_binop::shr_u; return true;
+                                                      case wasm1_code::i64_rotl: out = reorder_expr_binop::rotl; return true;
+                                                      case wasm1_code::i64_rotr:
+                                                          out = reorder_expr_binop::rotr;
+                                                          return true;
+                                                      [[unlikely]] default:
+                                                          return false;
+                                                  }
+                                              }
 
-                return false;
-            }};
+                                              return false;
+                                          }};
 
         auto const try_reschedule_left_reduce_local_update{
             [&]() constexpr UWVM_THROWS -> bool
@@ -327,10 +337,9 @@ case wasm1_code::local_get:
 
                     wasm_u32 next_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                    auto const [next_local_index_next, next_local_index_err]{
-                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
-                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                                      reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                      ::fast_io::mnp::leb128_get(next_local_index))};
                     if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
                        local_type_from_index(next_local_index) != curr_local_type)
                     {
@@ -370,10 +379,9 @@ case wasm1_code::local_get:
 
                 wasm_u32 dst_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                auto const [dst_local_index_next, dst_local_index_err]{
-                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
-                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                auto const [dst_local_index_next, dst_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                ::fast_io::mnp::leb128_get(dst_local_index))};
                 if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
                    local_type_from_index(dst_local_index) != curr_local_type)
                 {
@@ -410,7 +418,10 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_candidate_count;
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_local_reduce_set_count; }
-                    else { ++runtime_log_stats.instr_reorder_local_reduce_tee_count; }
+                    else
+                    {
+                        ++runtime_log_stats.instr_reorder_local_reduce_tee_count;
+                    }
                     if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     runtime_log_stats.instr_reorder_local_read_count += local_count;
                 }
@@ -455,46 +466,56 @@ case wasm1_code::local_get:
                         }
                     }};
 
-                auto const emit_reduce_update_for_count{
-                    [&]<bool KeepResult, reorder_int_binop Op>() constexpr UWVM_THROWS -> void
-                    {
-                        switch(local_count)
-                        {
-                            case 3uz: emit_reduce_update.template operator()<KeepResult, Op, 3uz>(); break;
-                            case 4uz: emit_reduce_update.template operator()<KeepResult, Op, 4uz>(); break;
-                            case 5uz: emit_reduce_update.template operator()<KeepResult, Op, 5uz>(); break;
-                            case 6uz: emit_reduce_update.template operator()<KeepResult, Op, 6uz>(); break;
-                            case 7uz: emit_reduce_update.template operator()<KeepResult, Op, 7uz>(); break;
-                            case 8uz: emit_reduce_update.template operator()<KeepResult, Op, 8uz>(); break;
-                            [[unlikely]] default:
-                            {
+                auto const emit_reduce_update_for_count{[&]<bool KeepResult, reorder_int_binop Op>() constexpr UWVM_THROWS -> void
+                                                        {
+                                                            switch(local_count)
+                                                            {
+                                                                case 3uz: emit_reduce_update.template operator()<KeepResult, Op, 3uz>(); break;
+                                                                case 4uz: emit_reduce_update.template operator()<KeepResult, Op, 4uz>(); break;
+                                                                case 5uz: emit_reduce_update.template operator()<KeepResult, Op, 5uz>(); break;
+                                                                case 6uz: emit_reduce_update.template operator()<KeepResult, Op, 6uz>(); break;
+                                                                case 7uz: emit_reduce_update.template operator()<KeepResult, Op, 7uz>(); break;
+                                                                case 8uz:
+                                                                    emit_reduce_update.template operator()<KeepResult, Op, 8uz>();
+                                                                    break;
+                                                                [[unlikely]] default:
+                                                                {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-                                ::fast_io::fast_terminate();
-                            }
-                        }
-                    }};
+                                                                    ::fast_io::fast_terminate();
+                                                                }
+                                                            }
+                                                        }};
 
-                auto const emit_reduce_update_for_op{
-                    [&]<bool KeepResult>() constexpr UWVM_THROWS -> void
-                    {
-                        switch(reduce_op)
-                        {
-                            case reorder_int_binop::add: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::add>(); break;
-                            case reorder_int_binop::mul: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::mul>(); break;
-                            case reorder_int_binop::and_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::and_>(); break;
-                            case reorder_int_binop::or_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::or_>(); break;
-                            case reorder_int_binop::xor_: emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::xor_>(); break;
-                            [[unlikely]] default:
-                            {
+                auto const emit_reduce_update_for_op{[&]<bool KeepResult>() constexpr UWVM_THROWS -> void
+                                                     {
+                                                         switch(reduce_op)
+                                                         {
+                                                             case reorder_int_binop::add:
+                                                                 emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::add>();
+                                                                 break;
+                                                             case reorder_int_binop::mul:
+                                                                 emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::mul>();
+                                                                 break;
+                                                             case reorder_int_binop::and_:
+                                                                 emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::and_>();
+                                                                 break;
+                                                             case reorder_int_binop::or_:
+                                                                 emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::or_>();
+                                                                 break;
+                                                             case reorder_int_binop::xor_:
+                                                                 emit_reduce_update_for_count.template operator()<KeepResult, reorder_int_binop::xor_>();
+                                                                 break;
+                                                             [[unlikely]] default:
+                                                             {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-                                ::fast_io::fast_terminate();
-                            }
-                        }
-                    }};
+                                                                 ::fast_io::fast_terminate();
+                                                             }
+                                                         }
+                                                     }};
 
                 if(update_op == wasm1_code::local_tee)
                 {
@@ -577,10 +598,9 @@ case wasm1_code::local_get:
 
                 wasm_u32 dst_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                auto const [dst_local_index_next, dst_local_index_err]{
-                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
-                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                auto const [dst_local_index_next, dst_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                ::fast_io::mnp::leb128_get(dst_local_index))};
                 if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
                    local_type_from_index(dst_local_index) != curr_local_type)
                 {
@@ -621,7 +641,10 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_candidate_count;
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_const_binop_local_set_count; }
-                    else { ++runtime_log_stats.instr_reorder_const_binop_local_tee_count; }
+                    else
+                    {
+                        ++runtime_log_stats.instr_reorder_const_binop_local_tee_count;
+                    }
                     if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     ++runtime_log_stats.instr_reorder_expr_step_count;
                     ++runtime_log_stats.instr_reorder_local_read_count;
@@ -635,34 +658,31 @@ case wasm1_code::local_get:
                         {
                             emit_opfunc_to(
                                 bytecode,
-                                translate::get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(
-                                    curr_stacktop,
-                                    interpreter_tuple));
+                                translate::get_uwvmint_reorder_i32_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                         }
                         else
                         {
                             emit_opfunc_to(
                                 bytecode,
-                                translate::get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(
-                                    curr_stacktop,
-                                    interpreter_tuple));
+                                translate::get_uwvmint_reorder_i64_const_binop_local_update_fptr_from_tuple<CompileOption, Op, KeepResult>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                         }
                     }};
 
-                auto const emit_const_update_for_op{
-                    [&]<reorder_expr_binop Op>() constexpr UWVM_THROWS -> void
-                    {
-                        if(update_op == wasm1_code::local_tee)
-                        {
-                            operand_stack_push(curr_local_type);
-                            stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
-                            emit_const_update.template operator()<true, Op>();
-                        }
-                        else
-                        {
-                            emit_const_update.template operator()<false, Op>();
-                        }
-                    }};
+                auto const emit_const_update_for_op{[&]<reorder_expr_binop Op>() constexpr UWVM_THROWS -> void
+                                                    {
+                                                        if(update_op == wasm1_code::local_tee)
+                                                        {
+                                                            operand_stack_push(curr_local_type);
+                                                            stacktop_prepare_push1_if_reachable(bytecode, curr_local_type);
+                                                            emit_const_update.template operator()<true, Op>();
+                                                        }
+                                                        else
+                                                        {
+                                                            emit_const_update.template operator()<false, Op>();
+                                                        }
+                                                    }};
 
                 switch(expr_op)
                 {
@@ -676,7 +696,9 @@ case wasm1_code::local_get:
                     case reorder_expr_binop::shr_s: emit_const_update_for_op.template operator()<reorder_expr_binop::shr_s>(); break;
                     case reorder_expr_binop::shr_u: emit_const_update_for_op.template operator()<reorder_expr_binop::shr_u>(); break;
                     case reorder_expr_binop::rotl: emit_const_update_for_op.template operator()<reorder_expr_binop::rotl>(); break;
-                    case reorder_expr_binop::rotr: emit_const_update_for_op.template operator()<reorder_expr_binop::rotr>(); break;
+                    case reorder_expr_binop::rotr:
+                        emit_const_update_for_op.template operator()<reorder_expr_binop::rotr>();
+                        break;
                     [[unlikely]] default:
                     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -688,7 +710,10 @@ case wasm1_code::local_get:
 
                 emit_imm_to(bytecode, local_off);
                 if(curr_local_type == curr_operand_stack_value_type::i32) { emit_imm_to(bytecode, static_cast<wasm_i32>(imm)); }
-                else { emit_imm_to(bytecode, imm); }
+                else
+                {
+                    emit_imm_to(bytecode, imm);
+                }
                 emit_imm_to(bytecode, dst_off);
 
                 if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
@@ -729,10 +754,10 @@ case wasm1_code::local_get:
                     {
                         wasm_u32 next_local_index{};
                         using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                        auto const [next_local_index_next, next_local_index_err]{
-                            ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
-                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                     ::fast_io::mnp::leb128_get(next_local_index))};
+                        auto const [next_local_index_next,
+                                    next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                   ::fast_io::mnp::leb128_get(next_local_index))};
                         if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
                            local_type_from_index(next_local_index) != curr_local_type)
                         {
@@ -806,10 +831,9 @@ case wasm1_code::local_get:
 
                 wasm_u32 dst_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                auto const [dst_local_index_next, dst_local_index_err]{
-                    ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
-                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                             ::fast_io::mnp::leb128_get(dst_local_index))};
+                auto const [dst_local_index_next, dst_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                ::fast_io::mnp::leb128_get(dst_local_index))};
                 if(dst_local_index_err != ::fast_io::parse_code::ok || dst_local_index >= all_local_count ||
                    local_type_from_index(dst_local_index) != curr_local_type)
                 {
@@ -851,7 +875,10 @@ case wasm1_code::local_get:
                     ++runtime_log_stats.instr_reorder_candidate_count;
                     ++runtime_log_stats.instr_reorder_applied_count;
                     if(update_op == wasm1_code::local_set) { ++runtime_log_stats.instr_reorder_expr_local_set_count; }
-                    else { ++runtime_log_stats.instr_reorder_expr_local_tee_count; }
+                    else
+                    {
+                        ++runtime_log_stats.instr_reorder_expr_local_tee_count;
+                    }
                     if(update_op == wasm1_code::local_tee) { ++runtime_log_stats.instr_reorder_ring_slot_used_count; }
                     runtime_log_stats.instr_reorder_expr_step_count += step_count;
                     runtime_log_stats.instr_reorder_local_read_count += local_read_count;
@@ -865,58 +892,55 @@ case wasm1_code::local_get:
                         {
                             if constexpr(KeepResult)
                             {
-                                emit_opfunc_to(
-                                    bytecode,
-                                    translate::get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                interpreter_tuple));
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i32_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                             }
                             else
                             {
-                                emit_opfunc_to(
-                                    bytecode,
-                                    translate::get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                interpreter_tuple));
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i32_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                             }
                         }
                         else
                         {
                             if constexpr(KeepResult)
                             {
-                                emit_opfunc_to(
-                                    bytecode,
-                                    translate::get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                interpreter_tuple));
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i64_expr_local_tee_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                             }
                             else
                             {
-                                emit_opfunc_to(
-                                    bytecode,
-                                    translate::get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                interpreter_tuple));
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_reorder_i64_expr_local_set_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
+                                                                                                                                           interpreter_tuple));
                             }
                         }
                     }};
 
-                auto const emit_expr_local_update_for_step_count{
-                    [&]<bool KeepResult>() constexpr UWVM_THROWS -> void
-                    {
-                        switch(step_count)
-                        {
-                            case 3uz: emit_expr_local_update.template operator()<KeepResult, 3uz>(); break;
-                            case 4uz: emit_expr_local_update.template operator()<KeepResult, 4uz>(); break;
-                            case 5uz: emit_expr_local_update.template operator()<KeepResult, 5uz>(); break;
-                            case 6uz: emit_expr_local_update.template operator()<KeepResult, 6uz>(); break;
-                            case 7uz: emit_expr_local_update.template operator()<KeepResult, 7uz>(); break;
-                            case 8uz: emit_expr_local_update.template operator()<KeepResult, 8uz>(); break;
-                            [[unlikely]] default:
-                            {
+                auto const emit_expr_local_update_for_step_count{[&]<bool KeepResult>() constexpr UWVM_THROWS -> void
+                                                                 {
+                                                                     switch(step_count)
+                                                                     {
+                                                                         case 3uz: emit_expr_local_update.template operator()<KeepResult, 3uz>(); break;
+                                                                         case 4uz: emit_expr_local_update.template operator()<KeepResult, 4uz>(); break;
+                                                                         case 5uz: emit_expr_local_update.template operator()<KeepResult, 5uz>(); break;
+                                                                         case 6uz: emit_expr_local_update.template operator()<KeepResult, 6uz>(); break;
+                                                                         case 7uz: emit_expr_local_update.template operator()<KeepResult, 7uz>(); break;
+                                                                         case 8uz:
+                                                                             emit_expr_local_update.template operator()<KeepResult, 8uz>();
+                                                                             break;
+                                                                         [[unlikely]] default:
+                                                                         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-                                ::fast_io::fast_terminate();
-                            }
-                        }
-                    }};
+                                                                             ::fast_io::fast_terminate();
+                                                                         }
+                                                                     }
+                                                                 }};
 
                 if(update_op == wasm1_code::local_tee)
                 {
@@ -936,14 +960,8 @@ case wasm1_code::local_get:
                 {
                     emit_imm_to(bytecode, static_cast<::std::uint8_t>(ops[i]));
                     emit_imm_to(bytecode, static_cast<::std::uint8_t>(kinds[i]));
-                    if(kinds[i] == reorder_expr_operand_kind::local)
-                    {
-                        emit_imm_to(bytecode, offs[i]);
-                    }
-                    else if(curr_local_type == curr_operand_stack_value_type::i32)
-                    {
-                        emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i]));
-                    }
+                    if(kinds[i] == reorder_expr_operand_kind::local) { emit_imm_to(bytecode, offs[i]); }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32) { emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i])); }
                     else
                     {
                         emit_imm_to(bytecode, imms[i]);
@@ -966,7 +984,7 @@ case wasm1_code::local_get:
 
                 ::std::byte const* scan{code_curr};
                 ::std::size_t local_count{1uz};
-                wasm1_code reduce_wasm_op{};  // init
+                wasm1_code reduce_wasm_op{};    // init
                 reorder_int_binop reduce_op{};  // init
                 bool has_reduce_op{};
 
@@ -980,10 +998,9 @@ case wasm1_code::local_get:
 
                     wasm_u32 next_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                    auto const [next_local_index_next, next_local_index_err]{
-                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
-                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                                      reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                      ::fast_io::mnp::leb128_get(next_local_index))};
                     if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
                        local_type_from_index(next_local_index) != curr_local_type)
                     {
@@ -1058,26 +1075,27 @@ case wasm1_code::local_get:
                         }
                     }};
 
-                auto const emit_reduce_for_op{
-                    [&]<reorder_int_binop Op>() constexpr UWVM_THROWS -> void
-                    {
-                        switch(local_count)
-                        {
-                            case 3uz: emit_reduce.template operator()<Op, 3uz>(); break;
-                            case 4uz: emit_reduce.template operator()<Op, 4uz>(); break;
-                            case 5uz: emit_reduce.template operator()<Op, 5uz>(); break;
-                            case 6uz: emit_reduce.template operator()<Op, 6uz>(); break;
-                            case 7uz: emit_reduce.template operator()<Op, 7uz>(); break;
-                            case 8uz: emit_reduce.template operator()<Op, 8uz>(); break;
-                            [[unlikely]] default:
-                            {
+                auto const emit_reduce_for_op{[&]<reorder_int_binop Op>() constexpr UWVM_THROWS -> void
+                                              {
+                                                  switch(local_count)
+                                                  {
+                                                      case 3uz: emit_reduce.template operator()<Op, 3uz>(); break;
+                                                      case 4uz: emit_reduce.template operator()<Op, 4uz>(); break;
+                                                      case 5uz: emit_reduce.template operator()<Op, 5uz>(); break;
+                                                      case 6uz: emit_reduce.template operator()<Op, 6uz>(); break;
+                                                      case 7uz: emit_reduce.template operator()<Op, 7uz>(); break;
+                                                      case 8uz:
+                                                          emit_reduce.template operator()<Op, 8uz>();
+                                                          break;
+                                                      [[unlikely]] default:
+                                                      {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                          ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-                                ::fast_io::fast_terminate();
-                            }
-                        }
-                    }};
+                                                          ::fast_io::fast_terminate();
+                                                      }
+                                                  }
+                                              }};
 
                 switch(reduce_op)
                 {
@@ -1085,7 +1103,9 @@ case wasm1_code::local_get:
                     case reorder_int_binop::mul: emit_reduce_for_op.template operator()<reorder_int_binop::mul>(); break;
                     case reorder_int_binop::and_: emit_reduce_for_op.template operator()<reorder_int_binop::and_>(); break;
                     case reorder_int_binop::or_: emit_reduce_for_op.template operator()<reorder_int_binop::or_>(); break;
-                    case reorder_int_binop::xor_: emit_reduce_for_op.template operator()<reorder_int_binop::xor_>(); break;
+                    case reorder_int_binop::xor_:
+                        emit_reduce_for_op.template operator()<reorder_int_binop::xor_>();
+                        break;
                     [[unlikely]] default:
                     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1136,10 +1156,10 @@ case wasm1_code::local_get:
                     {
                         wasm_u32 next_local_index{};
                         using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                        auto const [next_local_index_next, next_local_index_err]{
-                            ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
-                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                     ::fast_io::mnp::leb128_get(next_local_index))};
+                        auto const [next_local_index_next,
+                                    next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                   ::fast_io::mnp::leb128_get(next_local_index))};
                         if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
                            local_type_from_index(next_local_index) != curr_local_type)
                         {
@@ -1238,15 +1258,15 @@ case wasm1_code::local_get:
                     {
                         if(curr_local_type == curr_operand_stack_value_type::i32)
                         {
-                            emit_opfunc_to(bytecode,
-                                           translate::get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                  interpreter_tuple));
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i32_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop, interpreter_tuple));
                         }
                         else
                         {
-                            emit_opfunc_to(bytecode,
-                                           translate::get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop,
-                                                                                                                                  interpreter_tuple));
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_reorder_i64_expr_fold_fptr_from_tuple<CompileOption, StepCount>(curr_stacktop, interpreter_tuple));
                         }
                     }};
 
@@ -1257,7 +1277,9 @@ case wasm1_code::local_get:
                     case 5uz: emit_expr_fold.template operator()<5uz>(); break;
                     case 6uz: emit_expr_fold.template operator()<6uz>(); break;
                     case 7uz: emit_expr_fold.template operator()<7uz>(); break;
-                    case 8uz: emit_expr_fold.template operator()<8uz>(); break;
+                    case 8uz:
+                        emit_expr_fold.template operator()<8uz>();
+                        break;
                     [[unlikely]] default:
                     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1273,14 +1295,8 @@ case wasm1_code::local_get:
                 {
                     emit_imm_to(bytecode, static_cast<::std::uint8_t>(ops[i]));
                     emit_imm_to(bytecode, static_cast<::std::uint8_t>(kinds[i]));
-                    if(kinds[i] == reorder_expr_operand_kind::local)
-                    {
-                        emit_imm_to(bytecode, offs[i]);
-                    }
-                    else if(curr_local_type == curr_operand_stack_value_type::i32)
-                    {
-                        emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i]));
-                    }
+                    if(kinds[i] == reorder_expr_operand_kind::local) { emit_imm_to(bytecode, offs[i]); }
+                    else if(curr_local_type == curr_operand_stack_value_type::i32) { emit_imm_to(bytecode, static_cast<wasm_i32>(imms[i])); }
                     else
                     {
                         emit_imm_to(bytecode, imms[i]);
@@ -1350,10 +1366,9 @@ case wasm1_code::local_get:
 
                     wasm_u32 next_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                    auto const [next_local_index_next, next_local_index_err]{
-                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
-                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                 ::fast_io::mnp::leb128_get(next_local_index))};
+                    auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
+                                                                                                      reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                      ::fast_io::mnp::leb128_get(next_local_index))};
                     if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
                        local_type_from_index(next_local_index) != curr_local_type)
                     {
@@ -1400,7 +1415,7 @@ case wasm1_code::local_get:
                                 emit_opfunc_to(
                                     bytecode,
                                     translate::get_uwvmint_reorder_i32_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
-                                                                                                                                      interpreter_tuple));
+                                                                                                                                    interpreter_tuple));
                                 break;
                             }
                             case curr_operand_stack_value_type::i64:
@@ -1408,7 +1423,7 @@ case wasm1_code::local_get:
                                 emit_opfunc_to(
                                     bytecode,
                                     translate::get_uwvmint_reorder_i64_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
-                                                                                                                                      interpreter_tuple));
+                                                                                                                                    interpreter_tuple));
                                 break;
                             }
                             case curr_operand_stack_value_type::f32:
@@ -1416,7 +1431,7 @@ case wasm1_code::local_get:
                                 emit_opfunc_to(
                                     bytecode,
                                     translate::get_uwvmint_reorder_f32_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
-                                                                                                                                      interpreter_tuple));
+                                                                                                                                    interpreter_tuple));
                                 break;
                             }
                             case curr_operand_stack_value_type::f64:
@@ -1424,7 +1439,7 @@ case wasm1_code::local_get:
                                 emit_opfunc_to(
                                     bytecode,
                                     translate::get_uwvmint_reorder_f64_preload_nlocalget_fptr_from_tuple<CompileOption, LocalCount>(curr_stacktop,
-                                                                                                                                      interpreter_tuple));
+                                                                                                                                    interpreter_tuple));
                                 break;
                             }
                             [[unlikely]] default:
@@ -1445,7 +1460,9 @@ case wasm1_code::local_get:
                     case 5uz: emit_preload.template operator()<5uz>(); break;
                     case 6uz: emit_preload.template operator()<6uz>(); break;
                     case 7uz: emit_preload.template operator()<7uz>(); break;
-                    case 8uz: emit_preload.template operator()<8uz>(); break;
+                    case 8uz:
+                        emit_preload.template operator()<8uz>();
+                        break;
                     [[unlikely]] default:
                     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2434,8 +2451,8 @@ case wasm1_code::local_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = set_operand_type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(set_operand_type);
             err.err_code = code_validation_error_code::local_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -3160,8 +3177,8 @@ case wasm1_code::local_tee:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
             err.err_code = code_validation_error_code::local_tee_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -4084,8 +4101,8 @@ case wasm1_code::global_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
-            err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
-            err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
+            err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
             err.err_code = code_validation_error_code::global_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }

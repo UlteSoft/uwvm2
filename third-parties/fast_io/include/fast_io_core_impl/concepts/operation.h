@@ -118,6 +118,42 @@ concept dynamic_reserve_printable = ::std::integral<char_type> && requires(T t, 
 	} -> ::std::convertible_to<char_type *>;
 };
 
+namespace details
+{
+
+template <::std::size_t>
+struct reserve_static_stack_size_constant
+{};
+
+template <::std::integral char_type>
+inline constexpr ::std::size_t dynamic_reserve_default_static_stack_size() noexcept
+{
+	constexpr ::std::size_t bytes{4096u};
+	if constexpr (sizeof(char_type) < bytes)
+	{
+		return bytes / sizeof(char_type);
+	}
+	else
+	{
+		return 1u;
+	}
+}
+
+} // namespace details
+
+/// @brief      dynamic_reserve_with_possible_static_stack_size
+/// @details    That a type is dynamic reserve printable with a constexpr possible
+///             stack buffer size for small run-time reserve materialization.
+/// @fn         print_reserve_static_stack_size
+/// @brief      Returns the possible stack buffer size, in char_type units.
+template <typename char_type, typename T>
+concept dynamic_reserve_with_possible_static_stack_size =
+	::std::integral<char_type> && dynamic_reserve_printable<char_type, T> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<print_reserve_static_stack_size(
+			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		requires(print_reserve_static_stack_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
+	};
+
 /// @warning    UNSTABLE
 /// @brief      context_printable
 /// @details    That a type is context printable
@@ -145,6 +181,24 @@ concept context_printable = ::std::integral<char_type> && requires(T t, char_typ
 		{ st.print_context_define(t, ptr, ptr) } -> ::std::same_as<context_print_result<char_type *>>;
 	};
 };
+
+/// @brief      context_printable_with_static_buffer_size
+/// @details    That a context printable type declares a constexpr contiguous
+///             buffer window size that callers may use to drive the producer.
+///             The value is a stack/local streaming window in char_type units,
+///             not a total output size. Multiple context producers should share
+///             a window by taking the maximum required size, not by summing the
+///             returned values. Opt-in producers should keep this value stack-safe.
+/// @fn         print_context_static_buffer_size
+/// @brief      Returns the static context buffer window size, in char_type units.
+template <typename char_type, typename T>
+concept context_printable_with_static_buffer_size =
+	::std::integral<char_type> && context_printable<char_type, T> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<print_context_static_buffer_size(
+			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		requires(print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != 0);
+		requires(print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
+	};
 
 /// @brief      printable_internal_shift
 /// @details    Defines the behaviour when printed with ::fast_io::mnp::width<::fast_io::mnp::scalar_placement::internal>
@@ -299,6 +353,32 @@ struct parameter
 	T reference;
 };
 
+namespace details
+{
+
+template <::std::integral char_type, typename value_type>
+struct parameter_print_context
+{
+	using context_type = typename ::std::remove_cvref_t<
+		decltype(print_context_type(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>))>::type;
+	context_type state;
+
+	inline constexpr context_print_result<char_type *> print_context_define(parameter<value_type> para,
+																		   char_type *begin, char_type *end)
+	{
+		return state.print_context_define(para.reference, begin, end);
+	}
+};
+
+} // namespace details
+
+template <::std::integral char_type, typename value_type>
+	requires context_printable<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr auto print_context_type(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return io_type_t<::fast_io::details::parameter_print_context<char_type, value_type>>{};
+}
+
 template <::std::integral char_type, typename output, typename value_type>
 	requires(printable<char_type, ::std::remove_cvref_t<value_type>> && ::std::is_trivially_copyable_v<output>)
 inline constexpr void print_define(io_reserve_type_t<char_type, parameter<value_type>>, output out,
@@ -320,6 +400,22 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, p
 										   parameter<value_type> para)
 {
 	return print_reserve_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>, para.reference);
+}
+
+template <::std::integral char_type, typename value_type>
+	requires dynamic_reserve_with_possible_static_stack_size<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return print_reserve_static_stack_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>);
+}
+
+template <::std::integral char_type, typename value_type>
+	requires context_printable_with_static_buffer_size<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr ::std::size_t
+print_context_static_buffer_size(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>);
 }
 
 template <::std::integral char_type, typename value_type>

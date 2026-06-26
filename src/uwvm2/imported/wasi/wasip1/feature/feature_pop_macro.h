@@ -22,6 +22,7 @@
 
 // #pragma once
 
+/// @warning Extension point: keep this synchronized with feature_push_macro.h when adding WASI Preview1 capability macros.
 /// @todo add more features here
 #pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET")
 #pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET")

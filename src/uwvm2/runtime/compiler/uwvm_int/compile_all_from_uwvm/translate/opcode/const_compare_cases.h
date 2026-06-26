@@ -1,6 +1,7 @@
 // Constants and comparisons are deliberately kept close together because both mostly transform
 // operand-stack shape without touching external state. The comments below call out where immediate
 // parsing, delayed constants, and compare-result stack modeling affect later opcode fusion.
+/// @warning Extension point: new constants or comparison opcodes require immediate parsing, operand-stack modeling, lazy scanner, and opfunc support.
 case wasm1_code::i32_const:
 {
     // Constants are side-effect free, so the translator can either emit them directly, delay them as

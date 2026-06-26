@@ -258,8 +258,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline bool runtime_llvm_jit_cache_path_existed{};  // [global]
 
     /// @brief Runtime LLVM JIT cache path mode.
-    inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{
-        runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
+    inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
 
     /// @brief Runtime LLVM JIT custom cache directory path.
     inline ::uwvm2::utils::container::u8string global_runtime_llvm_jit_cache_path{};  // [global]

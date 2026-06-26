@@ -81,6 +81,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::is_valid_value_type(value_type); }
 
+    /// @brief Detect a feature-aware type-section value-type checker.
+    /// @details Extension features use this differently named hook so the MVP two-argument ADL hook remains unambiguous.
+    template <typename... Fs>
+    concept has_check_typesec_value_type_with_feature_parameter =
+        requires(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<type_section_storage_t<Fs...>> sec_adl,
+                 ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
+                 ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) {
+            { define_check_typesec_value_type_with_feature_parameter(sec_adl, value_type, fs_para) } -> ::std::same_as<bool>;
+        };
+
+    /// @brief Check whether a type-section value type is enabled for the current feature parameter set.
+    /// @details Prefer the extension-aware hook when present; otherwise fall back to the original wasm1 two-argument hook.
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr bool check_typesec_value_type(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<type_section_storage_t<Fs...>> sec_adl,
+                                                   ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type,
+                                                   ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
+    {
+        if constexpr(has_check_typesec_value_type_with_feature_parameter<Fs...>)
+        {
+            return define_check_typesec_value_type_with_feature_parameter(sec_adl, value_type, fs_para);
+        }
+        else
+        {
+            static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_check_typesec_value_type<Fs...>,
+                          "define_check_typesec_value_type(...) not found");
+            return define_check_typesec_value_type(sec_adl, value_type);
+        }
+    }
+
     /// @brief      handle type_prefix: "functype"
     /// @details    Separate processing to facilitate reuse in subsequent expansion
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -92,12 +121,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::base::error_impl& err,
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
     {
-        // Note that section_curr may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
-
         // [... prefix] para_len ... para_begin ... res_len (para_end) ... res_begin ... prefix (res_end) ...
         // [   safe   ] unsafe (could be the section_end)
         //              ^^ section_curr
+        //
+        // parse_by_scan below bounds-checks the parameter vector length against section_end.
 
         using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
         using value_type_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> const*;
@@ -140,13 +168,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
 
+            // parse_by_scan succeeded, so [section_curr, next_para_len) is now proven safe and next_para_len is inside [section_curr, section_end].
+            // Proof view before moving section_curr: section_curr still points at the parameter length, and next_para_len marks the parameter payload.
+            // Pointer move: advance section_curr to the first parameter byte, or to result length when the parameter vector is empty.
             section_curr = reinterpret_cast<::std::byte const*>(next_para_len);
-            // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
 
             // [... prefix para_len ...] para_begin ... res_len (para_end) ... res_begin ... prefix (res_end) ...
             // [           safe        ] unsafe (could be the section_end)
             //                           ^^ section_curr
 
+            // section_curr was produced by parse_by_scan inside [section_begin, section_end], so this subtraction is in range.
             if(static_cast<::std::size_t>(section_end - section_curr) < static_cast<::std::size_t>(para_len)) [[unlikely]]
             {
                 err.err_curr = section_curr;
@@ -159,8 +190,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [                 safe                 ] unsafe (could be the section_end)
             //                          ^^ section_curr
 
+            // The length check above proves [section_curr, section_curr + para_len) is safe inside the current section.
+
             // set parameters
+            // Pointer storage: ft.parameter.begin records the beginning of the checked parameter payload.
             ft.parameter.begin = reinterpret_cast<value_type_const_may_alias_ptr>(section_curr);
+            // Pointer move: advance by para_len bytes, which were proven safe by the length check above.
             section_curr += para_len;
 
             // [... prefix para_len ... para_begin ...] res_len (para_end) ... res_begin ... prefix (res_end) ...
@@ -170,15 +205,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             //                                          ^^ ft.parameter.end
 
             // Storing Temporary Variables into Modules
+            // Pointer storage: ft.parameter.end records the one-past-end pointer of the checked parameter payload.
             ft.parameter.end = reinterpret_cast<value_type_const_may_alias_ptr>(section_curr);
 
             // check handler
-            static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_check_typesec_value_type<Fs...>,
-                          "define_check_typesec_value_type(...) not found");
             // check parameters
+            // The range [ft.parameter.begin, ft.parameter.end) is inside the already length-checked parameter payload above,
+            // so dereferencing parameter_curr only reads bytes proven to belong to the current section.
             for(auto parameter_curr{ft.parameter.begin}; parameter_curr != ft.parameter.end; ++parameter_curr)
             {
-                if(!define_check_typesec_value_type(sec_adl, *parameter_curr)) [[unlikely]]
+                if(!check_typesec_value_type(sec_adl, *parameter_curr, fs_para)) [[unlikely]]
                 {
                     err.err_curr = reinterpret_cast<::std::byte const*>(parameter_curr);
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(
@@ -225,8 +261,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
 
+            // parse_by_scan succeeded, so [section_curr, next_result_len) is now proven safe and next_result_len is inside [section_curr, section_end].
+            // Proof view before moving section_curr: section_curr still points at the result length, and next_result_len marks the result payload.
+            // Pointer move: advance section_curr to the first result byte, or to the next function type prefix when the result vector is empty.
             section_curr = reinterpret_cast<::std::byte const*>(next_result_len);
-            // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
 
             // [... prefix para_len ... para_begin ... res_len (para_end) ...] res_begin ... prefix (res_end) ...
             // [                           safe                              ] unsafe (could be the section_end)
@@ -238,6 +276,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             constexpr bool allow_multi_value{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_result_vector<Fs...>()};
             if constexpr(allow_multi_value)
             {
+                // Keep wasm1 function-type validation strict until a runtime extension flag enables multi-value.
                 // When compile-time allows multi results, the runtime parameter can re-enable the single-result check
                 constexpr bool has_controllable_allow_multi_value{
                     ::uwvm2::parser::wasm::standard::wasm1::features::has_feature_parameter_controllable_allow_multi_result_vector_from_paras_c<Fs...>};
@@ -265,6 +304,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
 
+            // section_curr was produced by parse_by_scan inside [section_begin, section_end], so this subtraction is in range.
             if(static_cast<::std::size_t>(section_end - section_curr) < static_cast<::std::size_t>(result_len)) [[unlikely]]
             {
                 err.err_curr = section_curr;
@@ -277,8 +317,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [                           safe                                            ] unsafe (could be the section_end)
             //                                                                ^^ section_curr
 
+            // The length check above proves [section_curr, section_curr + result_len) is safe inside the current section.
+
             // set parameters
+            // Pointer storage: ft.result.begin records the beginning of the checked result payload.
             ft.result.begin = reinterpret_cast<value_type_const_may_alias_ptr>(section_curr);
+            // Pointer move: advance by result_len bytes, which were proven safe by the length check above.
             section_curr += result_len;
 
             // [... prefix para_len ... para_begin ... res_len (para_end) ... res_begin ...] prefix (res_end) ...
@@ -288,12 +332,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             //                                                                               ^^ ft.result.end
 
             // Storing Temporary Variables into Modules
+            // Pointer storage: ft.result.end records the one-past-end pointer of the checked result payload.
             ft.result.end = reinterpret_cast<value_type_const_may_alias_ptr>(section_curr);
 
             // check results
+            // The range [ft.result.begin, ft.result.end) is inside the already length-checked result payload above,
+            // so dereferencing result_curr only reads bytes proven to belong to the current section.
             for(auto result_curr{ft.result.begin}; result_curr != ft.result.end; ++result_curr)
             {
-                if(!define_check_typesec_value_type(sec_adl, *result_curr)) [[unlikely]]
+                if(!check_typesec_value_type(sec_adl, *result_curr, fs_para)) [[unlikely]]
                 {
                     err.err_curr = reinterpret_cast<::std::byte const*>(result_curr);
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(
@@ -408,8 +455,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse type section (id: 1)"};
 #endif
-        // Note that section_begin may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // section_begin may equal section_end; parse_by_scan below bounds-checks the type count against section_end.
 
         // get type_section_storage_t from storages
         auto& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
@@ -487,8 +533,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 type_counter{};  // use for check
 
-        section_curr = reinterpret_cast<::std::byte const*>(type_count_next);  // never out of bounds
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // parse_by_scan succeeded, so [section_curr, type_count_next) is now proven safe and type_count_next is inside [section_curr, section_end].
+        // Proof view before moving section_curr: section_curr still points at the type count, and type_count_next marks the first type prefix.
+        // Pointer move: advance section_curr to the first type prefix, or to section_end when the type vector is empty.
+        section_curr = reinterpret_cast<::std::byte const*>(type_count_next);
 
         // [before_section ... | type_count ...] prefix ...
         // [              safe                 ] unsafe (could be the section_end)
@@ -519,10 +567,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             ::uwvm2::parser::wasm::standard::wasm1::features::final_type_prefix_t<Fs...> prefix;
 
-            // no necessary to check, because (section_curr != section_end)
+            // section_curr != section_end from the loop condition proves the one-byte type prefix read is in bounds.
             ::std::memcpy(::std::addressof(prefix), section_curr, sizeof(prefix));
-            // set section_curr to next
-            // No sense check, never cross the line because (section_curr < section_end)
 
             static_assert(sizeof(prefix) == 1uz);
             // Size equal to one does not need to do little-endian conversion
@@ -532,6 +578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             prefix = static_cast<decltype(prefix)>(static_cast<::std::uint_least8_t>(prefix) & 0xFFu);
 #endif
 
+            // Pointer move: advance to the first byte after the checked type prefix.
             ++section_curr;
             // [... prefix] ...
             // [   safe   ] unsafe (could be the section_end)

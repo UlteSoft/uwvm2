@@ -27,7 +27,11 @@ control_flow_stack.push_back({
 // start parse the code
 auto code_curr{code_begin};
 
-using wasm_value_type_u = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+using wasm_value_type_u = curr_operand_stack_value_type;
+using wasm_error_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+
+auto const to_wasm1_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> wasm_error_value_type
+                               { return static_cast<wasm_error_value_type>(type); }};
 
 // Numeric validators advance the Wasm cursor, enforce typed-stack rules, and update the abstract
 // operand stack before opcode-specific emission runs. Keeping this shared avoids subtly different
@@ -63,9 +67,8 @@ auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view o
                                       {
                                           err.err_curr = op_begin;
                                           err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                                          err.err_selectable.numeric_operand_type_mismatch.expected_type =
-                                              static_cast<wasm_value_type_u>(expected_operand_type);
-                                          err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(operand.type);
+                                          err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                          err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
                                           err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
                                           ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                       }
@@ -75,53 +78,55 @@ auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view o
 
 // Binary numeric validation pops RHS first because that is the physical top of the Wasm operand
 // stack; error reporting still names the opcode and expected homogeneous operand type.
-auto const validate_numeric_binary{
-    [&](::uwvm2::utils::container::u8string_view op_name,
-        curr_operand_stack_value_type expected_operand_type,
-        curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
-    {
-        // op_name ...
-        // [safe] unsafe (could be the section_end)
-        // ^^ code_curr
+auto const validate_numeric_binary{[&](::uwvm2::utils::container::u8string_view op_name,
+                                       curr_operand_stack_value_type expected_operand_type,
+                                       curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
+                                   {
+                                       // op_name ...
+                                       // [safe] unsafe (could be the section_end)
+                                       // ^^ code_curr
 
-        auto const op_begin{code_curr};
+                                       auto const op_begin{code_curr};
 
-        // op_name ...
-        // [safe] unsafe (could be the section_end)
-        // ^^ op_begin
+                                       // op_name ...
+                                       // [safe] unsafe (could be the section_end)
+                                       // ^^ op_begin
 
-        ++code_curr;
+                                       ++code_curr;
 
-        // op_name ...
-        // [safe ] unsafe (could be the section_end)
-        //         ^^ code_curr
+                                       // op_name ...
+                                       // [safe ] unsafe (could be the section_end)
+                                       //         ^^ code_curr
 
-        if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, 2uz); }
+                                       if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
+                                       {
+                                           report_operand_stack_underflow(op_begin, op_name, 2uz);
+                                       }
 
-        auto const rhs{try_pop_concrete_operand()};
-        if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-            err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_operand_type);
-            err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(rhs.type);
-            err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+                                       auto const rhs{try_pop_concrete_operand()};
+                                       if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
+                                       {
+                                           err.err_curr = op_begin;
+                                           err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                           err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                           err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(rhs.type);
+                                           err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                           ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                       }
 
-        auto const lhs{try_pop_concrete_operand()};
-        if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-            err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_operand_type);
-            err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type_u>(lhs.type);
-            err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+                                       auto const lhs{try_pop_concrete_operand()};
+                                       if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
+                                       {
+                                           err.err_curr = op_begin;
+                                           err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                           err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                           err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(lhs.type);
+                                           err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                           ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                       }
 
-        operand_stack_push(result_type);
-    }};
+                                       operand_stack_push(result_type);
+                                   }};
 
 // Memory load validation returns only the static offset. Alignment, memory existence, address type,
 // and result stack effect are fully checked here so memory opcode cases can focus on choosing the
@@ -217,7 +222,7 @@ auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_nam
                                  {
                                      err.err_curr = op_begin;
                                      err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                     err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                     err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                      err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                  }
@@ -325,7 +330,7 @@ auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_na
                                   {
                                       err.err_curr = op_begin;
                                       err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                      err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                      err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                       err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                   }
@@ -334,8 +339,8 @@ auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_na
                                   {
                                       err.err_curr = op_begin;
                                       err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
-                                      err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_value_type);
-                                      err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                                      err.err_selectable.store_value_type_mismatch.expected_type = to_wasm1_value_type(expected_value_type);
+                                      err.err_selectable.store_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                       err.err_code = code_validation_error_code::store_value_type_mismatch;
                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                   }
@@ -2671,30 +2676,26 @@ auto const flush_conbine_pending{
             return runtime_uwvm_int_opcode_conbination_level_t::heavy;
         }
 # endif
-        return kind == conbine_pending_kind::none ? runtime_uwvm_int_opcode_conbination_level_t::disable
-                                                  : runtime_uwvm_int_opcode_conbination_level_t::soft;
+        return kind == conbine_pending_kind::none ? runtime_uwvm_int_opcode_conbination_level_t::disable : runtime_uwvm_int_opcode_conbination_level_t::soft;
     }};
 
 [[maybe_unused]] auto const runtime_uwvm_int_conbine_pending_allowed{
     [&](conbine_pending_kind kind) constexpr noexcept -> bool
-    {
-        return runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level,
-                                                                  runtime_uwvm_int_conbine_pending_level(kind));
-    }};
+    { return runtime_uwvm_int_opcode_conbination_level_at_least(runtime_uwvm_int_opcode_conbination_level, runtime_uwvm_int_conbine_pending_level(kind)); }};
 
-[[maybe_unused]] auto const runtime_uwvm_int_br_if_fuse_allowed{
-    [&](br_if_fuse_kind kind) constexpr noexcept -> bool
-    {
-        if(kind == br_if_fuse_kind::none) { return true; }
+[[maybe_unused]] auto const runtime_uwvm_int_br_if_fuse_allowed{[&](br_if_fuse_kind kind) constexpr noexcept -> bool
+                                                                {
+                                                                    if(kind == br_if_fuse_kind::none) { return true; }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-        auto const kind_u{static_cast<unsigned>(kind)};
-        if(kind_u >= static_cast<unsigned>(br_if_fuse_kind::f32_eq) && kind_u <= static_cast<unsigned>(br_if_fuse_kind::f64_lt_eqz))
-        {
-            return runtime_uwvm_int_opcode_conbination_heavy_enabled;
-        }
+                                                                    auto const kind_u{static_cast<unsigned>(kind)};
+                                                                    if(kind_u >= static_cast<unsigned>(br_if_fuse_kind::f32_eq) &&
+                                                                       kind_u <= static_cast<unsigned>(br_if_fuse_kind::f64_lt_eqz))
+                                                                    {
+                                                                        return runtime_uwvm_int_opcode_conbination_heavy_enabled;
+                                                                    }
 # endif
-        return runtime_uwvm_int_opcode_conbination_enabled;
-    }};
+                                                                    return runtime_uwvm_int_opcode_conbination_enabled;
+                                                                }};
 
 /*
  * Pending-fusion continuation policy.
@@ -2857,9 +2858,8 @@ auto const flush_conbine_pending{
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                            || (runtime_uwvm_int_opcode_conbination_heavy_enabled &&
-                               (op == wasm1_code::i32_clz || op == wasm1_code::i32_ctz || op == wasm1_code::i32_popcnt ||
-                                op == wasm1_code::f32_convert_i32_s || op == wasm1_code::f32_convert_i32_u ||
-                                op == wasm1_code::f64_convert_i32_s || op == wasm1_code::f64_convert_i32_u ||
+                               (op == wasm1_code::i32_clz || op == wasm1_code::i32_ctz || op == wasm1_code::i32_popcnt || op == wasm1_code::f32_convert_i32_s ||
+                                op == wasm1_code::f32_convert_i32_u || op == wasm1_code::f64_convert_i32_s || op == wasm1_code::f64_convert_i32_u ||
                                 op == wasm1_code::i64_extend_i32_s || op == wasm1_code::i64_extend_i32_u))
 # endif
                         ;
@@ -3273,8 +3273,7 @@ auto const flush_conbine_pending{
                     case wasm1_code::i32_ge_u: [[fallthrough]];
                     case wasm1_code::i32_store: [[fallthrough]];
                     case wasm1_code::i32_store8: [[fallthrough]];
-                    case wasm1_code::i32_store16:
-                        return true;
+                    case wasm1_code::i32_store16: return true;
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                     case wasm1_code::i32_rotl:
                     case wasm1_code::i32_rotr:
@@ -3288,15 +3287,13 @@ auto const flush_conbine_pending{
             {
                 switch(op)
                 {
-                    case wasm1_code::local_get:
-                        [[fallthrough]];
+                    case wasm1_code::local_get: [[fallthrough]];
                     case wasm1_code::i32_load:
                     {
                         return true;
                     }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                    case wasm1_code::f32_load:
-                        [[fallthrough]];
+                    case wasm1_code::f32_load: [[fallthrough]];
                     case wasm1_code::f64_load:
                     {
                         return runtime_uwvm_int_opcode_conbination_heavy_enabled;
@@ -3312,8 +3309,14 @@ auto const flush_conbine_pending{
             {
                 if(conbine_pending.vt == curr_operand_stack_value_type::i32) { return op == wasm1_code::i32_store; }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                if(conbine_pending.vt == curr_operand_stack_value_type::f32) { return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f32_store; }
-                if(conbine_pending.vt == curr_operand_stack_value_type::f64) { return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f64_store; }
+                if(conbine_pending.vt == curr_operand_stack_value_type::f32)
+                {
+                    return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f32_store;
+                }
+                if(conbine_pending.vt == curr_operand_stack_value_type::f64)
+                {
+                    return runtime_uwvm_int_opcode_conbination_heavy_enabled && op == wasm1_code::f64_store;
+                }
 # endif
                 return false;
             }
@@ -3914,8 +3917,8 @@ auto const translate_one_opcode{
         else
         {
             // Combine state: only fuse if the next opcode is immediately `br_if`.
-            if(br_if_fuse.kind != br_if_fuse_kind::none &&
-               (!runtime_uwvm_int_br_if_fuse_allowed(br_if_fuse.kind) || curr_opbase != wasm1_code::br_if)) [[unlikely]]
+            if(br_if_fuse.kind != br_if_fuse_kind::none && (!runtime_uwvm_int_br_if_fuse_allowed(br_if_fuse.kind) || curr_opbase != wasm1_code::br_if))
+                [[unlikely]]
             {
                 br_if_fuse.kind = br_if_fuse_kind::none;
                 br_if_fuse.site = SIZE_MAX;
@@ -4003,6 +4006,7 @@ auto const translate_one_opcode{
 
         // The opcode fragments are included inside the switch so they can share the helper lambdas above
         // while still keeping each opcode family in a separate file.
+        /// @warning Extension point: new opcode families must be included here and mirrored in the lazy validator immediate scanner.
         switch(curr_opbase)
         {
 #include "opcode/control_flow_cases.h"

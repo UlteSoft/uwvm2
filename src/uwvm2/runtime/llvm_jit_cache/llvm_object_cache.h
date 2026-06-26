@@ -131,7 +131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         inline static constexpr void warn_signature_missing_once() noexcept
         {
 # if defined(UWVM)
-            static ::std::atomic_bool warned{}; // [global]
+            static ::std::atomic_bool warned{};  // [global]
             // Unsigned cache hits can repeat for every module, so one warning is enough to explain the policy rejection.
             if(warned.exchange(true, ::std::memory_order_relaxed)) { return; }
 
@@ -191,8 +191,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const first{reinterpret_cast<::std::byte const*>(buffer.data())};
             // Store asynchronously because object emission is on the JIT compile path and disk latency should not block it.
             auto const status{store_object_async(ctx, first, buffer.size(), policy, module_name, true)};
-            details::runtime_log_line(
-                u8"object-cache-store-enqueue module=\"", module_name, u8"\" status=", cache_status_name(status), u8" bytes=", buffer.size());
+            details::runtime_log_line(u8"object-cache-store-enqueue module=\"",
+                                      module_name,
+                                      u8"\" status=",
+                                      cache_status_name(status),
+                                      u8" bytes=",
+                                      buffer.size());
         }
 
         [[nodiscard]] inline constexpr ::std::unique_ptr<::llvm::MemoryBuffer> getObject(::llvm::Module const* module) UWVM_THROWS override

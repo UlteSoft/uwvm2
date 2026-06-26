@@ -37,7 +37,7 @@
 #endif
 
 // wasip1 host api wrappers
-#if defined(UWVM_IMPORT_WASI_WASIP1)
+#if defined(UWVM_IMPORT_WASI_WASIP1) && !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_args_get(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t argv_ptrsz,
                                                                               ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t argv_buf_ptrsz) noexcept
 { return ::uwvm2::imported::wasi::wasip1::func::args_get(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), argv_ptrsz, argv_buf_ptrsz); }
@@ -961,7 +961,7 @@ namespace uwvm2::uwvm::wasm::type
 {
     extern "C" uwvm_wasip1_host_api_v1 const* uwvm_get_wasip1_host_api_v1() noexcept
     {
-#if defined(UWVM_IMPORT_WASI_WASIP1)
+#if defined(UWVM_IMPORT_WASI_WASIP1) && !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
         bool expose_host_api{::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
 # if defined(UWVM_USE_THREAD_LOCAL)
         // Keep the TLS build on the direct thread_local variables. The accessor

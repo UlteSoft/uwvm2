@@ -487,15 +487,14 @@ case wasm1_code::i64_store32:
 }
 
 // memory.size
-// Emits the current memory0 size in Wasm pages as an i32.  Validation already proved the WebAssembly 1.0/MVP memory index
-// is zero; this replay still decodes it to keep the emit cursor synchronized.  Multi-memory/memory64 must replace the
-// hard-coded zero check with selected-memory and widened-result lowering.
+// Emits the current memory0 size in Wasm pages as an i32.  Validation already proved the WebAssembly 1.0/MVP reserved
+// byte is zero; this replay still consumes it to keep the emit cursor synchronized.  Multi-memory/memory64 must replace
+// the hard-coded zero check with selected-memory and widened-result lowering.
 case wasm1_code::memory_size:
 {
     ++code_curr;
 
-    validation_module_traits_t::wasm_u32 memory_index{};
-    if(!parse_wasm_leb128_immediate(code_curr, code_end, memory_index) || memory_index != 0u || !emit_memory_size_call()) [[unlikely]] { return result; }
+    if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_size_call()) [[unlikely]] { return result; }
     break;
 }
 
@@ -508,7 +507,6 @@ case wasm1_code::memory_grow:
 {
     ++code_curr;
 
-    validation_module_traits_t::wasm_u32 memory_index{};
-    if(!parse_wasm_leb128_immediate(code_curr, code_end, memory_index) || memory_index != 0u || !emit_memory_grow_call()) [[unlikely]] { return result; }
+    if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_grow_call()) [[unlikely]] { return result; }
     break;
 }

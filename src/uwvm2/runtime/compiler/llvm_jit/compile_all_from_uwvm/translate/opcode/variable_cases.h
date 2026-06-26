@@ -76,7 +76,7 @@ case wasm1_code::select:
     if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
+        err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_diagnostic_value_type(cond_type);
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -102,8 +102,8 @@ case wasm1_code::select:
     if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.select_type_mismatch.type_v1 = v1_type;
-        err.err_selectable.select_type_mismatch.type_v2 = v2_type;
+        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_diagnostic_value_type(v1_type);
+        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_diagnostic_value_type(v2_type);
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -255,8 +255,8 @@ case wasm1_code::local_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_diagnostic_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_diagnostic_value_type(value.type);
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -345,8 +345,8 @@ case wasm1_code::local_tee:
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_diagnostic_value_type(curr_local_type);
+            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_diagnostic_value_type(value.type);
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_tee_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -537,8 +537,8 @@ case wasm1_code::global_set:
         {
             err.err_curr = op_begin;
             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
-            err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
-            err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
+            err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_diagnostic_value_type(curr_global_type);
+            err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_diagnostic_value_type(value.type);
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }

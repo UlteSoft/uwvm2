@@ -642,6 +642,15 @@ print_reserve_size(io_reserve_type_t<dst_char_type, code_cvt_t<src_scheme, dst_s
 
 template <encoding_scheme src_scheme = encoding_scheme::execution_charset,
 		  encoding_scheme dst_scheme = encoding_scheme::execution_charset, ::std::integral src_char_type,
+		  ::std::integral dst_char_type>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<dst_char_type, code_cvt_t<src_scheme, dst_scheme, src_char_type>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<dst_char_type>();
+}
+
+template <encoding_scheme src_scheme = encoding_scheme::execution_charset,
+		  encoding_scheme dst_scheme = encoding_scheme::execution_charset, ::std::integral src_char_type,
 		  ::std::integral char_type>
 inline constexpr char_type *
 print_reserve_define(io_reserve_type_t<char_type, code_cvt_t<src_scheme, dst_scheme, src_char_type>>, char_type *iter,

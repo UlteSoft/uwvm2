@@ -44,6 +44,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm_custom/customs/impl.h>
+# include <uwvm2/object/global/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include "para.h"
@@ -132,6 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         inline static constexpr ::uwvm2::utils::container::array<element_type, length> values{vals...};
     };
 
+    /// @warning Extension point: new wasm value types require C++ ABI carrier types here and matching runtime initializer/linker handling.
     template <typename FeatureList, auto... vals>
         requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
     inline consteval auto get_import_function_result_tuple(wasm_value_container<FeatureList, vals...>) noexcept
@@ -139,7 +141,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         constexpr bool allow_multi_value{feature_list_traits<::std::remove_cvref_t<FeatureList>>::allow_multi_result_vector};
 
         constexpr ::std::size_t tuple_size{sizeof...(vals)};
-        if constexpr(allow_multi_value)
+        if constexpr(!allow_multi_value)
         {
 #if __cpp_contracts >= 202502L
             contract_assert(tuple_size <= 1uz);
@@ -207,10 +209,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                                     return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<
                                         ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>{};
                                 }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::object::global::wasm_funcref_t>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::object::global::wasm_externref_t>{};
+                                }
                                 else
                                 {
                                     static_assert(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
-                                                  "unsupported global value type");
+                                                  "unsupported imported function result value type");
                                 }
                             }
                         }.template operator()<vals...[I]>()),  // This is an overloaded comma expression
@@ -223,22 +233,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
     using import_function_result_tuple_t = decltype(get_import_function_result_tuple(wasm_value_container<FeatureList, vals...>{}))::Type;
 
+    /// @warning Extension point: keep imported function parameter carrier types synchronized with value_type and result tuple mapping.
     template <typename FeatureList, auto... vals>
         requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
     inline consteval auto get_import_function_parameter_tuple(wasm_value_container<FeatureList, vals...>) noexcept
     {
-        constexpr bool allow_multi_value{feature_list_traits<::std::remove_cvref_t<FeatureList>>::allow_multi_result_vector};
-
         constexpr ::std::size_t tuple_size{sizeof...(vals)};
-        if constexpr(allow_multi_value)
-        {
-#if __cpp_contracts >= 202502L
-            contract_assert(tuple_size <= 1uz);
-#else
-            if(tuple_size > 1uz) { ::fast_io::fast_terminate(); }
-#endif
-        }
-
         using final_value_type = feature_list_final_value_type_t<FeatureList>;
 
         if constexpr(tuple_size == 0uz) { return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<>{}; }
@@ -276,8 +276,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                             }
                             else
                             {
-                                /// @todo support v128
-                                static_assert(::std::same_as<final_value_type, ::uwvm2::parser::wasm::standard::wasm1::type::value_type>, "not supported yet");
+                                // For all versions, only i32, i64, f32, f64, and v128 are supported.
+                                if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<
+                                        ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::object::global::wasm_funcref_t>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::object::global::wasm_externref_t>{};
+                                }
+                                else
+                                {
+                                    static_assert(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                  "unsupported imported function parameter value type");
+                                }
                             }
                         }.template operator()<vals...[I]>()),  // This is an overloaded comma expression
                     ...);
@@ -496,6 +529,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_local_memory_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple; } &&
                                      is_local_imported_memory_tuple<typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple>;
 
+    /// @warning Extension point: new wasm global value types require a carrier type here plus global_get/global_set and runtime storage support.
     template <typename FeatureList, auto val>
         requires is_feature_list<FeatureList> && ::std::same_as<decltype(val), feature_list_final_value_type_t<FeatureList>>
     inline consteval auto get_import_global_value_type(wasm_value_container<FeatureList, val>) noexcept
@@ -549,6 +583,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             {
                 return ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128{};
             }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref))
+            {
+                return ::uwvm2::object::global::wasm_funcref_t{};
+            }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref))
+            {
+                return ::uwvm2::object::global::wasm_externref_t{};
+            }
             else
             {
                 static_assert(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
@@ -582,12 +624,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_global_mutable = requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleGlobal::is_mutable)>, bool>; };
 
     /// @brief   check is local imported global value type
+    /// @warning Extension point: this concept must admit every carrier type returned by get_import_global_value_type().
     template <typename T>
     concept is_local_imported_global_value_type = ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32> ||
                                                   ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64> ||
                                                   ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
                                                   ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
-                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>;
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::object::global::wasm_funcref_t> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::object::global::wasm_externref_t>;
 
     /// @brief   check has global value type
     /// @details
@@ -870,6 +915,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>)
             {
                 return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::object::global::wasm_funcref_t>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::object::global::wasm_externref_t>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref);
             }
             else
             {
@@ -1499,7 +1552,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 static_assert(::std::is_trivially_copyable_v<value_type>, "global get requires trivially copyable value types");
 
                 value_type const v{global_get(::fast_io::get<N>(globals))};
-                ::std::memcpy(out, ::std::addressof(v), sizeof(value_type));
+                if constexpr(::std::same_as<value_type, ::uwvm2::object::global::wasm_funcref_t> ||
+                             ::std::same_as<value_type, ::uwvm2::object::global::wasm_externref_t>)
+                {
+                    ::std::memcpy(out, ::std::addressof(v.ref), sizeof(v.ref));
+                }
+                else
+                {
+                    ::std::memcpy(out, ::std::addressof(v), sizeof(value_type));
+                }
             }
         }
 
@@ -1521,7 +1582,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     using value_type = typename global_type::value_type;
                     static_assert(::std::is_trivially_copyable_v<value_type>, "global set requires trivially copyable value types");
                     value_type v{};
-                    ::std::memcpy(::std::addressof(v), in, sizeof(value_type));
+                    if constexpr(::std::same_as<value_type, ::uwvm2::object::global::wasm_funcref_t> ||
+                                 ::std::same_as<value_type, ::uwvm2::object::global::wasm_externref_t>)
+                    {
+                        ::std::memcpy(::std::addressof(v.ref), in, sizeof(v.ref));
+                    }
+                    else
+                    {
+                        ::std::memcpy(::std::addressof(v), in, sizeof(value_type));
+                    }
                     global_set(::fast_io::get<N>(globals), v);
                     return true;
                 }

@@ -139,6 +139,24 @@ concept minimum_buffer_output_stream_require_size_impl =
 	::fast_io::operations::decay::defines::has_obuffer_minimum_size_operations<output> &&
 	minimum_buffer_output_stream_require_size_constant_impl<output, N>;
 
+template <bool line, ::std::integral char_type, typename T>
+inline constexpr ::std::size_t context_print_static_buffer_size_v = []() constexpr {
+	using value_type = ::std::remove_cvref_t<T>;
+	if constexpr (::fast_io::context_printable_with_static_buffer_size<char_type, value_type>)
+	{
+		constexpr ::std::size_t n{
+			print_context_static_buffer_size(::fast_io::io_reserve_type<char_type, value_type>)};
+		static_assert(n != 0);
+		static_assert(n != SIZE_MAX);
+		static_assert(n > static_cast<::std::size_t>(line));
+		return n;
+	}
+	else
+	{
+		return 32u;
+	}
+}();
+
 template <::std::size_t sz>
 	requires(sz != 0)
 inline constexpr void scatter_rsv_update_times(::fast_io::io_scatter_t *first, ::fast_io::io_scatter_t *last) noexcept
@@ -495,7 +513,8 @@ inline constexpr void print_control_single(output outstm, T t)
 	else if constexpr (context_printable<char_type, value_type>)
 	{
 		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, value_type>))>::type st;
-		constexpr ::std::size_t reserved_size{32u};
+		constexpr ::std::size_t reserved_size{
+			::fast_io::details::decay::context_print_static_buffer_size_v<line, char_type, value_type>};
 		constexpr ::std::ptrdiff_t reserved_size_no_line{
 			static_cast<::std::ptrdiff_t>(reserved_size - static_cast<::std::size_t>(line))};
 		if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<output>)

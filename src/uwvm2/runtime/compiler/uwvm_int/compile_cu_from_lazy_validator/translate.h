@@ -44,6 +44,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
@@ -66,11 +67,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
     using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
-    using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    /// @warning Extension point: lazy scanner support must be audited when wasm_binfmt1_final_value_type_t gains new value categories.
+    using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
     using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
 
     using runtime_module_storage_t = ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t;
     using parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
     using full_function_symbol_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
     using local_func_storage_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
 
@@ -247,6 +250,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option compile_options{};
         // Validation needs parser-level module metadata. It is optional only when the caller explicitly promises prior validation.
         parser_module_storage_t const* validator_module_storage{};
+        // Validation also needs the exact feature switches used to parse that module.
+        parser_feature_parameter_t const* validator_feature_parameter{};
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
     };
 
@@ -328,6 +333,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err, ::fast_io::parse_code::end_of_file);
             }
             code_curr += bytes;
+        }
+
+        inline constexpr void skip_reserved_memory_index_byte(::std::byte const*& code_curr,
+                                                              ::std::byte const* code_end,
+                                                              ::std::byte const* op_begin,
+                                                              ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            if(code_curr == code_end) [[unlikely]]
+            {
+                fail_lazy_split(op_begin, code_validation_error_code::invalid_memory_index, err, ::fast_io::parse_code::end_of_file);
+            }
+            ++code_curr;
         }
 
         inline constexpr ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
@@ -518,6 +535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             // Non-structural immediates are skipped precisely so the scanner can continue finding block/loop/if/else/end opcodes
             // without performing full stack validation or semantic checks.
+            /// @warning Extension point: every opcode with immediates must be listed here or lazy structural splitting will desynchronize.
             switch(curr_opbase)
             {
                 case wasm1_code::br:
@@ -610,7 +628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 case wasm1_code::memory_size:
                 case wasm1_code::memory_grow:
                 {
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_memory_index, err);
+                    skip_reserved_memory_index_byte(code_curr, code_end, op_begin, err);
                     return;
                 }
                 case wasm1_code::i32_const:
@@ -721,6 +739,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
                 ++code_curr;
 
+                /// @warning Extension point: structural opcode additions must update this lazy execution-unit scanner.
                 switch(curr_opbase)
                 {
                     case wasm1_code::block:
@@ -889,9 +908,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             // structural metadata while preserving a strict validation barrier before code becomes executable.
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
-                // Lazy validation must use the standard wasm1 validator directly. This keeps the lazy path aligned with
-                // src/uwvm2/validation/standard/wasm1/validator.h, including its memory-safety boundary comments and parse checks.
+                // Lazy validation must use the standard wasm1p1 validator directly. This keeps the lazy path aligned with
+                // src/uwvm2/validation/standard/wasm1p1/validator.h, including its memory-safety boundary comments and parse checks.
                 if(options.validator_module_storage == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(options.validator_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 auto const import_func_count{curr_module.imported_function_vec_storage.size()};
                 auto const function_index{import_func_count + local_function_index};
@@ -900,12 +920,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
                 auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
-                ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                    *options.validator_module_storage,
-                                                                    function_index,
-                                                                    code_begin,
-                                                                    code_end,
-                                                                    err);
+                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                      *options.validator_module_storage,
+                                                                      function_index,
+                                                                      code_begin,
+                                                                      code_end,
+                                                                      err,
+                                                                      *options.validator_feature_parameter);
             }
         }
 

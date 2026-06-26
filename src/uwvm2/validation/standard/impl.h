@@ -25,4 +25,5 @@
 
 #ifndef UWVM_MODULE
 # include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 #endif

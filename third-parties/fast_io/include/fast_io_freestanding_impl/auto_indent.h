@@ -189,6 +189,13 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, a
 }
 
 template <::std::integral char_type, typename containe>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, auto_indent_t<char_type, containe>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
+}
+
+template <::std::integral char_type, typename containe>
 inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, auto_indent_t<char_type, containe>>,
 												 char_type *iter,
 												 auto_indent_t<char_type, containe> const &indent) noexcept

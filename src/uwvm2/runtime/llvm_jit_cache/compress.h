@@ -64,9 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             return static_cast<::std::uint_least16_t>((v ^ (v >> 16u)) & 0xffffu);
         }
 
-        inline constexpr void append_lzss_token(::uwvm2::utils::container::vector<::std::byte>& out,
-                                                ::std::size_t offset,
-                                                ::std::size_t length) noexcept
+        inline constexpr void append_lzss_token(::uwvm2::utils::container::vector<::std::byte>& out, ::std::size_t offset, ::std::size_t length) noexcept
         {
             // The 16-bit token stores a 12-bit backward distance and a 4-bit length delta to cap decoder work.
             auto const token{static_cast<::std::uint_least16_t>(((length - lzss_min_match) << 12uz) | (offset - 1uz))};
@@ -126,9 +124,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             }
         }
 
-        [[nodiscard]] inline constexpr bool read_native_lz_length(::std::byte const*& first,
-                                                                  ::std::byte const* last,
-                                                                  ::std::size_t& len) noexcept
+        [[nodiscard]] inline constexpr bool read_native_lz_length(::std::byte const*& first, ::std::byte const* last, ::std::size_t& len) noexcept
         {
             for(;;)
             {
@@ -142,8 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         }
     }  // namespace details
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> compress_lzss(::std::byte const* first, ::std::size_t size)
-        noexcept
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> compress_lzss(::std::byte const* first, ::std::size_t size) noexcept
     {
         ::uwvm2::utils::container::vector<::std::byte> out{};
         if(size == 0uz) { return out; }
@@ -218,9 +213,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 
     [[nodiscard]] inline constexpr bool decompress_lzss(::std::byte const* first,
-                                              ::std::byte const* last,
-                                              ::std::size_t expected_size,
-                                              ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
+                                                        ::std::byte const* last,
+                                                        ::std::size_t expected_size,
+                                                        ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
     {
         out = {};
         out.reserve(expected_size);
@@ -247,10 +242,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                     if(offset == 0uz || offset > out.size()) [[unlikely]] { return false; }
                     if(length > expected_size - out.size()) [[unlikely]] { return false; }
 
-                    for(::std::size_t i{}; i != length; ++i)
-                    {
-                        out.push_back(out.index_unchecked(out.size() - offset));
-                    }
+                    for(::std::size_t i{}; i != length; ++i) { out.push_back(out.index_unchecked(out.size() - offset)); }
                 }
                 else
                 {
@@ -263,8 +255,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         return first == last;
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> compress_native_lz(::std::byte const* first, ::std::size_t size)
-        noexcept
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> compress_native_lz(::std::byte const* first, ::std::size_t size) noexcept
     {
         ::uwvm2::utils::container::vector<::std::byte> out{};
         if(size == 0uz) { return out; }
@@ -296,10 +287,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
                 auto const match_end{pos + match_size};
                 // Populate skipped positions to keep later matches available after consuming a long run.
-                for(auto p{pos + 1uz}; p + details::native_lz_min_match <= match_end; ++p)
-                {
-                    table.index_unchecked(details::native_lz_hash4(first + p)) = p;
-                }
+                for(auto p{pos + 1uz}; p + details::native_lz_min_match <= match_end; ++p) { table.index_unchecked(details::native_lz_hash4(first + p)) = p; }
 
                 pos = match_end;
                 anchor = pos;
@@ -315,9 +303,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 
     [[nodiscard]] inline constexpr bool decompress_native_lz(::std::byte const* first,
-                                                   ::std::byte const* last,
-                                                   ::std::size_t expected_size,
-                                                   ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
+                                                             ::std::byte const* last,
+                                                             ::std::size_t expected_size,
+                                                             ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
     {
         out = {};
         out.reserve(expected_size);
@@ -329,10 +317,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const token{::std::to_integer<::std::size_t>(*first++)};
 
             auto literal_size{token >> 4uz};
-            if(literal_size == 15uz && !details::read_native_lz_length(first, last, literal_size)) [[unlikely]]
-            {
-                return false;
-            }
+            if(literal_size == 15uz && !details::read_native_lz_length(first, last, literal_size)) [[unlikely]] { return false; }
 
             if(static_cast<::std::size_t>(last - first) < literal_size) [[unlikely]] { return false; }
             if(literal_size > expected_size - out.size()) [[unlikely]] { return false; }
@@ -350,26 +335,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(offset == 0uz || offset > out.size()) [[unlikely]] { return false; }
 
             auto match_size{details::native_lz_min_match + (token & 0x0fuz)};
-            if((token & 0x0fuz) == 15uz && !details::read_native_lz_length(first, last, match_size)) [[unlikely]]
-            {
-                return false;
-            }
+            if((token & 0x0fuz) == 15uz && !details::read_native_lz_length(first, last, match_size)) [[unlikely]] { return false; }
             if(match_size > expected_size - out.size()) [[unlikely]] { return false; }
 
-            for(::std::size_t i{}; i != match_size; ++i)
-            {
-                out.push_back(out.index_unchecked(out.size() - offset));
-            }
+            for(::std::size_t i{}; i != match_size; ++i) { out.push_back(out.index_unchecked(out.size() - offset)); }
         }
 
         return first == last;
     }
 
     [[nodiscard]] inline constexpr bool decompress_payload(compression_kind kind,
-                                                 ::std::byte const* first,
-                                                 ::std::size_t compressed_size,
-                                                 ::std::size_t expected_size,
-                                                 ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
+                                                           ::std::byte const* first,
+                                                           ::std::size_t compressed_size,
+                                                           ::std::size_t expected_size,
+                                                           ::uwvm2::utils::container::vector<::std::byte>& out) noexcept
     {
         switch(kind)
         {
@@ -380,12 +359,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 out.reserve(expected_size);
                 details::append_bytes(out, first, first + compressed_size);
                 return true;
-            case compression_kind::uwvm_lzss:
-                return decompress_lzss(first, first + compressed_size, expected_size, out);
-            case compression_kind::uwvm_native_lz:
-                return decompress_native_lz(first, first + compressed_size, expected_size, out);
-            default:
-                return false;
+            case compression_kind::uwvm_lzss: return decompress_lzss(first, first + compressed_size, expected_size, out);
+            case compression_kind::uwvm_native_lz: return decompress_native_lz(first, first + compressed_size, expected_size, out);
+            default: return false;
         }
     }
 }  // namespace uwvm2::runtime::llvm_jit_cache

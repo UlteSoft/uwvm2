@@ -438,9 +438,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         Unsigned unsigned_value;  // no init necessary
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex_get<true, false, true>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin_get<true, false, true>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::oct_get<true, false, true, true>(unsigned_value)))
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex0x_get<true, false>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin0b_get<true, false>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::oct0o_get<true, false>(unsigned_value)))
         {
             out = ::std::bit_cast<Out>(unsigned_value);
             return true;
@@ -516,7 +516,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
 
         // Scan binary floating-point syntax, which must use the 0x-prefixed hexfloat form.
-        auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat_get<true, true>(out))};
+        auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat0x_get<true>(out))};
         if(hex_err == ::fast_io::parse_code::ok && hex_next == last) { return true; }
 
         return false;
@@ -766,11 +766,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::io::perr(output,
                             u8"bin=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            ::fast_io::mnp::bin<true>(bits),
+                            ::fast_io::mnp::bin0b(bits),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8", oct=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            ::fast_io::mnp::oct<true, false, true>(bits),
+                            ::fast_io::mnp::oct0o(bits),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8", sdec=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -847,7 +847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8", hexfloat=",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                    ::fast_io::mnp::hexfloat(value),
+                                    ::fast_io::mnp::hexfloat0x(value),
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8", bitfloat(hex)=",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -867,7 +867,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8", hexfloat=",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                    ::fast_io::mnp::hexfloat(value),
+                                    ::fast_io::mnp::hexfloat0x(value),
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8", bitfloat(hex)=",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -2045,10 +2045,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 }
                 break;
             }
+            /// @warning Extension point: new executable modes require dispatch, teardown, and diagnostics here.
             /// @todo add more modes here
             [[unlikely]] default:
             {
-                /// @warning Unhandled execute mode.  Add a dispatch branch before introducing a new executable mode.
+                /// @warning Extension point: unhandled execute mode; add a dispatch branch before introducing a new executable mode.
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif

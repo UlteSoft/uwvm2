@@ -1,6 +1,7 @@
 // Integer numeric translation is split between strict Wasm validation and opportunistic combine
 // emission. Every helper emitted here assumes the operand types have already been checked; the
 // surrounding comments explain why some expressions are delayed instead of immediately materialized.
+/// @warning Extension point: sign-extension, nontrapping-conversion, SIMD, or future numeric opcodes need matching validation and opfunc emission here.
 case wasm1_code::i32_clz:
 {
     // Unary integer ops preserve stack depth. Local-get fusion avoids pushing a temporary value only

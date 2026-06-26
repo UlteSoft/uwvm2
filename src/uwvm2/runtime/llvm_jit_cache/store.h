@@ -196,8 +196,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519)
             if(!ctx.has_signature_seed || signature == nullptr) { return false; }
-            auto const message{ed25519_signature_message_parts(
-                header, isa_metadata, isa_metadata_size, context_metadata, context_metadata_size, payload, payload_size)};
+            auto const message{
+                ed25519_signature_message_parts(header, isa_metadata, isa_metadata_size, context_metadata, context_metadata_size, payload, payload_size)};
             // Verification reconstructs the public key from the same local identity so no external key store is required.
             auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
             auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
@@ -791,17 +791,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_name(cache_context const& ctx) noexcept
     { return details::cache_file_name_from_hash(details::cache_key_hash(ctx)); }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_path(cache_context const& ctx) noexcept
-        {
-            auto path{ctx.cache_dir};
-            details::append_path_separator_if_needed(path);
-            ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
-            auto const key_hash{details::cache_key_hash(ctx)};
-            auto const shard{details::cache_key_shard(key_hash)};
-            // Public path construction mirrors the storage layout for diagnostics and tests.
-            ::fast_io::io::print(ref, u8"objects");
-            details::append_path_separator_if_needed(path);
-            ::fast_io::io::print(ref, shard);
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_file_path(cache_context const& ctx) noexcept
+    {
+        auto path{ctx.cache_dir};
+        details::append_path_separator_if_needed(path);
+        ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(path)};
+        auto const key_hash{details::cache_key_hash(ctx)};
+        auto const shard{details::cache_key_shard(key_hash)};
+        // Public path construction mirrors the storage layout for diagnostics and tests.
+        ::fast_io::io::print(ref, u8"objects");
+        details::append_path_separator_if_needed(path);
+        ::fast_io::io::print(ref, shard);
         details::append_path_separator_if_needed(path);
         auto const name{details::cache_file_name_from_hash(key_hash)};
         ::fast_io::io::print(ref, name);
@@ -812,14 +812,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                              ::std::byte const* object,
                                                              ::std::size_t size,
                                                              cache_policy const& policy) noexcept
-        {
-            if(!policy.enable) { return cache_status::disabled; }
+    {
+        if(!policy.enable) { return cache_status::disabled; }
 
-            ::uwvm2::utils::container::vector<::std::byte> blob{};
-            // Blob construction is separated from file publication so write failures cannot leave half-valid cache state.
-            if(auto const status{details::build_cache_blob(ctx, object, size, policy, blob)}; status != cache_status::ok) [[unlikely]] { return status; }
+        ::uwvm2::utils::container::vector<::std::byte> blob{};
+        // Blob construction is separated from file publication so write failures cannot leave half-valid cache state.
+        if(auto const status{details::build_cache_blob(ctx, object, size, policy, blob)}; status != cache_status::ok) [[unlikely]] { return status; }
 
-            return details::write_cache_blob_atomic(ctx, blob);
+        return details::write_cache_blob_atomic(ctx, blob);
     }
 
     namespace details
@@ -1132,8 +1132,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 auto const payload_size{static_cast<::std::size_t>(view.header.payload_size)};
 
                 // Verify before decompression so malformed compressed data is not processed unless it is signed for this context.
-                if(!details::ed25519_identity_verify(
-                       ctx, header_bytes, view.isa_metadata, isa_size, view.context_metadata, context_size, view.signature, view.payload, payload_size))
+                if(!details::ed25519_identity_verify(ctx,
+                                                     header_bytes,
+                                                     view.isa_metadata,
+                                                     isa_size,
+                                                     view.context_metadata,
+                                                     context_size,
+                                                     view.signature,
+                                                     view.payload,
+                                                     payload_size))
                 {
                     result.status = cache_status::signature_mismatch;
                     return result;

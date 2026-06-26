@@ -107,8 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse table section (id: 4)"};
 #endif
-        // Note that section_begin may be equal to section_end
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // section_begin may equal section_end; parse_by_scan below bounds-checks the table count against section_end.
 
         // get table_section_storage_t from storages
         auto& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<table_section_storage_t<Fs...>>(module_storage.sections)};
@@ -174,32 +173,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         }
 
-        constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
-        if constexpr(!allow_multi_table)
+        constexpr bool check_single_table{::uwvm2::parser::wasm::standard::wasm1::features::need_check_single_table_by_feature<Fs...>()};
+        if constexpr(check_single_table)
         {
-            /// @details    In the current version of WebAssembly, at most one table may be defined or imported in a single module,
-            ///             and all constructs implicitly reference this table 0. This restriction may be lifted in future versions.
-            /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.5.4
+            /// @brief Check table counts with the WebAssembly 1.0 single-table restriction selected by the feature set.
+            auto const check_single_table_section_limit{
+                [&]() constexpr UWVM_THROWS
+                {
+                    /// @details    In the current version of WebAssembly, at most one table may be defined or imported in a single module,
+                    ///             and all constructs implicitly reference this table 0. This restriction may be lifted in future versions.
+                    /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.5.4
 
-            // Since it has already been checked and an exception thrown in the import_section, it can never be greater than 1.
-            UWVM_ASSERT(imported_table_size <= 1u);
-            [[assume(imported_table_size <= 1u)]];
+                    // Since it has already been checked and an exception thrown in the import_section, it can never be greater than 1.
+                    UWVM_ASSERT(imported_table_size <= 1u);
+                    [[assume(imported_table_size <= 1u)]];
 
-            // table_count is not incremental and requires overflow checking
-            constexpr auto wasm_u32_max{::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max()};
+                    // table_count is not incremental and requires overflow checking
+                    constexpr auto wasm_u32_max{::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max()};
 
-            if(table_count > wasm_u32_max - imported_table_size ||
-               table_count + imported_table_size > static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(1u)) [[unlikely]]
+                    // imported_table_size comes from importsec.importdesc[table] and has already been checked by import_section when the single-table
+                    // restriction is active. The arithmetic is guarded before addition, so no u32 overflow can occur.
+                    if(table_count > wasm_u32_max - imported_table_size ||
+                       table_count + imported_table_size > static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(1u)) [[unlikely]]
+                    {
+                        err.err_curr = section_curr;
+                        err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+                }};
+
+            constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
+
+            if constexpr(!allow_multi_table) { check_single_table_section_limit(); }
+            else
             {
-                err.err_curr = section_curr;
-                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
-                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                /// @brief Check table-count overflow after a runtime feature flag permits multiple tables.
+                auto const check_multi_table_section_limit{
+                    [&]() constexpr UWVM_THROWS
+                    {
+                        constexpr auto wasm_u32_max{::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max()};
+
+                        // Multi-table mode keeps only the total imported+defined table count overflow check. The subtraction is safe because it is
+                        // performed before any addition involving table_count.
+                        if(table_count > wasm_u32_max - imported_table_size) [[unlikely]]
+                        {
+                            err.err_curr = section_curr;
+                            err.err_selectable.imp_def_num_exceed_u32max.type = 0x01;  // table
+                            err.err_selectable.imp_def_num_exceed_u32max.defined = table_count;
+                            err.err_selectable.imp_def_num_exceed_u32max.imported = imported_table_size;
+                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::imp_def_num_exceed_u32max;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }};
+
+                /// @brief Keep wasm1 table-section validation strict until a runtime extension flag enables multi-table.
+                if(::uwvm2::parser::wasm::standard::wasm1::features::get_feature_parameter_controllable_allow_multi_table_from_paras(fs_para))
+                {
+                    check_single_table_section_limit();
+                }
+                else
+                {
+                    check_multi_table_section_limit();
+                }
             }
         }
         else
         {
             constexpr auto wasm_u32_max{::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max()};
 
+            // This branch is compiled only for feature sets that never need the wasm1 single-table check. Keep the total table count overflow check before
+            // any imported+defined addition.
             if(table_count > wasm_u32_max - imported_table_size) [[unlikely]]
             {
                 err.err_curr = section_curr;
@@ -230,8 +273,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_counter{};  // use for check
 
-        section_curr = reinterpret_cast<::std::byte const*>(table_count_next);  // never out of bounds
-        // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        // parse_by_scan succeeded, so [section_curr, table_count_next) is now proven safe and table_count_next is inside [section_curr, section_end].
+        // Proof view before moving section_curr: section_curr still points at the table count, and table_count_next marks the first table type.
+        // Pointer move: advance section_curr to the first table type, or to section_end when the table vector is empty.
+        section_curr = reinterpret_cast<::std::byte const*>(table_count_next);
 
         // [before_section ... | table_count ...] table1 ...
         // [              safe                  ] unsafe (could be the section_end)
@@ -265,6 +310,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // Function call matching via adl
             static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_table_section_table_handler<Fs...>);
 
+            // table_section_table_handler checks the table type against section_end and returns the first byte after it.
+            // Pointer move: replace section_curr with the first byte after the checked table type.
             section_curr = table_section_table_handler(sec_adl, table, module_storage, section_curr, section_end, err, fs_para);
 
             // [... table_curr ...] table_next

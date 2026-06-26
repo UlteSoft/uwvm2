@@ -74,6 +74,7 @@ constexpr auto get_duplicate_exports_type_name{
             }
             [[unlikely]] default:
             {
+            /// @warning Extension point: new export description kinds need duplicate-export ECO names here.
             /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();

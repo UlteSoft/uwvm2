@@ -31,6 +31,13 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, b
 	return p.bits;
 }
 
+template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, bitset_print_reserve_proxy>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
+}
+
 namespace details
 {
 

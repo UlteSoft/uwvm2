@@ -39,6 +39,38 @@ inline constexpr auto hexfloat(::std::complex<scalar_type> t) noexcept
 
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat0x(::std::complex<scalar_type> t) noexcept
+{
+	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<scalar_type>, __float128>
+#endif
+	)
+	{
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+		if constexpr (sizeof(scalar_type) > sizeof(double))
+		{
+			return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
+								  ::std::complex<__float128>>{
+				{static_cast<__float128>(::std::real(t)), static_cast<__float128>(::std::imag(t))}};
+		}
+		else
+#endif
+			return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
+								  ::std::complex<double>>{
+				{static_cast<double>(::std::real(t)), static_cast<double>(::std::imag(t))}};
+	}
+	else
+	{
+		return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
+							  ::std::complex<::std::remove_cvref_t<scalar_type>>>{
+			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
+			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))}};
+	}
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat(::std::complex<scalar_type> t, ::std::size_t n) noexcept
 {
 	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
@@ -63,6 +95,39 @@ inline constexpr auto hexfloat(::std::complex<scalar_type> t, ::std::size_t n) n
 	else
 	{
 		return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false>,
+										::std::complex<::std::remove_cvref_t<scalar_type>>>{
+			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
+			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))},
+			n};
+	}
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat0x(::std::complex<scalar_type> t, ::std::size_t n) noexcept
+{
+	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<scalar_type>, __float128>
+#endif
+	)
+	{
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+		if constexpr (sizeof(scalar_type) > sizeof(double))
+		{
+			return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
+											::std::complex<__float128>>{
+				{static_cast<__float128>(::std::real(t)), static_cast<__float128>(::std::imag(t))}, n};
+		}
+		else
+#endif
+			return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
+											::std::complex<double>>{
+				{static_cast<double>(::std::real(t)), static_cast<double>(::std::imag(t))}, n};
+	}
+	else
+	{
+		return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>,
 										::std::complex<::std::remove_cvref_t<scalar_type>>>{
 			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
 			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))},
@@ -104,6 +169,38 @@ inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t) noexcept
 
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t) noexcept
+{
+	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<scalar_type>, __float128>
+#endif
+	)
+	{
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+		if constexpr (sizeof(scalar_type) > sizeof(double))
+		{
+			return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
+								  ::std::complex<__float128>>{
+				{static_cast<__float128>(::std::real(t)), static_cast<__float128>(::std::imag(t))}};
+		}
+		else
+#endif
+			return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
+								  ::std::complex<double>>{
+				{static_cast<double>(::std::real(t)), static_cast<double>(::std::imag(t))}};
+	}
+	else
+	{
+		return scalar_manip_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
+							  ::std::complex<::std::remove_cvref_t<scalar_type>>>{
+			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
+			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))}};
+	}
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t, ::std::size_t n) noexcept
 {
 	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
@@ -128,6 +225,39 @@ inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t, ::std::size_
 	else
 	{
 		return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true>,
+										::std::complex<::std::remove_cvref_t<scalar_type>>>{
+			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
+			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))},
+			n};
+	}
+}
+
+template <bool uppercase = false, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t, ::std::size_t n) noexcept
+{
+	if constexpr (::std::same_as<::std::remove_cvref_t<scalar_type>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<scalar_type>, __float128>
+#endif
+	)
+	{
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+		if constexpr (sizeof(scalar_type) > sizeof(double))
+		{
+			return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
+											::std::complex<__float128>>{
+				{static_cast<__float128>(::std::real(t)), static_cast<__float128>(::std::imag(t))}, n};
+		}
+		else
+#endif
+			return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
+											::std::complex<double>>{
+				{static_cast<double>(::std::real(t)), static_cast<double>(::std::imag(t))}, n};
+	}
+	else
+	{
+		return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>,
 										::std::complex<::std::remove_cvref_t<scalar_type>>>{
 			{static_cast<::std::remove_cvref_t<scalar_type>>(::std::real(t)),
 			 static_cast<::std::remove_cvref_t<scalar_type>>(::std::imag(t))},

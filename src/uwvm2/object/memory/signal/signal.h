@@ -181,12 +181,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @param      frame_address       Best-effort frame pointer captured at the faulting instruction.
         /// @param      stack_pointer       Best-effort stack pointer captured at the faulting instruction.
         /// @return     Diagnostic data consumed by the default reporter or a custom out-of-bounds hook.
-        inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t
-            make_mmap_memory_error(protected_memory_segment_t const& seg,
-                                   ::std::byte const* fault_addr,
-                                   ::std::uintptr_t instruction_address,
-                                   ::std::uintptr_t frame_address,
-                                   ::std::uintptr_t stack_pointer) noexcept
+        inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t make_mmap_memory_error(protected_memory_segment_t const& seg,
+                                                                                                    ::std::byte const* fault_addr,
+                                                                                                    ::std::uintptr_t instruction_address,
+                                                                                                    ::std::uintptr_t frame_address,
+                                                                                                    ::std::uintptr_t stack_pointer) noexcept
         {
             auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};

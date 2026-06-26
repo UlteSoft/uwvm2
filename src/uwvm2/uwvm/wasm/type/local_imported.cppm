@@ -45,6 +45,7 @@ import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1.features;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm_custom.customs;
+import uwvm2.object.global;
 import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.feature;
 import :para;

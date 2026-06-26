@@ -288,6 +288,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
 #include "error_code_outputs/eco_numeric_operand_type_mismatch.h"
                 return;
             }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_feature_required:
+            {
+#include "error_code_outputs/eco_wasm1p1_feature_required.h"
+                return;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_data_index:
+            {
+#include "error_code_outputs/eco_illegal_data_index.h"
+                return;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_element_index:
+            {
+#include "error_code_outputs/eco_illegal_element_index.h"
+                return;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_undeclared_ref_func:
+            {
+#include "error_code_outputs/eco_wasm1p1_undeclared_ref_func.h"
+                return;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_invalid_reference_type:
+            {
+#include "error_code_outputs/eco_wasm1p1_invalid_reference_type.h"
+                return;
+            }
             case ::uwvm2::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

@@ -45,6 +45,7 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
@@ -61,6 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr bool validate_all_wasm_code_for_module(
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
         [[maybe_unused]] ::uwvm2::utils::container::u8cstring_view file_name,
         [[maybe_unused]] ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
@@ -82,12 +84,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
             try
 #endif
             {
-                ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                    module_storage,
-                                                                    import_func_count + local_idx,
-                                                                    code_begin_ptr,
-                                                                    code_end_ptr,
-                                                                    v_err);
+                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                      module_storage,
+                                                                      import_func_count + local_idx,
+                                                                      code_begin_ptr,
+                                                                      code_end_ptr,
+                                                                      v_err,
+                                                                      fs_para);
             }
 #ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -193,7 +196,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                     {
                         case 1u:
                         {
-                            if(!validate_all_wasm_code_for_module(wf->wasm_module_storage.wasm_binfmt_ver1_storage, wf->file_name, module_name))
+                            if(!validate_all_wasm_code_for_module(wf->wasm_module_storage.wasm_binfmt_ver1_storage,
+                                                                  wf->wasm_parameter.binfmt1_para,
+                                                                  wf->file_name,
+                                                                  module_name))
                             {
                                 return false;
                             }

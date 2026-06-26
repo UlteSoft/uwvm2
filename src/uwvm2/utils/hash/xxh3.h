@@ -1079,9 +1079,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 # endif
 
             struct uint32x4x2_t
-            {
-                uint32x4_t val[2];
-            };
+            { uint32x4_t val[2]; };
 
             auto const acc_64aligned{::std::assume_aligned<xxh3_max_align_len>(acc)};
             using uint64x2_t_may_alias UWVM_GNU_MAY_ALIAS = uint64x2_t*;
@@ -1790,9 +1788,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 # endif
 
     struct uint32x4x2_t
-    {
-        uint32x4_t val[2];
-    };
+    { uint32x4_t val[2]; };
 
     auto const acc_64aligned{::std::assume_aligned<xxh3_max_align_len>(acc)};
     using uint64x2_t_may_alias UWVM_GNU_MAY_ALIAS = uint64x2_t*;

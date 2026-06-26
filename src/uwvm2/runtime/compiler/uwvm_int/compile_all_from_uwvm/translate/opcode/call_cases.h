@@ -1,6 +1,7 @@
 // Call-related opcodes are the boundary between the translated interpreter body and runtime call
 // machinery. The comments emphasize why operands must be materialized, how direct-call metadata is
 // selected, and why stack-top fast paths are guarded by narrow state checks.
+/// @warning Extension point: new function result/parameter value categories require call materialization, ABI lowering, and stack repair updates here.
 case wasm1_code::return_:
 {
     // `return` is equivalent to branching to the function frame. We validate result arity/types and
@@ -38,8 +39,8 @@ case wasm1_code::return_:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -209,8 +210,8 @@ case wasm1_code::call:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1019,7 +1020,7 @@ case wasm1_code::call_indirect:
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
-            err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<wasm_value_type_u>(idx.type);
+            err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
             err.err_code = code_validation_error_code::br_cond_type_not_i32;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
@@ -1037,8 +1038,8 @@ case wasm1_code::call_indirect:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
-                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1449,7 +1450,7 @@ case wasm1_code::select:
     if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
+        err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond_type);
         err.err_code = code_validation_error_code::select_cond_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -1473,8 +1474,8 @@ case wasm1_code::select:
     if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.select_type_mismatch.type_v1 = v1_type;
-        err.err_selectable.select_type_mismatch.type_v2 = v2_type;
+        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1_type);
+        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2_type);
         err.err_code = code_validation_error_code::select_type_mismatch;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }

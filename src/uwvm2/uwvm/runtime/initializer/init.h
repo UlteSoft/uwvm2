@@ -25,6 +25,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
 # include <utility>
@@ -83,7 +84,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         }
 
-#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
         // Runtime import resolution repeats the WASI Preview 1 visibility check
         // used by the pre-runtime dependency pass. The dependency pass provides
         // the user-facing error in normal executable mode, while this runtime
@@ -93,7 +93,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         [[nodiscard]] inline constexpr bool is_wasip1_import_visible_for_wasm_module(::uwvm2::utils::container::u8string_view consumer_module_name,
                                                                                      ::uwvm2::utils::container::u8string_view import_module_name) noexcept
         {
-# if defined(UWVM_IMPORT_WASI_WASIP1)
+#if defined(UWVM_IMPORT_WASI_WASIP1) && !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
             if(import_module_name != u8"wasi_snapshot_preview1") [[likely]] { return true; }
 
             auto const consumer_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(consumer_module_name)};
@@ -128,13 +128,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     return true;
                 }
             }
-# else
+#else
             static_cast<void>(consumer_module_name);
             static_cast<void>(import_module_name);
             return true;
-# endif
-        }
 #endif
+        }
 
         // use for verbose output
         inline ::uwvm2::utils::container::u8string_view current_initializing_module_name{};  // [global]
@@ -768,6 +767,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         inline constexpr ::uwvm2::utils::container::u8string_view module_type_to_string(::uwvm2::uwvm::wasm::type::module_type_t t) noexcept
         {
+            /// @warning Extension point: new module_type_t enumerators need readable names here and initializer/linker dispatch support.
             switch(t)
             {
                 case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
@@ -805,6 +805,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         inline constexpr ::std::size_t importdesc_table_index{1uz};
         inline constexpr ::std::size_t importdesc_memory_index{2uz};
         inline constexpr ::std::size_t importdesc_global_index{3uz};
+        /// @warning Extension point: tag imports must be wired through parser importdesc handling, runtime storage, linker, and initializer.
         inline constexpr ::std::size_t importdesc_tag_index{4uz};  /// @todo not supported tag yet
 
         // this is an adl function
@@ -812,6 +813,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             to_object_global_type(::uwvm2::parser::wasm::standard::wasm1::type::value_type t /* [adl] */) noexcept
         {
             /// @note The parser stage already validated the module version/value type, so no version/feature checks are needed here.
+            /// @warning Extension point: keep wasm1 global type projection in sync if MVP storage is ever widened.
             switch(t)
             {
                 case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32:
@@ -851,14 +853,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
+        inline constexpr ::uwvm2::object::global::global_type
+            to_object_global_type(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type t /* [adl] */) noexcept
+        {
+            /// @warning Extension point: new wasm1p1 value types that can initialize globals need object::global storage and local_imported support.
+            switch(t)
+            {
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i32:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_i32;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i64:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_i64;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::f32:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_f32;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::f64:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_f64;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_v128;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref: [[fallthrough]];
+                case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref:
+                {
+                    return ::uwvm2::object::global::global_type::wasm_ref;
+                }
+                [[unlikely]] default:
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Unsupported wasm value type for global in module \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        current_initializing_module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\": ",
+                                        ::fast_io::mnp::hex0x<true>(static_cast<::std::uint_least32_t>(static_cast<::std::uint_least8_t>(t))),
+                                        u8".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+            }
+        }
+
         // wasm1 const expr allows: i32/i64/f32/f64.const and global.get (only immutable imported globals).
         // Note: uwvm2 uses `std::uint_least64_t` for runtime offsets/addresses, so wasm1 `i32` offsets need widening conversion.
         // For wasm1 table/data offsets, the expression must evaluate to an i32, so we best-effort decode:
         // - i32.const
         // - global.get (only after import-linking, see `try_eval_wasm1_const_expr_offset_after_linking`)
-        inline constexpr void
-            try_eval_wasm1_const_expr_offset(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr /* [adl] */,
-                                             ::std::uint_least64_t& out) noexcept
+        inline constexpr void try_eval_wasm1_const_expr_offset(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr /* [adl] */,
+                                                               ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz) [[unlikely]]
             {
@@ -1056,6 +1109,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.v128)));
                             break;
                         }
+                        case ::uwvm2::object::global::global_type::wasm_ref:
+                        {
+                            local_imported_scratch.storage.ref = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.ref)));
+                            break;
+                        }
                         [[unlikely]] default:
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1119,6 +1178,85 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
             ::fast_io::fast_terminate();
+        }
+
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 wasm_ref_null_funcidx_sentinel{
+            (::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max)()};
+
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32
+            eval_wasm1p1_ref_const_expr_as_funcidx(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
+                                                   ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
+        {
+            if(expr.opcodes.size() != 1uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const& op{expr.opcodes.front_unchecked()};
+            if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD0u)) { return wasm_ref_null_funcidx_sentinel; }
+            if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD2u)) { return op.storage.ref_func_idx; }
+            if(op.opcode != ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const idx{static_cast<::std::size_t>(op.storage.global_idx)};
+            auto const imported_global_count{curr_rt.imported_global_vec_storage.size()};
+            ::uwvm2::object::global::wasm_global_storage_t const* resolved_global{};
+            ::uwvm2::object::global::wasm_global_storage_t local_imported_scratch{};
+
+            if(idx < imported_global_count)
+            {
+                try_resolve_wasm1_imported_global_value(::std::addressof(curr_rt.imported_global_vec_storage.index_unchecked(idx)),
+                                                        resolved_global,
+                                                        local_imported_scratch);
+            }
+            else
+            {
+                auto const local_idx{idx - imported_global_count};
+                if(local_idx >= curr_rt.local_defined_global_vec_storage.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto& local_global{curr_rt.local_defined_global_vec_storage.index_unchecked(local_idx)};
+                ensure_wasm1_local_defined_global_initialized(local_global);
+                resolved_global = ::std::addressof(local_global.global);
+            }
+
+            if(resolved_global == nullptr || resolved_global->kind != ::uwvm2::object::global::global_type::wasm_ref) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            switch(resolved_global->storage.ref.kind)
+            {
+                case ::uwvm2::object::global::wasm_ref_kind::wasm_null: return wasm_ref_null_funcidx_sentinel;
+                case ::uwvm2::object::global::wasm_ref_kind::wasm_func:
+                    return resolved_global->storage.ref.storage.func_idx;
+                [[unlikely]] default:
+                    ::fast_io::fast_terminate();
+            }
+        }
+
+        inline constexpr void materialize_wasm1p1_element_expr_payloads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
+        {
+            ::std::size_t total_expr_count{};
+            for(auto const& elem_seg: curr_rt.local_defined_element_vec_storage)
+            {
+                if(elem_seg.element_type_ptr == nullptr) [[unlikely]] { continue; }
+                auto const curr_expr_count{elem_seg.element_type_ptr->storage.segment.vec_expr.size()};
+                if(curr_expr_count > ::std::numeric_limits<::std::size_t>::max() - total_expr_count) [[unlikely]] { ::fast_io::fast_terminate(); }
+                total_expr_count += curr_expr_count;
+            }
+
+            auto& owned_funcidx_storage{curr_rt.element_expr_funcidx_vec_storage};
+            owned_funcidx_storage.clear();
+            owned_funcidx_storage.reserve(total_expr_count);
+
+            for(auto& elem_seg: curr_rt.local_defined_element_vec_storage)
+            {
+                if(elem_seg.element_type_ptr == nullptr) [[unlikely]] { continue; }
+                auto const& exprs{elem_seg.element_type_ptr->storage.segment.vec_expr};
+                if(exprs.empty()) { continue; }
+
+                auto const begin_index{owned_funcidx_storage.size()};
+                for(auto const& expr: exprs) { owned_funcidx_storage.push_back_unchecked(eval_wasm1p1_ref_const_expr_as_funcidx(expr, curr_rt)); }
+
+                auto const* const base{owned_funcidx_storage.data()};
+                elem_seg.element.funcidx_begin = base + begin_index;
+                elem_seg.element.funcidx_end = elem_seg.element.funcidx_begin + exprs.size();
+            }
         }
 
         inline constexpr void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
@@ -1938,7 +2076,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     auto const& expected_table{import_ptr->imports.storage.table};
                     auto const& actual_table{*resolved_table->table_type_ptr};
-                    if(!wasm1_limits_match(expected_table.limits, actual_table.limits)) [[unlikely]]
+                    if(expected_table.reftype != actual_table.reftype || !wasm1_limits_match(expected_table.limits, actual_table.limits)) [[unlikely]]
                     {
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -2164,8 +2302,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     auto const& expected_global{import_ptr->imports.storage.global};
-                    ::uwvm2::parser::wasm::standard::wasm1::type::global_type const* actual_global_ptr{};
-                    ::uwvm2::parser::wasm::standard::wasm1::type::global_type actual_global_local_imported{};
+                    using final_global_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_global_type_t;
+                    using final_value_type = decltype(final_global_type{}.type);
+
+                    final_global_type const* actual_global_ptr{};
+                    final_global_type actual_global_local_imported{};
 
                     if(imp.link_kind == global_link_kind::imported)
                     {
@@ -2226,9 +2367,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32): [[fallthrough]];
                             case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64): [[fallthrough]];
                             case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32): [[fallthrough]];
-                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64):
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64): [[fallthrough]];
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128): [[fallthrough]];
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref): [[fallthrough]];
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref):
                             {
-                                actual_global_local_imported.type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(vt_u8);
+                                actual_global_local_imported.type = static_cast<final_value_type>(vt_u8);
                                 break;
                             }
                             [[unlikely]] default:
@@ -2339,10 +2483,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline constexpr void
-            try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
-                                                           ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
-                                                           ::std::uint_least64_t& out) noexcept
+        inline constexpr void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
+                                                                             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_rt,
+                                                                             ::std::uint_least64_t& out) noexcept
         {
             if(expr.opcodes.size() != 1uz)
             {
@@ -2368,31 +2511,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
             else if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
             {
-                auto const idx{static_cast<::std::size_t>(op.storage.imported_global_idx)};
+                auto const idx{static_cast<::std::size_t>(op.storage.global_idx)};
                 auto const imported_global_count{curr_rt.imported_global_vec_storage.size()};
-                if(idx >= imported_global_count) [[unlikely]]
+                auto const local_global_count{curr_rt.local_defined_global_vec_storage.size()};
+                auto const all_global_count{imported_global_count + local_global_count};
+                if(idx >= all_global_count) [[unlikely]]
                 {
-                    ::fast_io::io::perr(
-                        ::uwvm2::uwvm::io::u8log_output,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                        u8"uwvm: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                        u8"[fatal] ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8"initializer: In wasm1.0, constant expressions retrieve offsets from imported globals, where the index is out of bounds: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                        idx,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8" >= ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                        imported_global_count,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8".\n\n",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Constant expression offset global index is out of bounds: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        idx,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" >= ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        all_global_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
 
-                try_resolve_wasm1_imported_global_i32_value(::std::addressof(curr_rt.imported_global_vec_storage.index_unchecked(idx)), out);
+                if(idx < imported_global_count)
+                {
+                    try_resolve_wasm1_imported_global_i32_value(::std::addressof(curr_rt.imported_global_vec_storage.index_unchecked(idx)), out);
+                }
+                else
+                {
+                    auto const& local_global{curr_rt.local_defined_global_vec_storage.index_unchecked(idx - imported_global_count)};
+                    if(local_global.init_state != ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized ||
+                       local_global.global.kind != ::uwvm2::object::global::global_type::wasm_i32) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                    out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(local_global.global.storage.i32));
+                }
 
                 return;
             }
@@ -2993,6 +3150,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 ::std::size_t table_idx{};
                 for(auto const& table_type: tablesec.tables)
                 {
+                    if(table_type.reftype != ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            current_initializing_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", runtime table storage currently supports only funcref tables; got local table ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            table_idx,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8" with type \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            ::uwvm2::parser::wasm::standard::wasm1p1::features::section_details(table_type),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
                     if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                     {
                         verbose_module_info(u8"Init: resize local table begin (table_idx=",
@@ -3001,7 +3183,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                             u8", table_type=\"",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(table_type),
+                                            ::uwvm2::parser::wasm::standard::wasm1p1::features::section_details(table_type),
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                             u8"\", initial_elems=",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -3166,33 +3348,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     auto const& op{local_global.expr.opcodes.front_unchecked()};
-                    switch(op.opcode)
+                    /// @warning Extension point: new const-expression opcodes must be evaluated here before defined globals are usable at runtime.
+                    switch(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode))
                     {
-                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const:
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const):
                         {
                             rec.global.storage.i32 = op.storage.i32;
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
-                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const:
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const):
                         {
                             rec.global.storage.i64 = op.storage.i64;
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
-                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const:
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const):
                         {
                             rec.global.storage.f32 = op.storage.f32;
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
-                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const:
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const):
                         {
                             rec.global.storage.f64 = op.storage.f64;
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
-                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get:
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD0u):
+                        {
+                            ::uwvm2::object::global::wasm_global_ref_t ref{};
+                            ref.storage.ptr = nullptr;
+                            ref.kind = ::uwvm2::object::global::wasm_ref_kind::wasm_null;
+                            rec.global.storage.ref = ref;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD2u):
+                        {
+                            ::uwvm2::object::global::wasm_global_ref_t ref{};
+                            ref.storage.func_idx = op.storage.ref_func_idx;
+                            ref.kind = ::uwvm2::object::global::wasm_ref_kind::wasm_func;
+                            rec.global.storage.ref = ref;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xFDu):
+                        {
+                            rec.global.storage.v128 = op.storage.v128;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get):
                         {
                             // Requires import-linking; evaluated in `finalize_wasm1_globals_after_linking()`.
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::uninitialized;
@@ -3226,10 +3438,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 out.local_defined_element_vec_storage.reserve(elemsec.elems.size());
                 for(auto const& elem: elemsec.elems)
                 {
+                    auto const& elem_segment{elem.storage.segment};
                     ::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t rec{};
                     rec.element_type_ptr = ::std::addressof(elem);
-                    rec.element.table_idx = elem.storage.table_idx.table_idx;
-                    auto const funcidx_size{elem.storage.table_idx.vec_funcidx.size()};
+                    rec.element.table_idx = elem_segment.table_idx;
+                    auto const funcidx_size{elem_segment.vec_funcidx.size()};
                     if(funcidx_size == 0uz)
                     {
                         rec.element.funcidx_begin = nullptr;
@@ -3237,12 +3450,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                     else
                     {
-                        rec.element.funcidx_begin = elem.storage.table_idx.vec_funcidx.data();
+                        rec.element.funcidx_begin = elem_segment.vec_funcidx.data();
                         rec.element.funcidx_end = rec.element.funcidx_begin + funcidx_size;
                     }
-                    rec.element.kind = ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active;
-                    rec.element.dropped = false;
-                    try_eval_wasm1_const_expr_offset(elem.storage.table_idx.expr, rec.element.offset);
+                    rec.element.kind = elem_segment.active ? ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active
+                                                           : ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::passive;
+                    rec.element.dropped = elem_segment.declarative;
+                    if(elem_segment.active) { try_eval_wasm1_const_expr_offset(elem_segment.expr, rec.element.offset); }
                     out.local_defined_element_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
@@ -3254,14 +3468,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 out.local_defined_data_vec_storage.reserve(datasec.datas.size());
                 for(auto const& data: datasec.datas)
                 {
+                    auto const& data_segment{data.storage.segment};
                     ::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t rec{};
                     rec.data_type_ptr = ::std::addressof(data);
-                    rec.data.kind = ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::active;
+                    rec.data.kind = data_segment.active ? ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::active
+                                                        : ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::passive;
                     rec.data.dropped = false;
-                    rec.data.memory_idx = data.storage.memory_idx.memory_idx;
-                    rec.data.byte_begin = reinterpret_cast<::std::byte const*>(data.storage.memory_idx.byte.begin);
-                    rec.data.byte_end = reinterpret_cast<::std::byte const*>(data.storage.memory_idx.byte.end);
-                    try_eval_wasm1_const_expr_offset(data.storage.memory_idx.expr, rec.data.offset);
+                    rec.data.memory_idx = data_segment.memory_idx;
+                    rec.data.byte_begin = reinterpret_cast<::std::byte const*>(data_segment.byte.begin);
+                    rec.data.byte_end = reinterpret_cast<::std::byte const*>(data_segment.byte.end);
+                    if(data_segment.active) { try_eval_wasm1_const_expr_offset(data_segment.expr, rec.data.offset); }
                     out.local_defined_data_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
@@ -3329,29 +3545,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             auto const& op{expr.opcodes.front_unchecked()};
-            switch(op.opcode)
+            switch(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode))
             {
-                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const:
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const):
                 {
                     g.global.storage.i32 = op.storage.i32;
                     break;
                 }
-                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const:
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const):
                 {
                     g.global.storage.i64 = op.storage.i64;
                     break;
                 }
-                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const:
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const):
                 {
                     g.global.storage.f32 = op.storage.f32;
                     break;
                 }
-                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const:
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const):
                 {
                     g.global.storage.f64 = op.storage.f64;
                     break;
                 }
-                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get:
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD0u):
+                {
+                    ::uwvm2::object::global::wasm_global_ref_t ref{};
+                    ref.storage.ptr = nullptr;
+                    ref.kind = ::uwvm2::object::global::wasm_ref_kind::wasm_null;
+                    g.global.storage.ref = ref;
+                    break;
+                }
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD2u):
+                {
+                    ::uwvm2::object::global::wasm_global_ref_t ref{};
+                    ref.storage.func_idx = op.storage.ref_func_idx;
+                    ref.kind = ::uwvm2::object::global::wasm_ref_kind::wasm_func;
+                    g.global.storage.ref = ref;
+                    break;
+                }
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xFDu):
+                {
+                    g.global.storage.v128 = op.storage.v128;
+                    break;
+                }
+                case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get):
                 {
                     auto const idx{static_cast<::std::size_t>(op.storage.imported_global_idx)};
                     auto const imported_count{g.owner_module_rt_ptr->imported_global_vec_storage.size()};
@@ -3471,6 +3713,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             g.global.storage.f64 = resolved_global->storage.f64;
                             break;
                         }
+                        case ::uwvm2::object::global::global_type::wasm_v128:
+                        {
+                            g.global.storage.v128 = resolved_global->storage.v128;
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_ref:
+                        {
+                            g.global.storage.ref = resolved_global->storage.ref;
+                            break;
+                        }
                         [[unlikely]] default:
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -3566,7 +3818,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 for(auto& elem: curr_rt.local_defined_element_vec_storage)
                 {
                     if(elem.element_type_ptr == nullptr) [[unlikely]] { continue; }
-                    auto const& expr{elem.element_type_ptr->storage.table_idx.expr};
+                    auto const& expr{elem.element_type_ptr->storage.segment.expr};
                     if(expr.opcodes.size() == 1uz &&
                        expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
                     {
@@ -3577,7 +3829,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 for(auto& data: curr_rt.local_defined_data_vec_storage)
                 {
                     if(data.data_type_ptr == nullptr) [[unlikely]] { continue; }
-                    auto const& expr{data.data_type_ptr->storage.memory_idx.expr};
+                    auto const& expr{data.data_type_ptr->storage.segment.expr};
                     if(expr.opcodes.size() == 1uz &&
                        expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
                     {
@@ -3682,6 +3934,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 ::std::size_t elem_active_applied{};
                 ::std::size_t data_active_applied{};
 
+                materialize_wasm1p1_element_expr_payloads(curr_rt);
+
                 // element (wasm1: active segments)
                 for(auto& elem_seg: curr_rt.local_defined_element_vec_storage)
                 {
@@ -3691,7 +3945,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     if(elem_seg.element_type_ptr != nullptr)
                     {
-                        auto const& expr{elem_seg.element_type_ptr->storage.table_idx.expr};
+                        auto const& expr{elem_seg.element_type_ptr->storage.segment.expr};
                         if(expr.opcodes.size() == 1uz &&
                            expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
                         {
@@ -3781,6 +4035,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
                         ::fast_io::fast_terminate();
                     }
+                    if(target_table->table_type_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+                    if(target_table->table_type_ptr->reftype != ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", active element segment targets a non-funcref table \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            ::uwvm2::parser::wasm::standard::wasm1p1::features::section_details(*target_table->table_type_ptr),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
 
                     auto const offset{safe_u64_to_size_t(elem.offset)};
 
@@ -3834,6 +4115,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     for(::std::size_t i{}; i != func_count; ++i)
                     {
                         auto& slot{target_table->elems.index_unchecked(offset + i)};
+                        if(funcidx_begin[i] == wasm_ref_null_funcidx_sentinel)
+                        {
+                            slot = {};
+                            continue;
+                        }
                         auto const func_idx{safe_u32_to_size_t(funcidx_begin[i])};
                         if(func_idx >= all_func_count) [[unlikely]]
                         {
@@ -3883,7 +4169,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     if(data_seg.data_type_ptr != nullptr)
                     {
-                        auto const& expr{data_seg.data_type_ptr->storage.memory_idx.expr};
+                        auto const& expr{data_seg.data_type_ptr->storage.segment.expr};
                         if(expr.opcodes.size() == 1uz &&
                            expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
                         {

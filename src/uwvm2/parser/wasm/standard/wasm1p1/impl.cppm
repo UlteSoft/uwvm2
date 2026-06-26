@@ -27,6 +27,8 @@ module;
 export module uwvm2.parser.wasm.standard.wasm1p1;
 export import uwvm2.parser.wasm.standard.wasm1;
 export import uwvm2.parser.wasm.standard.wasm1p1.type;
+export import uwvm2.parser.wasm.standard.wasm1p1.opcode;
+export import uwvm2.parser.wasm.standard.wasm1p1.features;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -164,6 +164,61 @@ concept minimum_buffer_output_stream_require_size_impl =
 	::fast_io::operations::decay::defines::has_obuffer_minimum_size_operations<output> &&
 	minimum_buffer_output_stream_require_size_constant_impl<output, N>;
 
+template <::std::size_t static_stack_size, ::std::integral char_type>
+inline constexpr ::std::size_t dynamic_print_reserve_static_stack_budget() noexcept
+{
+	/*
+	A dynamic producer's static stack size is only a local materialization hint.
+	A print run can contain many dynamic producers, so directly merging all hints into one
+	stack array can create a large frame and defeat the stack-safety purpose of this path.
+	*/
+	constexpr ::std::size_t run_cap{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+	if constexpr (static_stack_size < run_cap)
+	{
+		return static_stack_size;
+	}
+	else
+	{
+		return run_cap;
+	}
+}
+
+template <bool line, ::std::integral char_type, typename T>
+inline constexpr ::std::size_t dynamic_print_reserve_static_stack_size()
+{
+	using nocvreft = ::std::remove_cvref_t<T>;
+	if constexpr (::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, nocvreft>)
+	{
+		constexpr ::std::size_t static_stack_size{
+			print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>)};
+		static_assert(!line || static_stack_size != SIZE_MAX);
+		return ::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<static_stack_size, char_type>() +
+			   static_cast<::std::size_t>(line);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+template <bool line, ::std::integral char_type, typename T>
+inline constexpr ::std::size_t context_print_static_buffer_size_v = []() constexpr {
+	using value_type = ::std::remove_cvref_t<T>;
+	if constexpr (::fast_io::context_printable_with_static_buffer_size<char_type, value_type>)
+	{
+		constexpr ::std::size_t n{
+			print_context_static_buffer_size(::fast_io::io_reserve_type<char_type, value_type>)};
+		static_assert(n != 0);
+		static_assert(n != SIZE_MAX);
+		static_assert(n > static_cast<::std::size_t>(line));
+		return n;
+	}
+	else
+	{
+		return 32u;
+	}
+}();
+
 template <::std::size_t sz>
 	requires(sz != 0)
 inline constexpr void scatter_rsv_update_times(::fast_io::io_scatter_t *first, ::fast_io::io_scatter_t *last) noexcept
@@ -389,6 +444,8 @@ inline constexpr void print_control_single(output outstm, T t)
 	else if constexpr (dynamic_reserve_printable<char_type, value_type>)
 	{
 		::std::size_t size{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>, t)};
+		constexpr ::std::size_t stack_buffer_size{
+			::fast_io::details::decay::dynamic_print_reserve_static_stack_size<line, char_type, value_type>()};
 		if constexpr (line)
 		{
 			constexpr ::std::size_t mx{::std::numeric_limits<::std::ptrdiff_t>::max() - 1};
@@ -431,28 +488,15 @@ inline constexpr void print_control_single(output outstm, T t)
 				auto curr{obuffer_curr(outstm)};
 				auto ed{obuffer_end(outstm)};
 				::std::ptrdiff_t diff(ed - curr);
-				auto toptr{curr};
 				bool smaller{static_cast<::std::ptrdiff_t>(size) < diff};
-				::fast_io::details::local_operator_new_array_ptr<char_type> newptr;
-				if (!smaller)
-#if __has_cpp_attribute(unlikely)
-					[[unlikely]]
-#endif
-				{
-					newptr.ptr = toptr = ::fast_io::details::allocate_iobuf_space<
-						char_type,
-						typename ::fast_io::details::local_operator_new_array_ptr<char_type>::allocator_type>(size);
-					newptr.size = size;
-				}
-
-				auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, toptr, t)};
-				if constexpr (line)
-				{
-					*it = lfch;
-					++it;
-				}
 				if (smaller)
 				{
+					auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, t)};
+					if constexpr (line)
+					{
+						*it = lfch;
+						++it;
+					}
 					obuffer_set_curr(outstm, it);
 				}
 				else
@@ -460,19 +504,85 @@ inline constexpr void print_control_single(output outstm, T t)
 					[[unlikely]]
 #endif
 				{
-					::fast_io::operations::decay::write_all_decay(outstm, toptr, it);
+					if constexpr (stack_buffer_size != 0)
+					{
+						if (size <= stack_buffer_size)
+						{
+							char_type stack_buffer[stack_buffer_size];
+							auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>,
+														 stack_buffer, t)};
+							if constexpr (line)
+							{
+								*it = lfch;
+								++it;
+							}
+							::fast_io::operations::decay::write_all_decay(outstm, stack_buffer, it);
+						}
+						else
+						{
+							::fast_io::details::local_operator_new_array_ptr<char_type> newptr(size);
+							auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>,
+														 newptr.ptr, t)};
+							if constexpr (line)
+							{
+								*it = lfch;
+								++it;
+							}
+							::fast_io::operations::decay::write_all_decay(outstm, newptr.ptr, it);
+						}
+					}
+					else
+					{
+						::fast_io::details::local_operator_new_array_ptr<char_type> newptr(size);
+						auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, newptr.ptr,
+													 t)};
+						if constexpr (line)
+						{
+							*it = lfch;
+							++it;
+						}
+						::fast_io::operations::decay::write_all_decay(outstm, newptr.ptr, it);
+					}
 				}
 			}
 			else
 			{
-				::fast_io::details::local_operator_new_array_ptr<char_type> newptr(size);
-				auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, newptr.ptr, t)};
-				if constexpr (line)
+				if constexpr (stack_buffer_size != 0)
 				{
-					*it = lfch;
-					++it;
+					if (size <= stack_buffer_size)
+					{
+						char_type buffer[stack_buffer_size];
+						auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, buffer, t)};
+						if constexpr (line)
+						{
+							*it = lfch;
+							++it;
+						}
+						::fast_io::operations::decay::write_all_decay(outstm, buffer, it);
+					}
+					else
+					{
+						::fast_io::details::local_operator_new_array_ptr<char_type> newptr(size);
+						auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, newptr.ptr, t)};
+						if constexpr (line)
+						{
+							*it = lfch;
+							++it;
+						}
+						::fast_io::operations::decay::write_all_decay(outstm, newptr.ptr, it);
+					}
 				}
-				::fast_io::operations::decay::write_all_decay(outstm, newptr.ptr, it);
+				else
+				{
+					::fast_io::details::local_operator_new_array_ptr<char_type> newptr(size);
+					auto it{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, newptr.ptr, t)};
+					if constexpr (line)
+					{
+						*it = lfch;
+						++it;
+					}
+					::fast_io::operations::decay::write_all_decay(outstm, newptr.ptr, it);
+				}
 			}
 		}
 	}
@@ -522,7 +632,8 @@ inline constexpr void print_control_single(output outstm, T t)
 	else if constexpr (context_printable<char_type, value_type>)
 	{
 		typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, value_type>))>::type st;
-		constexpr ::std::size_t reserved_size{32u};
+		constexpr ::std::size_t reserved_size{
+			::fast_io::details::decay::context_print_static_buffer_size_v<line, char_type, value_type>};
 		constexpr ::std::ptrdiff_t reserved_size_no_line{
 			static_cast<::std::ptrdiff_t>(reserved_size - static_cast<::std::size_t>(line))};
 		if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<output>)
@@ -648,6 +759,179 @@ inline constexpr void print_control_single(output outstm, T t)
 	{
 		constexpr bool no{printable<char_type, value_type>};
 		static_assert(no, "type not printable");
+	}
+}
+
+struct context_capture_run_result
+{
+	::std::size_t position{};
+	::std::size_t context_buffer_size{};
+	::std::size_t dynamic_buffer_size{};
+	::std::size_t max_static_reserve_burst_size{};
+	::std::size_t leading_static_reserve_burst_size{};
+	bool has_context{};
+	bool has_dynamic{};
+};
+
+template <::std::integral char_type, typename Arg, typename... Args>
+inline constexpr context_capture_run_result find_context_capture_run_n()
+{
+	using nocvreft = ::std::remove_cvref_t<Arg>;
+	if constexpr (::fast_io::reserve_printable<char_type, nocvreft>)
+	{
+		context_capture_run_result ret{};
+		if constexpr (sizeof...(Args) != 0)
+		{
+			ret = ::fast_io::details::decay::find_context_capture_run_n<char_type, Args...>();
+		}
+		constexpr ::std::size_t sz{print_reserve_size(::fast_io::io_reserve_type<char_type, nocvreft>)};
+		static_assert(sz != 0);
+		++ret.position;
+		ret.leading_static_reserve_burst_size =
+			::fast_io::details::intrinsics::add_or_overflow_die_chain(ret.leading_static_reserve_burst_size, sz);
+		if (ret.max_static_reserve_burst_size < ret.leading_static_reserve_burst_size)
+		{
+			ret.max_static_reserve_burst_size = ret.leading_static_reserve_burst_size;
+		}
+		return ret;
+	}
+	else if constexpr (::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, nocvreft>)
+	{
+		context_capture_run_result ret{};
+		if constexpr (sizeof...(Args) != 0)
+		{
+			ret = ::fast_io::details::decay::find_context_capture_run_n<char_type, Args...>();
+		}
+		constexpr ::std::size_t static_stack_size{
+			print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>)};
+		constexpr ::std::size_t dynamic_buffer_size{
+			::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<static_stack_size, char_type>()};
+		++ret.position;
+		ret.leading_static_reserve_burst_size = 0;
+		ret.has_dynamic = true;
+		if (ret.dynamic_buffer_size < dynamic_buffer_size)
+		{
+			ret.dynamic_buffer_size = dynamic_buffer_size;
+		}
+		return ret;
+	}
+	else if constexpr (::fast_io::context_printable_with_static_buffer_size<char_type, nocvreft>)
+	{
+		context_capture_run_result ret{};
+		if constexpr (sizeof...(Args) != 0)
+		{
+			ret = ::fast_io::details::decay::find_context_capture_run_n<char_type, Args...>();
+		}
+		constexpr ::std::size_t context_buffer_size{
+			::fast_io::details::decay::context_print_static_buffer_size_v<false, char_type, nocvreft>};
+		++ret.position;
+		ret.leading_static_reserve_burst_size = 0;
+		ret.has_context = true;
+		if (ret.context_buffer_size < context_buffer_size)
+		{
+			ret.context_buffer_size = context_buffer_size;
+		}
+		return ret;
+	}
+	else if constexpr (::std::same_as<nocvreft, ::fast_io::io_null_t>)
+	{
+		context_capture_run_result ret{};
+		if constexpr (sizeof...(Args) != 0)
+		{
+			ret = ::fast_io::details::decay::find_context_capture_run_n<char_type, Args...>();
+		}
+		++ret.position;
+		return ret;
+	}
+	else
+	{
+		return {};
+	}
+}
+
+template <typename output, ::std::integral char_type>
+inline constexpr void context_capture_flush(output outstm, char_type *buffer, char_type *&curr)
+{
+	if (curr != buffer)
+	{
+		::fast_io::operations::decay::write_all_decay(outstm, buffer, curr);
+		curr = buffer;
+	}
+}
+
+template <bool needprintlf, ::std::size_t n, typename output, ::std::integral char_type, typename T,
+		  typename... Args>
+inline constexpr void print_context_capture_run(output outstm, char_type *buffer, char_type *curr, char_type *end,
+												T t, Args... args)
+{
+	if constexpr (n != 0)
+	{
+		using value_type = ::std::remove_cvref_t<T>;
+		if constexpr (::fast_io::reserve_printable<char_type, value_type>)
+		{
+			constexpr ::std::size_t sz{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>)};
+			static_assert(sz < PTRDIFF_MAX);
+			if (static_cast<::std::size_t>(end - curr) < sz)
+			{
+				::fast_io::details::decay::context_capture_flush(outstm, buffer, curr);
+			}
+			curr = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, t);
+		}
+		else if constexpr (::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, value_type>)
+		{
+			::std::size_t const sz{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>, t)};
+			if (static_cast<::std::size_t>(end - curr) < sz)
+			{
+				::fast_io::details::decay::context_capture_flush(outstm, buffer, curr);
+			}
+			if (sz <= static_cast<::std::size_t>(end - buffer))
+			{
+				curr = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, t);
+			}
+			else
+			{
+				::fast_io::details::decay::print_control_single<false>(outstm, t);
+			}
+		}
+		else if constexpr (::fast_io::context_printable_with_static_buffer_size<char_type, value_type>)
+		{
+			typename ::std::remove_cvref_t<decltype(print_context_type(io_reserve_type<char_type, value_type>))>::type st;
+			for (;;)
+			{
+				if (curr == end)
+				{
+					::fast_io::details::decay::context_capture_flush(outstm, buffer, curr);
+				}
+				auto [resit, done] = st.print_context_define(t, curr, end);
+				curr = resit;
+				if (done)
+				{
+					break;
+				}
+			}
+		}
+		else if constexpr (::std::same_as<value_type, ::fast_io::io_null_t>)
+		{
+		}
+
+		if constexpr (n == 1)
+		{
+			if constexpr (needprintlf)
+			{
+				if (curr == end)
+				{
+					::fast_io::details::decay::context_capture_flush(outstm, buffer, curr);
+				}
+				*curr = ::fast_io::char_literal_v<u8'\n', char_type>;
+				++curr;
+			}
+			::fast_io::details::decay::context_capture_flush(outstm, buffer, curr);
+		}
+		else
+		{
+			::fast_io::details::decay::print_context_capture_run<needprintlf, n - 1>(outstm, buffer, curr, end,
+																					 args...);
+		}
 	}
 }
 
@@ -841,6 +1125,68 @@ inline constexpr ::std::size_t ndynamic_print_reserve_size(T t, Args... args)
 		{
 			return ::fast_io::details::decay::ndynamic_print_reserve_size<n - 1, char_type>(args...);
 		}
+	}
+}
+
+template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr ::std::size_t ndynamic_print_reserve_static_stack_size()
+{
+	using nocvreft = ::std::remove_cvref_t<T>;
+	if constexpr (n == 0)
+	{
+		return 0;
+	}
+	else if constexpr (n == 1)
+	{
+		if constexpr (::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, nocvreft>)
+		{
+			return print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>);
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	else
+	{
+		if constexpr (::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, nocvreft>)
+		{
+			return ::fast_io::details::intrinsics::add_or_overflow_die(
+				print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>),
+				::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<n - 1, char_type, Args...>());
+		}
+		else
+		{
+			return ::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<n - 1, char_type, Args...>();
+		}
+	}
+}
+
+template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+inline constexpr bool ndynamic_print_reserve_has_static_stack_size()
+{
+	using nocvreft = ::std::remove_cvref_t<T>;
+	if constexpr (n == 0)
+	{
+		return true;
+	}
+	else if constexpr (::fast_io::dynamic_reserve_printable<char_type, nocvreft> &&
+					   !::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, nocvreft>)
+	{
+		return false;
+	}
+	else if constexpr (n == 1)
+	{
+		return true;
+	}
+	else
+	{
+		return ::fast_io::details::decay::ndynamic_print_reserve_has_static_stack_size<n - 1, char_type, Args...>();
 	}
 }
 
@@ -1086,6 +1432,8 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 		io_scatter_t, basic_io_scatter_t<char_type>>;
 	constexpr contiguous_scatter_result res{
 		::fast_io::details::decay::find_continuous_scatters_n<char_type, T, Args...>()};
+	constexpr context_capture_run_result context_capture_res{
+		::fast_io::details::decay::find_context_capture_run_n<char_type, T, Args...>()};
 	if constexpr (skippings != 0)
 	{
 		print_controls_impl<line, outputstmtype, skippings - 1>(optstm, args...);
@@ -1093,6 +1441,35 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 	else if constexpr (sizeof...(Args) == 0)
 	{
 		print_control_single<line>(optstm, t);
+	}
+	else if constexpr (context_capture_res.has_context)
+	{
+		static_assert(SIZE_MAX != sizeof...(Args));
+		constexpr ::std::size_t n{sizeof...(Args) + static_cast<::std::size_t>(1)};
+		constexpr bool needprintlf{n == context_capture_res.position && line};
+		/*
+		Context and dynamic producer sizes are reusable streaming windows.
+		Only consecutive static reserve producers contribute a burst size, so
+		the final capture buffer uses max semantics instead of summing producer
+		windows across the run.
+		*/
+		constexpr ::std::size_t context_dynamic_size{
+			context_capture_res.context_buffer_size < context_capture_res.dynamic_buffer_size
+				? context_capture_res.dynamic_buffer_size
+				: context_capture_res.context_buffer_size};
+		constexpr ::std::size_t reserve_context_dynamic_size{
+			context_dynamic_size < context_capture_res.max_static_reserve_burst_size
+				? context_capture_res.max_static_reserve_burst_size
+				: context_dynamic_size};
+		constexpr ::std::size_t buffer_size{reserve_context_dynamic_size < 32u ? 32u
+																			   : reserve_context_dynamic_size};
+		char_type buffer[buffer_size];
+		::fast_io::details::decay::print_context_capture_run<needprintlf, context_capture_res.position>(
+			optstm, buffer, buffer, buffer + buffer_size, t, args...);
+		if constexpr (context_capture_res.position != n)
+		{
+			print_controls_impl<line, outputstmtype, context_capture_res.position - 1>(optstm, args...);
+		}
 	}
 	else if constexpr (res.position == 0)
 	{
@@ -1143,19 +1520,68 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 				static_assert(!needprintlf || res.neededspace != SIZE_MAX);
 				if constexpr (res.hasdynamicreserve)
 				{
+					constexpr bool has_static_stack_size{
+						::fast_io::details::decay::ndynamic_print_reserve_has_static_stack_size<res.position,
+																								 char_type, T,
+																								 Args...>()};
+					constexpr ::std::size_t producer_static_stack_size{
+						::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<res.position, char_type,
+																							   T, Args...>()};
+					constexpr ::std::size_t dynamic_stack_budget{
+						::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<producer_static_stack_size,
+																							char_type>()};
+					/*
+					Cap only the dynamic reserve budget. mxsize belongs to the existing
+					reserve_printable storage and intentionally keeps its old stack behavior.
+					*/
+					constexpr ::std::size_t stack_buffer_size{
+						::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynamic_stack_budget)};
 					::std::size_t dynsz{
 						::fast_io::details::decay::ndynamic_print_reserve_size<res.position, char_type>(t, args...)};
 					::std::size_t totalsz{::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynsz)};
-					::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
-					char_type *buffer{newptr.ptr};
-					char_type *ptred{
-						::fast_io::details::decay::print_n_reserve<res.position, char_type>(buffer, t, args...)};
-					if constexpr (needprintlf)
+					if constexpr (has_static_stack_size && stack_buffer_size != 0)
 					{
-						*ptred = ::fast_io::char_literal_v<u8'\n', char_type>;
-						++ptred;
+						if (totalsz <= stack_buffer_size)
+						{
+							char_type buffer[stack_buffer_size];
+							char_type *ptred{
+								::fast_io::details::decay::print_n_reserve<res.position, char_type>(buffer, t,
+																									args...)};
+							if constexpr (needprintlf)
+							{
+								*ptred = ::fast_io::char_literal_v<u8'\n', char_type>;
+								++ptred;
+							}
+							::fast_io::operations::decay::write_all_decay(optstm, buffer, ptred);
+						}
+						else
+						{
+							::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
+							char_type *buffer{newptr.ptr};
+							char_type *ptred{
+								::fast_io::details::decay::print_n_reserve<res.position, char_type>(buffer, t,
+																									args...)};
+							if constexpr (needprintlf)
+							{
+								*ptred = ::fast_io::char_literal_v<u8'\n', char_type>;
+								++ptred;
+							}
+							::fast_io::operations::decay::write_all_decay(optstm, buffer, ptred);
+						}
 					}
-					::fast_io::operations::decay::write_all_decay(optstm, buffer, ptred);
+					else
+					{
+						::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
+						char_type *buffer{newptr.ptr};
+						char_type *ptred{
+							::fast_io::details::decay::print_n_reserve<res.position, char_type>(buffer, t, args...)};
+						if constexpr (needprintlf)
+						{
+							*ptred = ::fast_io::char_literal_v<u8'\n', char_type>;
+							++ptred;
+						}
+						::fast_io::operations::decay::write_all_decay(optstm, buffer, ptred);
+					}
 				}
 				else if constexpr (res.hasreserve)
 				{
@@ -1206,23 +1632,80 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 			{
 				constexpr ::std::size_t scatterscount{res.neededscatters +
 													  static_cast<::std::size_t>(line && res.position == n)};
+				constexpr bool has_static_stack_size{
+					::fast_io::details::decay::ndynamic_print_reserve_has_static_stack_size<res.position, char_type, T,
+																							 Args...>()};
+				constexpr ::std::size_t producer_static_stack_size{
+					::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<res.position, char_type, T,
+																					   Args...>()};
+				constexpr ::std::size_t dynamic_stack_budget{
+					::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<producer_static_stack_size,
+																						char_type>()};
+				/*
+				Cap only the dynamic reserve budget. mxsize belongs to the existing
+				reserve/scatter storage and intentionally keeps its old stack behavior.
+				*/
+				constexpr ::std::size_t stack_buffer_size{
+					::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynamic_stack_budget)};
 				::std::size_t dynsz{
 					::fast_io::details::decay::ndynamic_print_reserve_size<res.position, char_type>(t, args...)};
 				::std::size_t totalsz{::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynsz)};
-				::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
 				scatter_type scatters[scatterscount];
-				char_type *buffer{newptr.ptr};
-				auto ptr{::fast_io::details::decay::print_n_scatters_reserve<needprintlf, res.position, char_type>(
-					scatters, buffer, t, args...)};
-				::std::size_t diff{static_cast<::std::size_t>(ptr - scatters)};
-				if constexpr (::fast_io::operations::decay::defines::has_any_of_write_or_seek_pwrite_bytes_operations<
-								  outputstmtype>)
+				if constexpr (has_static_stack_size && stack_buffer_size != 0)
 				{
-					::fast_io::operations::decay::scatter_write_all_bytes_decay(optstm, scatters, diff);
+					if (totalsz <= stack_buffer_size)
+					{
+						char_type buffer[stack_buffer_size];
+						auto ptr{::fast_io::details::decay::print_n_scatters_reserve<needprintlf, res.position,
+																					 char_type>(scatters, buffer, t,
+																								args...)};
+						::std::size_t diff{static_cast<::std::size_t>(ptr - scatters)};
+						if constexpr (::fast_io::operations::decay::defines::
+										  has_any_of_write_or_seek_pwrite_bytes_operations<outputstmtype>)
+						{
+							::fast_io::operations::decay::scatter_write_all_bytes_decay(optstm, scatters, diff);
+						}
+						else
+						{
+							::fast_io::operations::decay::scatter_write_all_decay(optstm, scatters, diff);
+						}
+					}
+					else
+					{
+						::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
+						char_type *buffer{newptr.ptr};
+						auto ptr{::fast_io::details::decay::print_n_scatters_reserve<needprintlf, res.position,
+																					 char_type>(scatters, buffer, t,
+																								args...)};
+						::std::size_t diff{static_cast<::std::size_t>(ptr - scatters)};
+						if constexpr (::fast_io::operations::decay::defines::
+										  has_any_of_write_or_seek_pwrite_bytes_operations<outputstmtype>)
+						{
+							::fast_io::operations::decay::scatter_write_all_bytes_decay(optstm, scatters, diff);
+						}
+						else
+						{
+							::fast_io::operations::decay::scatter_write_all_decay(optstm, scatters, diff);
+						}
+					}
 				}
 				else
 				{
-					::fast_io::operations::decay::scatter_write_all_decay(optstm, scatters, diff);
+					::fast_io::details::local_operator_new_array_ptr<char_type> newptr(totalsz);
+					char_type *buffer{newptr.ptr};
+					auto ptr{::fast_io::details::decay::print_n_scatters_reserve<needprintlf, res.position,
+																				 char_type>(scatters, buffer, t,
+																							args...)};
+					::std::size_t diff{static_cast<::std::size_t>(ptr - scatters)};
+					if constexpr (::fast_io::operations::decay::defines::
+									  has_any_of_write_or_seek_pwrite_bytes_operations<outputstmtype>)
+					{
+						::fast_io::operations::decay::scatter_write_all_bytes_decay(optstm, scatters, diff);
+					}
+					else
+					{
+						::fast_io::operations::decay::scatter_write_all_decay(optstm, scatters, diff);
+					}
 				}
 			}
 			if constexpr (res.position != n)

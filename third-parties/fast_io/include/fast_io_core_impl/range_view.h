@@ -53,6 +53,14 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, s
 		return retval;
 	}
 }
+
+template <::std::integral char_type, ::std::input_iterator It>
+inline constexpr ::std::size_t
+print_reserve_static_stack_size(io_reserve_type_t<char_type, sized_range_view_t<char_type, It>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
+}
+
 template <::std::integral char_type, ::std::input_iterator It>
 inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, sized_range_view_t<char_type, It>>,
 												 char_type *__restrict ptr, sized_range_view_t<char_type, It> t)

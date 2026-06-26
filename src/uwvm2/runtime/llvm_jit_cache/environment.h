@@ -184,8 +184,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         }
 
         template <::std::size_t N>
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(
-            char16_t const (&name)[N], ::uwvm2::utils::container::u8string_view suffix) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(char16_t const (&name)[N],
+                                                                                                    ::uwvm2::utils::container::u8string_view suffix) noexcept
         {
             auto out{win32_environment_variable(name)};
             if(out.empty()) { return {}; }
@@ -213,8 +213,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             return out;
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(
-            char const* name, ::uwvm2::utils::container::u8string_view suffix) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(char const* name,
+                                                                                                    ::uwvm2::utils::container::u8string_view suffix) noexcept
         {
             auto out{win32_environment_variable(name)};
             if(out.empty()) { return {}; }
@@ -231,8 +231,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             return u8string_from_cstr(value);
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(
-            char const* name, ::uwvm2::utils::container::u8string_view suffix) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string cache_directory_from_env(char const* name,
+                                                                                                    ::uwvm2::utils::container::u8string_view suffix) noexcept
         {
             auto out{environment_variable(name)};
             if(out.empty()) { return {}; }
@@ -262,24 +262,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view llvm_jit_policy_name(
-            ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_policy_t policy) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+            llvm_jit_policy_name(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_policy_t policy) noexcept
         {
             using enum ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_policy_t;
             switch(policy)
             {
-                case debug:
-                    return u8"debug";
-                case default_policy:
-                    return u8"default";
-                case fast_compile:
-                    return u8"fast_compile";
-                case balanced:
-                    return u8"balanced";
-                case max:
-                    return u8"max";
-                default:
-                    return u8"unknown";
+                case debug: return u8"debug";
+                case default_policy: return u8"default";
+                case fast_compile: return u8"fast_compile";
+                case balanced: return u8"balanced";
+                case max: return u8"max";
+                default: return u8"unknown";
             }
         }
 #endif
@@ -424,9 +418,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         auto out{details::make_cache_key(u8"codegen-policy")};
         // Optimization policy is hashed because different policies can emit different native code for the same module.
         details::append_cache_key_value(out, u8"backend", u8"llvm-jit");
-        details::append_cache_key_value(out,
-                                        u8"policy",
-                                        details::llvm_jit_policy_name(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_policy));
+        details::append_cache_key_value(out, u8"policy", details::llvm_jit_policy_name(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_policy));
         return out;
 #else
         auto out{details::make_cache_key(u8"codegen-policy")};
@@ -485,8 +477,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         return out;
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size>
-        collect_signature_seed(cache_context const& ctx) noexcept
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> collect_signature_seed(
+        cache_context const& ctx) noexcept
     {
         ::fast_io::sha256_context sha{};
         details::seed_sha256_update_literal(sha, u8"uwvm2-llvm-jit-cache-ed25519-seed-v1");
@@ -537,7 +529,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 
     [[nodiscard]] inline constexpr cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
-                                                                      ::uwvm2::utils::container::u8string_view codegen_policy = {}) noexcept
+                                                                       ::uwvm2::utils::container::u8string_view codegen_policy = {}) noexcept
     {
         cache_context ctx{};
         ctx.cache_dir = configured_cache_directory();
@@ -563,8 +555,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     [[nodiscard]] inline constexpr cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
-                                                                      ::uwvm2::utils::container::u8string_view codegen_policy,
-                                                                      ::llvm::TargetMachine const& target_machine) noexcept
+                                                                       ::uwvm2::utils::container::u8string_view codegen_policy,
+                                                                       ::llvm::TargetMachine const& target_machine) noexcept
     {
         cache_context ctx{};
         ctx.cache_dir = configured_cache_directory();

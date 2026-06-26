@@ -432,6 +432,16 @@ hexfloat_get(scalar_type &t) noexcept
 	return {t};
 }
 
+template <bool noskipws = false, ::fast_io::details::my_floating_point scalar_type>
+inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase = true,
+																	  .noskipws = noskipws,
+																	  .floating = ::fast_io::manipulators::floating_format::hexfloat},
+								scalar_type &>
+hexfloat0x_get(scalar_type &t) noexcept
+{
+	return {t};
+}
+
 } // namespace manipulators
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,

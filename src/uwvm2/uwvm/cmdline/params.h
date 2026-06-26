@@ -70,6 +70,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_memory_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_initializer_limit),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_1p1),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_multi_value),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_reference_types),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_bulk_memory),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_sign_extension),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_nontrapping_float_to_int),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_simd),
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
 #endif

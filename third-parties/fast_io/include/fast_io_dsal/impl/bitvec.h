@@ -2603,6 +2603,12 @@ inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<c
 }
 
 template <::std::integral chtype, typename allocator>
+inline constexpr ::std::size_t print_reserve_static_stack_size(::fast_io::io_reserve_type_t<chtype, ::fast_io::containers::bitvec<allocator>>) noexcept
+{
+	return ::fast_io::details::dynamic_reserve_default_static_stack_size<chtype>();
+}
+
+template <::std::integral chtype, typename allocator>
 inline constexpr chtype *print_reserve_define(::fast_io::io_reserve_type_t<chtype, ::fast_io::containers::bitvec<allocator>>, chtype *it, ::fast_io::containers::bitvec<allocator> const &bv) noexcept
 {
 	return ::fast_io::details::pr_rsv_bitvec(it, bv);

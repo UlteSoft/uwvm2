@@ -295,6 +295,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
         using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
+        auto const to_wasm1_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> wasm_value_type
+                                       { return static_cast<wasm_value_type>(type); }};
 
         struct concrete_operand_t
         {
@@ -375,9 +377,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                               {
                                                   err.err_curr = op_begin;
                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                                                  err.err_selectable.numeric_operand_type_mismatch.expected_type =
-                                                      static_cast<wasm_value_type>(expected_operand_type);
-                                                  err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type>(operand.type);
+                                                  err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                                  err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
                                                   err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                               }
@@ -385,55 +386,57 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                               operand_stack.push_back({result_type});
                                           }};
 
-        auto const validate_numeric_binary{
-            [&](::uwvm2::utils::container::u8string_view op_name,
-                curr_operand_stack_value_type expected_operand_type,
-                curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
-            {
-                // op_name ...
-                // [safe] unsafe (could be the section_end)
-                // ^^ code_curr
+        auto const validate_numeric_binary{[&](::uwvm2::utils::container::u8string_view op_name,
+                                               curr_operand_stack_value_type expected_operand_type,
+                                               curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
+                                           {
+                                               // op_name ...
+                                               // [safe] unsafe (could be the section_end)
+                                               // ^^ code_curr
 
-                auto const op_begin{code_curr};
+                                               auto const op_begin{code_curr};
 
-                // op_name ...
-                // [safe] unsafe (could be the section_end)
-                // ^^ op_begin
+                                               // op_name ...
+                                               // [safe] unsafe (could be the section_end)
+                                               // ^^ op_begin
 
-                ++code_curr;
+                                               ++code_curr;
 
-                // op_name ...
-                // [safe ] unsafe (could be the section_end)
-                //         ^^ code_curr
+                                               // op_name ...
+                                               // [safe ] unsafe (could be the section_end)
+                                               //         ^^ code_curr
 
-                if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, 2uz); }
+                                               if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
+                                               {
+                                                   report_operand_stack_underflow(op_begin, op_name, 2uz);
+                                               }
 
-                // rhs
-                auto const rhs{try_pop_concrete_operand()};
-                if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                    err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_operand_type);
-                    err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type>(rhs.type);
-                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                               // rhs
+                                               auto const rhs{try_pop_concrete_operand()};
+                                               if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
+                                               {
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                   err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                                   err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(rhs.type);
+                                                   err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }
 
-                // lhs
-                auto const lhs{try_pop_concrete_operand()};
-                if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                    err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_operand_type);
-                    err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type>(lhs.type);
-                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                               // lhs
+                                               auto const lhs{try_pop_concrete_operand()};
+                                               if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
+                                               {
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                   err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
+                                                   err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(lhs.type);
+                                                   err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }
 
-                operand_stack.push_back({result_type});
-            }};
+                                               operand_stack.push_back({result_type});
+                                           }};
 
         auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_name,
                                          ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 const max_align,
@@ -501,7 +504,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                          {
                                              err.err_curr = op_begin;
                                              err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                             err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                              err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                          }
@@ -578,7 +581,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                           {
                                               err.err_curr = op_begin;
                                               err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                                              err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                              err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                               err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
@@ -587,8 +590,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                           {
                                               err.err_curr = op_begin;
                                               err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
-                                              err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_value_type);
-                                              err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                                              err.err_selectable.store_value_type_mismatch.expected_type = to_wasm1_value_type(expected_value_type);
+                                              err.err_selectable.store_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                               err.err_code = code_validation_error_code::store_value_type_mismatch;
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
@@ -955,7 +958,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     if(cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
+                        err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1326,10 +1329,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -1422,7 +1423,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
-                        err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(cond.type);
+                        err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1439,10 +1440,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -1621,10 +1620,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
                             err.err_selectable.br_table_target_type_mismatch.actual_arity =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(arity);
-                            err.err_selectable.br_table_target_type_mismatch.expected_type =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                            err.err_selectable.br_table_target_type_mismatch.actual_type =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(type);
+                            err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                            err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(type);
                             err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
@@ -1674,10 +1671,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
                         err.err_selectable.br_table_target_type_mismatch.actual_arity =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(default_arity);
-                        err.err_selectable.br_table_target_type_mismatch.expected_type =
-                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                        err.err_selectable.br_table_target_type_mismatch.actual_type =
-                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(default_type);
+                        err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                        err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(default_type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1697,7 +1692,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
-                        err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(idx.type);
+                        err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1713,10 +1708,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(curr_expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(curr_expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -1776,10 +1769,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -1896,10 +1887,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -2020,7 +2009,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
-                        err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(idx.type);
+                        err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2038,10 +2027,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
-                                err.err_selectable.br_value_type_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
                                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
@@ -2122,7 +2109,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
+                        err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond_type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2148,8 +2135,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_selectable.select_type_mismatch.type_v1 = v1_type;
-                        err.err_selectable.select_type_mismatch.type_v2 = v2_type;
+                        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1_type);
+                        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2_type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2350,8 +2337,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-                        err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-                        err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+                        err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+                        err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2466,8 +2453,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-                            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
-                            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+                            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+                            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                             err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_tee_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
@@ -2641,8 +2628,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.global_variable_type_mismatch.global_index = global_index;
-                        err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
-                        err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
+                        err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
+                        err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2782,45 +2769,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    // In the Wasm MVP binary format, `memory.size` carries a reserved memory index
-                    // immediate that must decode to memory index 0. This immediate is still encoded
-                    // as an unsigned LEB128 integer, not as a raw fixed byte.
-                    //
-                    // That distinction matters for validation strictness: the validator must reject
-                    // malformed LEB128, but it must not incorrectly require the canonical single-byte
-                    // encoding `0x00`. Per the W3C binary integer rules, trailing-zero forms that are
-                    // still well-formed LEB128 within the width bounds remain valid encodings of zero.
-                    // Therefore the correct MVP check here is:
-                    //   1. decode the immediate as `u32` LEB128,
-                    //   2. reject malformed encodings as `invalid_memory_index`,
-                    //   3. reject decoded non-zero values as `illegal_memory_index`.
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // MVP only defines memory 0 here. The binary encoding may use any well-formed
-                    // LEB128 representation whose decoded value is zero; the semantic constraint is
-                    // on the decoded memidx, not on the byte sequence being exactly `0x00`.
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -2841,7 +2814,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     }
 
                     // Stack effect: () -> (i32)
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
 
                     break;
                 }
@@ -2863,37 +2836,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    // `memory.grow` follows the same MVP rule as `memory.size`: the immediate is a
-                    // reserved memidx encoded as unsigned LEB128 and it must decode to zero.
-                    //
-                    // We intentionally validate the decoded value instead of hard-coding a literal
-                    // single-byte check, because well-formed non-canonical zero encodings are still
-                    // accepted by the Wasm binary integer grammar.
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // As above, this is a decoded-value check, not a raw-byte check.
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -2916,16 +2883,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
                     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
 
-                    if(auto const delta{try_pop_concrete_operand()};
-                       delta.from_stack && delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
+                        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_value_type(delta.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
 
                     break;
                 }
@@ -2973,7 +2939,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     //               ^^ code_curr
 
                     // Stack effect: () -> (i32)
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
 
                     break;
                 }
@@ -3021,7 +2987,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     //               ^^ code_curr
 
                     // Stack effect: () -> (i64)
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64});
+                    operand_stack.push_back({curr_operand_stack_value_type::i64});
 
                     break;
                 }
@@ -3062,7 +3028,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     //               ^^ code_curr
 
                     // Stack effect: () -> (f32)
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32});
+                    operand_stack.push_back({curr_operand_stack_value_type::f32});
 
                     break;
                 }
@@ -3103,7 +3069,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     //               ^^ code_curr
 
                     // Stack effect: () -> (f64)
-                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64});
+                    operand_stack.push_back({curr_operand_stack_value_type::f64});
 
                     break;
                 }
