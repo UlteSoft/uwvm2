@@ -2795,31 +2795,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.size memidx ...
-                    // [ safe           ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -2862,31 +2862,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
-
-                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(memidx))};
-                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
+                    if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
+                    // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
-                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+                    auto const memidx_pos{code_curr};
+                    ++code_curr;
 
                     // memory.grow memidx ...
-                    // [        safe    ] unsafe (could be the section_end)
-                    //                    ^^ code_curr
+                    // [ safe    ] unsafe (could be the section_end)
+                    //              ^^ code_curr
 
-                    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
+                    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
+#if CHAR_BIT > 8
+                    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
+#endif
+
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
