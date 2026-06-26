@@ -438,9 +438,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         Unsigned unsigned_value;  // no init necessary
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex_get<true, false, true>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin_get<true, false, true>(unsigned_value)) ||
-           wasm_entry_scan_exact(first, last, ::fast_io::mnp::oct_get<true, false, true, true>(unsigned_value)))
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex0x_get<true, false>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin0b_get<true, false>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::oct0o_get<true, false>(unsigned_value)))
         {
             out = ::std::bit_cast<Out>(unsigned_value);
             return true;
@@ -766,11 +766,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::io::perr(output,
                             u8"bin=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            ::fast_io::mnp::bin<true>(bits),
+                            ::fast_io::mnp::bin0b(bits),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8", oct=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            ::fast_io::mnp::oct<true, false, true>(bits),
+                            ::fast_io::mnp::oct0o(bits),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8", sdec=",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
