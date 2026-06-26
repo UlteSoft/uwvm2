@@ -164,6 +164,25 @@ concept minimum_buffer_output_stream_require_size_impl =
 	::fast_io::operations::decay::defines::has_obuffer_minimum_size_operations<output> &&
 	minimum_buffer_output_stream_require_size_constant_impl<output, N>;
 
+template <::std::size_t static_stack_size, ::std::integral char_type>
+inline constexpr ::std::size_t dynamic_print_reserve_static_stack_budget() noexcept
+{
+	/*
+	A dynamic producer's static stack size is only a local materialization hint.
+	A print run can contain many dynamic producers, so directly merging all hints into one
+	stack array can create a large frame and defeat the stack-safety purpose of this path.
+	*/
+	constexpr ::std::size_t run_cap{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+	if constexpr (static_stack_size < run_cap)
+	{
+		return static_stack_size;
+	}
+	else
+	{
+		return run_cap;
+	}
+}
+
 template <bool line, ::std::integral char_type, typename T>
 inline constexpr ::std::size_t dynamic_print_reserve_static_stack_size()
 {
@@ -173,7 +192,8 @@ inline constexpr ::std::size_t dynamic_print_reserve_static_stack_size()
 		constexpr ::std::size_t static_stack_size{
 			print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>)};
 		static_assert(!line || static_stack_size != SIZE_MAX);
-		return static_stack_size + static_cast<::std::size_t>(line);
+		return ::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<static_stack_size, char_type>() +
+			   static_cast<::std::size_t>(line);
 	}
 	else
 	{
@@ -1281,11 +1301,18 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 						::fast_io::details::decay::ndynamic_print_reserve_has_static_stack_size<res.position,
 																								 char_type, T,
 																								 Args...>()};
-					constexpr ::std::size_t static_stack_size{
+					constexpr ::std::size_t producer_static_stack_size{
 						::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<res.position, char_type,
 																							   T, Args...>()};
+					constexpr ::std::size_t dynamic_stack_budget{
+						::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<producer_static_stack_size,
+																							char_type>()};
+					/*
+					Cap only the dynamic reserve budget. mxsize belongs to the existing
+					reserve_printable storage and intentionally keeps its old stack behavior.
+					*/
 					constexpr ::std::size_t stack_buffer_size{
-						::fast_io::details::intrinsics::add_or_overflow_die(mxsize, static_stack_size)};
+						::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynamic_stack_budget)};
 					::std::size_t dynsz{
 						::fast_io::details::decay::ndynamic_print_reserve_size<res.position, char_type>(t, args...)};
 					::std::size_t totalsz{::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynsz)};
@@ -1385,11 +1412,18 @@ inline constexpr void print_controls_impl(outputstmtype optstm, T t, Args... arg
 				constexpr bool has_static_stack_size{
 					::fast_io::details::decay::ndynamic_print_reserve_has_static_stack_size<res.position, char_type, T,
 																							 Args...>()};
-				constexpr ::std::size_t static_stack_size{
+				constexpr ::std::size_t producer_static_stack_size{
 					::fast_io::details::decay::ndynamic_print_reserve_static_stack_size<res.position, char_type, T,
 																					   Args...>()};
+				constexpr ::std::size_t dynamic_stack_budget{
+					::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<producer_static_stack_size,
+																						char_type>()};
+				/*
+				Cap only the dynamic reserve budget. mxsize belongs to the existing
+				reserve/scatter storage and intentionally keeps its old stack behavior.
+				*/
 				constexpr ::std::size_t stack_buffer_size{
-					::fast_io::details::intrinsics::add_or_overflow_die(mxsize, static_stack_size)};
+					::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynamic_stack_budget)};
 				::std::size_t dynsz{
 					::fast_io::details::decay::ndynamic_print_reserve_size<res.position, char_type>(t, args...)};
 				::std::size_t totalsz{::fast_io::details::intrinsics::add_or_overflow_die(mxsize, dynsz)};
