@@ -30,13 +30,10 @@ namespace details
 #if __has_cpp_attribute(__gnu__::__cold__)
 [[__gnu__::__cold__]]
 #endif
-#if __has_cpp_attribute(__gnu__::__pure__)
-[[__gnu__::__pure__]]
-#endif
 inline ::fast_io::install_path get_module_install_path()
 {
 #if FAST_IO_HAS_BUILTIN()
-	if (!__builtin_available(macOS 10.2, iOS 2.0)) [[unlikely]]
+	if (!__builtin_available(macOS 10.2, iOS 2.0, *)) [[unlikely]]
 	{
 		throw_posix_error(ENOSYS);
 	}

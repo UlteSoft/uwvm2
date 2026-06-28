@@ -8,9 +8,6 @@ namespace fast_io::details
 #if __has_cpp_attribute(__gnu__::__cold__)
 [[__gnu__::__cold__]]
 #endif
-#if __has_cpp_attribute(__gnu__::__pure__)
-[[__gnu__::__pure__]]
-#endif
 inline ::fast_io::install_path get_module_install_path()
 {
 	auto c_peb{::fast_io::win32::nt::nt_get_current_peb()};
