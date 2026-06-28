@@ -421,6 +421,10 @@ inline win32_file_loader_return_value_t win32_load_address_options_impl(win32_mm
 					file_protect, nullptr, 0))};
 				if (prefix_address != address)
 				{
+					if (prefix_address != nullptr)
+					{
+						::fast_io::win32::UnmapViewOfFile(prefix_address);
+					}
 					throw_win32_error();
 				}
 				guard.mark_file_mapped(file_mapping_size);
@@ -431,6 +435,10 @@ inline win32_file_loader_return_value_t win32_load_address_options_impl(win32_mm
 				anonymous_protect, nullptr, 0))};
 			if (tail_address != address + file_mapping_size)
 			{
+				if (tail_address != nullptr)
+				{
+					::fast_io::win32::VirtualFree(tail_address, 0, 0x00008000u /*MEM_RELEASE*/);
+				}
 				throw_win32_error();
 			}
 			guard.mark_anonymous_mapped(anonymous_mapping_size);

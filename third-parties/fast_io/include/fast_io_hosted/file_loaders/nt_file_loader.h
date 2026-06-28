@@ -342,6 +342,11 @@ inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_
 			}
 			if (p_map_address != address)
 			{
+				if (p_map_address != nullptr)
+				{
+					::fast_io::win32::nt::nt_unmap_view_of_section<family == ::fast_io::nt_family::zw>(
+						nt_file_loader_current_process(), p_map_address);
+				}
 				throw_nt_error(0xC0000018); // STATUS_CONFLICTING_ADDRESSES
 			}
 			guard.mark_file_mapped(file_mapping_size);
@@ -359,6 +364,10 @@ inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_
 		}
 		if (tail_address != address + file_mapping_size)
 		{
+			if (tail_address != nullptr)
+			{
+				nt_free_virtual_memory_release<family>(tail_address);
+			}
 			throw_nt_error(0xC0000018); // STATUS_CONFLICTING_ADDRESSES
 		}
 		guard.mark_anonymous_mapped(anonymous_mapping_size);
