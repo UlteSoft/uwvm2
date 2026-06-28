@@ -8,9 +8,14 @@ struct posix_mmap_options
 	void *addr{};
 	int prot{};
 	int flags{};
+	::std::size_t extra_bytes{};
+	::fast_io::file_loader_padding_mode padding_mode{};
 	inline explicit constexpr posix_mmap_options() noexcept = default;
 	inline constexpr posix_mmap_options(int protv, int flagsv) noexcept
 		: prot(protv), flags(flagsv)
+	{}
+	inline constexpr posix_mmap_options(int protv, int flagsv, ::fast_io::file_loader_extra_bytes extra) noexcept
+		: prot(protv), flags(flagsv), extra_bytes(extra.n), padding_mode(extra.mode)
 	{}
 #ifdef __linux__
 	inline constexpr posix_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv) noexcept
@@ -27,6 +32,13 @@ struct posix_mmap_options
 			}
 		}
 #endif
+	}
+	inline constexpr posix_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv,
+										::fast_io::file_loader_extra_bytes extra) noexcept
+		: posix_mmap_options(protv, flagsv)
+	{
+		this->extra_bytes = extra.n;
+		this->padding_mode = extra.mode;
 	}
 #else
 	inline constexpr posix_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv) noexcept
@@ -221,6 +233,13 @@ struct posix_mmap_options
 		}
 		this->prot = prottemp;
 		this->flags = flagstemp;
+	}
+	inline constexpr posix_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv,
+										::fast_io::file_loader_extra_bytes extra) noexcept
+		: posix_mmap_options(protv, flagsv)
+	{
+		this->extra_bytes = extra.n;
+		this->padding_mode = extra.mode;
 	}
 #endif
 };

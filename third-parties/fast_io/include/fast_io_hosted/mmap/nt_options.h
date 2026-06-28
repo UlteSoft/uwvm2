@@ -10,6 +10,8 @@ struct nt_mmap_options
 	::std::uint_least32_t flProtect{};
 	::std::uint_least32_t attributes{};
 	::std::uint_least32_t viewShare{};
+	::std::size_t extra_bytes{};
+	::fast_io::file_loader_padding_mode padding_mode{};
 
 	inline explicit constexpr nt_mmap_options() noexcept = default;
 	inline constexpr nt_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv) noexcept
@@ -91,6 +93,13 @@ struct nt_mmap_options
 		this->flProtect = flprotecttemp;
 		this->attributes = 0x08000000;
 		this->viewShare = 0x01;
+	}
+	inline constexpr nt_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv,
+									 ::fast_io::file_loader_extra_bytes extra) noexcept
+		: nt_mmap_options(protv, flagsv)
+	{
+		this->extra_bytes = extra.n;
+		this->padding_mode = extra.mode;
 	}
 };
 

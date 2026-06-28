@@ -10,7 +10,17 @@ struct nt_file_loader_return_value_t
 {
 	char *address_begin{};
 	char *address_end{};
+	char *address_capacity{};
 };
+
+inline ::std::size_t nt_file_loader_add_extra_bytes(::std::size_t file_size, ::std::size_t extra_bytes)
+{
+	if (SIZE_MAX - file_size < extra_bytes)
+	{
+		throw_nt_error(0xC0000095); // STATUS_INTEGER_OVERFLOW
+	}
+	return file_size + extra_bytes;
+}
 
 template <::fast_io::nt_family family>
 inline void nt_unload_address(void *address) noexcept
@@ -34,13 +44,16 @@ inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_
 		= ::fast_io::win32::nt::object_attributes *;
 
 	::std::size_t const fsz{::fast_io::win32::nt::details::nt_load_file_get_file_size<(family == ::fast_io::nt_family::zw)>(handle)};
+	::std::size_t const capacity{nt_file_loader_add_extra_bytes(fsz, options.extra_bytes)};
 
-	if (fsz == 0)
+	if (capacity == 0)
 	{
-		return {nullptr, nullptr};
+		return {nullptr, nullptr, nullptr};
 	}
 
 	void *h_section{};
+	::std::uint_least64_t capacity64{static_cast<::std::uint_least64_t>(capacity)};
+	::std::uint_least64_t *maximum_size{capacity == fsz ? nullptr : __builtin_addressof(capacity64)};
 	::fast_io::win32::nt::object_attributes objAttr;
 	secattr_ptr pobjattr{reinterpret_cast<secattr_ptr>(options.objAttr)};
 	if (pobjattr == nullptr)
@@ -50,21 +63,22 @@ inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_
 		pobjattr = __builtin_addressof(objAttr);
 	}
 	::std::uint_least32_t status{};
-	status = ::fast_io::win32::nt::nt_create_section<(family == ::fast_io::nt_family::zw)>(__builtin_addressof(h_section), options.dwDesiredAccess, pobjattr, nullptr, options.flProtect, options.attributes, handle);
+	status = ::fast_io::win32::nt::nt_create_section<(family == ::fast_io::nt_family::zw)>(__builtin_addressof(h_section), options.dwDesiredAccess, pobjattr, maximum_size, options.flProtect, options.attributes, handle);
 	if (status)
 	{
 		throw_nt_error(status);
 	}
 	::fast_io::basic_nt_family_file<family, char> map_hd{h_section};
 	void *p_map_address{};
-	::std::size_t view_size{fsz};
+	::std::size_t view_size{capacity};
 	void *current_process_handle{reinterpret_cast<void *>(static_cast<::std::ptrdiff_t>(-1))};
 	status = ::fast_io::win32::nt::nt_map_view_of_section<(family == ::fast_io::nt_family::zw)>(h_section, current_process_handle, __builtin_addressof(p_map_address), 0u, 0u, nullptr, __builtin_addressof(view_size), static_cast<::fast_io::win32::nt::section_inherit>(options.viewShare), 0u, options.flProtect);
 	if (status)
 	{
 		throw_nt_error(status);
 	}
-	return {reinterpret_cast<char *>(p_map_address), reinterpret_cast<char *>(p_map_address) + fsz};
+	return {reinterpret_cast<char *>(p_map_address), reinterpret_cast<char *>(p_map_address) + fsz,
+			reinterpret_cast<char *>(p_map_address) + capacity};
 }
 
 inline constexpr auto create_nt_default_load_address_option() noexcept
@@ -74,6 +88,14 @@ inline constexpr auto create_nt_default_load_address_option() noexcept
 	options.flProtect = 0x08;
 	options.attributes = 0x08000000;
 	options.viewShare = 1;
+	return options;
+}
+
+inline constexpr auto create_nt_default_load_address_option(::fast_io::file_loader_extra_bytes extra) noexcept
+{
+	auto options{create_nt_default_load_address_option()};
+	options.extra_bytes = extra.n;
+	options.padding_mode = extra.mode;
 	return options;
 }
 
@@ -119,6 +141,7 @@ public:
 
 	pointer address_begin{};
 	pointer address_end{};
+	pointer address_capacity{};
 
 	inline constexpr nt_family_file_loader() noexcept = default;
 	inline explicit nt_family_file_loader(::fast_io::nt_at_entry ent)
@@ -126,6 +149,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_address_impl<family>(ent.handle)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	inline explicit nt_family_file_loader(::fast_io::nt_fs_dirent fsdirent,
 										  ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -134,6 +158,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_impl<family>(fsdirent, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(T const &filename, ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -142,6 +167,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_impl<family>(filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::nt_at_entry ent, T const &filename,
@@ -151,6 +177,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_impl<family>(ent, filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::io_kernel_t, T const &t, 
@@ -160,6 +187,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_impl<family>(::fast_io::io_kernel, t, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::io_kernel_t, ::fast_io::nt_at_entry ent, T const &t,
@@ -169,6 +197,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_impl<family>(::fast_io::io_kernel, ent, t, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_at_entry ent)
@@ -176,6 +205,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_address_options_impl<family>(options, ent.handle)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_fs_dirent fsdirent,
 										  ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -184,6 +214,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_options_impl<family>(options, fsdirent, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, T const &filename,
@@ -193,6 +224,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_options_impl<family>(options, filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_at_entry ent, T const &filename,
@@ -202,6 +234,7 @@ public:
 		auto ret{::fast_io::win32::nt::details::nt_load_file_options_impl<family>(options, ent, filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::io_kernel_t, T const &t,
@@ -212,6 +245,7 @@ public:
 			::fast_io::win32::nt::details::nt_load_file_options_impl<family>(options, ::fast_io::io_kernel, t, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::io_kernel_t,
@@ -223,13 +257,15 @@ public:
 																				  om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
+		address_capacity = ret.address_capacity;
 	}
 	inline nt_family_file_loader(nt_family_file_loader const &) = delete;
 	inline nt_family_file_loader &operator=(nt_family_file_loader const &) = delete;
 	inline constexpr nt_family_file_loader(nt_family_file_loader &&__restrict other) noexcept
-		: address_begin(other.address_begin), address_end(other.address_end)
+		: address_begin(other.address_begin), address_end(other.address_end),
+		  address_capacity(other.address_capacity)
 	{
-		other.address_end = other.address_begin = nullptr;
+		other.address_capacity = other.address_end = other.address_begin = nullptr;
 	}
 	inline nt_family_file_loader &operator=(nt_family_file_loader &&__restrict other) noexcept
 	{
@@ -240,7 +276,8 @@ public:
 		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin);
 		address_begin = other.address_begin;
 		address_end = other.address_end;
-		other.address_end = other.address_begin = nullptr;
+		address_capacity = other.address_capacity;
+		other.address_capacity = other.address_end = other.address_begin = nullptr;
 		return *this;
 	}
 	inline constexpr pointer data() noexcept
@@ -266,6 +303,10 @@ public:
 	inline constexpr ::std::size_t max_size() const noexcept
 	{
 		return SIZE_MAX;
+	}
+	inline constexpr ::std::size_t capacity() const noexcept
+	{
+		return static_cast<::std::size_t>(address_capacity - address_begin);
 	}
 	inline constexpr const_iterator cbegin() const noexcept
 	{
@@ -432,14 +473,14 @@ public:
 	inline constexpr pointer release() noexcept
 	{
 		pointer temp{this->address_begin};
-		this->address_end = this->address_begin = nullptr;
+		this->address_capacity = this->address_end = this->address_begin = nullptr;
 		return temp;
 	}
 
 	inline void close()
 	{
 		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin);
-		address_end = address_begin = nullptr;
+		address_capacity = address_end = address_begin = nullptr;
 	}
 	inline ~nt_family_file_loader()
 	{

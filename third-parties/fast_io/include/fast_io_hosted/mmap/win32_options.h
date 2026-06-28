@@ -9,6 +9,8 @@ struct win32_mmap_options
 	::std::uint_least32_t dwDesiredAccess{};
 	void *lpFileMappingAttributes{};
 	void *lpName{};
+	::std::size_t extra_bytes{};
+	::fast_io::file_loader_padding_mode padding_mode{};
 
 	inline explicit constexpr win32_mmap_options() noexcept = default;
 	inline constexpr win32_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv) noexcept
@@ -103,6 +105,13 @@ struct win32_mmap_options
 		}
 		this->flProtect = flprotecttemp;
 		this->dwDesiredAccess = dwDesiredAccesstemp;
+	}
+	inline constexpr win32_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv,
+										::fast_io::file_loader_extra_bytes extra) noexcept
+		: win32_mmap_options(protv, flagsv)
+	{
+		this->extra_bytes = extra.n;
+		this->padding_mode = extra.mode;
 	}
 };
 

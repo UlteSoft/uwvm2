@@ -100,7 +100,7 @@ struct load_file_allocation_guard
 	void *address{};
 	inline explicit constexpr load_file_allocation_guard() noexcept = default;
 	inline explicit load_file_allocation_guard(::std::size_t file_size)
-		: address(
+		: address(file_size == 0 ? nullptr :
 #if FAST_IO_HAS_BUILTIN(__builtin_malloc)
 			  __builtin_malloc
 #else
@@ -108,7 +108,7 @@ struct load_file_allocation_guard
 #endif
 			  (file_size))
 	{
-		if (address == nullptr)
+		if (file_size != 0 && address == nullptr)
 		{
 			throw_posix_error(ENOMEM);
 		}
@@ -125,17 +125,42 @@ struct load_file_allocation_guard
 	}
 };
 
-inline allocation_file_loader_ret allocation_load_address_impl(int fd)
+inline ::std::size_t allocation_file_loader_padded_capacity(::std::size_t file_size,
+															::std::size_t extra_bytes)
+{
+	if (SIZE_MAX - file_size < extra_bytes)
+	{
+		throw_posix_error(EINVAL);
+	}
+	return file_size + extra_bytes;
+}
+
+inline allocation_file_loader_ret allocation_load_address_options_impl(int fd,
+																	   ::fast_io::allocation_mmap_options options)
 {
 	::std::size_t filesize{::fast_io::details::posix_loader_get_file_size(fd)};
-	load_file_allocation_guard guard{filesize};
+	::std::size_t capacity{allocation_file_loader_padded_capacity(filesize, options.extra_bytes)};
+	load_file_allocation_guard guard{capacity};
 	posix_io_observer piob{fd};
 	auto addr{reinterpret_cast<char *>(guard.address)};
-	auto addr_ed{addr + filesize};
-	::fast_io::operations::decay::read_all_bytes_decay(piob, reinterpret_cast<::std::byte *>(addr),
-													   reinterpret_cast<::std::byte *>(addr_ed));
+	auto addr_ed{addr == nullptr ? nullptr : addr + filesize};
+	auto addr_cap{addr == nullptr ? nullptr : addr + capacity};
+	if (filesize)
+	{
+		::fast_io::operations::decay::read_all_bytes_decay(piob, reinterpret_cast<::std::byte *>(addr),
+														   reinterpret_cast<::std::byte *>(addr_ed));
+	}
+	if (options.padding_mode == ::fast_io::file_loader_padding_mode::zero && options.extra_bytes)
+	{
+		::fast_io::freestanding::my_memset(addr_ed, 0, options.extra_bytes);
+	}
 	guard.address = nullptr;
-	return {addr, addr_ed, addr_ed, -1};
+	return {addr, addr_ed, addr_cap, -1};
+}
+
+inline allocation_file_loader_ret allocation_load_address_impl(int fd)
+{
+	return allocation_load_address_options_impl(fd, ::fast_io::allocation_mmap_options{});
 }
 
 inline void rewind_allocation_file_loader(int fd)
@@ -156,12 +181,36 @@ inline void rewind_allocation_file_loader(int fd)
 }
 
 template <typename... Args>
-inline allocation_file_loader_ret allocation_load_file_impl(bool writeback, Args &&...args)
+inline allocation_file_loader_ret allocation_load_file_impl(::fast_io::allocation_mmap_options options, Args &&...args)
 {
 	::fast_io::posix_file pf(::fast_io::freestanding::forward<Args>(args)...);
-	auto ret{allocation_load_address_impl(pf.fd)};
+	auto ret{allocation_load_address_options_impl(pf.fd, options)};
 
-	if (writeback)
+	if (options.write_back)
+	{
+		load_file_allocation_guard loader;
+		loader.address = ret.address_begin;
+		rewind_allocation_file_loader(pf.fd);
+		loader.address = nullptr;
+		ret.fd = pf.release();
+	}
+	return ret;
+}
+
+template <typename... Args>
+inline allocation_file_loader_ret allocation_load_file_impl(bool writeback, Args &&...args)
+{
+	::fast_io::allocation_mmap_options options;
+	options.write_back = writeback;
+	return allocation_load_file_impl(options, ::fast_io::freestanding::forward<Args>(args)...);
+}
+
+inline allocation_file_loader_ret allocation_load_file_fd_impl(::fast_io::allocation_mmap_options options, int fd)
+{
+	::fast_io::posix_file pf(::fast_io::io_dup, ::fast_io::posix_io_observer{fd});
+	rewind_allocation_file_loader(pf.fd);
+	auto ret{allocation_load_address_options_impl(pf.fd, options)};
+	if (options.write_back)
 	{
 		load_file_allocation_guard loader;
 		loader.address = ret.address_begin;
@@ -174,18 +223,9 @@ inline allocation_file_loader_ret allocation_load_file_impl(bool writeback, Args
 
 inline allocation_file_loader_ret allocation_load_file_fd_impl(bool writeback, int fd)
 {
-	::fast_io::posix_file pf(::fast_io::io_dup, ::fast_io::posix_io_observer{fd});
-	rewind_allocation_file_loader(pf.fd);
-	auto ret{allocation_load_address_impl(pf.fd)};
-	if (writeback)
-	{
-		load_file_allocation_guard loader;
-		loader.address = ret.address_begin;
-		rewind_allocation_file_loader(pf.fd);
-		loader.address = nullptr;
-		ret.fd = pf.release();
-	}
-	return ret;
+	::fast_io::allocation_mmap_options options;
+	options.write_back = writeback;
+	return allocation_load_file_fd_impl(options, fd);
 }
 
 } // namespace details
@@ -247,7 +287,7 @@ public:
 	}
 	inline explicit allocation_file_loader(allocation_mmap_options options, posix_at_entry pate)
 	{
-		auto ret{::fast_io::details::allocation_load_file_fd_impl(options.write_back, pate.fd)};
+		auto ret{::fast_io::details::allocation_load_file_fd_impl(options, pate.fd)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
@@ -256,7 +296,7 @@ public:
 	inline explicit allocation_file_loader(allocation_mmap_options options, native_fs_dirent fsdirent,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
-		auto ret{::fast_io::details::allocation_load_file_impl(options.write_back, fsdirent, om, pm)};
+		auto ret{::fast_io::details::allocation_load_file_impl(options, fsdirent, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
@@ -266,7 +306,7 @@ public:
 	inline explicit allocation_file_loader(allocation_mmap_options options, T const &filename,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
-		auto ret{::fast_io::details::allocation_load_file_impl(options.write_back, filename, om, pm)};
+		auto ret{::fast_io::details::allocation_load_file_impl(options, filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
@@ -276,7 +316,7 @@ public:
 	inline explicit allocation_file_loader(allocation_mmap_options options, native_at_entry ent, T const &filename,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
-		auto ret{::fast_io::details::allocation_load_file_impl(options.write_back, ent, filename, om, pm)};
+		auto ret{::fast_io::details::allocation_load_file_impl(options, ent, filename, om, pm)};
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
