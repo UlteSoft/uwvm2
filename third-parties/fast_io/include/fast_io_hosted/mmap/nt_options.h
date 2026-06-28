@@ -31,8 +31,18 @@ struct nt_mmap_options
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
-					dwDesiredAccesstemp |= (0x0002 | 0x0008);
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x80 /*PAGE_EXECUTE_WRITECOPY*/;
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0600 /* NtCurrentPeb()->OSMajorVersion >= 6 */
+						dwDesiredAccesstemp |= 0x0008;
+#endif
+					}
+					else
+					{
+						flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
+						dwDesiredAccesstemp |= (0x0002 | 0x0008);
+					}
 				}
 				else
 				{
@@ -62,8 +72,15 @@ struct nt_mmap_options
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
-					dwDesiredAccesstemp |= 0x0002;
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x8 /*PAGE_WRITECOPY*/;
+					}
+					else
+					{
+						flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
+						dwDesiredAccesstemp |= 0x0002;
+					}
 				}
 				else
 				{

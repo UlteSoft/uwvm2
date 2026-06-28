@@ -11,6 +11,8 @@ struct nt_file_loader_return_value_t
 	char *address_begin{};
 	char *address_end{};
 	char *address_capacity{};
+	::std::size_t file_mapping_size{};
+	::std::size_t anonymous_mapping_size{};
 };
 
 inline ::std::size_t nt_file_loader_add_extra_bytes(::std::size_t file_size, ::std::size_t extra_bytes)
@@ -22,16 +24,207 @@ inline ::std::size_t nt_file_loader_add_extra_bytes(::std::size_t file_size, ::s
 	return file_size + extra_bytes;
 }
 
+inline ::std::size_t nt_file_loader_round_up_to_page(::std::size_t value, ::std::size_t page_size)
+{
+	if (value == 0)
+	{
+		return 0;
+	}
+	::std::size_t const rem{value % page_size};
+	if (rem == 0)
+	{
+		return value;
+	}
+	::std::size_t const inc{page_size - rem};
+	if (SIZE_MAX - value < inc)
+	{
+		throw_nt_error(0xC0000095); // STATUS_INTEGER_OVERFLOW
+	}
+	return value + inc;
+}
+
+inline bool nt_file_loader_is_private_write(::fast_io::nt_mmap_options const &options) noexcept
+{
+	return options.flProtect == 0x08u /*PAGE_WRITECOPY*/ ||
+		   options.flProtect == 0x80u /*PAGE_EXECUTE_WRITECOPY*/;
+}
+
+inline ::std::uint_least32_t nt_file_loader_writecopy_protect(::std::uint_least32_t flprotect) noexcept
+{
+	if (flprotect & (0x10u | 0x20u | 0x40u | 0x80u))
+	{
+		return 0x80u /*PAGE_EXECUTE_WRITECOPY*/;
+	}
+	return 0x08u /*PAGE_WRITECOPY*/;
+}
+
+inline ::std::uint_least32_t nt_file_loader_file_protect(::fast_io::nt_mmap_options const &options) noexcept
+{
+	if (nt_file_loader_is_private_write(options))
+	{
+		return nt_file_loader_writecopy_protect(options.flProtect);
+	}
+	return options.flProtect;
+}
+
+inline ::std::uint_least32_t nt_file_loader_section_access(::fast_io::nt_mmap_options const &options) noexcept
+{
+	if (nt_file_loader_is_private_write(options))
+	{
+		return (options.dwDesiredAccess | 0x0004u /*SECTION_MAP_READ*/) & ~0x0002u /*SECTION_MAP_WRITE*/;
+	}
+	return options.dwDesiredAccess;
+}
+
+inline ::std::uint_least32_t nt_file_loader_anonymous_protect(::std::uint_least32_t flprotect) noexcept
+{
+	if (flprotect == 0x08u /*PAGE_WRITECOPY*/)
+	{
+		return 0x04u /*PAGE_READWRITE*/;
+	}
+	if (flprotect == 0x80u /*PAGE_EXECUTE_WRITECOPY*/)
+	{
+		return 0x40u /*PAGE_EXECUTE_READWRITE*/;
+	}
+	return flprotect;
+}
+
 template <::fast_io::nt_family family>
-inline void nt_unload_address(void *address) noexcept
+inline ::std::size_t nt_file_loader_get_page_size()
+{
+	::fast_io::win32::nt::system_basic_information sb{};
+	auto status{::fast_io::win32::nt::nt_query_system_information<family == ::fast_io::nt_family::zw>(
+		::fast_io::win32::nt::system_information_class::SystemBasicInformation, __builtin_addressof(sb),
+		static_cast<::std::uint_least32_t>(sizeof(sb)), nullptr)};
+	if (status)
+	{
+		throw_nt_error(status);
+	}
+	if (sb.PageSize != 0)
+	{
+		return sb.PageSize;
+	}
+	return 4096u;
+}
+
+inline constexpr void *nt_file_loader_current_process() noexcept
+{
+	return reinterpret_cast<void *>(static_cast<::std::ptrdiff_t>(-1));
+}
+
+template <::fast_io::nt_family family>
+inline void nt_free_virtual_memory_release(void *address) noexcept
 {
 	if (address)
 	{
-		void *current_process_handle{reinterpret_cast<void *>(static_cast<::std::ptrdiff_t>(-1))};
-		::fast_io::win32::nt::nt_unmap_view_of_section<family == ::fast_io::nt_family::zw>(current_process_handle,
-																						   address);
+		void *base_address{address};
+		::std::size_t region_size{};
+		::fast_io::win32::nt::nt_free_virtual_memory<family == ::fast_io::nt_family::zw>(
+			nt_file_loader_current_process(), __builtin_addressof(base_address), __builtin_addressof(region_size),
+			0x00008000u /*MEM_RELEASE*/);
 	}
 }
+
+template <::fast_io::nt_family family>
+inline void nt_unload_address(void *address, ::std::size_t file_mapping_size = 0,
+							  ::std::size_t anonymous_mapping_size = 0) noexcept
+{
+	if (address)
+	{
+		if (file_mapping_size || anonymous_mapping_size)
+		{
+			if (file_mapping_size)
+			{
+				::fast_io::win32::nt::nt_unmap_view_of_section<family == ::fast_io::nt_family::zw>(
+					nt_file_loader_current_process(), address);
+			}
+			if (anonymous_mapping_size)
+			{
+				nt_free_virtual_memory_release<family>(reinterpret_cast<char *>(address) + file_mapping_size);
+			}
+		}
+		else
+		{
+			::fast_io::win32::nt::nt_unmap_view_of_section<family == ::fast_io::nt_family::zw>(
+				nt_file_loader_current_process(), address);
+		}
+	}
+}
+
+template <::fast_io::nt_family family>
+struct nt_file_loader_composite_guard
+{
+	char *address{};
+	::std::size_t prefix_placeholder_size{};
+	::std::size_t tail_placeholder_offset{};
+	::std::size_t tail_placeholder_size{};
+	::std::size_t file_mapping_size{};
+	::std::size_t anonymous_mapping_size{};
+	inline explicit constexpr nt_file_loader_composite_guard() noexcept = default;
+	inline explicit constexpr nt_file_loader_composite_guard(char *addr, ::std::size_t n) noexcept
+		: address{addr}, prefix_placeholder_size{n}
+	{}
+	inline nt_file_loader_composite_guard(nt_file_loader_composite_guard const &) = delete;
+	inline nt_file_loader_composite_guard &operator=(nt_file_loader_composite_guard const &) = delete;
+	inline constexpr void split_tail_placeholder(::std::size_t prefix, ::std::size_t tail) noexcept
+	{
+		prefix_placeholder_size = prefix;
+		tail_placeholder_offset = prefix;
+		tail_placeholder_size = tail;
+	}
+	inline constexpr void mark_file_mapped(::std::size_t n) noexcept
+	{
+		prefix_placeholder_size = 0;
+		file_mapping_size = n;
+	}
+	inline constexpr void mark_prefix_placeholder_released() noexcept
+	{
+		prefix_placeholder_size = 0;
+	}
+	inline constexpr void mark_anonymous_mapped(::std::size_t n) noexcept
+	{
+		if (tail_placeholder_offset == 0)
+		{
+			prefix_placeholder_size = 0;
+		}
+		tail_placeholder_size = 0;
+		anonymous_mapping_size = n;
+	}
+	inline constexpr void release() noexcept
+	{
+		address = nullptr;
+		prefix_placeholder_size = 0;
+		tail_placeholder_offset = 0;
+		tail_placeholder_size = 0;
+		file_mapping_size = 0;
+		anonymous_mapping_size = 0;
+	}
+	inline ~nt_file_loader_composite_guard()
+	{
+		if (address == nullptr)
+		{
+			return;
+		}
+		if (file_mapping_size)
+		{
+			::fast_io::win32::nt::nt_unmap_view_of_section<family == ::fast_io::nt_family::zw>(
+				nt_file_loader_current_process(), address);
+		}
+		if (prefix_placeholder_size)
+		{
+			nt_free_virtual_memory_release<family>(address);
+		}
+		auto tail{address + tail_placeholder_offset};
+		if (anonymous_mapping_size)
+		{
+			nt_free_virtual_memory_release<family>(tail);
+		}
+		if (tail_placeholder_size)
+		{
+			nt_free_virtual_memory_release<family>(tail);
+		}
+	}
+};
 
 template <::fast_io::nt_family family>
 inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_mmap_options const &options,
@@ -49,6 +242,129 @@ inline nt_file_loader_return_value_t nt_load_address_options_impl(::fast_io::nt_
 	if (capacity == 0)
 	{
 		return {nullptr, nullptr, nullptr};
+	}
+	if (options.extra_bytes)
+	{
+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0A00
+		throw_nt_error(0xC00000BB); // STATUS_NOT_SUPPORTED
+#else
+		::std::size_t const page_size{nt_file_loader_get_page_size<family>()};
+		::std::size_t const file_mapping_size{nt_file_loader_round_up_to_page(fsz, page_size)};
+		::std::size_t const total_mapping_size{nt_file_loader_round_up_to_page(capacity, page_size)};
+		::std::size_t const anonymous_mapping_size{total_mapping_size - file_mapping_size};
+		::std::uint_least32_t const file_protect{nt_file_loader_file_protect(options)};
+		::std::uint_least32_t const section_access{nt_file_loader_section_access(options)};
+		::std::uint_least32_t const anonymous_protect{nt_file_loader_anonymous_protect(file_protect)};
+		::fast_io::win32::nt::object_attributes objAttr;
+		secattr_ptr pobjattr{reinterpret_cast<secattr_ptr>(options.objAttr)};
+		if (pobjattr == nullptr)
+		{
+			objAttr = {};
+			objAttr.Length = sizeof(::fast_io::win32::nt::object_attributes);
+			pobjattr = __builtin_addressof(objAttr);
+		}
+		if (capacity <= file_mapping_size)
+		{
+			void *h_section{};
+			auto status{::fast_io::win32::nt::nt_create_section<family == ::fast_io::nt_family::zw>(
+				__builtin_addressof(h_section), section_access, pobjattr, nullptr, file_protect,
+				options.attributes, handle)};
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			::fast_io::basic_nt_family_file<family, char> map_hd{h_section};
+			void *p_map_address{};
+			::std::size_t view_size{};
+			status = ::fast_io::win32::nt::nt_map_view_of_section<family == ::fast_io::nt_family::zw>(
+				h_section, nt_file_loader_current_process(), __builtin_addressof(p_map_address), 0u, 0u, nullptr,
+				__builtin_addressof(view_size), static_cast<::fast_io::win32::nt::section_inherit>(options.viewShare),
+				0u, file_protect);
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			auto address{reinterpret_cast<char *>(p_map_address)};
+			return {address, address + fsz, address + capacity, file_mapping_size, 0};
+		}
+		void *base_address{};
+		::std::size_t reserve_size{total_mapping_size};
+		auto status{::fast_io::win32::nt::nt_allocate_virtual_memory_ex<family == ::fast_io::nt_family::zw>(
+			nt_file_loader_current_process(), __builtin_addressof(base_address), __builtin_addressof(reserve_size),
+			0x00002000u | 0x00040000u /*MEM_RESERVE | MEM_RESERVE_PLACEHOLDER*/, 0x01u /*PAGE_NOACCESS*/,
+			nullptr, 0)};
+		if (status)
+		{
+			throw_nt_error(status);
+		}
+		auto address{reinterpret_cast<char *>(base_address)};
+		nt_file_loader_composite_guard<family> guard{address, total_mapping_size};
+		if (file_mapping_size)
+		{
+			void *tail_placeholder{address + file_mapping_size};
+			::std::size_t tail_placeholder_size{anonymous_mapping_size};
+			status = ::fast_io::win32::nt::nt_free_virtual_memory<family == ::fast_io::nt_family::zw>(
+				nt_file_loader_current_process(), __builtin_addressof(tail_placeholder),
+				__builtin_addressof(tail_placeholder_size),
+				0x00008000u | 0x00000002u /*MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER*/);
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			guard.split_tail_placeholder(file_mapping_size, anonymous_mapping_size);
+			void *prefix_placeholder{address};
+			::std::size_t prefix_placeholder_size{};
+			status = ::fast_io::win32::nt::nt_free_virtual_memory<family == ::fast_io::nt_family::zw>(
+				nt_file_loader_current_process(), __builtin_addressof(prefix_placeholder),
+				__builtin_addressof(prefix_placeholder_size), 0x00008000u /*MEM_RELEASE*/);
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			guard.mark_prefix_placeholder_released();
+			void *h_section{};
+			status = ::fast_io::win32::nt::nt_create_section<family == ::fast_io::nt_family::zw>(
+				__builtin_addressof(h_section), section_access, pobjattr, nullptr, file_protect,
+				options.attributes, handle);
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			::fast_io::basic_nt_family_file<family, char> map_hd{h_section};
+			void *p_map_address{address};
+			::std::size_t view_size{};
+			status = ::fast_io::win32::nt::nt_map_view_of_section_ex<family == ::fast_io::nt_family::zw>(
+				h_section, nt_file_loader_current_process(), __builtin_addressof(p_map_address), nullptr,
+				__builtin_addressof(view_size), 0, file_protect, nullptr, 0);
+			if (status)
+			{
+				throw_nt_error(status);
+			}
+			if (p_map_address != address)
+			{
+				throw_nt_error(0xC0000018); // STATUS_CONFLICTING_ADDRESSES
+			}
+			guard.mark_file_mapped(file_mapping_size);
+		}
+		void *tail_address{address + file_mapping_size};
+		::std::size_t tail_region_size{anonymous_mapping_size};
+		status = ::fast_io::win32::nt::nt_allocate_virtual_memory_ex<family == ::fast_io::nt_family::zw>(
+			nt_file_loader_current_process(), __builtin_addressof(tail_address),
+			__builtin_addressof(tail_region_size),
+			0x00001000u | 0x00002000u | 0x00004000u /*MEM_COMMIT | MEM_RESERVE | MEM_REPLACE_PLACEHOLDER*/,
+			anonymous_protect, nullptr, 0);
+		if (status)
+		{
+			throw_nt_error(status);
+		}
+		if (tail_address != address + file_mapping_size)
+		{
+			throw_nt_error(0xC0000018); // STATUS_CONFLICTING_ADDRESSES
+		}
+		guard.mark_anonymous_mapped(anonymous_mapping_size);
+		guard.release();
+		return {address, address + fsz, address + capacity, file_mapping_size, anonymous_mapping_size};
+#endif
 	}
 
 	void *h_section{};
@@ -142,6 +458,8 @@ public:
 	pointer address_begin{};
 	pointer address_end{};
 	pointer address_capacity{};
+	::std::size_t file_mapping_size{};
+	::std::size_t anonymous_mapping_size{};
 
 	inline constexpr nt_family_file_loader() noexcept = default;
 	inline explicit nt_family_file_loader(::fast_io::nt_at_entry ent)
@@ -150,6 +468,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	inline explicit nt_family_file_loader(::fast_io::nt_fs_dirent fsdirent,
 										  ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -159,6 +479,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(T const &filename, ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -168,6 +490,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::nt_at_entry ent, T const &filename,
@@ -178,6 +502,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::io_kernel_t, T const &t, 
@@ -188,6 +514,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(::fast_io::io_kernel_t, ::fast_io::nt_at_entry ent, T const &t,
@@ -198,6 +526,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_at_entry ent)
@@ -206,6 +536,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_fs_dirent fsdirent,
 										  ::fast_io::open_mode om = ::fast_io::open_mode::in,
@@ -215,6 +547,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, T const &filename,
@@ -225,6 +559,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::nt_at_entry ent, T const &filename,
@@ -235,6 +571,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::io_kernel_t, T const &t,
@@ -246,6 +584,8 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit nt_family_file_loader(nt_mmap_options const &options, ::fast_io::io_kernel_t,
@@ -258,14 +598,19 @@ public:
 		address_begin = ret.address_begin;
 		address_end = ret.address_end;
 		address_capacity = ret.address_capacity;
+		file_mapping_size = ret.file_mapping_size;
+		anonymous_mapping_size = ret.anonymous_mapping_size;
 	}
 	inline nt_family_file_loader(nt_family_file_loader const &) = delete;
 	inline nt_family_file_loader &operator=(nt_family_file_loader const &) = delete;
 	inline constexpr nt_family_file_loader(nt_family_file_loader &&__restrict other) noexcept
 		: address_begin(other.address_begin), address_end(other.address_end),
-		  address_capacity(other.address_capacity)
+		  address_capacity(other.address_capacity), file_mapping_size(other.file_mapping_size),
+		  anonymous_mapping_size(other.anonymous_mapping_size)
 	{
 		other.address_capacity = other.address_end = other.address_begin = nullptr;
+		other.file_mapping_size = {};
+		other.anonymous_mapping_size = {};
 	}
 	inline nt_family_file_loader &operator=(nt_family_file_loader &&__restrict other) noexcept
 	{
@@ -273,11 +618,16 @@ public:
 		{
 			return *this;
 		}
-		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin);
+		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin, file_mapping_size,
+																  anonymous_mapping_size);
 		address_begin = other.address_begin;
 		address_end = other.address_end;
 		address_capacity = other.address_capacity;
+		file_mapping_size = other.file_mapping_size;
+		anonymous_mapping_size = other.anonymous_mapping_size;
 		other.address_capacity = other.address_end = other.address_begin = nullptr;
+		other.file_mapping_size = {};
+		other.anonymous_mapping_size = {};
 		return *this;
 	}
 	inline constexpr pointer data() noexcept
@@ -482,17 +832,23 @@ public:
 	{
 		pointer temp{this->address_begin};
 		this->address_capacity = this->address_end = this->address_begin = nullptr;
+		this->file_mapping_size = {};
+		this->anonymous_mapping_size = {};
 		return temp;
 	}
 
 	inline void close()
 	{
-		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin);
+		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin, file_mapping_size,
+																  anonymous_mapping_size);
 		address_capacity = address_end = address_begin = nullptr;
+		file_mapping_size = {};
+		anonymous_mapping_size = {};
 	}
 	inline ~nt_family_file_loader()
 	{
-		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin);
+		::fast_io::win32::nt::details::nt_unload_address<family>(address_begin, file_mapping_size,
+																  anonymous_mapping_size);
 	}
 };
 

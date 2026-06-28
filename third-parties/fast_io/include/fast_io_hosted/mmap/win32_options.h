@@ -24,18 +24,20 @@ struct win32_mmap_options
 			exclusiveflags = 1;
 		}
 
-		if (exclusiveflags == 2)
-		{
-			dwDesiredAccesstemp |= 0x00000001 /*FILE_MAP_COPY*/;
-		}
-
 		if ((protv & ::fast_io::mmap_prot::prot_exec) == ::fast_io::mmap_prot::prot_exec)
 		{
 			if ((protv & ::fast_io::mmap_prot::prot_read) == ::fast_io::mmap_prot::prot_read)
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x80 /*PAGE_EXECUTE_WRITECOPY*/;
+					}
+					else
+					{
+						flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
+					}
 				}
 				else
 				{
@@ -61,7 +63,14 @@ struct win32_mmap_options
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x8 /*PAGE_WRITECOPY*/;
+					}
+					else
+					{
+						flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
+					}
 				}
 				else
 				{
@@ -81,7 +90,23 @@ struct win32_mmap_options
 			}
 		}
 
-		if ((protv & ::fast_io::mmap_prot::prot_read) == ::fast_io::mmap_prot::prot_read &&
+		if (exclusiveflags == 2)
+		{
+			dwDesiredAccesstemp = {};
+			if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
+			{
+				dwDesiredAccesstemp |= 0x00000001 /*FILE_MAP_COPY*/;
+			}
+			else if ((protv & ::fast_io::mmap_prot::prot_read) == ::fast_io::mmap_prot::prot_read)
+			{
+				dwDesiredAccesstemp |= 0x00000004 /*FILE_MAP_READ*/;
+			}
+			if ((protv & ::fast_io::mmap_prot::prot_exec) == ::fast_io::mmap_prot::prot_exec)
+			{
+				dwDesiredAccesstemp |= 0x00000020 /*FILE_MAP_EXECUTE*/;
+			}
+		}
+		else if ((protv & ::fast_io::mmap_prot::prot_read) == ::fast_io::mmap_prot::prot_read &&
 			(protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 		{
 			dwDesiredAccesstemp |= 0x000F001F /*FILE_MAP_ALL_ACCESS*/;

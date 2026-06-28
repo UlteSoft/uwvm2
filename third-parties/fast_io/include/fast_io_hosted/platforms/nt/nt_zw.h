@@ -325,6 +325,20 @@ inline ::std::uint_least32_t nt_map_view_of_section(Args... args) noexcept
 }
 
 template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 9)
+inline ::std::uint_least32_t nt_map_view_of_section_ex(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwMapViewOfSectionEx(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtMapViewOfSectionEx(args...);
+	}
+}
+
+template <bool zw, typename... Args>
 	requires(sizeof...(Args) == 2)
 inline ::std::uint_least32_t nt_unmap_view_of_section(Args... args) noexcept
 {
@@ -377,6 +391,20 @@ inline ::std::uint_least32_t nt_allocate_virtual_memory(Args... args) noexcept
 	else
 	{
 		return ::fast_io::win32::nt::NtAllocateVirtualMemory(args...);
+	}
+}
+
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 7)
+inline ::std::uint_least32_t nt_allocate_virtual_memory_ex(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwAllocateVirtualMemoryEx(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtAllocateVirtualMemoryEx(args...);
 	}
 }
 
