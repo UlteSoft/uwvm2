@@ -622,3 +622,40 @@
 #else
 # define UWVM_FASTCALL
 #endif
+
+/// @brief        Define a char-family literal provider from a plain string literal.
+/// @details      `UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(foo, "bar")` declares
+///               `foo<char_type>()`, returning the matching char/wchar_t/char8_t/char16_t/char32_t
+///               string-literal array reference.
+#pragma push_macro("UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL")
+#undef UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL
+#define UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(name, literal)                                                                                                  \
+    template <::std::integral char_type>                                                                                                                       \
+    inline constexpr decltype(auto) name() noexcept                                                                                                            \
+    {                                                                                                                                                          \
+        if constexpr(::std::same_as<char_type, char>)                                                                                                         \
+        {                                                                                                                                                      \
+            constexpr auto& literal_ref{literal};                                                                                                              \
+            return literal_ref;                                                                                                                                \
+        }                                                                                                                                                      \
+        else if constexpr(::std::same_as<char_type, wchar_t>)                                                                                                  \
+        {                                                                                                                                                      \
+            constexpr auto& literal_ref{L##literal};                                                                                                           \
+            return literal_ref;                                                                                                                                \
+        }                                                                                                                                                      \
+        else if constexpr(::std::same_as<char_type, char8_t>)                                                                                                  \
+        {                                                                                                                                                      \
+            constexpr auto& literal_ref{u8##literal};                                                                                                          \
+            return literal_ref;                                                                                                                                \
+        }                                                                                                                                                      \
+        else if constexpr(::std::same_as<char_type, char16_t>)                                                                                                 \
+        {                                                                                                                                                      \
+            constexpr auto& literal_ref{u##literal};                                                                                                           \
+            return literal_ref;                                                                                                                                \
+        }                                                                                                                                                      \
+        else if constexpr(::std::same_as<char_type, char32_t>)                                                                                                 \
+        {                                                                                                                                                      \
+            constexpr auto& literal_ref{U##literal};                                                                                                           \
+            return literal_ref;                                                                                                                                \
+        }                                                                                                                                                      \
+    }
