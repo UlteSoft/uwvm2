@@ -32,13 +32,8 @@ namespace details
 #endif
 inline ::fast_io::install_path get_module_install_path()
 {
-#if FAST_IO_HAS_BUILTIN()
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (!__builtin_available(macOS 10.2, iOS 2.0, *)) [[unlikely]]
-	{
-		throw_posix_error(ENOSYS);
-	}
-#else
-	if (::fast_io::posix::_NSGetExecutablePath == nullptr) [[unlikely]]
 	{
 		throw_posix_error(ENOSYS);
 	}
