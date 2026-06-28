@@ -288,6 +288,14 @@ public:
 	{
 		return static_cast<::std::size_t>(address_capacity - address_begin);
 	}
+	inline constexpr ::std::size_t padding_size() const noexcept
+	{
+		return static_cast<::std::size_t>(address_capacity - address_end);
+	}
+	inline constexpr bool has_padding(::std::size_t n) const noexcept
+	{
+		return n <= this->padding_size();
+	}
 	inline constexpr const_iterator cbegin() const noexcept
 	{
 		return address_begin;

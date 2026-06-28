@@ -401,6 +401,14 @@ public:
 	{
 		return static_cast<::std::size_t>(this->address_capacity - this->address_begin);
 	}
+	inline constexpr ::std::size_t padding_size() const noexcept
+	{
+		return static_cast<::std::size_t>(this->address_capacity - this->address_end);
+	}
+	inline constexpr bool has_padding(::std::size_t n) const noexcept
+	{
+		return n <= this->padding_size();
+	}
 	inline constexpr const_reverse_iterator crbegin() const noexcept
 	{
 		return const_reverse_iterator{address_end};
