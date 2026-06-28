@@ -230,6 +230,14 @@ inline allocation_file_loader_ret allocation_load_file_fd_impl(bool writeback, i
 
 } // namespace details
 
+struct released_allocation_file_loader_mapping
+{
+	char *address_begin{};
+	char *address_end{};
+	char *address_capacity{};
+	int fd{-1};
+};
+
 class allocation_file_loader
 {
 public:
@@ -245,92 +253,72 @@ public:
 	using difference_type = ::std::ptrdiff_t;
 	using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
 	using reverse_iterator = ::std::reverse_iterator<iterator>;
+	using native_handle_type = released_allocation_file_loader_mapping;
 
-	pointer address_begin{};
-	pointer address_end{};
-	pointer address_capacity{};
-	int fd{-1};
+	native_handle_type storage{};
 	inline explicit constexpr allocation_file_loader() noexcept = default;
+	inline explicit constexpr allocation_file_loader(native_handle_type mapping) noexcept
+		: storage(mapping)
+	{
+	}
 
 	inline explicit allocation_file_loader(posix_at_entry pate)
 	{
 		auto ret{::fast_io::details::allocation_load_file_fd_impl(false, pate.fd)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	inline explicit allocation_file_loader(native_fs_dirent fsdirent, open_mode om = open_mode::in,
 										   perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(false, fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit allocation_file_loader(T const &filename, open_mode om = open_mode::in,
 										   perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(false, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit allocation_file_loader(native_at_entry ent, T const &filename, open_mode om = open_mode::in,
 										   perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(false, ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	inline explicit allocation_file_loader(allocation_mmap_options options, posix_at_entry pate)
 	{
 		auto ret{::fast_io::details::allocation_load_file_fd_impl(options, pate.fd)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		fd = ret.fd;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	inline explicit allocation_file_loader(allocation_mmap_options options, native_fs_dirent fsdirent,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(options, fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		fd = ret.fd;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit allocation_file_loader(allocation_mmap_options options, T const &filename,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(options, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		fd = ret.fd;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit allocation_file_loader(allocation_mmap_options options, native_at_entry ent, T const &filename,
 										   open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::allocation_load_file_impl(options, ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		fd = ret.fd;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.fd};
 	}
 
 	inline allocation_file_loader(allocation_file_loader const &) = delete;
 	inline allocation_file_loader &operator=(allocation_file_loader const &) = delete;
 	inline constexpr allocation_file_loader(allocation_file_loader &&__restrict other) noexcept
-		: address_begin(other.address_begin), address_end(other.address_end), address_capacity(other.address_capacity),
-		  fd(other.fd)
+		: storage(other.storage)
 	{
-		other.address_capacity = other.address_end = other.address_begin = nullptr;
-		other.fd = -1;
+		other.storage = {};
 	}
 	inline allocation_file_loader &operator=(allocation_file_loader &&__restrict other) noexcept
 	{
@@ -339,59 +327,56 @@ public:
 			return *this;
 		}
 
-		::fast_io::details::close_allocation_file_loader_impl(fd, address_begin, address_end);
+		::fast_io::details::close_allocation_file_loader_impl(storage.fd, storage.address_begin, storage.address_end);
 
 		// There is no need to check the 'this' pointer as there are no side effects
-		address_begin = other.address_begin;
-		address_end = other.address_end;
-		address_capacity = other.address_capacity;
-		other.address_capacity = other.address_end = other.address_begin = nullptr;
-		other.fd = -1;
+		storage = other.storage;
+		other.storage = {};
 		return *this;
 	}
 	inline constexpr pointer data() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_pointer data() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr bool empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr bool is_empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr ::std::size_t size() const noexcept
 	{
-		return static_cast<::std::size_t>(address_end - address_begin);
+		return static_cast<::std::size_t>(storage.address_end - storage.address_begin);
 	}
 	inline constexpr const_iterator cbegin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator begin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr iterator begin() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator cend() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr const_iterator end() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr iterator end() noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr ::std::size_t max_size() const noexcept
 	{
@@ -399,11 +384,11 @@ public:
 	}
 	inline constexpr ::std::size_t capacity() const noexcept
 	{
-		return static_cast<::std::size_t>(this->address_capacity - this->address_begin);
+		return static_cast<::std::size_t>(this->storage.address_capacity - this->storage.address_begin);
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
-		return static_cast<::std::size_t>(this->address_capacity - this->address_end);
+		return static_cast<::std::size_t>(this->storage.address_capacity - this->storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
 	{
@@ -411,27 +396,27 @@ public:
 	}
 	inline constexpr const_reverse_iterator crbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr reverse_iterator rbegin() noexcept
 	{
-		return reverse_iterator{address_end};
+		return reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator rbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator crend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 	inline constexpr reverse_iterator rend() noexcept
 	{
-		return reverse_iterator{address_begin};
+		return reverse_iterator{storage.address_begin};
 	}
 	inline constexpr const_reverse_iterator rend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -441,11 +426,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference front() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -455,11 +440,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference front() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -469,11 +454,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference back() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -483,28 +468,28 @@ public:
 	[[nodiscard]]
 	inline constexpr reference back() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 
 	inline constexpr const_reference front_unchecked() const noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr reference front_unchecked() noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr const_reference back_unchecked() const noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 	inline constexpr reference back_unchecked() noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -514,11 +499,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference operator[](size_type size) noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -528,48 +513,38 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference operator[](size_type size) const noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 
 	inline constexpr reference index_unchecked(size_type size) noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 	inline constexpr const_reference index_unchecked(size_type size) const noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 	inline void close()
 	{
-		::fast_io::details::close_allocation_file_loader_impl(fd, address_begin, address_end);
-		address_capacity = address_end = address_begin = nullptr;
-		fd = -1;
+		::fast_io::details::close_allocation_file_loader_impl(storage.fd, storage.address_begin, storage.address_end);
+		storage = {};
 	}
 #if __has_cpp_attribute(nodiscard)
 	[[nodiscard]]
 #endif
-	inline constexpr pointer release() noexcept
+	inline constexpr native_handle_type release() noexcept
 	{
-		pointer temp{address_begin};
-		address_capacity = address_end = address_begin = nullptr;
-		if (fd != -1)
-		{
-#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__)
-			::fast_io::noexcept_call(::_close, fd);
-#else
-			::fast_io::noexcept_call(::close, fd);
-#endif
-		}
-		fd = -1;
+		native_handle_type temp{this->storage};
+		this->storage = {};
 		return temp;
 	}
 	inline ~allocation_file_loader()
 	{
-		::fast_io::details::close_allocation_file_loader_impl(fd, address_begin, address_end);
+		::fast_io::details::close_allocation_file_loader_impl(storage.fd, storage.address_begin, storage.address_end);
 	}
 };
 

@@ -109,6 +109,10 @@ inline int posix_file_loader_make_anonymous_flags(int flags, ::fast_io::file_loa
 	{
 		flags &= ~MAP_UNINITIALIZED;
 	}
+	else if (padding_mode == ::fast_io::file_loader_padding_mode::uninitialized)
+	{
+		flags |= MAP_UNINITIALIZED;
+	}
 #else
 	static_cast<void>(padding_mode);
 #endif
@@ -201,9 +205,9 @@ inline posix_file_loader_return_value_t posix_load_address(int fd, ::std::size_t
 	auto add{::std::bit_cast<char *>(sys_mmap(nullptr, file_size, PROT_READ | PROT_WRITE,
 											  MAP_PRIVATE
 #if defined(MAP_POPULATE)
-												| MAP_POPULATE
+												  | MAP_POPULATE
 #endif
-											,
+											  ,
 											  fd, 0))};
 	return {add, add + file_size, add + file_size};
 }
@@ -245,7 +249,14 @@ inline auto posix_load_file_options_impl(::fast_io::posix_mmap_options const &op
 
 } // namespace details
 
-class posix_file_loader 
+struct released_posix_file_loader_mapping
+{
+	char *address_begin{::fast_io::details::posix_file_loader_empty_address()};
+	char *address_end{::fast_io::details::posix_file_loader_empty_address()};
+	char *address_capacity{::fast_io::details::posix_file_loader_empty_address()};
+};
+
+class posix_file_loader
 {
 public:
 	using value_type = char;
@@ -259,91 +270,71 @@ public:
 	using difference_type = ::std::ptrdiff_t;
 	using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
 	using reverse_iterator = ::std::reverse_iterator<iterator>;
+	using native_handle_type = released_posix_file_loader_mapping;
 
-	pointer address_begin{};
-	pointer address_end{};
-	pointer address_capacity{};
-	inline explicit constexpr posix_file_loader() noexcept
-		: address_begin(::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1))),
-		  address_end(::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1))),
-		  address_capacity(::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1)))
+	native_handle_type storage{};
+	inline explicit constexpr posix_file_loader() noexcept = default;
+	inline explicit constexpr posix_file_loader(native_handle_type mapping) noexcept
+		: storage(mapping)
 	{
 	}
 	inline explicit posix_file_loader(posix_at_entry pate)
 	{
 		auto ret{::fast_io::details::posix_load_address_impl(pate.fd)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	inline explicit posix_file_loader(native_fs_dirent fsdirent, open_mode om = open_mode::in,
 									  perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_impl(fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit posix_file_loader(T const &filename, open_mode om = open_mode::in,
 									  perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_impl(filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit posix_file_loader(native_at_entry ent, T const &filename, open_mode om = open_mode::in,
 									  perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_impl(ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	inline explicit posix_file_loader(posix_mmap_options const &options, posix_at_entry pate)
 	{
 		auto ret{::fast_io::details::posix_load_address_options_impl(options, pate.fd)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	inline explicit posix_file_loader(posix_mmap_options const &options, native_fs_dirent fsdirent,
 									  open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_options_impl(options, fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit posix_file_loader(posix_mmap_options const &options, T const &filename,
 									  open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_options_impl(options, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit posix_file_loader(posix_mmap_options const &options, native_at_entry ent, T const &filename,
 									  open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::details::posix_load_file_options_impl(options, ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity};
 	}
 
 	inline posix_file_loader(posix_file_loader const &) = delete;
 	inline posix_file_loader &operator=(posix_file_loader const &) = delete;
 	inline constexpr posix_file_loader(posix_file_loader &&__restrict other) noexcept
-		: address_begin(other.address_begin), address_end(other.address_end),
-		  address_capacity(other.address_capacity)
+		: storage(other.storage)
 	{
-		other.address_capacity = other.address_end = other.address_begin =
-			::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1));
+		other.storage = {};
 	}
 	inline posix_file_loader &operator=(posix_file_loader &&__restrict other) noexcept
 	{
@@ -351,59 +342,56 @@ public:
 		{
 			return *this;
 		}
-		::fast_io::details::posix_unload_address(address_begin,
-												 static_cast<::std::size_t>(address_capacity - address_begin));
-		address_begin = other.address_begin;
-		address_end = other.address_end;
-		address_capacity = other.address_capacity;
-		other.address_capacity = other.address_end = other.address_begin =
-			::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1));
+		::fast_io::details::posix_unload_address(storage.address_begin,
+												 static_cast<::std::size_t>(storage.address_capacity - storage.address_begin));
+		storage = other.storage;
+		other.storage = {};
 		return *this;
 	}
 
 	inline constexpr pointer data() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_pointer data() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr bool empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr bool is_empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr ::std::size_t size() const noexcept
 	{
-		return static_cast<::std::size_t>(address_end - address_begin);
+		return static_cast<::std::size_t>(storage.address_end - storage.address_begin);
 	}
 	inline constexpr const_iterator cbegin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator begin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr iterator begin() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator cend() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr const_iterator end() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr iterator end() noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr ::std::size_t max_size() const noexcept
 	{
@@ -411,11 +399,11 @@ public:
 	}
 	inline constexpr ::std::size_t capacity() const noexcept
 	{
-		return static_cast<::std::size_t>(this->address_capacity - this->address_begin);
+		return static_cast<::std::size_t>(this->storage.address_capacity - this->storage.address_begin);
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
-		return static_cast<::std::size_t>(this->address_capacity - this->address_end);
+		return static_cast<::std::size_t>(this->storage.address_capacity - this->storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
 	{
@@ -423,27 +411,27 @@ public:
 	}
 	inline constexpr const_reverse_iterator crbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr reverse_iterator rbegin() noexcept
 	{
-		return reverse_iterator{address_end};
+		return reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator rbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator crend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 	inline constexpr reverse_iterator rend() noexcept
 	{
-		return reverse_iterator{address_begin};
+		return reverse_iterator{storage.address_begin};
 	}
 	inline constexpr const_reverse_iterator rend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -453,11 +441,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference front() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -467,11 +455,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference front() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -481,11 +469,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference back() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -495,28 +483,28 @@ public:
 	[[nodiscard]]
 	inline constexpr reference back() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 
 	inline constexpr const_reference front_unchecked() const noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr reference front_unchecked() noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr const_reference back_unchecked() const noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 	inline constexpr reference back_unchecked() noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -526,11 +514,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference operator[](size_type size) noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -540,40 +528,40 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference operator[](size_type size) const noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 
 	inline constexpr reference index_unchecked(size_type size) noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 	inline constexpr const_reference index_unchecked(size_type size) const noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 	inline void close()
 	{
-		::fast_io::details::posix_unload_address(address_begin,
-												 static_cast<::std::size_t>(address_capacity - address_begin));
-		address_capacity = address_end = address_begin = ::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1));
+		::fast_io::details::posix_unload_address(storage.address_begin,
+												 static_cast<::std::size_t>(storage.address_capacity - storage.address_begin));
+		storage = {};
 	}
 #if __has_cpp_attribute(nodiscard)
 	[[nodiscard]]
 #endif
-	inline constexpr pointer release() noexcept
+	inline constexpr native_handle_type release() noexcept
 	{
-		pointer temp{address_begin};
-		address_capacity = address_end = address_begin = ::std::bit_cast<char *>(static_cast<::std::ptrdiff_t>(-1));
+		native_handle_type temp{this->storage};
+		this->storage = {};
 		return temp;
 	}
 	inline ~posix_file_loader()
 	{
-		::fast_io::details::posix_unload_address(address_begin,
-												 static_cast<::std::size_t>(address_capacity - address_begin));
+		::fast_io::details::posix_unload_address(storage.address_begin,
+												 static_cast<::std::size_t>(storage.address_capacity - storage.address_begin));
 	}
 };
 

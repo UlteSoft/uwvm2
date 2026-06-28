@@ -627,7 +627,7 @@ enum class file_loader_padding_mode : unsigned
 struct file_loader_extra_bytes
 {
 	::std::size_t n{};
-	file_loader_padding_mode mode{};
+	file_loader_padding_mode mode{file_loader_padding_mode::zero};
 	inline explicit constexpr file_loader_extra_bytes(::std::size_t nn) noexcept
 		: n(nn)
 	{}

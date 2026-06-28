@@ -484,6 +484,15 @@ inline auto win32_load_file_options_impl(win32_mmap_options const &options, Args
 
 } // namespace win32::details
 
+struct released_win32_file_loader_mapping
+{
+	char *address_begin{};
+	char *address_end{};
+	char *address_capacity{};
+	::std::size_t file_mapping_size{};
+	::std::size_t anonymous_mapping_size{};
+};
+
 template <win32_family family>
 class win32_family_file_loader 
 {
@@ -499,127 +508,94 @@ public:
 	using difference_type = ::std::ptrdiff_t;
 	using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
 	using reverse_iterator = ::std::reverse_iterator<iterator>;
+	using native_handle_type = released_win32_file_loader_mapping;
 
-	pointer address_begin{};
-	pointer address_end{};
-	pointer address_capacity{};
-	::std::size_t file_mapping_size{};
-	::std::size_t anonymous_mapping_size{};
+	native_handle_type storage{};
 	inline constexpr win32_family_file_loader() noexcept = default;
+	inline explicit constexpr win32_family_file_loader(native_handle_type mapping) noexcept
+		: storage(mapping)
+	{
+	}
 	inline explicit win32_family_file_loader(nt_at_entry ent)
 	{
 		auto ret{::fast_io::win32::details::win32_load_address_impl<family>(ent.handle)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	inline explicit win32_family_file_loader(nt_fs_dirent fsdirent, open_mode om = open_mode::in,
 											 perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_impl<family>(fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	inline explicit win32_family_file_loader(win32_9xa_fs_dirent fsdirent, open_mode om = open_mode::in,
 											 perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_impl<family>(fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit win32_family_file_loader(T const &filename, open_mode om = open_mode::in,
 											 perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_impl<family>(filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit win32_family_file_loader(nt_at_entry ent, T const &filename, open_mode om = open_mode::in,
 											 perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_impl<family>(ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit win32_family_file_loader(win32_9xa_at_entry ent, T const &filename, open_mode om = open_mode::in,
 											 perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_impl<family>(ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	inline explicit win32_family_file_loader(win32_mmap_options const &options, nt_at_entry ent)
 	{
 		auto ret{::fast_io::win32::details::win32_load_address_options_impl<family>(options, ent.handle)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	inline explicit win32_family_file_loader(win32_mmap_options const &options, nt_fs_dirent fsdirent,
 											 open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_options_impl<family>(options, fsdirent, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit win32_family_file_loader(win32_mmap_options const &options, T const &filename,
 											 open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_options_impl<family>(options, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 	template <::fast_io::constructible_to_os_c_str T>
 	inline explicit win32_family_file_loader(win32_mmap_options const &options, nt_at_entry ent, T const &filename,
 											 open_mode om = open_mode::in, perms pm = static_cast<perms>(436))
 	{
 		auto ret{::fast_io::win32::details::win32_load_file_options_impl<family>(options, ent, filename, om, pm)};
-		address_begin = ret.address_begin;
-		address_end = ret.address_end;
-		address_capacity = ret.address_capacity;
-		file_mapping_size = ret.file_mapping_size;
-		anonymous_mapping_size = ret.anonymous_mapping_size;
+		storage = native_handle_type{ret.address_begin, ret.address_end, ret.address_capacity, ret.file_mapping_size,
+									  ret.anonymous_mapping_size};
 	}
 
 	inline win32_family_file_loader(win32_family_file_loader const &) = delete;
 	inline win32_family_file_loader &operator=(win32_family_file_loader const &) = delete;
 	inline constexpr win32_family_file_loader(win32_family_file_loader &&__restrict other) noexcept
-		: address_begin(other.address_begin), address_end(other.address_end),
-		  address_capacity(other.address_capacity), file_mapping_size(other.file_mapping_size),
-		  anonymous_mapping_size(other.anonymous_mapping_size)
+		: storage(other.storage)
 	{
-		other.address_capacity = other.address_end = other.address_begin = nullptr;
-		other.file_mapping_size = {};
-		other.anonymous_mapping_size = {};
+		other.storage = {};
 	}
 	inline win32_family_file_loader &operator=(win32_family_file_loader &&__restrict other) noexcept
 	{
@@ -627,37 +603,31 @@ public:
 		{
 			return *this;
 		}
-		::fast_io::win32::details::win32_unload_address(address_begin, file_mapping_size,
-														 anonymous_mapping_size);
-		address_begin = other.address_begin;
-		address_end = other.address_end;
-		address_capacity = other.address_capacity;
-		file_mapping_size = other.file_mapping_size;
-		anonymous_mapping_size = other.anonymous_mapping_size;
-		other.address_capacity = other.address_end = other.address_begin = nullptr;
-		other.file_mapping_size = {};
-		other.anonymous_mapping_size = {};
+		::fast_io::win32::details::win32_unload_address(storage.address_begin, storage.file_mapping_size,
+														 storage.anonymous_mapping_size);
+		storage = other.storage;
+		other.storage = {};
 		return *this;
 	}
 	inline constexpr pointer data() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_pointer data() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr bool empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr bool is_empty() const noexcept
 	{
-		return address_begin == address_end;
+		return storage.address_begin == storage.address_end;
 	}
 	inline constexpr ::std::size_t size() const noexcept
 	{
-		return static_cast<::std::size_t>(address_end - address_begin);
+		return static_cast<::std::size_t>(storage.address_end - storage.address_begin);
 	}
 	inline constexpr ::std::size_t max_size() const noexcept
 	{
@@ -665,11 +635,11 @@ public:
 	}
 	inline constexpr ::std::size_t capacity() const noexcept
 	{
-		return static_cast<::std::size_t>(address_capacity - address_begin);
+		return static_cast<::std::size_t>(storage.address_capacity - storage.address_begin);
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
-		return static_cast<::std::size_t>(address_capacity - address_end);
+		return static_cast<::std::size_t>(storage.address_capacity - storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
 	{
@@ -677,51 +647,51 @@ public:
 	}
 	inline constexpr const_iterator cbegin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator begin() const noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr iterator begin() noexcept
 	{
-		return address_begin;
+		return storage.address_begin;
 	}
 	inline constexpr const_iterator cend() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr const_iterator end() const noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr iterator end() noexcept
 	{
-		return address_end;
+		return storage.address_end;
 	}
 	inline constexpr const_reverse_iterator crbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr reverse_iterator rbegin() noexcept
 	{
-		return reverse_iterator{address_end};
+		return reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator rbegin() const noexcept
 	{
-		return const_reverse_iterator{address_end};
+		return const_reverse_iterator{storage.address_end};
 	}
 	inline constexpr const_reverse_iterator crend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 	inline constexpr reverse_iterator rend() noexcept
 	{
-		return reverse_iterator{address_begin};
+		return reverse_iterator{storage.address_begin};
 	}
 	inline constexpr const_reverse_iterator rend() const noexcept
 	{
-		return const_reverse_iterator{address_begin};
+		return const_reverse_iterator{storage.address_begin};
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -731,11 +701,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference front() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -745,11 +715,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference front() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return *address_begin;
+		return *storage.address_begin;
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -759,11 +729,11 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference back() const noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -773,28 +743,28 @@ public:
 	[[nodiscard]]
 	inline constexpr reference back() noexcept
 	{
-		if (address_begin == address_end) [[unlikely]]
+		if (storage.address_begin == storage.address_end) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 
 	inline constexpr const_reference front_unchecked() const noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr reference front_unchecked() noexcept
 	{
-		return *address_begin;
+		return *storage.address_begin;
 	}
 	inline constexpr const_reference back_unchecked() const noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 	inline constexpr reference back_unchecked() noexcept
 	{
-		return address_end[-1];
+		return storage.address_end[-1];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -804,11 +774,11 @@ public:
 	[[nodiscard]]
 	inline constexpr reference operator[](size_type size) noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 	[[__gnu__::__always_inline__]]
@@ -818,44 +788,40 @@ public:
 	[[nodiscard]]
 	inline constexpr const_reference operator[](size_type size) const noexcept
 	{
-		if (static_cast<size_type>(address_end - address_begin) <= size) [[unlikely]]
+		if (static_cast<size_type>(storage.address_end - storage.address_begin) <= size) [[unlikely]]
 		{
 			::fast_io::fast_terminate();
 		}
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 
 	inline constexpr reference index_unchecked(size_type size) noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 	inline constexpr const_reference index_unchecked(size_type size) const noexcept
 	{
-		return address_begin[size];
+		return storage.address_begin[size];
 	}
 #if __has_cpp_attribute(nodiscard)
 	[[nodiscard]]
 #endif
-	inline constexpr pointer release() noexcept
+	inline constexpr native_handle_type release() noexcept
 	{
-		auto temp{this->address_begin};
-		this->address_capacity = this->address_end = this->address_begin = nullptr;
-		this->file_mapping_size = {};
-		this->anonymous_mapping_size = {};
+		native_handle_type temp{this->storage};
+		this->storage = {};
 		return temp;
 	}
 
 	inline void close()
 	{
-		::fast_io::win32::details::win32_unload_address(address_begin, file_mapping_size,
-														 anonymous_mapping_size);
-		address_capacity = address_end = address_begin = nullptr;
-		file_mapping_size = {};
-		anonymous_mapping_size = {};
+		::fast_io::win32::details::win32_unload_address(storage.address_begin, storage.file_mapping_size,
+														 storage.anonymous_mapping_size);
+		storage = {};
 	}
 	inline ~win32_family_file_loader()
 	{
-		win32::details::win32_unload_address(address_begin, file_mapping_size, anonymous_mapping_size);
+		win32::details::win32_unload_address(storage.address_begin, storage.file_mapping_size, storage.anonymous_mapping_size);
 	}
 };
 

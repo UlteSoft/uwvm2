@@ -263,6 +263,7 @@ namespace uwvm2_test_windows_file_loader_padding
     {
         auto const writable{semantics != mapped_write_semantics::read_only};
         auto const shared_writeback{semantics == mapped_write_semantics::shared_writeback};
+        static_cast<void>(padding_mode);
         current_payload_size = payload_size;
         current_extra_size = extra_size;
         current_semantics = semantics;
@@ -314,10 +315,7 @@ namespace uwvm2_test_windows_file_loader_padding
             {
                 auto const value{data[payload_size + i]};
                 padding_sum += static_cast<unsigned>(static_cast<unsigned char>(value));
-                if(padding_mode == ::fast_io::file_loader_padding_mode::zero)
-                {
-                    UWVM_TEST_REQUIRE(value == 0);
-                }
+                UWVM_TEST_REQUIRE(value == 0);
             }
 
             if(writable && payload_size != 0)
@@ -400,6 +398,191 @@ namespace uwvm2_test_windows_file_loader_padding
         return 0;
     }
 
+    template <typename Mapping>
+    inline int verify_released_mapping(Mapping const& mapping, ::std::size_t payload_size,
+                                       ::std::size_t page_size, ::std::size_t extra_size)
+    {
+        UWVM_TEST_REQUIRE(mapping.address_begin != nullptr);
+        UWVM_TEST_REQUIRE(mapping.address_end == mapping.address_begin + payload_size);
+        UWVM_TEST_REQUIRE(mapping.address_capacity == mapping.address_begin + payload_size + extra_size);
+
+        auto const file_region{round_up_to_page(payload_size, page_size)};
+        auto const total_region{round_up_to_page(payload_size + extra_size, page_size)};
+        UWVM_TEST_REQUIRE(mapping.file_mapping_size == file_region);
+        UWVM_TEST_REQUIRE(mapping.anonymous_mapping_size == total_region - file_region);
+        UWVM_TEST_REQUIRE(mapping.anonymous_mapping_size != 0);
+
+        for(::std::size_t i{}; i != payload_size; ++i)
+        {
+            UWVM_TEST_REQUIRE(static_cast<::std::byte>(mapping.address_begin[i]) == payload_byte(i));
+        }
+        for(::std::size_t i{}; i != extra_size; ++i)
+        {
+            UWVM_TEST_REQUIRE(mapping.address_begin[payload_size + i] == 0);
+        }
+
+        UWVM_TEST_REQUIRE(virtual_query_type_is(mapping.address_begin, mem_mapped) == 0);
+        if(payload_size != 0 && payload_size < file_region)
+        {
+            UWVM_TEST_REQUIRE(virtual_query_type_is(mapping.address_begin + payload_size, mem_mapped) == 0);
+            UWVM_TEST_REQUIRE(virtual_query_type_is(mapping.address_begin + file_region - 1uz, mem_mapped) == 0);
+        }
+        UWVM_TEST_REQUIRE(virtual_query_type_is(mapping.address_begin + file_region, mem_private) == 0);
+        UWVM_TEST_REQUIRE(virtual_query_type_is(mapping.address_capacity - 1uz, mem_private) == 0);
+        return 0;
+    }
+
+    template <typename Loader, typename Options>
+    inline int exercise_release_case(Options const& options, ::std::size_t payload_size,
+                                     ::std::size_t page_size, ::std::size_t extra_size,
+                                     mapped_write_semantics semantics, bool readonly_file)
+    {
+        auto const writable{semantics != mapped_write_semantics::read_only};
+        auto const shared_writeback{semantics == mapped_write_semantics::shared_writeback};
+        current_payload_size = payload_size;
+        current_extra_size = extra_size;
+        current_semantics = semantics;
+        current_readonly_file = readonly_file;
+
+        char16_t path[512]{};
+        UWVM_TEST_REQUIRE(make_temp_path(path) == 0);
+        file_guard cleanup{path};
+        UWVM_TEST_REQUIRE(write_payload(path, payload_size) == 0);
+        if(readonly_file)
+        {
+            UWVM_TEST_REQUIRE(::fast_io::win32::SetFileAttributesW(path, file_attribute_readonly));
+        }
+
+        auto const mode{readonly_file ? ::fast_io::open_mode::in :
+                                        (::fast_io::open_mode::in | ::fast_io::open_mode::out)};
+        {
+            char16_t const* const filename{path};
+            Loader loader{options, ::fast_io::mnp::os_c_str(filename), mode};
+            auto mapping{loader.release()};
+            UWVM_TEST_REQUIRE(loader.data() == nullptr);
+            UWVM_TEST_REQUIRE(verify_released_mapping(mapping, payload_size, page_size, extra_size) == 0);
+
+            {
+                Loader adopted{mapping};
+                UWVM_TEST_REQUIRE(adopted.data() == mapping.address_begin);
+                UWVM_TEST_REQUIRE(adopted.size() == payload_size);
+                UWVM_TEST_REQUIRE(adopted.capacity() == payload_size + extra_size);
+                UWVM_TEST_REQUIRE(adopted.padding_size() == extra_size);
+
+                if(writable)
+                {
+                    auto* const data{adopted.data()};
+                    data[0] = static_cast<char>(0x5a);
+                    data[payload_size - 1uz] = static_cast<char>(0x6b);
+                    data[payload_size] = static_cast<char>(0x55);
+                    data[payload_size + extra_size - 1uz] = static_cast<char>(0x66);
+                    auto const file_region{round_up_to_page(payload_size, page_size)};
+                    data[file_region - 1uz] = static_cast<char>(0x44);
+                    data[file_region] = static_cast<char>(0x77);
+                }
+            }
+        }
+
+        UWVM_TEST_REQUIRE(file_size_is(path, payload_size) == 0);
+        UWVM_TEST_REQUIRE(file_content_is_payload(path, payload_size, shared_writeback) == 0);
+        return 0;
+    }
+
+    template <typename Loader, typename Options>
+    inline int exercise_noncomposite_release_case(Options const& options, ::std::size_t payload_size)
+    {
+        current_payload_size = payload_size;
+        current_extra_size = 0;
+        current_semantics = mapped_write_semantics::read_only;
+        current_readonly_file = true;
+
+        char16_t path[512]{};
+        UWVM_TEST_REQUIRE(make_temp_path(path) == 0);
+        file_guard cleanup{path};
+        UWVM_TEST_REQUIRE(write_payload(path, payload_size) == 0);
+
+        {
+            char16_t const* const filename{path};
+            Loader loader{options, ::fast_io::mnp::os_c_str(filename), ::fast_io::open_mode::in};
+            auto mapping{loader.release()};
+            UWVM_TEST_REQUIRE(loader.data() == nullptr);
+            UWVM_TEST_REQUIRE(mapping.address_begin != nullptr);
+            UWVM_TEST_REQUIRE(mapping.address_end == mapping.address_begin + payload_size);
+            UWVM_TEST_REQUIRE(mapping.address_capacity == mapping.address_end);
+            UWVM_TEST_REQUIRE(mapping.anonymous_mapping_size == 0);
+            {
+                Loader adopted{mapping};
+                UWVM_TEST_REQUIRE(adopted.data() == mapping.address_begin);
+                UWVM_TEST_REQUIRE(adopted.size() == payload_size);
+            }
+        }
+
+        UWVM_TEST_REQUIRE(file_size_is(path, payload_size) == 0);
+        UWVM_TEST_REQUIRE(file_content_is_payload(path, payload_size, false) == 0);
+        return 0;
+    }
+
+    inline int exercise_release(::std::size_t page_size)
+    {
+        UWVM_TEST_REQUIRE(page_size > 16uz);
+        auto const payload_size{page_size - 7uz};
+        auto const extra_size{page_size + 23uz};
+        auto const extra{::fast_io::file_loader_extra_bytes{extra_size}};
+        auto const legacy_extra{::fast_io::file_loader_extra_bytes{0uz}};
+
+        auto const win32_shared_options{::fast_io::win32_mmap_options{
+            ::fast_io::mmap_prot::prot_read | ::fast_io::mmap_prot::prot_write,
+            ::fast_io::mmap_flags::map_shared,
+            extra}};
+        auto const win32_shared_readonly_options{::fast_io::win32_mmap_options{
+            ::fast_io::mmap_prot::prot_read,
+            ::fast_io::mmap_flags::map_shared,
+            extra}};
+        auto const nt_shared_options{::fast_io::nt_mmap_options{
+            ::fast_io::mmap_prot::prot_read | ::fast_io::mmap_prot::prot_write,
+            ::fast_io::mmap_flags::map_shared,
+            extra}};
+        auto const nt_shared_readonly_options{::fast_io::nt_mmap_options{
+            ::fast_io::mmap_prot::prot_read,
+            ::fast_io::mmap_flags::map_shared,
+            extra}};
+        auto const win32_legacy_options{::fast_io::win32_mmap_options{
+            ::fast_io::mmap_prot::prot_read,
+            ::fast_io::mmap_flags::map_shared,
+            legacy_extra}};
+        auto const nt_legacy_options{::fast_io::nt_mmap_options{
+            ::fast_io::mmap_prot::prot_read,
+            ::fast_io::mmap_flags::map_shared,
+            legacy_extra}};
+
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::win32_file_loader>(
+            win32_shared_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::shared_writeback, false) == 0);
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::win32_file_loader>(
+            win32_shared_readonly_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::read_only, true) == 0);
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::nt_file_loader>(
+            nt_shared_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::shared_writeback, false) == 0);
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::nt_file_loader>(
+            nt_shared_readonly_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::read_only, true) == 0);
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::zw_file_loader>(
+            nt_shared_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::shared_writeback, false) == 0);
+        UWVM_TEST_REQUIRE(exercise_release_case<::fast_io::zw_file_loader>(
+            nt_shared_readonly_options, payload_size, page_size, extra_size,
+            mapped_write_semantics::read_only, true) == 0);
+
+        UWVM_TEST_REQUIRE(exercise_noncomposite_release_case<::fast_io::win32_file_loader>(
+            win32_legacy_options, page_size) == 0);
+        UWVM_TEST_REQUIRE(exercise_noncomposite_release_case<::fast_io::nt_file_loader>(
+            nt_legacy_options, page_size) == 0);
+        UWVM_TEST_REQUIRE(exercise_noncomposite_release_case<::fast_io::zw_file_loader>(
+            nt_legacy_options, page_size) == 0);
+        return 0;
+    }
+
     inline int run()
     {
         auto const page_size{get_page_size()};
@@ -418,15 +601,15 @@ namespace uwvm2_test_windows_file_loader_padding
             64uz,
             page_size + 17uz};
 
-        constexpr ::fast_io::file_loader_padding_mode modes[]{
-            ::fast_io::file_loader_padding_mode::zero,
-            ::fast_io::file_loader_padding_mode::uninitialized};
-
-        for(auto const padding_mode : modes)
+        for(auto const extra_size : extra_sizes)
         {
-            for(auto const extra_size : extra_sizes)
+            ::fast_io::file_loader_extra_bytes const extra_cases[]{
+                ::fast_io::file_loader_extra_bytes{extra_size},
+                ::fast_io::file_loader_extra_bytes{extra_size, ::fast_io::file_loader_padding_mode::zero},
+                ::fast_io::file_loader_extra_bytes{extra_size, ::fast_io::file_loader_padding_mode::uninitialized}};
+            for(auto const extra : extra_cases)
             {
-                auto const extra{::fast_io::file_loader_extra_bytes{extra_size, padding_mode}};
+                auto const padding_mode{extra.mode};
                 auto const win32_private_options{::fast_io::win32_mmap_options{
                     ::fast_io::mmap_prot::prot_read | ::fast_io::mmap_prot::prot_write,
                     ::fast_io::mmap_flags::map_private,
@@ -492,6 +675,7 @@ namespace uwvm2_test_windows_file_loader_padding
                     padding_mode, mapped_write_semantics::read_only, true) == 0);
             }
         }
+        UWVM_TEST_REQUIRE(exercise_release(page_size) == 0);
         return 0;
     }
 } // namespace uwvm2_test_windows_file_loader_padding
