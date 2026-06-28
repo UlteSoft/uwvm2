@@ -11,7 +11,16 @@
 #define PATH_MAX 4096
 #endif
 
-namespace fast_io::details
+namespace fast_io
+{
+namespace posix
+{
+[[clang::availability(macos, introduced = 10.2), clang::availability(ios, introduced = 2.0)]]
+extern int _NSGetExecutablePath(char *buf, ::std::uint_least32_t *bufsize) noexcept __asm__("__NSGetExecutablePath");
+
+} // namespace posix
+
+namespace details
 {
 /*
  * unknown-apple-darwin
@@ -21,16 +30,28 @@ namespace fast_io::details
 #if __has_cpp_attribute(__gnu__::__cold__)
 [[__gnu__::__cold__]]
 #endif
-#if __has_cpp_attribute(__gnu__::__const__)
-[[__gnu__::__const__]]
+#if __has_cpp_attribute(__gnu__::__pure__)
+[[__gnu__::__pure__]]
 #endif
 inline ::fast_io::install_path get_module_install_path()
 {
+#if FAST_IO_HAS_BUILTIN()
+	if (!__builtin_available(macOS 10.2, iOS 2.0)) [[unlikely]]
+	{
+		throw_posix_error(ENOSYS);
+	}
+#else
+	if (::fast_io::posix::_NSGetExecutablePath == nullptr) [[unlikely]]
+	{
+		throw_posix_error(ENOSYS);
+	}
+#endif
+
 	char buffer[PATH_MAX + 1];
 	::std::uint_least32_t size{PATH_MAX};
-	if (::fast_io::noexcept_call(::_NSGetExecutablePath, buffer, __builtin_addressof(size)) == -1) [[unlikely]]
+	if (::fast_io::noexcept_call(::fast_io::posix::_NSGetExecutablePath, buffer, __builtin_addressof(size)) == -1) [[unlikely]]
 	{
-		if (size > PATH_MAX) 
+		if (size > PATH_MAX)
 		{
 			throw_posix_error(ERANGE);
 		}
@@ -63,4 +84,5 @@ inline ::fast_io::install_path get_module_install_path()
 	ret.module_name.erase(begin, curr);
 	return ret;
 }
-} // namespace fast_io::details
+} // namespace details
+} // namespace fast_io
