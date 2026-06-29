@@ -2546,7 +2546,11 @@ template <typename MemoryT, typename Fn>
     }
     else if constexpr(MemoryT::support_multi_thread)
     {
+#if __cpp_lib_atomic_wait >= 201907L
         [[maybe_unused]] ::uwvm2::object::memory::linear::memory_operation_guard_t guard{memory.growing_flag_p, memory.active_ops_p};
+#else
+        static_assert(!MemoryT::support_multi_thread);
+#endif
         return checked_access(memory.memory_begin, memory.memory_length);
     }
     else

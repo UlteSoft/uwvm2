@@ -105,6 +105,18 @@ inline constexpr ::std::size_t cal_new_cap_io_strlike(::std::size_t cap) noexcep
 
 template <::std::integral ch_type, typename T>
 	requires buffer_strlike<ch_type, T>
+inline constexpr void output_stream_buffer_flush_define(io_strlike_reference_wrapper<ch_type, T> bref) noexcept
+{
+	auto &strref{*bref.ptr};
+	auto bptr{strlike_begin(::fast_io::io_strlike_type<ch_type, T>, strref)};
+	auto eptr{strlike_end(::fast_io::io_strlike_type<ch_type, T>, strref)};
+	auto cap{static_cast<::std::size_t>(eptr - bptr)};
+	strlike_reserve(::fast_io::io_strlike_type<ch_type, T>, strref,
+					::fast_io::details::cal_new_cap_io_strlike<sizeof(ch_type)>(cap));
+}
+
+template <::std::integral ch_type, typename T>
+	requires buffer_strlike<ch_type, T>
 #if __has_cpp_attribute(__gnu__::__cold__)
 [[__gnu__::__cold__]]
 #endif
