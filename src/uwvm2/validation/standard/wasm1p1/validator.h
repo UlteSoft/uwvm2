@@ -79,6 +79,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
     struct operand_stack_storage_t
     {
         operand_stack_value_type<Fs...> type{};
+        bool is_unknown{};
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -492,6 +493,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         {
             bool from_stack{};
             curr_operand_stack_value_type type{};
+            bool is_unknown{};
         };
 
         auto const curr_frame_operand_stack_base{[&]() constexpr noexcept -> ::std::size_t
@@ -523,19 +525,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                 if(concrete_operand_count() == 0uz) { return {}; }
                                                 auto const operand{operand_stack.back_unchecked()};
                                                 operand_stack.pop_back_unchecked();
-                                                return {.from_stack = true, .type = operand.type};
-                                            }};
+                                                return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
+                                                }};
 
         auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
-                                             {
-                                                 if(concrete_operand_count() == 0uz) { return {}; }
-                                                 return {.from_stack = true, .type = operand_stack.back_unchecked().type};
-                                             }};
+                                                 {
+                                                     if(concrete_operand_count() == 0uz) { return {}; }
+                                                     auto const operand{operand_stack.back_unchecked()};
+                                                     return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
+                                                 }};
 
         auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr noexcept
-                                                   {
-                                                       while(count-- != 0uz && concrete_operand_count() != 0uz) { operand_stack.pop_back_unchecked(); }
-                                                   }};
+                                                       {
+                                                           while(count-- != 0uz && concrete_operand_count() != 0uz) { operand_stack.pop_back_unchecked(); }
+                                                       }};
+
+        auto const operand_type_matches{[](concrete_operand_t operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                        { return !operand.from_stack || operand.is_unknown || operand.type == expected_type; }};
+
+        auto const stack_entry_type_matches{[](operand_stack_storage_t<Fs...> operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                           { return operand.is_unknown || operand.type == expected_type; }};
 
         auto const is_reference_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> bool
                                            {
@@ -557,9 +566,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                 }};
 
         auto const push_value_types{[&](block_result_type<Fs...> types) constexpr
-                                    {
-                                        for(auto curr{types.begin}; curr != types.end; ++curr) { operand_stack.push_back({*curr}); }
-                                    }};
+                                        {
+                                            for(auto curr{types.begin}; curr != types.end; ++curr) { operand_stack.push_back({*curr}); }
+                                        }};
+
+        auto const push_unknown_operand{[&]() constexpr { operand_stack.push_back({.is_unknown = true}); }};
 
         auto const pop_expected_operands{
             [&](::std::byte const* op_begin, ::uwvm2::utils::container::u8string_view op_name, block_result_type<Fs...> expected) constexpr UWVM_THROWS
@@ -574,19 +585,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 auto const available_count{concrete_operand_count()};
                 auto const concrete_to_check{available_count < expected_count ? available_count : expected_count};
 
-                for(::std::size_t i{}; i != concrete_to_check; ++i)
-                {
-                    auto const expected_type{expected.begin[expected_count - 1uz - i]};
-                    auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                    if(actual_type != expected_type) [[unlikely]]
+                    for(::std::size_t i{}; i != concrete_to_check; ++i)
                     {
-                        err.err_curr = op_begin;
-                        err.err_selectable.br_value_type_mismatch.op_code_name = op_name;
-                        err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                        err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                        err.err_code = code_validation_error_code::br_value_type_mismatch;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        auto const expected_type{expected.begin[expected_count - 1uz - i]};
+                        auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+                        if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_value_type_mismatch.op_code_name = op_name;
+                            err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                            err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                            err.err_code = code_validation_error_code::br_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                 }
 
                 pop_available_concrete_operands(expected_count);
@@ -814,10 +825,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                               }
 
                                               auto const operand{try_pop_concrete_operand()};
-                                              if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
-                                              {
-                                                  err.err_curr = op_begin;
-                                                  err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                  if(!operand_type_matches(operand, expected_operand_type)) [[unlikely]]
+                                                  {
+                                                      err.err_curr = op_begin;
+                                                      err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
                                                   err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
                                                   err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
                                                   err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -854,10 +865,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                                                // rhs
                                                auto const rhs{try_pop_concrete_operand()};
-                                               if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
-                                               {
-                                                   err.err_curr = op_begin;
-                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                   if(!operand_type_matches(rhs, expected_operand_type)) [[unlikely]]
+                                                   {
+                                                       err.err_curr = op_begin;
+                                                       err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
                                                    err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
                                                    err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(rhs.type);
                                                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -866,10 +877,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                                                // lhs
                                                auto const lhs{try_pop_concrete_operand()};
-                                               if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
-                                               {
-                                                   err.err_curr = op_begin;
-                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                   if(!operand_type_matches(lhs, expected_operand_type)) [[unlikely]]
+                                                   {
+                                                       err.err_curr = op_begin;
+                                                       err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
                                                    err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(expected_operand_type);
                                                    err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(lhs.type);
                                                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -941,10 +952,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                          }
 
                                          auto const addr{try_pop_concrete_operand()};
-                                         if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                                         {
-                                             err.err_curr = op_begin;
-                                             err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
+                                             if(!operand_type_matches(addr, curr_operand_stack_value_type::i32)) [[unlikely]]
+                                             {
+                                                 err.err_curr = op_begin;
+                                                 err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
                                              err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                              err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -1018,19 +1029,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                           auto const value{try_pop_concrete_operand()};
                                           auto const addr{try_pop_concrete_operand()};
 
-                                          if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                                          {
-                                              err.err_curr = op_begin;
-                                              err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
+                                              if(!operand_type_matches(addr, curr_operand_stack_value_type::i32)) [[unlikely]]
+                                              {
+                                                  err.err_curr = op_begin;
+                                                  err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
                                               err.err_selectable.memarg_address_type_not_i32.addr_type = to_wasm1_value_type(addr.type);
                                               err.err_code = code_validation_error_code::memarg_address_type_not_i32;
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
 
-                                          if(value.from_stack && value.type != expected_value_type) [[unlikely]]
-                                          {
-                                              err.err_curr = op_begin;
-                                              err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
+                                              if(!operand_type_matches(value, expected_value_type)) [[unlikely]]
+                                              {
+                                                  err.err_curr = op_begin;
+                                                  err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
                                               err.err_selectable.store_value_type_mismatch.expected_type = to_wasm1_value_type(expected_value_type);
                                               err.err_selectable.store_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                               err.err_code = code_validation_error_code::store_value_type_mismatch;
@@ -1142,19 +1153,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
             {
                 if(!is_polymorphic && concrete_operand_count() < count) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, count); }
 
-                auto const concrete_to_check{concrete_operand_count() < count ? concrete_operand_count() : count};
-                for(::std::size_t i{}; i != concrete_to_check; ++i)
-                {
-                    auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-                    if(actual_type != curr_operand_stack_value_type::i32) [[unlikely]]
+                    auto const concrete_to_check{concrete_operand_count() < count ? concrete_operand_count() : count};
+                    for(::std::size_t i{}; i != concrete_to_check; ++i)
                     {
-                        err.err_curr = op_begin;
-                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                        err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
-                        err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                        err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+                        if(!stack_entry_type_matches(actual_operand, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                            err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
+                            err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                            err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                 }
 
                 pop_available_concrete_operands(count);
@@ -1171,10 +1182,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                            }
 
                                                            auto const operand{try_pop_concrete_operand()};
-                                                           if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
-                                                           {
-                                                               err.err_curr = op_begin;
-                                                               err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                               if(!operand_type_matches(operand, expected_operand_type)) [[unlikely]]
+                                                               {
+                                                                   err.err_curr = op_begin;
+                                                                   err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
                                                                err.err_selectable.numeric_operand_type_mismatch.expected_type =
                                                                    to_wasm1_value_type(expected_operand_type);
                                                                err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(operand.type);
@@ -1337,10 +1348,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const cond{try_pop_concrete_operand()};
-                    if(cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
+                        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
                         err.err_code = code_validation_error_code::if_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1417,22 +1428,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(expected_count != 0uz)
                     {
                         auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
+                                auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
                                 err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
-                                err.err_selectable.if_then_result_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.if_then_result_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                    err.err_selectable.if_then_result_mismatch.expected_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                                    err.err_selectable.if_then_result_mismatch.actual_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -1574,23 +1585,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(expected_count != 0uz)
                     {
                         auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.end_result_mismatch.block_kind = block_kind;
+                                auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.end_result_mismatch.block_kind = block_kind;
                                 err.err_selectable.end_result_mismatch.expected_count = expected_count;
                                 err.err_selectable.end_result_mismatch.actual_count = actual_count;
-                                err.err_selectable.end_result_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                err.err_selectable.end_result_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                    err.err_selectable.end_result_mismatch.expected_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                                    err.err_selectable.end_result_mismatch.actual_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -1698,19 +1709,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(target_arity != 0uz)
                     {
                         auto const concrete_to_check{concrete_operand_count() < target_arity ? concrete_operand_count() : target_arity};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{target_frame.label.begin[target_arity - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const expected_type{target_frame.label.begin[target_arity - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -1795,10 +1806,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     // cond (must be i32 if present)
                     auto const cond{try_pop_concrete_operand()};
-                    if(cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
+                        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
                         err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -1808,19 +1819,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(target_arity != 0uz)
                     {
                         auto const concrete_to_check{concrete_operand_count() < target_arity ? concrete_operand_count() : target_arity};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{target_frame.label.begin[target_arity - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const expected_type{target_frame.label.begin[target_arity - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
 
                         if(is_polymorphic && concrete_to_check != target_arity)
@@ -2061,10 +2072,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const idx{try_pop_concrete_operand()};
-                    if(idx.from_stack && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
+                        if(!operand_type_matches(idx, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
                         err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -2073,19 +2084,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(expected_arity != 0uz)
                     {
                         auto const concrete_to_check{concrete_operand_count() < expected_arity ? concrete_operand_count() : expected_arity};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-                            auto const curr_expected_type{expected_label_types.begin[expected_arity - 1uz - i]};
-                            if(actual_type != curr_expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(curr_expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+                                auto const curr_expected_type{expected_label_types.begin[expected_arity - 1uz - i]};
+                                if(!stack_entry_type_matches(actual_operand, curr_expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(curr_expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -2134,19 +2145,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(return_arity != 0uz)
                     {
                         auto const concrete_to_check{available_return_values < return_arity ? available_return_values : return_arity};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(operator_stack_size - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(operator_stack_size - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -2252,19 +2263,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(param_count != 0uz)
                     {
                         auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -2390,10 +2401,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     // function index operand (must be i32 if present)
                     auto const idx{try_pop_concrete_operand()};
-                    if(idx.from_stack && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
+                        if(!operand_type_matches(idx, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
                         err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -2404,19 +2415,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(param_count != 0uz)
                     {
                         auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
-                        for(::std::size_t i{}; i != concrete_to_check; ++i)
-                        {
-                            auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                            if(actual_type != expected_type) [[unlikely]]
+                            for(::std::size_t i{}; i != concrete_to_check; ++i)
                             {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
-                                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
-                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                                auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
+                                auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+                                if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
+                                    err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                    err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
                         }
                     }
 
@@ -2500,10 +2511,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
 
                     auto const value{try_pop_concrete_operand()};
-                    if(value.from_stack && value.type != table_type) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.set";
+                        if(!operand_type_matches(value, table_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.set";
                         err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(table_type);
                         err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                         err.err_code = code_validation_error_code::br_value_type_mismatch;
@@ -2511,10 +2522,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const index{try_pop_concrete_operand()};
-                    if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.set";
+                        if(!operand_type_matches(index, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.set";
                         err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
                         err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(index.type);
                         err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -2571,70 +2582,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [safe] unsafe (could be the section_end)
                     //        ^^ code_curr
 
-                    // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
-                    // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
+                        // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
+                        // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
 
-                    if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
+                        if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
 
-                    // cond (must be i32 if it exists on the concrete stack)
-                    bool cond_from_stack{};
-                    curr_operand_stack_value_type cond_type{};
-                    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
-                    {
-                        cond_from_stack = true;
-                        cond_type = cond.type;
-                    }
+                        // cond (must be i32 if it exists on the concrete stack)
+                        auto const cond{try_pop_concrete_operand()};
+                        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
 
-                    if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond_type);
-                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        // v2
+                        auto const v2{try_pop_concrete_operand()};
 
-                    // v2
-                    bool v2_from_stack{};
-                    curr_operand_stack_value_type v2_type{};
-                    if(auto const v2{try_pop_concrete_operand()}; v2.from_stack)
-                    {
-                        v2_from_stack = true;
-                        v2_type = v2.type;
-                    }
+                        // v1 (kept as result when present, matching existing implementation)
+                        auto const v1{try_peek_concrete_operand()};
 
-                    // v1 (kept as result when present, matching existing implementation)
-                    bool v1_from_stack{};
-                    curr_operand_stack_value_type v1_type{};
-                    if(auto const v1{try_peek_concrete_operand()}; v1.from_stack)
-                    {
-                        v1_from_stack = true;
-                        v1_type = v1.type;
-                    }
+                        if(v1.from_stack && v2.from_stack && !v1.is_unknown && !v2.is_unknown && v1.type != v2.type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1.type);
+                            err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2.type);
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
 
-                    if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1_type);
-                        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2_type);
-                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
-
-                    auto const select_value_type{v1_from_stack ? v1_type : v2_type};
-                    if((v1_from_stack || v2_from_stack) && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
+                        bool const have_known_select_value_type{(v1.from_stack && !v1.is_unknown) || (v2.from_stack && !v2.is_unknown)};
+                        auto const select_value_type{(v1.from_stack && !v1.is_unknown) ? v1.type : v2.type};
+                        if(have_known_select_value_type && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
                         err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(select_value_type);
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        // If v1 is not present on the concrete stack but v2 is, we must still produce one result of v2's type.
+                        if(!v1.from_stack)
+                        {
+                            if(v2.from_stack) { operand_stack.push_back({v2.type, v2.is_unknown}); }
+                            else if(is_polymorphic) { push_unknown_operand(); }
+                        }
+
+                        break;
                     }
-
-                    // If v1 is not present on the concrete stack but v2 is, we must still produce one result of v2's type.
-                    if(!v1_from_stack && v2_from_stack) { operand_stack.push_back({v2_type}); }
-
-                    break;
-                }
                 case opcode_byte(wasm1p1_code::select_t):
                 {
                     // select_t result_types ...
@@ -2653,20 +2650,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [  safe ] unsafe (could be the section_end)
                     //          ^^ code_curr
 
-                    if(!wasm1p1_para.enable_multi_value) [[unlikely]]
-                    {
-                        details::fail_feature_required(op_begin,
-                                                       err,
-                                                       opcode_u32(wasm1p1_code::select_t),
-                                                       ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value,
-                                                       ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
-                    }
-
                     auto const result_type_count{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
                                                                                                                               code_end,
                                                                                                                               op_begin,
                                                                                                                               err,
                                                                                                                               u8"select.result_types")};
+
+                    if(result_type_count == 0u)
+                    {
+                        if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
+
+                        auto const cond{try_pop_concrete_operand()};
+                        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
+                            err.err_code = code_validation_error_code::select_cond_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const v2{try_pop_concrete_operand()};
+                        auto const v1{try_peek_concrete_operand()};
+
+                        if(v1.from_stack && v2.from_stack && !v1.is_unknown && !v2.is_unknown && v1.type != v2.type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1.type);
+                            err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2.type);
+                            err.err_code = code_validation_error_code::select_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        bool const have_known_select_value_type{(v1.from_stack && !v1.is_unknown) || (v2.from_stack && !v2.is_unknown)};
+                        auto const select_value_type{(v1.from_stack && !v1.is_unknown) ? v1.type : v2.type};
+                        if(have_known_select_value_type && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
+                            err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(select_value_type);
+                            err.err_code = code_validation_error_code::select_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(!v1.from_stack)
+                        {
+                            if(v2.from_stack) { operand_stack.push_back({v2.type, v2.is_unknown}); }
+                            else if(is_polymorphic) { push_unknown_operand(); }
+                        }
+
+                        break;
+                    }
                     if(result_type_count != 1u) [[unlikely]] { details::fail_invalid_immediate(op_begin, err, u8"select.result_types"); }
 
                     auto const result_type_byte{details::read_u8(code_curr, code_end, op_begin, err, u8"select.result_type")};
@@ -2676,7 +2709,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
 
                     auto const cond{try_pop_concrete_operand()};
-                    if(cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                    if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
@@ -2685,7 +2718,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const v2{try_pop_concrete_operand()};
-                    if(v2.from_stack && v2.type != result_type) [[unlikely]]
+                    if(!operand_type_matches(v2, result_type)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(result_type);
@@ -2695,7 +2728,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     }
 
                     auto const v1{try_pop_concrete_operand()};
-                    if(v1.from_stack && v1.type != result_type) [[unlikely]]
+                    if(!operand_type_matches(v1, result_type)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(result_type);
@@ -2895,15 +2928,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"local.set", 1uz); }
 
-                    if(auto const value{try_pop_concrete_operand()}; value.from_stack && value.type != curr_local_type) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.local_variable_type_mismatch.local_index = local_index;
-                        err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
-                        err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
-                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        auto const value{try_pop_concrete_operand()};
+                        if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.local_variable_type_mismatch.local_index = local_index;
+                            err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
+                            err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
 
                     break;
                 }
@@ -3008,13 +3042,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             operand_stack.push_back({curr_local_type});
                         }
                     }
-                    else
-                    {
-                        auto const value{try_peek_concrete_operand()};
-                        if(value.type != curr_local_type) [[unlikely]]
+                        else
                         {
-                            err.err_curr = op_begin;
-                            err.err_selectable.local_variable_type_mismatch.local_index = local_index;
+                            auto const value{try_peek_concrete_operand()};
+                            if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
+                            {
+                                err.err_curr = op_begin;
+                                err.err_selectable.local_variable_type_mismatch.local_index = local_index;
                             err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
                             err.err_selectable.local_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                             err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_tee_type_mismatch;
@@ -3186,15 +3220,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // Stack effect: (value) -> () where value must match global's value type
                     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"global.set", 1uz); }
 
-                    if(auto const value{try_pop_concrete_operand()}; value.from_stack && value.type != curr_global_type) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.global_variable_type_mismatch.global_index = global_index;
-                        err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
-                        err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
-                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        auto const value{try_pop_concrete_operand()};
+                        if(!operand_type_matches(value, curr_global_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.global_variable_type_mismatch.global_index = global_index;
+                            err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
+                            err.err_selectable.global_variable_type_mismatch.actual_type = to_wasm1_value_type(value.type);
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
 
                     break;
                 }
@@ -3445,13 +3480,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
                     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
 
-                    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_value_type(delta.type);
-                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
+                        auto const delta{try_pop_concrete_operand()};
+                        if(!operand_type_matches(delta, curr_operand_stack_value_type::i32)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_value_type(delta.type);
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
 
                     operand_stack.push_back({curr_operand_stack_value_type::i32});
 
@@ -4378,10 +4414,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"ref.is_null", 1uz); }
 
                     auto const ref_value{try_pop_concrete_operand()};
-                    if(ref_value.from_stack && !is_reference_value_type(ref_value.type)) [[unlikely]]
-                    {
-                        err.err_curr = op_begin;
-                        err.err_selectable.wasm1p1_invalid_reference_type.value =
+                        if(ref_value.from_stack && !ref_value.is_unknown && !is_reference_value_type(ref_value.type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.wasm1p1_invalid_reference_type.value =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(ref_value.type);
                         err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -4756,10 +4792,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
 
                             auto const delta{try_pop_concrete_operand()};
-                            if(delta.from_stack && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.grow";
+                                if(!operand_type_matches(delta, curr_operand_stack_value_type::i32)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.grow";
                                 err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
                                 err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(delta.type);
                                 err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -4767,10 +4803,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
 
                             auto const value{try_pop_concrete_operand()};
-                            if(value.from_stack && value.type != table_type) [[unlikely]]
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.grow";
+                                if(!operand_type_matches(value, table_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.grow";
                                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(table_type);
                                 err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                 err.err_code = code_validation_error_code::br_value_type_mismatch;
@@ -4798,17 +4834,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             check_table_index(op_begin, table_index);
                             operand_stack.push_back({curr_operand_stack_value_type::i32});
                             break;
-                        }
-                        case wasm1p1_numeric_code::table_fill:
-                        {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
-                            {
-                                details::fail_feature_required(op_begin,
-                                                               err,
-                                                               subopcode,
-                                                               ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                             }
+                            case wasm1p1_numeric_code::table_fill:
+                            {
+                                if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                {
+                                    details::fail_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                }
                             auto const table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
                                                                                                                                 code_end,
                                                                                                                                 op_begin,
@@ -4823,10 +4859,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
 
                             auto const len{try_pop_concrete_operand()};
-                            if(len.from_stack && len.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";
+                                if(!operand_type_matches(len, curr_operand_stack_value_type::i32)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";
                                 err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
                                 err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(len.type);
                                 err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
@@ -4834,10 +4870,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
 
                             auto const value{try_pop_concrete_operand()};
-                            if(value.from_stack && value.type != table_type) [[unlikely]]
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.fill";
+                                if(!operand_type_matches(value, table_type)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.fill";
                                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(table_type);
                                 err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(value.type);
                                 err.err_code = code_validation_error_code::br_value_type_mismatch;
@@ -4845,10 +4881,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
 
                             auto const index{try_pop_concrete_operand()};
-                            if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";
+                                if(!operand_type_matches(index, curr_operand_stack_value_type::i32)) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";
                                 err.err_selectable.numeric_operand_type_mismatch.expected_type = to_wasm1_value_type(curr_operand_stack_value_type::i32);
                                 err.err_selectable.numeric_operand_type_mismatch.actual_type = to_wasm1_value_type(index.type);
                                 err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
