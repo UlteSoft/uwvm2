@@ -817,7 +817,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 								append_unique(cxxflags, cxxflags_seen, flag)
 							end
 
-							if target:is_plat("linux") then
+							if target:is_plat("linux") or target:is_plat("macosx") or target:is_plat("iphoneos") or target:is_plat("watchos") then
 								append_unique(linkerflags, linkerflags_seen, "-fuse-ld=lld")
 							end
 							for _, linkdir in ipairs(llvm_jit_options.linkdirs or {}) do

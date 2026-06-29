@@ -26,6 +26,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <concepts>
 # include <limits>
 # include <memory>
 # include <utility>
@@ -46,6 +47,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/object/impl.h>
@@ -144,6 +146,281 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         template <typename... Args>
         inline constexpr void verbose_module_info(Args&&... args) noexcept;
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+            wasm1p1_initializer_feature_name(::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature) noexcept
+        {
+            using feature_kind = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind;
+            switch(feature)
+            {
+                case feature_kind::multi_value: return u8"multi-value";
+                case feature_kind::bulk_memory: return u8"bulk-memory";
+                case feature_kind::reference_types: return u8"reference-types";
+                case feature_kind::sign_extension: return u8"sign-extension";
+                case feature_kind::nontrapping_float_to_int: return u8"nontrapping-float-to-int";
+                case feature_kind::simd: return u8"simd";
+                [[unlikely]] default: return u8"unknown";
+            }
+        }
+
+        [[noreturn]] inline constexpr void fatal_wasm1p1_initializer_feature_required(
+            ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
+            ::uwvm2::utils::container::u8string_view subject,
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value) noexcept
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                u8"[fatal] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"initializer: In module \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                current_initializing_module_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", WebAssembly 1.1 ",
+                                subject,
+                                u8" requires ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                wasm1p1_initializer_feature_name(feature),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" (value=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                value,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8").\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::fast_terminate();
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::parser::wasm::base::wasm1p1_feature_kind wasm1p1_initializer_feature_for_value_type(
+            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type value_type) noexcept
+        {
+            using feature_kind = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind;
+            using value_type_t = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
+            switch(value_type)
+            {
+                case value_type_t::v128: return feature_kind::simd;
+                case value_type_t::funcref: [[fallthrough]];
+                case value_type_t::externref: return feature_kind::reference_types;
+                default: return feature_kind::multi_value;
+            }
+        }
+
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr void check_wasm1p1_initializer_value_type(
+            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type value_type,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+            ::uwvm2::utils::container::u8string_view subject) noexcept
+        {
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::features::value_type_enabled(value_type, fs_para)) [[unlikely]]
+            {
+                fatal_wasm1p1_initializer_feature_required(
+                    wasm1p1_initializer_feature_for_value_type(value_type),
+                    subject,
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(value_type)));
+            }
+        }
+
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr void check_wasm1p1_initializer_reference_type(
+            ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type reference_type,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+            ::uwvm2::utils::container::u8string_view subject) noexcept
+        {
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::features::reference_type_enabled(reference_type, fs_para)) [[unlikely]]
+            {
+                fatal_wasm1p1_initializer_feature_required(
+                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                    subject,
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(reference_type)));
+            }
+        }
+
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr void check_wasm1p1_initializer_const_expr(
+            ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...> const& expr,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+            ::uwvm2::utils::container::u8string_view subject) noexcept
+        {
+            auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
+            for(auto const& op: expr.opcodes)
+            {
+                auto const opcode{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode)};
+                if(opcode == 0xD0u || opcode == 0xD2u)
+                {
+                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    {
+                        fatal_wasm1p1_initializer_feature_required(::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types, subject, opcode);
+                    }
+                }
+                else if(opcode == 0xFDu)
+                {
+                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    {
+                        fatal_wasm1p1_initializer_feature_required(::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd, subject, opcode);
+                    }
+                }
+            }
+        }
+
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr void enforce_wasm1p1_initializer_feature_parameters(
+            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
+        {
+            if constexpr((::std::same_as<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1, Fs> || ...))
+            {
+                using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+                using feature_kind = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind;
+                using data_type = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_data_type_t;
+                using element_type = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_type_t;
+                constexpr ::std::size_t feature_check_importdesc_table_index{1uz};
+                constexpr ::std::size_t feature_check_importdesc_global_index{3uz};
+
+                auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
+
+                auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>>(module_storage.sections)};
+                auto const& datacountsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>(module_storage.sections)};
+
+                for(auto const& type: typesec.types)
+                {
+                    for(auto curr{type.parameter.begin}; curr != type.parameter.end; ++curr)
+                    {
+                        check_wasm1p1_initializer_value_type(*curr, fs_para, u8"function parameter type");
+                    }
+                    auto const result_count{static_cast<::std::size_t>(type.result.end - type.result.begin)};
+                    if(wasm1p1_para.controllable_allow_multi_result_vector && result_count > 1uz) [[unlikely]]
+                    {
+                        fatal_wasm1p1_initializer_feature_required(feature_kind::multi_value,
+                                                                   u8"function result vector",
+                                                                   static_cast<wasm_u32>(result_count));
+                    }
+                    for(auto curr{type.result.begin}; curr != type.result.end; ++curr)
+                    {
+                        check_wasm1p1_initializer_value_type(*curr, fs_para, u8"function result type");
+                    }
+                }
+
+                static_assert(importsec.importdesc_count > feature_check_importdesc_global_index);
+                for(auto const* imported_table_ptr: importsec.importdesc.index_unchecked(feature_check_importdesc_table_index))
+                {
+                    if(imported_table_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    check_wasm1p1_initializer_reference_type(imported_table_ptr->imports.storage.table.reftype, fs_para, u8"imported table type");
+                }
+                for(auto const* imported_global_ptr: importsec.importdesc.index_unchecked(feature_check_importdesc_global_index))
+                {
+                    if(imported_global_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    check_wasm1p1_initializer_value_type(imported_global_ptr->imports.storage.global.type, fs_para, u8"imported global type");
+                }
+
+                auto const imported_table_count{importsec.importdesc.index_unchecked(feature_check_importdesc_table_index).size()};
+                auto const local_table_count{tablesec.tables.size()};
+                if(wasm1p1_para.controllable_allow_multi_table &&
+                   (imported_table_count > 1uz || local_table_count > 1uz || (imported_table_count == 1uz && local_table_count == 1uz))) [[unlikely]]
+                {
+                    fatal_wasm1p1_initializer_feature_required(feature_kind::reference_types,
+                                                               u8"multiple table definitions/imports",
+                                                               static_cast<wasm_u32>(imported_table_count + local_table_count));
+                }
+
+                for(auto const& table: tablesec.tables) { check_wasm1p1_initializer_reference_type(table.reftype, fs_para, u8"local table type"); }
+                for(auto const& global: globalsec.local_globals)
+                {
+                    check_wasm1p1_initializer_value_type(global.global.type, fs_para, u8"local global type");
+                    check_wasm1p1_initializer_const_expr(global.expr, fs_para, u8"local global initializer");
+                }
+
+                if(datacountsec.present && !wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                {
+                    fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
+                                                               u8"data count section",
+                                                               ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<
+                                                                   Fs...>::section_id);
+                }
+
+                for(auto const& data: datasec.datas)
+                {
+                    if((data.type == data_type::passive || data.type == data_type::active_explicit) && !wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                    {
+                        fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
+                                                                   u8"data segment",
+                                                                   static_cast<wasm_u32>(data.type));
+                    }
+                    check_wasm1p1_initializer_const_expr(data.storage.segment.expr, fs_para, u8"data segment offset initializer");
+                }
+
+                for(auto const& elem: elemsec.elems)
+                {
+                    switch(elem.type)
+                    {
+                        case element_type::passive_funcidx: [[fallthrough]];
+                        case element_type::declarative_funcidx:
+                        {
+                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            {
+                                fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
+                                                                           u8"element segment",
+                                                                           static_cast<wasm_u32>(elem.type));
+                            }
+                            break;
+                        }
+                        case element_type::active_explicit_funcidx: [[fallthrough]];
+                        case element_type::active_implicit_expr: [[fallthrough]];
+                        case element_type::active_explicit_expr:
+                        {
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fatal_wasm1p1_initializer_feature_required(feature_kind::reference_types,
+                                                                           u8"element segment",
+                                                                           static_cast<wasm_u32>(elem.type));
+                            }
+                            break;
+                        }
+                        case element_type::passive_expr: [[fallthrough]];
+                        case element_type::declarative_expr:
+                        {
+                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            {
+                                fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
+                                                                           u8"element segment",
+                                                                           static_cast<wasm_u32>(elem.type));
+                            }
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fatal_wasm1p1_initializer_feature_required(feature_kind::reference_types,
+                                                                           u8"element segment",
+                                                                           static_cast<wasm_u32>(elem.type));
+                            }
+                            break;
+                        }
+                        case element_type::active_implicit_funcidx: break;
+                        [[unlikely]] default:
+                        {
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+
+                    check_wasm1p1_initializer_reference_type(elem.storage.segment.reftype, fs_para, u8"element segment reference type");
+                    check_wasm1p1_initializer_const_expr(elem.storage.segment.expr, fs_para, u8"element segment offset initializer");
+                    for(auto const& expr: elem.storage.segment.vec_expr) { check_wasm1p1_initializer_const_expr(expr, fs_para, u8"element expression"); }
+                }
+            }
+        }
 
         inline constexpr void
             fatal_reserve_limit_exceeded(::uwvm2::utils::container::u8string_view reserve_name, ::std::size_t requested, ::std::size_t limit) noexcept
@@ -2571,6 +2848,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline constexpr void initialize_from_binfmt_ver1_module_storage(
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept
         {
             using type_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>;
@@ -2592,6 +2870,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             auto const& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<element_section_storage_t>(module_storage.sections)};
             auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<code_section_storage_t>(module_storage.sections)};
             auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_section_storage_t>(module_storage.sections)};
+
+            enforce_wasm1p1_initializer_feature_parameters(module_storage, fs_para);
 
             // Expose type section range for runtime/compilers (e.g. call_indirect validation).
             if(typesec.types.empty())
@@ -4425,7 +4705,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 case 1u:
                 {
-                    initialize_from_binfmt_ver1_module_storage(wf.wasm_module_storage.wasm_binfmt_ver1_storage, out);
+                    initialize_from_binfmt_ver1_module_storage(wf.wasm_module_storage.wasm_binfmt_ver1_storage, wf.wasm_parameter.binfmt1_para, out);
                     break;
                 }
 
