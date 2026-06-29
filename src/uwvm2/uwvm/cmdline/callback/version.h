@@ -771,7 +771,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #elif defined(__MSDOS__)
                                 u8"Microsoft Dos"
 #elif defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
-                                u8"Linux "
+                                u8"Linux Header "
 # if defined(LINUX_VERSION_CODE)
                                 ,
                                 static_cast<::std::make_unsigned_t<decltype(LINUX_VERSION_CODE)>>(LINUX_VERSION_CODE) >> 16u,

@@ -4,6 +4,7 @@ macosx, iphoneos, watchos, tvos
 ## Prerequisites
 - Ensure Command Line Tools are available:
   - `xcode-select --install`
+- Use the latest available Darwin SDK (typically via the newest Xcode / Command Line Tools) when building.
 - Optional package manager: Homebrew
   - Install LLVM: `brew install llvm`
   - Install GCC: `brew install gcc`
