@@ -157,13 +157,13 @@ inline void sys_close_throw_error(int &fd)
 
 namespace posix
 {
-extern int fcntl(int fd, int cmd, ... /* arg */) noexcept
-#if !defined(__MSDOS__) && !defined(__DARWIN_C_LEVEL)
-	__asm__("fcntl")
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern int fcntl(int fd, int cmd, ... /* arg */) noexcept __asm__("_fcntl");
+#elif defined(__MSDOS__)
+extern int fcntl(int fd, int cmd, ... /* arg */) noexcept __asm__("_fcntl");
 #else
-	__asm__("_fcntl")
+extern int fcntl(int fd, int cmd, ... /* arg */) noexcept __asm__("fcntl");
 #endif
-		;
 } // namespace posix
 
 template <typename... Args>

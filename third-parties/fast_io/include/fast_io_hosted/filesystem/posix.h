@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <dirent.h>
+#include <errno.h>
 
 namespace fast_io
 {
@@ -72,6 +73,20 @@ public:
 namespace details
 {
 
+inline DIR *sys_fdopendir(int fd) noexcept
+{
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return ::fdopendir(fd);
+	}
+	errno = ENOSYS;
+	return nullptr;
+#else
+	return ::fdopendir(fd);
+#endif
+}
+
 inline DIR *sys_dup_dir(DIR *dirp)
 {
 	if (dirp == nullptr)
@@ -90,7 +105,7 @@ inline DIR *sys_dup_dir(DIR *dirp)
 		throw_posix_error();
 	}
 	auto newfd{details::sys_dup(fd)};
-	auto newdir{::fdopendir(newfd)};
+	auto newdir{details::sys_fdopendir(newfd)};
 	if (newdir == nullptr)
 	{
 		details::sys_close(newfd);
@@ -116,7 +131,7 @@ public:
 	{
 	}
 	inline posix_directory_file(posix_file &&pioh)
-		: posix_directory_io_observer{noexcept_call(::fdopendir, pioh.fd)}
+		: posix_directory_io_observer{details::sys_fdopendir(pioh.fd)}
 	{
 		if (this->dirp == nullptr)
 		{

@@ -491,6 +491,160 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+    namespace details::wasm1_import_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr ::std::size_t literal_size(char_type const (&)[n]) noexcept
+        {
+            constexpr ::std::size_t size{n - 1uz};
+            return size;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* copy_literal(char_type* iter, char_type const (&literal)[n]) noexcept
+        { return ::fast_io::freestanding::my_copy_n(literal, n - 1uz, iter); }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(func_prefix, "func[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(func_sig_prefix, "]: {sig: type[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(func_suffix, "]}");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(table_prefix, "table[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(memory_prefix, "memory[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(global_prefix, "global[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(body_prefix, "]: {");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_brace, "}");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(unknown, "unknown");
+
+        template <::std::integral char_type, typename T>
+        inline constexpr ::std::size_t indexed_body_size(char_type const* prefix, ::std::size_t prefix_size, T value) noexcept
+        {
+            static_cast<void>(prefix);
+            using value_type = ::std::remove_cvref_t<T>;
+            return prefix_size + print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+                   literal_size(body_prefix<char_type>()) +
+                   print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>, value) + literal_size(right_brace<char_type>());
+        }
+
+        template <::std::integral char_type, ::std::size_t n, typename T>
+        inline constexpr char_type* copy_indexed_body(char_type* iter,
+                                                      char_type const (&prefix)[n],
+                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 index,
+                                                      T value) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            iter = copy_literal(iter, prefix);
+            iter = print_reserve_define(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>, iter, index);
+            iter = copy_literal(iter, body_prefix<char_type>());
+            iter = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, iter, value);
+            return copy_literal(iter, right_brace<char_type>());
+        }
+    }  // namespace details::wasm1_import_section_details_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto stack_size{384u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>,
+                                                      wasm1_final_extern_type_section_details_wrapper_t<Fs...> const extern_type_details_wrapper) noexcept
+    {
+        switch(extern_type_details_wrapper.extern_type_ptr->type)
+        {
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func:
+                return details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::func_prefix<char_type>()) +
+                       print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+                       details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::func_sig_prefix<char_type>()) +
+                       print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+                       details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::func_suffix<char_type>());
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::table:
+                return details::wasm1_import_section_details_print::indexed_body_size(
+                    details::wasm1_import_section_details_print::table_prefix<char_type>(),
+                    details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::table_prefix<char_type>()),
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.table));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::memory:
+                return details::wasm1_import_section_details_print::indexed_body_size(
+                    details::wasm1_import_section_details_print::memory_prefix<char_type>(),
+                    details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::memory_prefix<char_type>()),
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.memory));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::global:
+                return details::wasm1_import_section_details_print::indexed_body_size(
+                    details::wasm1_import_section_details_print::global_prefix<char_type>(),
+                    details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::global_prefix<char_type>()),
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.global));
+            [[unlikely]] default:
+                return details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::unknown<char_type>());
+        }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>,
+                                                     char_type* iter,
+                                                     wasm1_final_extern_type_section_details_wrapper_t<Fs...> const extern_type_details_wrapper) noexcept
+    {
+        auto const& all_sections{*extern_type_details_wrapper.all_sections_ptr};
+
+        switch(extern_type_details_wrapper.extern_type_ptr->type)
+        {
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func:
+            {
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[0u]};
+                auto const curr_functype_ptr{extern_type_details_wrapper.extern_type_ptr->storage.function};
+                auto const& type_section{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(all_sections)};
+                auto const sign{
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(curr_functype_ptr - type_section.types.cbegin())};
+
+                iter = details::wasm1_import_section_details_print::copy_literal(iter, details::wasm1_import_section_details_print::func_prefix<char_type>());
+                iter = print_reserve_define(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>,
+                                            iter,
+                                            curr_importdesc_counter);
+                iter =
+                    details::wasm1_import_section_details_print::copy_literal(iter, details::wasm1_import_section_details_print::func_sig_prefix<char_type>());
+                iter = print_reserve_define(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>, iter, sign);
+                iter = details::wasm1_import_section_details_print::copy_literal(iter, details::wasm1_import_section_details_print::func_suffix<char_type>());
+                ++curr_importdesc_counter;
+                return iter;
+            }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::table:
+            {
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[1u]};
+                iter = details::wasm1_import_section_details_print::copy_indexed_body(
+                    iter,
+                    details::wasm1_import_section_details_print::table_prefix<char_type>(),
+                    curr_importdesc_counter,
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.table));
+                ++curr_importdesc_counter;
+                return iter;
+            }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::memory:
+            {
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[2u]};
+                iter = details::wasm1_import_section_details_print::copy_indexed_body(
+                    iter,
+                    details::wasm1_import_section_details_print::memory_prefix<char_type>(),
+                    curr_importdesc_counter,
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.memory));
+                ++curr_importdesc_counter;
+                return iter;
+            }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::global:
+            {
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[3u]};
+                iter = details::wasm1_import_section_details_print::copy_indexed_body(
+                    iter,
+                    details::wasm1_import_section_details_print::global_prefix<char_type>(),
+                    curr_importdesc_counter,
+                    section_details(extern_type_details_wrapper.extern_type_ptr->storage.global));
+                ++curr_importdesc_counter;
+                return iter;
+            }
+            [[unlikely]] default:
+                return details::wasm1_import_section_details_print::copy_literal(iter, details::wasm1_import_section_details_print::unknown<char_type>());
+        }
+    }
+
     /// @brief Define functions for handle imports table
     template <typename... Fs>
     concept has_extern_imports_table_handler =
@@ -1468,6 +1622,110 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+    namespace details::wasm1_export_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr ::std::size_t literal_size(char_type const (&)[n]) noexcept
+        {
+            constexpr ::std::size_t size{n - 1uz};
+            return size;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* copy_literal(char_type* iter, char_type const (&literal)[n]) noexcept
+        { return ::fast_io::freestanding::my_copy_n(literal, n - 1uz, iter); }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(func_prefix, "func[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(table_prefix, "table[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(memory_prefix, "memory[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(global_prefix, "global[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_bracket, "]");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(unknown, "unknown");
+
+        template <::std::integral char_type>
+        inline constexpr ::std::size_t index_body_size(char_type const* prefix, ::std::size_t prefix_size) noexcept
+        {
+            static_cast<void>(prefix);
+            return prefix_size + print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+                   literal_size(right_bracket<char_type>());
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* copy_index_body(char_type* iter,
+                                                    char_type const (&prefix)[n],
+                                                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 index) noexcept
+        {
+            iter = copy_literal(iter, prefix);
+            iter = print_reserve_define(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>, iter, index);
+            return copy_literal(iter, right_bracket<char_type>());
+        }
+    }  // namespace details::wasm1_export_section_details_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_final_export_type_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto stack_size{64u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, wasm1_final_export_type_section_details_wrapper_t<Fs...>>,
+                                                      wasm1_final_export_type_section_details_wrapper_t<Fs...> const export_type_details_wrapper) noexcept
+    {
+        switch(export_type_details_wrapper.export_type_ptr->type)
+        {
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func:
+                return details::wasm1_export_section_details_print::index_body_size(
+                    details::wasm1_export_section_details_print::func_prefix<char_type>(),
+                    details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::func_prefix<char_type>()));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::table:
+                return details::wasm1_export_section_details_print::index_body_size(
+                    details::wasm1_export_section_details_print::table_prefix<char_type>(),
+                    details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::table_prefix<char_type>()));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::memory:
+                return details::wasm1_export_section_details_print::index_body_size(
+                    details::wasm1_export_section_details_print::memory_prefix<char_type>(),
+                    details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::memory_prefix<char_type>()));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::global:
+                return details::wasm1_export_section_details_print::index_body_size(
+                    details::wasm1_export_section_details_print::global_prefix<char_type>(),
+                    details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::global_prefix<char_type>()));
+            [[unlikely]] default: return details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::unknown<char_type>());
+        }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm1_final_export_type_section_details_wrapper_t<Fs...>>,
+                                                     char_type* iter,
+                                                     wasm1_final_export_type_section_details_wrapper_t<Fs...> const export_type_details_wrapper) noexcept
+    {
+        switch(export_type_details_wrapper.export_type_ptr->type)
+        {
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func:
+                return details::wasm1_export_section_details_print::copy_index_body(
+                    iter,
+                    details::wasm1_export_section_details_print::func_prefix<char_type>(),
+                    export_type_details_wrapper.export_type_ptr->storage.func_idx);
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::table:
+                return details::wasm1_export_section_details_print::copy_index_body(
+                    iter,
+                    details::wasm1_export_section_details_print::table_prefix<char_type>(),
+                    export_type_details_wrapper.export_type_ptr->storage.table_idx);
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::memory:
+                return details::wasm1_export_section_details_print::copy_index_body(
+                    iter,
+                    details::wasm1_export_section_details_print::memory_prefix<char_type>(),
+                    export_type_details_wrapper.export_type_ptr->storage.memory_idx);
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::global:
+                return details::wasm1_export_section_details_print::copy_index_body(
+                    iter,
+                    details::wasm1_export_section_details_print::global_prefix<char_type>(),
+                    export_type_details_wrapper.export_type_ptr->storage.global_idx);
+            [[unlikely]] default: return details::wasm1_export_section_details_print::copy_literal(iter, details::wasm1_export_section_details_print::unknown<char_type>());
+        }
+    }
+
     template <typename... Fs>
     concept has_handle_export_index = requires(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<export_section_storage_t<Fs...>> sec_adl,
                                                ::uwvm2::parser::wasm::standard::wasm1::features::final_export_type_t<Fs...>& fwet,
@@ -1509,6 +1767,190 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         wasm1_elem_storage_t<Fs...> const& element_storage,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(element_storage), ::std::addressof(all_sections)}; }
+
+    namespace details::wasm1_element_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        {
+            constexpr ::std::size_t literal_size{n - 1uz};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <::std::integral char_type, typename T>
+        inline constexpr bool emit_reserve(char_type*& curr, char_type* end, T value, ::std::size_t& offset) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            constexpr ::std::size_t reserve_size{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>)};
+
+            if(offset == 0uz && static_cast<::std::size_t>(end - curr) >= reserve_size)
+            {
+                curr = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, value);
+                return true;
+            }
+
+            char_type buffer[reserve_size];
+            auto const buffer_end{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, buffer, value)};
+            auto const literal_size{static_cast<::std::size_t>(buffer_end - buffer)};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(buffer + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_table_prefix, "table_idx: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_count_prefix, ", count: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_suffix, "\n");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_prefix, "  - ref[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_func_prefix, "] -> func[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_suffix, "]\n");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(flag0_prefix, "flag: 0, ");
+
+        enum class storage_stage : unsigned char
+        {
+            header_table_prefix,
+            header_table_index,
+            header_count_prefix,
+            header_count,
+            header_suffix,
+            row_prefix,
+            row_ref_index,
+            row_func_prefix,
+            row_func_index,
+            row_suffix,
+            done
+        };
+
+        struct storage_context
+        {
+            storage_stage curr_stage{};
+            ::std::size_t offset{};
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 curr_elem_counter{};
+
+            template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            inline constexpr ::fast_io::context_print_result<char_type*> print_context_define(
+                wasm1_elem_storage_t_section_details_wrapper_t<Fs...> const element_storage_details_wrapper,
+                char_type* curr,
+                char_type* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(element_storage_details_wrapper.element_storage_ptr == nullptr || element_storage_details_wrapper.all_sections_ptr == nullptr) [[unlikely]]
+                {
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+                if(this->curr_stage == storage_stage::done) { return {curr, true}; }
+
+                auto const& funcs{element_storage_details_wrapper.element_storage_ptr->vec_funcidx};
+                auto const func_size{funcs.size()};
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case storage_stage::header_table_prefix:
+                        {
+                            if(!emit_literal(curr, end, header_table_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::header_table_index;
+                            break;
+                        }
+                        case storage_stage::header_table_index:
+                        {
+                            if(!emit_reserve(curr, end, element_storage_details_wrapper.element_storage_ptr->table_idx, this->offset))
+                            {
+                                return {curr, false};
+                            }
+                            this->curr_stage = storage_stage::header_count_prefix;
+                            break;
+                        }
+                        case storage_stage::header_count_prefix:
+                        {
+                            if(!emit_literal(curr, end, header_count_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::header_count;
+                            break;
+                        }
+                        case storage_stage::header_count:
+                        {
+                            if(!emit_reserve(curr, end, func_size, this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::header_suffix;
+                            break;
+                        }
+                        case storage_stage::header_suffix:
+                        {
+                            if(!emit_literal(curr, end, header_suffix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = func_size == 0uz ? storage_stage::done : storage_stage::row_prefix;
+                            break;
+                        }
+                        case storage_stage::row_prefix:
+                        {
+                            if(this->curr_elem_counter == func_size)
+                            {
+                                this->curr_stage = storage_stage::done;
+                                break;
+                            }
+
+                            if(!emit_literal(curr, end, row_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::row_ref_index;
+                            break;
+                        }
+                        case storage_stage::row_ref_index:
+                        {
+                            if(!emit_reserve(curr, end, this->curr_elem_counter, this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::row_func_prefix;
+                            break;
+                        }
+                        case storage_stage::row_func_prefix:
+                        {
+                            if(!emit_literal(curr, end, row_func_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::row_func_index;
+                            break;
+                        }
+                        case storage_stage::row_func_index:
+                        {
+                            if(!emit_reserve(curr, end, funcs.index_unchecked(this->curr_elem_counter), this->offset)) { return {curr, false}; }
+                            this->curr_stage = storage_stage::row_suffix;
+                            break;
+                        }
+                        case storage_stage::row_suffix:
+                        {
+                            if(!emit_literal(curr, end, row_suffix<char_type>(), this->offset)) { return {curr, false}; }
+                            ++this->curr_elem_counter;
+                            this->curr_stage = storage_stage::row_prefix;
+                            break;
+                        }
+                        case storage_stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::wasm1_element_section_details_print
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>,
@@ -1615,6 +2057,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             ++curr_elem_counter;
         }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::wasm1_element_section_details_print::storage_context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
     }
 }
 
@@ -1769,6 +2223,79 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+    namespace details::wasm1_element_section_details_print
+    {
+        enum class element_stage : unsigned char
+        {
+            flag_prefix,
+            storage,
+            done
+        };
+
+        struct element_context
+        {
+            element_stage curr_stage{};
+            ::std::size_t offset{};
+            storage_context storage_ctx{};
+
+            template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            inline constexpr ::fast_io::context_print_result<char_type*> print_context_define(
+                wasm1_element_t_section_details_wrapper_t<Fs...> const element_details_wrapper,
+                char_type* curr,
+                char_type* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(element_details_wrapper.element_ptr == nullptr || element_details_wrapper.all_sections_ptr == nullptr) [[unlikely]]
+                {
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case element_stage::flag_prefix:
+                        {
+                            if(!emit_literal(curr, end, flag0_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = element_stage::storage;
+                            break;
+                        }
+                        case element_stage::storage:
+                        {
+                            auto const storage_result{this->storage_ctx.print_context_define(
+                                section_details(element_details_wrapper.element_ptr->storage.table_idx, *element_details_wrapper.all_sections_ptr),
+                                curr,
+                                end)};
+                            curr = storage_result.iter;
+                            if(!storage_result.done) { return {curr, false}; }
+                            this->storage_ctx = {};
+                            this->curr_stage = element_stage::done;
+                            break;
+                        }
+                        case element_stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::wasm1_element_section_details_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, wasm1_element_t_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::wasm1_element_section_details_print::element_context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_element_t_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
+    }
+
     template <typename... Fs>
     concept has_handle_element_type = requires(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<element_section_storage_t<Fs...>> sec_adl,
                                                ::uwvm2::parser::wasm::standard::wasm1::features::final_element_type_t<Fs...>& fet,
@@ -1856,6 +2383,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(data_storage), ::std::addressof(all_sections)}; }
 
+    namespace details::wasm1_data_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr ::std::size_t literal_size(char_type const (&)[n]) noexcept
+        {
+            constexpr ::std::size_t size{n - 1uz};
+            return size;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* copy_literal(char_type* iter, char_type const (&literal)[n]) noexcept
+        { return ::fast_io::freestanding::my_copy_n(literal, n - 1uz, iter); }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(memory_idx_prefix, "memory_idx: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(size_prefix, ", size: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(flag0_prefix, "flag: 0, ");
+    }  // namespace details::wasm1_data_section_details_print
+
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
                                        Stm && stream,
@@ -1913,6 +2458,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 U", size: ",
                 static_cast<::std::size_t>(data_details_wrapper.data_storage_ptr->byte.end - data_details_wrapper.data_storage_ptr->byte.begin));
         }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto stack_size{128u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
+                                                      wasm1_data_storage_t_section_details_wrapper_t<Fs...> const) noexcept
+    {
+        return details::wasm1_data_section_details_print::literal_size(details::wasm1_data_section_details_print::memory_idx_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+               details::wasm1_data_section_details_print::literal_size(details::wasm1_data_section_details_print::size_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, ::std::size_t>);
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
+                                                     char_type* iter,
+                                                     wasm1_data_storage_t_section_details_wrapper_t<Fs...> const data_details_wrapper) noexcept
+    {
+        auto const size{static_cast<::std::size_t>(data_details_wrapper.data_storage_ptr->byte.end - data_details_wrapper.data_storage_ptr->byte.begin)};
+        iter = details::wasm1_data_section_details_print::copy_literal(iter, details::wasm1_data_section_details_print::memory_idx_prefix<char_type>());
+        iter = print_reserve_define(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>,
+                                    iter,
+                                    data_details_wrapper.data_storage_ptr->memory_idx);
+        iter = details::wasm1_data_section_details_print::copy_literal(iter, details::wasm1_data_section_details_print::size_prefix<char_type>());
+        return print_reserve_define(::fast_io::io_reserve_type<char_type, ::std::size_t>, iter, size);
     }
 }
 
@@ -2064,6 +2641,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 U"flag: 0, ",
                 section_details(data_details_wrapper.data_ptr->storage.memory_idx, *data_details_wrapper.all_sections_ptr));
         }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, wasm1_data_t_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto stack_size{160u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, wasm1_data_t_section_details_wrapper_t<Fs...>>,
+                                                      wasm1_data_t_section_details_wrapper_t<Fs...> const data_details_wrapper) noexcept
+    {
+        return details::wasm1_data_section_details_print::literal_size(details::wasm1_data_section_details_print::flag0_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
+                                  section_details(data_details_wrapper.data_ptr->storage.memory_idx, *data_details_wrapper.all_sections_ptr));
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm1_data_t_section_details_wrapper_t<Fs...>>,
+                                                     char_type* iter,
+                                                     wasm1_data_t_section_details_wrapper_t<Fs...> const data_details_wrapper) noexcept
+    {
+        iter = details::wasm1_data_section_details_print::copy_literal(iter, details::wasm1_data_section_details_print::flag0_prefix<char_type>());
+        return print_reserve_define(::fast_io::io_reserve_type<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
+                                    iter,
+                                    section_details(data_details_wrapper.data_ptr->storage.memory_idx, *data_details_wrapper.all_sections_ptr));
     }
 
     template <typename... Fs>

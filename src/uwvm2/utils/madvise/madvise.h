@@ -34,6 +34,8 @@
 #  include <unistd.h>
 #  include <sys/mman.h>
 # endif
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
 #endif
@@ -48,8 +50,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
     !defined(__wasm__)
     namespace details::posix
     {
-# if defined(__DARWIN_C_LEVEL)
-        extern int posix_madvise(void* addr, ::std::size_t length, int flag) noexcept __asm__("_posix_madvise");
+# if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+        [[clang::availability(macos, introduced = 10.2)]] extern int posix_madvise(void* addr, ::std::size_t length, int flag) noexcept
+            __asm__("_posix_madvise");
 # else
         extern int posix_madvise(void* addr, ::std::size_t length, int flag) noexcept __asm__("posix_madvise");
 # endif
@@ -226,8 +229,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
         // is part of IEEE 1003.1-2001 and was first implemented in Mac OS X 10.2.
 
         // "addr" will not be modified, the pass parameter requires
+#  if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#   if UWVM_HAS_BUILTIN(__builtin_available)
+        if(__builtin_available(macOS 10.2, *)) [[likely]] { details::posix::posix_madvise(const_cast<void*>(addr), length, static_cast<int>(flag)); }
+#   else
         details::posix::posix_madvise(const_cast<void*>(addr), length, static_cast<int>(flag));
+#   endif
+#  else
+        details::posix::posix_madvise(const_cast<void*>(addr), length, static_cast<int>(flag));
+#  endif
 # endif
 #endif
     }
 }
+
+#ifndef UWVM_MODULE
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif

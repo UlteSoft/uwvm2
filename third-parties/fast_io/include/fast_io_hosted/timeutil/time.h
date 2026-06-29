@@ -1,15 +1,387 @@
 ﻿#pragma once
 
+#include <errno.h>
+
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <mach/mach_init.h>
+#include <mach/mach_port.h>
+#include <mach/mach_time.h>
+#include <mach/thread_act.h>
+#include <sys/resource.h>
+#include <sys/time.h>
+#include <TargetConditionals.h>
+#endif
+
 namespace fast_io
 {
+
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+namespace posix
+{
+extern int libc_gettimeofday(struct ::timeval *tp, void *tz) noexcept __asm__("_gettimeofday");
+extern ::kern_return_t libc_mach_timebase_info(::mach_timebase_info_t info) noexcept __asm__("_mach_timebase_info");
+extern ::std::uint_least64_t libc_mach_absolute_time() noexcept __asm__("_mach_absolute_time");
+extern int libc_getrusage(int who, struct ::rusage *rusage) noexcept __asm__("_getrusage");
+extern ::thread_t libc_mach_thread_self() noexcept __asm__("_mach_thread_self");
+extern ::kern_return_t libc_thread_info(::thread_t target_thread, ::thread_flavor_t flavor, ::thread_info_t thread_info_out,
+										::mach_msg_type_number_t *thread_info_outCnt) noexcept
+	__asm__("_thread_info");
+extern ::kern_return_t libc_mach_port_deallocate(::ipc_space_t task, ::mach_port_name_t name) noexcept __asm__("_mach_port_deallocate");
+
+} // namespace posix
+
+namespace details
+{
+
+inline constexpr int darwin_clock_realtime_id{};
+inline constexpr int darwin_clock_monotonic_raw_id{4};
+inline constexpr int darwin_clock_monotonic_raw_approx_id{5};
+inline constexpr int darwin_clock_monotonic_id{6};
+inline constexpr int darwin_clock_uptime_raw_id{8};
+inline constexpr int darwin_clock_uptime_raw_approx_id{9};
+inline constexpr int darwin_clock_process_cputime_id{12};
+inline constexpr int darwin_clock_thread_cputime_id{16};
+
+inline constexpr int darwin_timespec_from_nanoseconds(::std::uint_least64_t ns, struct timespec *tp) noexcept
+{
+	tp->tv_sec = static_cast<decltype(tp->tv_sec)>(ns / 1000000000ull);
+	tp->tv_nsec = static_cast<decltype(tp->tv_nsec)>(ns % 1000000000ull);
+	return 0;
+}
+
+inline constexpr int darwin_timespec_from_seconds_microseconds(::std::int_least64_t seconds,
+															   ::std::int_least64_t microseconds,
+															   struct timespec *tp) noexcept
+{
+	seconds += microseconds / 1000000u;
+	microseconds %= 1000000u;
+	if (microseconds < 0)
+	{
+		microseconds += 1000000u;
+		--seconds;
+	}
+	tp->tv_sec = static_cast<decltype(tp->tv_sec)>(seconds);
+	tp->tv_nsec = static_cast<decltype(tp->tv_nsec)>(microseconds * 1000);
+	return 0;
+}
+
+inline int darwin_clock_realtime_fallback(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	struct timeval tv{};
+	if (::fast_io::posix::libc_gettimeofday(__builtin_addressof(tv), nullptr) != 0) [[unlikely]]
+	{
+		return -1;
+	}
+
+	tp->tv_sec = static_cast<decltype(tp->tv_sec)>(tv.tv_sec);
+	tp->tv_nsec = static_cast<decltype(tp->tv_nsec)>(tv.tv_usec * 1000);
+	return 0;
+}
+
+inline int darwin_clock_mach_absolute_time_fallback(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	mach_timebase_info_data_t tbi{};
+	if (::fast_io::posix::libc_mach_timebase_info(__builtin_addressof(tbi)) != KERN_SUCCESS || tbi.denom == 0) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	auto const ticks{::fast_io::posix::libc_mach_absolute_time()};
+#if defined(__SIZEOF_INT128__)
+	auto const ns128{(static_cast<unsigned __int128>(ticks) * static_cast<unsigned __int128>(tbi.numer)) /
+					 static_cast<unsigned __int128>(tbi.denom)};
+	auto const ns{static_cast<::std::uint_least64_t>(ns128)};
+#else
+	auto const ns{(ticks / tbi.denom) * tbi.numer + ((ticks % tbi.denom) * tbi.numer) / tbi.denom};
+#endif
+	return darwin_timespec_from_nanoseconds(ns, tp);
+}
+
+inline int darwin_clock_process_cputime_fallback(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	struct rusage ru{};
+	if (::fast_io::posix::libc_getrusage(RUSAGE_SELF, __builtin_addressof(ru)) != 0) [[unlikely]]
+	{
+		return -1;
+	}
+
+	auto const seconds{static_cast<::std::int_least64_t>(ru.ru_utime.tv_sec) +
+					   static_cast<::std::int_least64_t>(ru.ru_stime.tv_sec)};
+	auto const microseconds{static_cast<::std::int_least64_t>(ru.ru_utime.tv_usec) +
+							static_cast<::std::int_least64_t>(ru.ru_stime.tv_usec)};
+	return darwin_timespec_from_seconds_microseconds(seconds, microseconds, tp);
+}
+
+inline int darwin_clock_thread_cputime_fallback(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	thread_basic_info_data_t tbi{};
+	mach_msg_type_number_t count{THREAD_BASIC_INFO_COUNT};
+	auto const thread{::fast_io::posix::libc_mach_thread_self()};
+	auto const kr{
+		::fast_io::posix::libc_thread_info(thread, THREAD_BASIC_INFO, reinterpret_cast<::thread_info_t>(__builtin_addressof(tbi)),
+										   __builtin_addressof(count))};
+	(void)::fast_io::posix::libc_mach_port_deallocate(::mach_task_self(), thread);
+	if (kr != KERN_SUCCESS) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	auto const seconds{static_cast<::std::int_least64_t>(tbi.user_time.seconds) +
+					   static_cast<::std::int_least64_t>(tbi.system_time.seconds)};
+	auto const microseconds{static_cast<::std::int_least64_t>(tbi.user_time.microseconds) +
+							static_cast<::std::int_least64_t>(tbi.system_time.microseconds)};
+	return darwin_timespec_from_seconds_microseconds(seconds, microseconds, tp);
+}
+
+inline int darwin_clock_getres_one_microsecond(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	tp->tv_sec = 0;
+	tp->tv_nsec = 1000;
+	return 0;
+}
+
+inline int darwin_clock_getres_mach_absolute_time(struct timespec *tp) noexcept
+{
+	if (tp == nullptr) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	mach_timebase_info_data_t tbi{};
+	if (::fast_io::posix::libc_mach_timebase_info(__builtin_addressof(tbi)) != KERN_SUCCESS || tbi.denom == 0) [[unlikely]]
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	auto ns{(static_cast<::std::uint_least64_t>(tbi.numer) + static_cast<::std::uint_least64_t>(tbi.denom) - 1u) /
+			static_cast<::std::uint_least64_t>(tbi.denom)};
+	if (ns == 0)
+	{
+		ns = 1;
+	}
+	return darwin_timespec_from_nanoseconds(ns, tp);
+}
+
+inline int darwin_clock_gettime_fallback_from_native_clock_id(int clk_id, struct timespec *tp) noexcept
+{
+	switch (clk_id)
+	{
+	case darwin_clock_realtime_id:
+		return darwin_clock_realtime_fallback(tp);
+	case darwin_clock_monotonic_raw_id:
+	case darwin_clock_monotonic_raw_approx_id:
+	case darwin_clock_monotonic_id:
+	case darwin_clock_uptime_raw_id:
+	case darwin_clock_uptime_raw_approx_id:
+		// CLOCK_MONOTONIC falls back to uptime-like Mach ticks here; strict Apple
+		// semantics would need gettimeofday() minus kern.boottime.
+		return darwin_clock_mach_absolute_time_fallback(tp);
+	case darwin_clock_process_cputime_id:
+		return darwin_clock_process_cputime_fallback(tp);
+	case darwin_clock_thread_cputime_id:
+		return darwin_clock_thread_cputime_fallback(tp);
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+inline int darwin_clock_getres_fallback_from_native_clock_id(int clk_id, struct timespec *tp) noexcept
+{
+	switch (clk_id)
+	{
+	case darwin_clock_realtime_id:
+	case darwin_clock_process_cputime_id:
+	case darwin_clock_thread_cputime_id:
+		return darwin_clock_getres_one_microsecond(tp);
+	case darwin_clock_monotonic_raw_id:
+	case darwin_clock_monotonic_raw_approx_id:
+	case darwin_clock_monotonic_id:
+	case darwin_clock_uptime_raw_id:
+	case darwin_clock_uptime_raw_approx_id:
+		return darwin_clock_getres_mach_absolute_time(tp);
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+inline int darwin_clock_gettime_fallback_from_posix_clock_id(posix_clock_id pclk_id, struct timespec *tp) noexcept
+{
+	switch (pclk_id)
+	{
+	case posix_clock_id::realtime:
+	case posix_clock_id::realtime_alarm:
+	case posix_clock_id::realtime_coarse:
+	case posix_clock_id::tai:
+		return darwin_clock_realtime_fallback(tp);
+	case posix_clock_id::monotonic:
+	case posix_clock_id::monotonic_coarse:
+	case posix_clock_id::monotonic_raw:
+	case posix_clock_id::monotonic_raw_approx:
+	case posix_clock_id::boottime:
+	case posix_clock_id::boottime_alarm:
+	case posix_clock_id::uptime_raw:
+	case posix_clock_id::uptime_raw_approx:
+		// CLOCK_MONOTONIC and boottime fall back to uptime-like Mach ticks here; strict Apple
+		// CLOCK_MONOTONIC semantics would need gettimeofday() minus kern.boottime.
+		return darwin_clock_mach_absolute_time_fallback(tp);
+	case posix_clock_id::process_cputime_id:
+		return darwin_clock_process_cputime_fallback(tp);
+	case posix_clock_id::thread_cputime_id:
+		return darwin_clock_thread_cputime_fallback(tp);
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+inline int darwin_clock_getres_fallback_from_posix_clock_id(posix_clock_id pclk_id, struct timespec *tp) noexcept
+{
+	switch (pclk_id)
+	{
+	case posix_clock_id::realtime:
+	case posix_clock_id::realtime_alarm:
+	case posix_clock_id::realtime_coarse:
+	case posix_clock_id::tai:
+	case posix_clock_id::process_cputime_id:
+	case posix_clock_id::thread_cputime_id:
+		return darwin_clock_getres_one_microsecond(tp);
+	case posix_clock_id::monotonic:
+	case posix_clock_id::monotonic_coarse:
+	case posix_clock_id::monotonic_raw:
+	case posix_clock_id::monotonic_raw_approx:
+	case posix_clock_id::boottime:
+	case posix_clock_id::boottime_alarm:
+	case posix_clock_id::uptime_raw:
+	case posix_clock_id::uptime_raw_approx:
+		return darwin_clock_getres_mach_absolute_time(tp);
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+} // namespace details
+#endif
 
 namespace posix
 {
 #if !defined(_WIN32) && !defined(__AVR__) && !defined(__MSDOS__)
-#if defined(__DARWIN_C_LEVEL)
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+
+
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+inline int libc_clock_getres_checked(clockid_t clk_id, struct timespec *tp) noexcept
+{
+	return ::fast_io::details::darwin_clock_getres_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+}
+#else
+[[clang::availability(macos, introduced = 10.12), clang::availability(ios, introduced = 10.0),
+  clang::availability(tvos, introduced = 10.0), clang::availability(watchos, introduced = 3.0),
+  clang::availability(visionos, unavailable)]]
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_getres");
-extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("_clock_settime");
+[[clang::availability(macos, introduced = 10.12), clang::availability(ios, introduced = 10.0),
+  clang::availability(tvos, introduced = 10.0), clang::availability(watchos, introduced = 3.0),
+  clang::availability(visionos, unavailable)]]
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_gettime");
+
+inline int libc_clock_getres_checked(clockid_t clk_id, struct timespec *tp) noexcept
+{
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+	{
+		return libc_clock_getres(clk_id, tp);
+	}
+	return ::fast_io::details::darwin_clock_getres_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+#else
+	return ::fast_io::details::darwin_clock_getres_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+#endif
+}
+#endif
+
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || \
+	(defined(TARGET_OS_WATCH) && TARGET_OS_WATCH) || (defined(TARGET_OS_VISION) && TARGET_OS_VISION)
+inline int libc_clock_settime_checked(clockid_t, struct timespec const *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#else
+[[clang::availability(macos, introduced = 10.12)]]
+extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("_clock_settime");
+
+inline int libc_clock_settime_checked(clockid_t clk_id, struct timespec const *tp) noexcept
+{
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, *)) [[likely]]
+	{
+		return libc_clock_settime(clk_id, tp);
+	}
+	else
+	{
+		errno = ENOSYS;
+		return -1;
+	}
+#else
+	return libc_clock_settime(clk_id, tp);
+#endif
+}
+#endif
+
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noexcept
+{
+	return ::fast_io::details::darwin_clock_gettime_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+}
+#else
+inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noexcept
+{
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+	{
+		return libc_clock_gettime(clk_id, tp);
+	}
+	return ::fast_io::details::darwin_clock_gettime_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+#else
+	return ::fast_io::details::darwin_clock_gettime_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
+#endif
+}
+#endif
 #else
 #if defined(_REDIR_TIME64)
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres64");
@@ -59,7 +431,12 @@ namespace details
 #if __has_cpp_attribute(__gnu__::__pure__)
 [[__gnu__::__pure__]]
 #endif
-inline constexpr auto posix_clock_id_to_native_value(posix_clock_id pcid)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && defined(TARGET_OS_VISION) && TARGET_OS_VISION
+inline auto
+#else
+inline constexpr auto
+#endif
+posix_clock_id_to_native_value(posix_clock_id pcid)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
 	switch (pcid)
@@ -75,68 +452,76 @@ inline constexpr auto posix_clock_id_to_native_value(posix_clock_id pcid)
 		throw_win32_error(0x00000057);
 	};
 #else
-	switch (pcid)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	throw_posix_error(ENOSYS);
+	return clockid_t{};
+#else
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
 	{
+#endif
+		switch (pcid)
+		{
 #ifdef CLOCK_REALTIME
-	case posix_clock_id::realtime:
-		return CLOCK_REALTIME;
-		break;
+		case posix_clock_id::realtime:
+			return CLOCK_REALTIME;
+			break;
 #endif
 #ifdef CLOCK_REALTIME_ALARM
-	case posix_clock_id::realtime_alarm:
-		return CLOCK_REALTIME_ALARM;
-		break;
+		case posix_clock_id::realtime_alarm:
+			return CLOCK_REALTIME_ALARM;
+			break;
 #elif defined(CLOCK_REALTIME)
 	case posix_clock_id::realtime_alarm:
 		return CLOCK_REALTIME;
 		break;
 #endif
 #ifdef CLOCK_REALTIME_COARSE
-	case posix_clock_id::realtime_coarse:
-		return CLOCK_REALTIME_COARSE;
-		break;
+		case posix_clock_id::realtime_coarse:
+			return CLOCK_REALTIME_COARSE;
+			break;
 #elif defined(CLOCK_REALTIME)
 	case posix_clock_id::realtime_coarse:
 		return CLOCK_REALTIME;
 		break;
 #endif
 #ifdef CLOCK_TAI
-	case posix_clock_id::tai:
-		return CLOCK_TAI;
-		break;
+		case posix_clock_id::tai:
+			return CLOCK_TAI;
+			break;
 #elif defined(CLOCK_REALTIME)
 	case posix_clock_id::tai:
 		return CLOCK_REALTIME;
 		break;
 #endif
 #ifdef CLOCK_MONOTONIC
-	case posix_clock_id::monotonic:
-		return CLOCK_MONOTONIC;
-		break;
+		case posix_clock_id::monotonic:
+			return CLOCK_MONOTONIC;
+			break;
 #endif
 #ifdef CLOCK_MONOTONIC_COARSE
-	case posix_clock_id::monotonic_coarse:
-		return CLOCK_MONOTONIC_COARSE;
-		break;
+		case posix_clock_id::monotonic_coarse:
+			return CLOCK_MONOTONIC_COARSE;
+			break;
 #endif
 #ifdef CLOCK_MONOTONIC_RAW
-	case posix_clock_id::monotonic_raw:
-		return CLOCK_MONOTONIC_RAW;
-		break;
+		case posix_clock_id::monotonic_raw:
+			return CLOCK_MONOTONIC_RAW;
+			break;
 #elif defined(CLOCK_MONOTONIC)
 	case posix_clock_id::monotonic_raw:
 		return CLOCK_MONOTONIC;
 		break;
 #endif
 #ifdef CLOCK_MONOTONIC_RAW_APPROX
-	case posix_clock_id::monotonic_raw_approx:
-		return CLOCK_MONOTONIC_RAW_APPROX;
-		break;
+		case posix_clock_id::monotonic_raw_approx:
+			return CLOCK_MONOTONIC_RAW_APPROX;
+			break;
 #endif
 #ifdef CLOCK_BOOTTIME
-	case posix_clock_id::boottime:
-		return CLOCK_BOOTTIME;
-		break;
+		case posix_clock_id::boottime:
+			return CLOCK_BOOTTIME;
+			break;
 #else
 #ifdef CLOCK_MONOTONIC
 	case posix_clock_id::boottime:
@@ -145,33 +530,38 @@ inline constexpr auto posix_clock_id_to_native_value(posix_clock_id pcid)
 #endif
 #endif
 #ifdef CLOCK_BOOTTIME_ALARM
-	case posix_clock_id::boottime_alarm:
-		return CLOCK_BOOTTIME_ALARM;
-		break;
+		case posix_clock_id::boottime_alarm:
+			return CLOCK_BOOTTIME_ALARM;
+			break;
 #endif
 #ifdef CLOCK_UPTIME_RAW
-	case posix_clock_id::uptime_raw:
-		return CLOCK_UPTIME_RAW;
-		break;
+		case posix_clock_id::uptime_raw:
+			return CLOCK_UPTIME_RAW;
+			break;
 #endif
 #ifdef CLOCK_UPTIME_RAW_APPROX
-	case posix_clock_id::uptime_raw_approx:
-		return CLOCK_UPTIME_RAW_APPROX;
-		break;
+		case posix_clock_id::uptime_raw_approx:
+			return CLOCK_UPTIME_RAW_APPROX;
+			break;
 #endif
 #ifdef CLOCK_PROCESS_CPUTIME_ID
-	case posix_clock_id::process_cputime_id:
-		return CLOCK_PROCESS_CPUTIME_ID;
-		break;
+		case posix_clock_id::process_cputime_id:
+			return CLOCK_PROCESS_CPUTIME_ID;
+			break;
 #endif
 #ifdef CLOCK_THREAD_CPUTIME_ID
-	case posix_clock_id::thread_cputime_id:
-		return CLOCK_THREAD_CPUTIME_ID;
-		break;
+		case posix_clock_id::thread_cputime_id:
+			return CLOCK_THREAD_CPUTIME_ID;
+			break;
 #endif
-	default:
-		throw_posix_error(EINVAL);
-	};
+		default:
+			throw_posix_error(EINVAL);
+		};
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	}
+	throw_posix_error(ENOSYS);
+#endif
+#endif
 #endif
 }
 
@@ -262,10 +652,28 @@ inline
 #elif defined(__AVR__)
 	return {1, 0};
 #elif !defined(__NEWLIB__) || defined(_POSIX_TIMERS)
-	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
 	struct timespec res;
 	// vdso
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	if (::fast_io::details::darwin_clock_getres_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) < 0)
+#elif FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+	{
+		auto clk{details::posix_clock_id_to_native_value(pclk_id)};
+		if (::fast_io::posix::libc_clock_getres_checked(clk, __builtin_addressof(res)) < 0)
+		{
+			throw_posix_error();
+		}
+	}
+	else if (::fast_io::details::darwin_clock_getres_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) < 0)
+#else
+	if (::fast_io::details::darwin_clock_getres_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) < 0)
+#endif
+#else
+	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
 	if (::fast_io::posix::libc_clock_getres(clk, __builtin_addressof(res)) < 0)
+#endif
 	{
 		throw_posix_error();
 	}
@@ -644,9 +1052,27 @@ inline unix_timestamp posix_clock_gettime([[maybe_unused]] posix_clock_id pclk_i
 			0};
 #elif defined(_POSIX_TIMERS)
 	struct timespec res;
-	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
 	// vdso
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	if (::fast_io::details::darwin_clock_gettime_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) != 0)
+#elif FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+	{
+		auto clk{details::posix_clock_id_to_native_value(pclk_id)};
+		if (::fast_io::posix::libc_clock_gettime_checked(clk, __builtin_addressof(res)) != 0)
+		{
+			throw_posix_error();
+		}
+	}
+	else if (::fast_io::details::darwin_clock_gettime_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) != 0)
+#else
+	if (::fast_io::details::darwin_clock_gettime_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) != 0)
+#endif
+#else
+	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
 	if (::fast_io::posix::libc_clock_gettime(clk, __builtin_addressof(res)) != 0)
+#endif
 	{
 		throw_posix_error();
 	}
@@ -817,14 +1243,14 @@ inline iso8601_timestamp to_iso8601_local_impl(::std::int_least64_t seconds, ::s
 				throw_posix_error(static_cast<int>(errn));
 			}
 		}
-#elif defined(_WIN32) && !defined(__BIONIC__) && !defined(__WINE__) && !defined(__CYGWIN__) && \
-		((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) &&                          \
-         !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+#elif defined(_WIN32) && !defined(__BIONIC__) && !defined(__WINE__) && !defined(__CYGWIN__) &&                 \
+	((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) && \
+	 !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		bias = _dstbias;
 #else
 		bias = daylight ? -3600L : 0;
 #endif
-		}
+	}
 	::std::uint_least32_t const ul32_tm_gmtoff{
 		static_cast<::std::uint_least32_t>(static_cast<long unsigned>(tm_gmtoff))};
 	::std::uint_least32_t const ul32_bias{static_cast<::std::uint_least32_t>(static_cast<long unsigned>(bias))};
@@ -851,18 +1277,18 @@ inline iso8601_timestamp to_iso8601_local_impl(::std::int_least64_t seconds, ::s
 #endif
 	long unsigned ulong_tm_gmtoff{static_cast<long unsigned>(tm_gmtoff)};
 	long seconds{};
-#if (defined(_MSC_VER) || defined(_UCRT)) && \
-		((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) &&                          \
-         !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+#if (defined(_MSC_VER) || defined(_UCRT)) &&                                                                   \
+	((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) && \
+	 !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+	{
+		auto errn{::fast_io::noexcept_call(_get_dstbias, __builtin_addressof(seconds))};
+		if (errn)
 		{
-			auto errn{::fast_io::noexcept_call(_get_dstbias, __builtin_addressof(seconds))};
-			if (errn)
-			{
-				throw_posix_error(static_cast<int>(errn));
-			}
+			throw_posix_error(static_cast<int>(errn));
 		}
+	}
 #else
-		seconds = _dstbias;
+	seconds = _dstbias;
 #endif
 	auto const ulong_seconds{static_cast<long unsigned>(static_cast<unsigned>(seconds))};
 	ulong_tm_gmtoff += ulong_seconds;
@@ -1116,7 +1542,11 @@ inline void posix_clock_settime([[maybe_unused]] posix_clock_id pclk_id, [[maybe
 #ifdef __linux__
 	system_call_throw_error(system_call<__NR_clock_settime, int>(clk, __builtin_addressof(res)));
 #else
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+	if (::fast_io::posix::libc_clock_settime_checked(clk, __builtin_addressof(res)) != 0)
+#else
 	if (::fast_io::posix::libc_clock_settime(clk, __builtin_addressof(res)) != 0)
+#endif
 	{
 		throw_posix_error();
 	}

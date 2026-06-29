@@ -328,6 +328,216 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+    namespace details::function_type_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        {
+            constexpr ::std::size_t literal_size{n - 1uz};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <::std::integral char_type, typename T>
+        inline constexpr bool emit_reserve(char_type*& curr, char_type* end, T value, ::std::size_t& offset) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            constexpr ::std::size_t reserve_size{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>)};
+
+            if(offset == 0uz && static_cast<::std::size_t>(end - curr) >= reserve_size)
+            {
+                curr = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, value);
+                return true;
+            }
+
+            char_type buffer[reserve_size];
+            auto const buffer_end{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, buffer, value)};
+            auto const literal_size{static_cast<::std::size_t>(buffer_end - buffer)};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(buffer + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(left_paren, "(");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_paren, ")");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(comma_space, ", ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(arrow, " -> ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(nil_literal, "nil");
+
+        enum class stage : unsigned char
+        {
+            param_open,
+            param_separator,
+            param_value,
+            param_close,
+            arrow,
+            result_start,
+            result_open,
+            result_separator,
+            result_value,
+            result_close,
+            done
+        };
+
+        struct context
+        {
+            stage curr_stage{};
+            ::std::size_t offset{};
+            ::std::size_t value_index{};
+
+            template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            inline constexpr ::fast_io::context_print_result<char_type*> print_context_define(
+                final_function_type_section_details_wrapper_t<Fs...> const function_type_details_wrapper,
+                char_type* curr,
+                char_type* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(function_type_details_wrapper.function_type_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+
+                auto const para{function_type_details_wrapper.function_type_ptr->parameter};
+                auto const para_size{static_cast<::std::size_t>(para.end - para.begin)};
+                auto const res{function_type_details_wrapper.function_type_ptr->result};
+                auto const res_size{static_cast<::std::size_t>(res.end - res.begin)};
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case stage::param_open:
+                        {
+                            if(!emit_literal(curr, end, left_paren<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = para_size == 0uz ? stage::param_close : stage::param_separator;
+                            break;
+                        }
+                        case stage::param_separator:
+                        {
+                            if(this->value_index == para_size)
+                            {
+                                this->curr_stage = stage::param_close;
+                                break;
+                            }
+
+                            if(this->value_index != 0uz && !emit_literal(curr, end, comma_space<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::param_value;
+                            break;
+                        }
+                        case stage::param_value:
+                        {
+                            if(!emit_reserve(curr, end, section_details(para.begin[this->value_index]), this->offset)) { return {curr, false}; }
+                            ++this->value_index;
+                            this->curr_stage = stage::param_separator;
+                            break;
+                        }
+                        case stage::param_close:
+                        {
+                            if(!emit_literal(curr, end, right_paren<char_type>(), this->offset)) { return {curr, false}; }
+                            this->value_index = 0uz;
+                            this->curr_stage = stage::arrow;
+                            break;
+                        }
+                        case stage::arrow:
+                        {
+                            if(!emit_literal(curr, end, arrow<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::result_start;
+                            break;
+                        }
+                        case stage::result_start:
+                        {
+                            if(res_size == 0uz)
+                            {
+                                if(!emit_literal(curr, end, nil_literal<char_type>(), this->offset)) { return {curr, false}; }
+                                this->curr_stage = stage::done;
+                                break;
+                            }
+
+                            if(res_size == 1uz)
+                            {
+                                if(!emit_reserve(curr, end, section_details(*res.begin), this->offset)) { return {curr, false}; }
+                                this->curr_stage = stage::done;
+                                break;
+                            }
+
+                            this->curr_stage = stage::result_open;
+                            break;
+                        }
+                        case stage::result_open:
+                        {
+                            if(!emit_literal(curr, end, left_paren<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::result_separator;
+                            break;
+                        }
+                        case stage::result_separator:
+                        {
+                            if(this->value_index == res_size)
+                            {
+                                this->curr_stage = stage::result_close;
+                                break;
+                            }
+
+                            if(this->value_index != 0uz && !emit_literal(curr, end, comma_space<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::result_value;
+                            break;
+                        }
+                        case stage::result_value:
+                        {
+                            if(!emit_reserve(curr, end, section_details(res.begin[this->value_index]), this->offset)) { return {curr, false}; }
+                            ++this->value_index;
+                            this->curr_stage = stage::result_separator;
+                            break;
+                        }
+                        case stage::result_close:
+                        {
+                            if(!emit_literal(curr, end, right_paren<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::done;
+                            break;
+                        }
+                        case stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::function_type_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, final_function_type_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::function_type_print::context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, final_function_type_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
+    }
+
     /// @brief      has type prefie
     /// @details
     ///             ```cpp
@@ -691,6 +901,174 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                              ::fast_io::mnp::code_cvt(import_type_details_wrapper.import_type_ptr->extern_name),
                                                              U"\"");
         }
+    }
+
+    namespace details::final_import_type_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        {
+            constexpr ::std::size_t literal_size{n - 1uz};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        inline constexpr bool emit_u8string_view(char8_t*& curr,
+                                                 char8_t* end,
+                                                 ::uwvm2::utils::container::u8string_view view,
+                                                 ::std::size_t& offset) noexcept
+        {
+            auto const literal_size{view.size()};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(view.data() + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <typename... Fs>
+        using body_wrapper_t = decltype(section_details(
+            ::std::declval<final_import_type<Fs...> const&>().imports,
+            ::std::declval<::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const&>(),
+            ::std::declval<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32*>()));
+
+        template <typename char_type, typename... Fs>
+        concept context_body_supported = ::std::same_as<char_type, char8_t> && (::uwvm2::parser::wasm::concepts::wasm_feature<Fs> && ...) &&
+                                         ::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, body_wrapper_t<Fs...>>;
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(module_prefix, ", Module Name: \"");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(extern_prefix, "\", Extern Name: \"");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(quote, "\"");
+
+        enum class stage : unsigned char
+        {
+            body,
+            module_prefix,
+            module_name,
+            extern_prefix,
+            extern_name,
+            quote,
+            done
+        };
+
+        struct context
+        {
+            stage curr_stage{};
+            ::std::size_t offset{};
+
+            template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+                requires context_body_supported<char8_t, Fs...>
+            inline constexpr ::fast_io::context_print_result<char8_t*> print_context_define(
+                final_import_type_section_details_wrapper_t<Fs...> const import_type_details_wrapper,
+                char8_t* curr,
+                char8_t* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(import_type_details_wrapper.import_type_ptr == nullptr || import_type_details_wrapper.all_sections_ptr == nullptr ||
+                   import_type_details_wrapper.importdesc_counter_ptr == nullptr) [[unlikely]]
+                {
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case stage::body:
+                        {
+                            using body_type = body_wrapper_t<Fs...>;
+                            constexpr ::std::size_t reserve_size{print_reserve_static_stack_size(::fast_io::io_reserve_type<char8_t, body_type>)};
+                            if(static_cast<::std::size_t>(end - curr) < reserve_size) { return {curr, false}; }
+                            curr = print_reserve_define(
+                                ::fast_io::io_reserve_type<char8_t, body_type>,
+                                curr,
+                                section_details(import_type_details_wrapper.import_type_ptr->imports,
+                                                *import_type_details_wrapper.all_sections_ptr,
+                                                import_type_details_wrapper.importdesc_counter_ptr));
+                            this->curr_stage = stage::module_prefix;
+                            break;
+                        }
+                        case stage::module_prefix:
+                        {
+                            if(!emit_literal(curr, end, module_prefix<char8_t>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::module_name;
+                            break;
+                        }
+                        case stage::module_name:
+                        {
+                            if(!emit_u8string_view(curr, end, import_type_details_wrapper.import_type_ptr->module_name, this->offset))
+                            {
+                                return {curr, false};
+                            }
+                            this->curr_stage = stage::extern_prefix;
+                            break;
+                        }
+                        case stage::extern_prefix:
+                        {
+                            if(!emit_literal(curr, end, extern_prefix<char8_t>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::extern_name;
+                            break;
+                        }
+                        case stage::extern_name:
+                        {
+                            if(!emit_u8string_view(curr, end, import_type_details_wrapper.import_type_ptr->extern_name, this->offset))
+                            {
+                                return {curr, false};
+                            }
+                            this->curr_stage = stage::quote;
+                            break;
+                        }
+                        case stage::quote:
+                        {
+                            if(!emit_literal(curr, end, quote<char8_t>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::done;
+                            break;
+                        }
+                        case stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::final_import_type_section_details_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::final_import_type_section_details_print::context_body_supported<char_type, Fs...>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, final_import_type_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::final_import_type_section_details_print::context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::final_import_type_section_details_print::context_body_supported<char_type, Fs...>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, final_import_type_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
     }
 
     /// @brief      Prohibited use of strings with a length of 0
@@ -1340,6 +1718,177 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ::fast_io::mnp::code_cvt(export_type_details_wrapper.export_type_ptr->export_name),
                 U"\"");
         }
+    }
+
+    namespace details::final_export_type_section_details_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        {
+            constexpr ::std::size_t literal_size{n - 1uz};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <typename T>
+        inline constexpr bool emit_dynamic_reserve(char8_t*& curr, char8_t* end, T value, ::std::size_t& offset) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            constexpr ::std::size_t reserve_size{print_reserve_static_stack_size(::fast_io::io_reserve_type<char8_t, value_type>)};
+            char8_t buffer[reserve_size];
+            auto const buffer_end{print_reserve_define(::fast_io::io_reserve_type<char8_t, value_type>, buffer, value)};
+            auto const literal_size{static_cast<::std::size_t>(buffer_end - buffer)};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(buffer + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        inline constexpr bool emit_u8string_view(char8_t*& curr,
+                                                 char8_t* end,
+                                                 ::uwvm2::utils::container::u8string_view view,
+                                                 ::std::size_t& offset) noexcept
+        {
+            auto const literal_size{view.size()};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(view.data() + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <typename... Fs>
+        using body_wrapper_t = decltype(section_details(
+            ::std::declval<final_wasm_export_type<Fs...> const&>().exports,
+            ::std::declval<::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const&>()));
+
+        template <typename char_type, typename... Fs>
+        concept context_body_supported = ::std::same_as<char_type, char8_t> && (::uwvm2::parser::wasm::concepts::wasm_feature<Fs> && ...) &&
+                                         ::fast_io::dynamic_reserve_with_possible_static_stack_size<char_type, body_wrapper_t<Fs...>>;
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(name_prefix, ", Export Name: \"");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(quote, "\"");
+
+        enum class stage : unsigned char
+        {
+            body,
+            name_prefix,
+            name,
+            quote,
+            done
+        };
+
+        struct context
+        {
+            stage curr_stage{};
+            ::std::size_t offset{};
+
+            template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+                requires context_body_supported<char8_t, Fs...>
+            inline constexpr ::fast_io::context_print_result<char8_t*> print_context_define(
+                final_export_type_section_details_wrapper_t<Fs...> const export_type_details_wrapper,
+                char8_t* curr,
+                char8_t* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(export_type_details_wrapper.export_type_ptr == nullptr || export_type_details_wrapper.all_sections_ptr == nullptr) [[unlikely]]
+                {
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case stage::body:
+                        {
+                            if(!emit_dynamic_reserve(curr,
+                                                     end,
+                                                     section_details(export_type_details_wrapper.export_type_ptr->exports,
+                                                                     *export_type_details_wrapper.all_sections_ptr),
+                                                     this->offset))
+                            {
+                                return {curr, false};
+                            }
+                            this->curr_stage = stage::name_prefix;
+                            break;
+                        }
+                        case stage::name_prefix:
+                        {
+                            if(!emit_literal(curr, end, name_prefix<char8_t>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::name;
+                            break;
+                        }
+                        case stage::name:
+                        {
+                            if(!emit_u8string_view(curr, end, export_type_details_wrapper.export_type_ptr->export_name, this->offset))
+                            {
+                                return {curr, false};
+                            }
+                            this->curr_stage = stage::quote;
+                            break;
+                        }
+                        case stage::quote:
+                        {
+                            if(!emit_literal(curr, end, quote<char8_t>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::done;
+                            break;
+                        }
+                        case stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::final_export_type_section_details_print
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::final_export_type_section_details_print::context_body_supported<char_type, Fs...>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, final_export_type_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::final_export_type_section_details_print::context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::final_export_type_section_details_print::context_body_supported<char_type, Fs...>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, final_export_type_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
     }
 
     //////////////////////////////

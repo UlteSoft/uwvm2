@@ -8616,6 +8616,292 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(function_section_storage), ::std::addressof(all_sections)}; }
 
+    namespace details::function_section_print
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        {
+            constexpr ::std::size_t literal_size{n - 1uz};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr ::std::size_t literal_size(char_type const (&)[n]) noexcept
+        {
+            constexpr ::std::size_t size{n - 1uz};
+            return size;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* append_literal(char_type* iter, char_type const (&literal)[n]) noexcept
+        { return ::fast_io::freestanding::my_copy_n(literal, n - 1uz, iter); }
+
+        template <::std::integral char_type, typename T>
+        inline constexpr char_type* append_reserve(char_type* iter, T value) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            return print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, iter, value);
+        }
+
+        template <::std::integral char_type, typename T>
+        inline constexpr bool emit_reserve(char_type*& curr, char_type* end, T value, ::std::size_t& offset) noexcept
+        {
+            using value_type = ::std::remove_cvref_t<T>;
+            constexpr ::std::size_t reserve_size{print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>)};
+
+            if(offset == 0uz && static_cast<::std::size_t>(end - curr) >= reserve_size)
+            {
+                curr = print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, curr, value);
+                return true;
+            }
+
+            char_type buffer[reserve_size];
+            auto const buffer_end{print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, buffer, value)};
+            auto const literal_size{static_cast<::std::size_t>(buffer_end - buffer)};
+            auto const remain{literal_size - offset};
+            auto const space{static_cast<::std::size_t>(end - curr)};
+            auto const count{remain < space ? remain : space};
+
+            curr = ::fast_io::freestanding::my_copy_n(buffer + offset, count, curr);
+            offset += count;
+
+            if(offset == literal_size)
+            {
+                offset = 0uz;
+                return true;
+            }
+
+            return false;
+        }
+
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 get_type_index(function_section_storage_t const& function_section,
+                                                                                              ::std::size_t index) noexcept
+        {
+            switch(function_section.funcs.mode)
+            {
+                case ::uwvm2::parser::wasm::standard::wasm1::features::vectypeidx_minimize_storage_mode::u8_view:
+                {
+                    return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        function_section.funcs.storage.typeidx_u8_view.begin[index]);
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::features::vectypeidx_minimize_storage_mode::u8_vector:
+                {
+                    return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        function_section.funcs.storage.typeidx_u8_vector.index_unchecked(index));
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::features::vectypeidx_minimize_storage_mode::u16_vector:
+                {
+                    return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                        function_section.funcs.storage.typeidx_u16_vector.index_unchecked(index));
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::features::vectypeidx_minimize_storage_mode::u32_vector:
+                {
+                    return function_section.funcs.storage.typeidx_u32_vector.index_unchecked(index);
+                }
+                [[unlikely]] default:
+                {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::std::unreachable();
+                }
+            }
+        }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_prefix, "\nFunction[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_suffix, "]:\n");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_prefix, " - localfunc[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_func_prefix, "] -> func[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_sig_prefix, "]: {sig: type[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_suffix, "]}\n");
+
+        template <::std::integral char_type>
+        inline constexpr ::std::size_t row_static_buffer_size() noexcept
+        {
+            using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+            constexpr auto buffer_size{literal_size(row_prefix<char_type>()) + print_reserve_size(::fast_io::io_reserve_type<char_type, wasm_u32>) +
+                                       literal_size(row_func_prefix<char_type>()) + print_reserve_size(::fast_io::io_reserve_type<char_type, wasm_u32>) +
+                                       literal_size(row_sig_prefix<char_type>()) + print_reserve_size(::fast_io::io_reserve_type<char_type, wasm_u32>) +
+                                       literal_size(row_suffix<char_type>())};
+            return buffer_size;
+        }
+
+        template <::std::integral char_type>
+        inline constexpr char_type* append_row(char_type* iter,
+                                               ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 localdef_counter,
+                                               ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_counter,
+                                               ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 type_index) noexcept
+        {
+            iter = append_literal(iter, row_prefix<char_type>());
+            iter = append_reserve(iter, localdef_counter);
+            iter = append_literal(iter, row_func_prefix<char_type>());
+            iter = append_reserve(iter, func_counter);
+            iter = append_literal(iter, row_sig_prefix<char_type>());
+            iter = append_reserve(iter, type_index);
+            return append_literal(iter, row_suffix<char_type>());
+        }
+
+        enum class stage : unsigned char
+        {
+            init,
+            header_prefix,
+            header_count,
+            header_suffix,
+            row_prefix,
+            row_local_index,
+            row_func_prefix,
+            row_func_index,
+            row_sig_prefix,
+            row_type_index,
+            row_suffix,
+            done
+        };
+
+        struct context
+        {
+            stage curr_stage{};
+            ::std::size_t offset{};
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_counter{};
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 localdef_counter{};
+
+            template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            inline constexpr ::fast_io::context_print_result<char_type*> print_context_define(
+                function_section_storage_section_details_wrapper_t<Fs...> const function_section_details_wrapper,
+                char_type* curr,
+                char_type* end) noexcept
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(function_section_details_wrapper.function_section_storage_ptr == nullptr || function_section_details_wrapper.all_sections_ptr == nullptr)
+                    [[unlikely]]
+                {
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                }
+#endif
+
+                if(curr == end) [[unlikely]] { return {curr, false}; }
+
+                auto const function_section_span{function_section_details_wrapper.function_section_storage_ptr->sec_span};
+                auto const function_section_size{static_cast<::std::size_t>(function_section_span.sec_end - function_section_span.sec_begin)};
+
+                if(function_section_size == 0uz || this->curr_stage == stage::done) { return {curr, true}; }
+
+                auto const& function_section{*function_section_details_wrapper.function_section_storage_ptr};
+                auto const function_size{function_section.funcs.size()};
+
+                for(;;)
+                {
+                    switch(this->curr_stage)
+                    {
+                        case stage::init:
+                        {
+                            auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(
+                                *function_section_details_wrapper.all_sections_ptr)};
+                            static_assert(importsec.importdesc_count > 0uz);
+                            this->func_counter =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(importsec.importdesc.index_unchecked(0uz).size());
+                            this->curr_stage = stage::header_prefix;
+                            break;
+                        }
+                        case stage::header_prefix:
+                        {
+                            if(!emit_literal(curr, end, header_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::header_count;
+                            break;
+                        }
+                        case stage::header_count:
+                        {
+                            if(!emit_reserve(curr, end, function_size, this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::header_suffix;
+                            break;
+                        }
+                        case stage::header_suffix:
+                        {
+                            if(!emit_literal(curr, end, header_suffix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = function_size == 0uz ? stage::done : stage::row_prefix;
+                            break;
+                        }
+                        case stage::row_prefix:
+                        {
+                            if(this->localdef_counter == function_size)
+                            {
+                                this->curr_stage = stage::done;
+                                break;
+                            }
+
+                            auto const type_index{get_type_index(function_section, this->localdef_counter)};
+                            if(this->offset == 0uz && static_cast<::std::size_t>(end - curr) >= row_static_buffer_size<char_type>())
+                            {
+                                curr = append_row(curr, this->localdef_counter, this->func_counter, type_index);
+                                ++this->func_counter;
+                                ++this->localdef_counter;
+                                break;
+                            }
+
+                            if(!emit_literal(curr, end, row_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_local_index;
+                            break;
+                        }
+                        case stage::row_local_index:
+                        {
+                            if(!emit_reserve(curr, end, this->localdef_counter, this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_func_prefix;
+                            break;
+                        }
+                        case stage::row_func_prefix:
+                        {
+                            if(!emit_literal(curr, end, row_func_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_func_index;
+                            break;
+                        }
+                        case stage::row_func_index:
+                        {
+                            if(!emit_reserve(curr, end, this->func_counter, this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_sig_prefix;
+                            break;
+                        }
+                        case stage::row_sig_prefix:
+                        {
+                            if(!emit_literal(curr, end, row_sig_prefix<char_type>(), this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_type_index;
+                            break;
+                        }
+                        case stage::row_type_index:
+                        {
+                            auto const type_index{get_type_index(function_section, this->localdef_counter)};
+                            if(!emit_reserve(curr, end, type_index, this->offset)) { return {curr, false}; }
+                            this->curr_stage = stage::row_suffix;
+                            break;
+                        }
+                        case stage::row_suffix:
+                        {
+                            if(!emit_literal(curr, end, row_suffix<char_type>(), this->offset)) { return {curr, false}; }
+                            ++this->func_counter;
+                            ++this->localdef_counter;
+                            this->curr_stage = stage::row_prefix;
+                            break;
+                        }
+                        case stage::done: return {curr, true};
+                    }
+
+                    if(curr == end) { return {curr, false}; }
+                }
+            }
+        };
+    }  // namespace details::function_section_print
+
     /// @brief Print the function section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -8959,6 +9245,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
             }
         }
+    }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, function_section_storage_section_details_wrapper_t<Fs...>>) noexcept
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::function_section_print::context>{}; }
+
+    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr ::std::size_t print_context_static_buffer_size(
+        ::fast_io::io_reserve_type_t<char_type, function_section_storage_section_details_wrapper_t<Fs...>>) noexcept
+    {
+        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+        return buffer_size;
     }
 }
 

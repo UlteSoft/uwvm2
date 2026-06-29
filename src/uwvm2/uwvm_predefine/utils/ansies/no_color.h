@@ -57,7 +57,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
         /// @brief Direct C-library `getenv` entry point used for POSIX-style `NO_COLOR` probing.
         /// @details The declaration binds to the platform symbol explicitly so the diagnostic color switch can be
         ///          queried in low-level startup paths without depending on higher-level C++ wrappers.
-#  if defined(__DARWIN_C_LEVEL) || defined(__DJGPP__)
+#  if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+        extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
+#  elif defined(__DJGPP__)
         extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
 #  else
         extern char* libc_getenv(char const*) noexcept __asm__("getenv");

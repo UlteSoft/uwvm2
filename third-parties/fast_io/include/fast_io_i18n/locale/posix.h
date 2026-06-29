@@ -5,8 +5,10 @@ namespace fast_io
 
 namespace details
 {
-#if defined(_GNU_SOURCE) && !defined(__ANDROID__)
+#if defined(_GNU_SOURCE) && !defined(__ANDROID__) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
 extern char const *libc_secure_getenv(char const *) noexcept __asm__("secure_getenv");
+#elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern char const *libc_getenv(char const *) noexcept __asm__("_getenv");
 #else
 extern char const *libc_getenv(char const *) noexcept __asm__("getenv");
 #endif
@@ -14,7 +16,7 @@ extern char const *libc_getenv(char const *) noexcept __asm__("getenv");
 inline char const *my_u8getenv(char8_t const *env) noexcept
 {
 	return
-#if defined(_GNU_SOURCE) && !defined(__ANDROID__)
+#if defined(_GNU_SOURCE) && !defined(__ANDROID__) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
 		libc_secure_getenv(reinterpret_cast<char const *>(env));
 #else
 		libc_getenv(reinterpret_cast<char const *>(env));

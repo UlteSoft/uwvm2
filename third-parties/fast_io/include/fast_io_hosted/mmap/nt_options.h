@@ -10,6 +10,8 @@ struct nt_mmap_options
 	::std::uint_least32_t flProtect{};
 	::std::uint_least32_t attributes{};
 	::std::uint_least32_t viewShare{};
+	::std::size_t extra_bytes{};
+	::fast_io::file_loader_padding_mode padding_mode{};
 
 	inline explicit constexpr nt_mmap_options() noexcept = default;
 	inline constexpr nt_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv) noexcept
@@ -29,8 +31,18 @@ struct nt_mmap_options
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
-					dwDesiredAccesstemp |= (0x0002 | 0x0008);
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x80 /*PAGE_EXECUTE_WRITECOPY*/;
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0600 /* NtCurrentPeb()->OSMajorVersion >= 6 */
+						dwDesiredAccesstemp |= 0x0008;
+#endif
+					}
+					else
+					{
+						flprotecttemp |= 0x40 /*PAGE_EXECUTE_READWRITE*/;
+						dwDesiredAccesstemp |= (0x0002 | 0x0008);
+					}
 				}
 				else
 				{
@@ -60,8 +72,15 @@ struct nt_mmap_options
 			{
 				if ((protv & ::fast_io::mmap_prot::prot_write) == ::fast_io::mmap_prot::prot_write)
 				{
-					flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
-					dwDesiredAccesstemp |= 0x0002;
+					if (exclusiveflags == 2)
+					{
+						flprotecttemp |= 0x8 /*PAGE_WRITECOPY*/;
+					}
+					else
+					{
+						flprotecttemp |= 0x4 /*PAGE_READWRITE*/;
+						dwDesiredAccesstemp |= 0x0002;
+					}
 				}
 				else
 				{
@@ -91,6 +110,13 @@ struct nt_mmap_options
 		this->flProtect = flprotecttemp;
 		this->attributes = 0x08000000;
 		this->viewShare = 0x01;
+	}
+	inline constexpr nt_mmap_options(::fast_io::mmap_prot protv, ::fast_io::mmap_flags flagsv,
+									 ::fast_io::file_loader_extra_bytes extra) noexcept
+		: nt_mmap_options(protv, flagsv)
+	{
+		this->extra_bytes = extra.n;
+		this->padding_mode = extra.mode;
 	}
 };
 

@@ -39,9 +39,15 @@ struct posix_timezone_name
 
 namespace posix
 {
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern int libc_lstat(char8_t const *pathname, struct stat *buf) noexcept __asm__("_lstat");
+extern ::std::ptrdiff_t libc_readlink(char8_t const *pathname, char8_t *buf, ::std::size_t bufsiz) noexcept
+	__asm__("_readlink");
+#else
 extern int libc_lstat(char8_t const *pathname, struct stat *buf) noexcept __asm__("lstat");
 extern ::std::ptrdiff_t libc_readlink(char8_t const *pathname, char8_t *buf, ::std::size_t bufsiz) noexcept
 	__asm__("readlink");
+#endif
 } // namespace posix
 
 namespace details

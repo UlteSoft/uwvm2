@@ -63,7 +63,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
 #if !(defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__))
             // The direct libc symbol keeps environment lookup available inside the header-only/module-shared implementation.
-# if defined(__DARWIN_C_LEVEL) || defined(__DJGPP__)
+# if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+            extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
+# elif defined(__DJGPP__)
             extern char* libc_getenv(char const*) noexcept __asm__("_getenv");
 # else
             extern char* libc_getenv(char const*) noexcept __asm__("getenv");

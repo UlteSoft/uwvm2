@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <errno.h>
+
 #if ((defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__)) && !defined(__CYGWIN__)) || defined(__MSDOS__)
 #if __has_include(<corecrt_io.h>)
 #include <corecrt_io.h>
@@ -38,6 +40,10 @@
 #include <sys/socket.h>
 #endif
 
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <TargetConditionals.h>
+#endif
+
 #if defined(__wasi__)
 #include <wasi/api.h>
 #endif
@@ -65,7 +71,9 @@ namespace fast_io
 #if ((!defined(_WIN32) || defined(__WINE__)) || defined(__CYGWIN__))
 namespace posix
 {
-#if defined(__DARWIN_C_LEVEL) || defined(__MSDOS__)
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern int libc_ioctl(int fd, unsigned long request, ...) noexcept __asm__("_ioctl");
+#elif defined(__MSDOS__)
 extern int libc_ioctl(int fd, unsigned long request, ...) noexcept __asm__("_ioctl");
 #else
 extern int libc_ioctl(int fd, unsigned long request, ...) noexcept __asm__("ioctl");
@@ -877,7 +885,10 @@ inline int open_fd_from_handle(void *handle, open_mode md)
 }
 
 #else
-#if defined(__DARWIN_C_LEVEL) || defined(__MSDOS__)
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern int my_posix_open_noexcept(char const *pathname, int flags) noexcept __asm__("_open");
+extern int my_posix_open_noexcept(char const *pathname, int flags, mode_t mode) noexcept __asm__("_open");
+#elif defined(__MSDOS__)
 extern int my_posix_open_noexcept(char const *pathname, int flags) noexcept __asm__("_open");
 extern int my_posix_open_noexcept(char const *pathname, int flags, mode_t mode) noexcept __asm__("_open");
 #else
@@ -996,7 +1007,31 @@ inline int my_posix_openat(int, char const *, int, mode_t)
 }
 #else
 
-#if defined(__DARWIN_C_LEVEL) || defined(__MSDOS__)
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
+extern int my_posix_openat_noexcept(int fd, char const *path, int aflag, ... /*mode_t mode*/) noexcept __asm__("_openat");
+
+template <typename... Args>
+inline int my_posix_openat_noexcept_checked(int fd, char const *path, int aflag, Args... args) noexcept
+{
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return my_posix_openat_noexcept(fd, path, aflag, args...);
+	}
+#else
+	return my_posix_openat_noexcept(fd, path, aflag, args...);
+#endif
+#if defined(AT_FDCWD)
+	if (fd == AT_FDCWD)
+	{
+		return my_posix_open_noexcept(path, aflag, args...);
+	}
+#endif
+	errno = ENOSYS;
+	return -1;
+}
+#elif defined(__MSDOS__)
 extern int my_posix_openat_noexcept(int fd, char const *path, int aflag, ... /*mode_t mode*/) noexcept __asm__("_openat");
 #else
 extern int my_posix_openat_noexcept(int fd, char const *path, int aflag, ... /*mode_t mode*/) noexcept __asm__("openat");
@@ -1009,7 +1044,11 @@ inline int my_posix_openat(int dirfd, char const *pathname, int flags, mode_t mo
 #if defined(__linux__) && defined(__NR_openat)
 		system_call<__NR_openat, int>
 #else
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		my_posix_openat_noexcept_checked
+#else
 		my_posix_openat_noexcept
+#endif
 #endif
 		(dirfd, pathname, flags, mode)};
 

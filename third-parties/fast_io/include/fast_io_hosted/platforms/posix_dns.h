@@ -27,7 +27,7 @@ struct
 
 namespace details
 {
-#ifdef __DARWIN_C_LEVEL
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
 extern int libc_getaddrinfo(char const *node, char const *service, posix_addrinfo const *hints,
 							posix_addrinfo **res) noexcept __asm__("_getaddrinfo");
 

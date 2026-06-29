@@ -32,6 +32,7 @@
 # include <type_traits>
 # include <utility>
 // macro
+# include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/parser/wasm/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
@@ -46,6 +47,30 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
 {
+    namespace details
+    {
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr ::std::size_t section_details_literal_size(char_type const (&)[n]) noexcept
+        {
+            constexpr ::std::size_t size{n - 1uz};
+            return size;
+        }
+
+        template <::std::integral char_type, ::std::size_t n>
+        inline constexpr char_type* section_details_copy_literal(char_type* iter, char_type const (&literal)[n]) noexcept
+        { return ::fast_io::freestanding::my_copy_n(literal, n - 1uz, iter); }
+
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(limits_min_prefix, "limits: {min: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(limits_max_prefix, ", max: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_brace, "}");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(pages_prefix, "pages: {");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(type_funcref_prefix, "type: funcref, ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(mutable_prefix, "mutable: ");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(bool_true_literal, "true");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(bool_false_literal, "false");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(type_prefix, ", type: ");
+    }  // namespace details
+
     /// @brief      Limits
     /// @details    Limits classify the size range of resizeable storage associated with memory types and table types.
     /// @details    New feature
@@ -156,6 +181,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
         }
     }
 
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, limits_type_section_details_wrapper_t>) noexcept
+    {
+        constexpr auto stack_size{128u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, limits_type_section_details_wrapper_t>,
+                                                      limits_type_section_details_wrapper_t const limits_section_details_wrapper) noexcept
+    {
+        constexpr auto wasm_u32_size{print_reserve_size(::fast_io::io_reserve_type<char_type, wasm_u32>)};
+        auto size{details::section_details_literal_size(details::limits_min_prefix<char_type>()) + wasm_u32_size};
+
+        if(limits_section_details_wrapper.limits.present_max)
+        {
+            size += details::section_details_literal_size(details::limits_max_prefix<char_type>()) + wasm_u32_size;
+        }
+
+        return size + details::section_details_literal_size(details::right_brace<char_type>());
+    }
+
+    template <::std::integral char_type>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, limits_type_section_details_wrapper_t>,
+                                                     char_type* iter,
+                                                     limits_type_section_details_wrapper_t const limits_section_details_wrapper) noexcept
+    {
+        iter = details::section_details_copy_literal(iter, details::limits_min_prefix<char_type>());
+        iter = print_reserve_define(::fast_io::io_reserve_type<char_type, wasm_u32>, iter, limits_section_details_wrapper.limits.min);
+
+        if(limits_section_details_wrapper.limits.present_max)
+        {
+            iter = details::section_details_copy_literal(iter, details::limits_max_prefix<char_type>());
+            iter = print_reserve_define(::fast_io::io_reserve_type<char_type, wasm_u32>, iter, limits_section_details_wrapper.limits.max);
+        }
+
+        return details::section_details_copy_literal(iter, details::right_brace<char_type>());
+    }
+
     /// @brief      Function Types
     /// @details    Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
     /// @details    New feature
@@ -221,6 +286,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
         }
     }
 
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, memory_type_section_details_wrapper_t>) noexcept
+    {
+        constexpr auto stack_size{160u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, memory_type_section_details_wrapper_t>,
+                                                      memory_type_section_details_wrapper_t const memory_section_details_wrapper) noexcept
+    {
+        return details::section_details_literal_size(details::pages_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, limits_type_section_details_wrapper_t>,
+                                  section_details(memory_section_details_wrapper.memory.limits)) +
+               details::section_details_literal_size(details::right_brace<char_type>());
+    }
+
+    template <::std::integral char_type>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, memory_type_section_details_wrapper_t>,
+                                                     char_type* iter,
+                                                     memory_type_section_details_wrapper_t const memory_section_details_wrapper) noexcept
+    {
+        iter = details::section_details_copy_literal(iter, details::pages_prefix<char_type>());
+        iter = print_reserve_define(::fast_io::io_reserve_type<char_type, limits_type_section_details_wrapper_t>,
+                                    iter,
+                                    section_details(memory_section_details_wrapper.memory.limits));
+        return details::section_details_copy_literal(iter, details::right_brace<char_type>());
+    }
+
     /// @brief      Table Types
     /// @details    Memory types classify linear memories and their size range.
     /// @details    New feature
@@ -273,6 +368,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                                                              U"type: funcref, ",
                                                              section_details(table_section_details_wrapper.table.limits));
         }
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, table_type_section_details_wrapper_t>) noexcept
+    {
+        constexpr auto stack_size{160u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, table_type_section_details_wrapper_t>,
+                                                      table_type_section_details_wrapper_t const table_section_details_wrapper) noexcept
+    {
+        return details::section_details_literal_size(details::type_funcref_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, limits_type_section_details_wrapper_t>,
+                                  section_details(table_section_details_wrapper.table.limits));
+    }
+
+    template <::std::integral char_type>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, table_type_section_details_wrapper_t>,
+                                                     char_type* iter,
+                                                     table_type_section_details_wrapper_t const table_section_details_wrapper) noexcept
+    {
+        iter = details::section_details_copy_literal(iter, details::type_funcref_prefix<char_type>());
+        return print_reserve_define(::fast_io::io_reserve_type<char_type, limits_type_section_details_wrapper_t>,
+                                    iter,
+                                    section_details(table_section_details_wrapper.table.limits));
     }
 
     /// @brief      Global Types
@@ -335,6 +458,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                                                              U", type: ",
                                                              section_details(global_section_details_wrapper.global.type));
         }
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_static_stack_size(
+        ::fast_io::io_reserve_type_t<char_type, global_type_section_details_wrapper_t>) noexcept
+    {
+        constexpr auto stack_size{96u};
+        return stack_size;
+    }
+
+    template <::std::integral char_type>
+    inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, global_type_section_details_wrapper_t>,
+                                                      global_type_section_details_wrapper_t const global_section_details_wrapper) noexcept
+    {
+        return details::section_details_literal_size(details::mutable_prefix<char_type>()) +
+               (global_section_details_wrapper.global.is_mutable
+                    ? details::section_details_literal_size(details::bool_true_literal<char_type>())
+                    : details::section_details_literal_size(details::bool_false_literal<char_type>())) +
+               details::section_details_literal_size(details::type_prefix<char_type>()) +
+               print_reserve_size(::fast_io::io_reserve_type<char_type, value_type_section_details_wrapper_t>);
+    }
+
+    template <::std::integral char_type>
+    inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, global_type_section_details_wrapper_t>,
+                                                     char_type* iter,
+                                                     global_type_section_details_wrapper_t const global_section_details_wrapper) noexcept
+    {
+        iter = details::section_details_copy_literal(iter, details::mutable_prefix<char_type>());
+        iter = global_section_details_wrapper.global.is_mutable
+                   ? details::section_details_copy_literal(iter, details::bool_true_literal<char_type>())
+                   : details::section_details_copy_literal(iter, details::bool_false_literal<char_type>());
+        iter = details::section_details_copy_literal(iter, details::type_prefix<char_type>());
+        return print_reserve_define(::fast_io::io_reserve_type<char_type, value_type_section_details_wrapper_t>,
+                                    iter,
+                                    section_details(global_section_details_wrapper.global.type));
     }
 
     /// @brief      External Types
@@ -527,4 +685,5 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
 #endif
