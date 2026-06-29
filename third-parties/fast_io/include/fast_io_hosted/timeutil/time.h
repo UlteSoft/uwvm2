@@ -18,7 +18,7 @@ namespace fast_io
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
 namespace posix
 {
-extern int libc_gettimeofday(struct ::timeval *tp, struct ::timezone *tz) noexcept __asm__("_gettimeofday");
+extern int libc_gettimeofday(struct ::timeval *tp, void *tz) noexcept __asm__("_gettimeofday");
 extern ::kern_return_t libc_mach_timebase_info(::mach_timebase_info_t info) noexcept __asm__("_mach_timebase_info");
 extern ::std::uint_least64_t libc_mach_absolute_time() noexcept __asm__("_mach_absolute_time");
 extern int libc_getrusage(int who, struct ::rusage *rusage) noexcept __asm__("_getrusage");
@@ -207,6 +207,8 @@ inline int darwin_clock_gettime_fallback_from_native_clock_id(int clk_id, struct
 	case darwin_clock_monotonic_id:
 	case darwin_clock_uptime_raw_id:
 	case darwin_clock_uptime_raw_approx_id:
+		// CLOCK_MONOTONIC falls back to uptime-like Mach ticks here; strict Apple
+		// semantics would need gettimeofday() minus kern.boottime.
 		return darwin_clock_mach_absolute_time_fallback(tp);
 	case darwin_clock_process_cputime_id:
 		return darwin_clock_process_cputime_fallback(tp);
@@ -255,6 +257,8 @@ inline int darwin_clock_gettime_fallback_from_posix_clock_id(posix_clock_id pclk
 	case posix_clock_id::boottime_alarm:
 	case posix_clock_id::uptime_raw:
 	case posix_clock_id::uptime_raw_approx:
+		// CLOCK_MONOTONIC and boottime fall back to uptime-like Mach ticks here; strict Apple
+		// CLOCK_MONOTONIC semantics would need gettimeofday() minus kern.boottime.
 		return darwin_clock_mach_absolute_time_fallback(tp);
 	case posix_clock_id::process_cputime_id:
 		return darwin_clock_process_cputime_fallback(tp);
@@ -325,7 +329,7 @@ inline int libc_clock_getres_checked(clockid_t clk_id, struct timespec *tp) noex
 	}
 	return ::fast_io::details::darwin_clock_getres_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
 #else
-	return libc_clock_getres(clk_id, tp);
+	return ::fast_io::details::darwin_clock_getres_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
 #endif
 }
 #endif
@@ -374,7 +378,7 @@ inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noe
 	}
 	return ::fast_io::details::darwin_clock_gettime_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
 #else
-	return libc_clock_gettime(clk_id, tp);
+	return ::fast_io::details::darwin_clock_gettime_fallback_from_native_clock_id(static_cast<int>(clk_id), tp);
 #endif
 }
 #endif
@@ -664,8 +668,7 @@ inline
 	}
 	else if (::fast_io::details::darwin_clock_getres_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) < 0)
 #else
-	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
-	if (::fast_io::posix::libc_clock_getres_checked(clk, __builtin_addressof(res)) < 0)
+	if (::fast_io::details::darwin_clock_getres_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) < 0)
 #endif
 #else
 	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
@@ -1064,8 +1067,7 @@ inline unix_timestamp posix_clock_gettime([[maybe_unused]] posix_clock_id pclk_i
 	}
 	else if (::fast_io::details::darwin_clock_gettime_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) != 0)
 #else
-	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
-	if (::fast_io::posix::libc_clock_gettime_checked(clk, __builtin_addressof(res)) != 0)
+	if (::fast_io::details::darwin_clock_gettime_fallback_from_posix_clock_id(pclk_id, __builtin_addressof(res)) != 0)
 #endif
 #else
 	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
