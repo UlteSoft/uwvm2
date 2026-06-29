@@ -31,7 +31,19 @@ namespace details
 
 inline void bsd_arc4random_read_all_bytes_define_impl(::std::byte *first, ::std::byte *last) noexcept
 {
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.7, iOS 4.3, *)) [[likely]]
+	{
+		::fast_io::noexcept_call(arc4random_buf, first, static_cast<::std::size_t>(last - first));
+		return;
+	}
+	else
+	{
+		fast_terminate();
+	}
+#else
 	::fast_io::noexcept_call(arc4random_buf, first, static_cast<::std::size_t>(last - first));
+#endif
 }
 
 } // namespace details

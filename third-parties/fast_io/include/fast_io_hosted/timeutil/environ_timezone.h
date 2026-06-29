@@ -19,11 +19,12 @@ namespace details
 {
 namespace posix
 {
-extern char const *libc_getenv(char const *) noexcept
-#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) || (defined(__MSDOS__) || defined(__DJGPP__))
-	__asm__("_getenv");
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+extern char const *libc_getenv(char const *) noexcept __asm__("_getenv");
+#elif defined(__MSDOS__) || defined(__DJGPP__)
+extern char const *libc_getenv(char const *) noexcept __asm__("_getenv");
 #else
-	__asm__("getenv");
+extern char const *libc_getenv(char const *) noexcept __asm__("getenv");
 #endif
 } // namespace posix
 

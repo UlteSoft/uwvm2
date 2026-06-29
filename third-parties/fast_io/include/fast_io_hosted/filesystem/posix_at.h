@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+#include <errno.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <unistd.h>
+
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <TargetConditionals.h>
+#endif
+
 namespace fast_io
 {
 
@@ -7,23 +17,399 @@ namespace posix
 {
 using posix_ssize_t = ::std::make_signed_t<::std::size_t>;
 
-#ifdef __DARWIN_C_LEVEL
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+inline bool libc_is_at_fdcwd(int fd) noexcept
+{
+#if defined(AT_FDCWD)
+	return fd == AT_FDCWD;
+#else
+	return false;
+#endif
+}
+
+inline int libc_at_unsupported() noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+inline posix_ssize_t libc_at_unsupported_ssize() noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+inline bool libc_at_unsupported_platform() noexcept
+{
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	return true;
+#endif
+	return false;
+}
+
+inline bool libc_timespec_pair_to_timeval_pair(struct timeval timeval_times[2], struct timespec const times[2]) noexcept
+{
+	for (::std::size_t i{}; i != 2u; ++i)
+	{
+#if defined(UTIME_NOW)
+		if (times[i].tv_nsec == UTIME_NOW)
+		{
+			errno = ENOSYS;
+			return false;
+		}
+#endif
+#if defined(UTIME_OMIT)
+		if (times[i].tv_nsec == UTIME_OMIT)
+		{
+			errno = ENOSYS;
+			return false;
+		}
+#endif
+		if (times[i].tv_nsec < 0 || times[i].tv_nsec >= 1000000000L)
+		{
+			errno = EINVAL;
+			return false;
+		}
+		timeval_times[i].tv_sec = times[i].tv_sec;
+		timeval_times[i].tv_usec = static_cast<decltype(timeval_times[i].tv_usec)>(times[i].tv_nsec / 1000L);
+	}
+	return true;
+}
+
+inline int libc_utimensat_fallback_to_utimes(int dirfd, char const *pathname, struct timespec const *times, int flags) noexcept
+{
+	if (!libc_is_at_fdcwd(dirfd) || flags != 0)
+	{
+		return libc_at_unsupported();
+	}
+	if (times == nullptr)
+	{
+		return ::utimes(pathname, nullptr);
+	}
+	struct timeval timeval_times[2]{};
+	if (!libc_timespec_pair_to_timeval_pair(timeval_times, times))
+	{
+		return -1;
+	}
+	return ::utimes(pathname, timeval_times);
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_faccessat(int dirfd, char const *pathname, int mode, int flags) noexcept __asm__("_faccessat");
+
+inline int libc_faccessat_checked(int dirfd, char const *pathname, int mode, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_faccessat(dirfd, pathname, mode, flags);
+	}
+#else
+	return libc_faccessat(dirfd, pathname, mode, flags);
+#endif
+	if (libc_is_at_fdcwd(dirfd) && flags == 0)
+	{
+		return ::access(pathname, mode);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_renameat(int olddirfd, char const *oldpath, int newdirfd, char const *newpath) noexcept
 	__asm__("_renameat");
+
+inline int libc_renameat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_renameat(olddirfd, oldpath, newdirfd, newpath);
+	}
+#else
+	return libc_renameat(olddirfd, oldpath, newdirfd, newpath);
+#endif
+	if (libc_is_at_fdcwd(olddirfd) && libc_is_at_fdcwd(newdirfd))
+	{
+		return ::rename(oldpath, newpath);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_linkat(int olddirfd, char const *oldpath, int newdirfd, char const *newpath, int flags) noexcept
 	__asm__("_linkat");
+
+inline int libc_linkat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+	}
+#else
+	return libc_linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+#endif
+	if (libc_is_at_fdcwd(olddirfd) && libc_is_at_fdcwd(newdirfd) && flags == 0)
+	{
+		return ::link(oldpath, newpath);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_symlinkat(char const *oldpath, int newdirfd, char const *newpath) noexcept __asm__("_symlinkat");
+
+inline int libc_symlinkat_checked(char const *oldpath, int newdirfd, char const *newpath) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_symlinkat(oldpath, newdirfd, newpath);
+	}
+#else
+	return libc_symlinkat(oldpath, newdirfd, newpath);
+#endif
+	if (libc_is_at_fdcwd(newdirfd))
+	{
+		return ::symlink(oldpath, newpath);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_fchmodat(int dirfd, char const *pathname, mode_t mode, int flags) noexcept __asm__("_fchmodat");
+
+inline int libc_fchmodat_checked(int dirfd, char const *pathname, mode_t mode, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_fchmodat(dirfd, pathname, mode, flags);
+	}
+#else
+	return libc_fchmodat(dirfd, pathname, mode, flags);
+#endif
+	if (libc_is_at_fdcwd(dirfd) && flags == 0)
+	{
+		return ::chmod(pathname, mode);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.13), clang::availability(ios, introduced = 11.0),
+  clang::availability(tvos, introduced = 11.0), clang::availability(watchos, introduced = 4.0)]]
 extern int libc_utimensat(int dirfd, char const *pathname, struct timespec const *times, int flags) noexcept
 	__asm__("_utimensat");
+
+inline int libc_utimensat_checked(int dirfd, char const *pathname, struct timespec const *times, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)) [[likely]]
+	{
+		return libc_utimensat(dirfd, pathname, times, flags);
+	}
+#else
+	return libc_utimensat(dirfd, pathname, times, flags);
+#endif
+	return libc_utimensat_fallback_to_utimes(dirfd, pathname, times, flags);
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_fchownat(int dirfd, char const *pathname, uid_t owner, gid_t group, int flags) noexcept
 	__asm__("_fchownat");
+
+inline int libc_fchownat_checked(int dirfd, char const *pathname, uid_t owner, gid_t group, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_fchownat(dirfd, pathname, owner, group, flags);
+	}
+#else
+	return libc_fchownat(dirfd, pathname, owner, group, flags);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		if (flags == 0)
+		{
+			return ::chown(pathname, owner, group);
+		}
+#if defined(AT_SYMLINK_NOFOLLOW)
+		if (flags == AT_SYMLINK_NOFOLLOW)
+		{
+			return ::lchown(pathname, owner, group);
+		}
+#endif
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_fstatat(int dirfd, char const *pathname, struct stat *buf, int flags) noexcept __asm__("_fstatat");
+
+inline int libc_fstatat_checked(int dirfd, char const *pathname, struct stat *buf, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_fstatat(dirfd, pathname, buf, flags);
+	}
+#else
+	return libc_fstatat(dirfd, pathname, buf, flags);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		if (flags == 0)
+		{
+			return ::stat(pathname, buf);
+		}
+#if defined(AT_SYMLINK_NOFOLLOW)
+		if (flags == AT_SYMLINK_NOFOLLOW)
+		{
+			return ::lstat(pathname, buf);
+		}
+#endif
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_mkdirat(int dirfd, char const *pathname, mode_t mode) noexcept __asm__("_mkdirat");
+
+inline int libc_mkdirat_checked(int dirfd, char const *pathname, mode_t mode) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_mkdirat(dirfd, pathname, mode);
+	}
+#else
+	return libc_mkdirat(dirfd, pathname, mode);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		return ::mkdir(pathname, mode);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 13.0), clang::availability(ios, introduced = 16.0),
+  clang::availability(tvos, introduced = 16.0), clang::availability(watchos, introduced = 9.0)]]
 extern int libc_mknodat(int dirfd, char const *pathname, mode_t mode, dev_t dev) noexcept __asm__("_mknodat");
+
+inline int libc_mknodat_checked(int dirfd, char const *pathname, mode_t mode, dev_t dev) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) [[likely]]
+	{
+		return libc_mknodat(dirfd, pathname, mode, dev);
+	}
+#else
+	return libc_mknodat(dirfd, pathname, mode, dev);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		return ::mknod(pathname, mode, dev);
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int libc_unlinkat(int dirfd, char const *pathname, int flags) noexcept __asm__("_unlinkat");
+
+inline int libc_unlinkat_checked(int dirfd, char const *pathname, int flags) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_unlinkat(dirfd, pathname, flags);
+	}
+#else
+	return libc_unlinkat(dirfd, pathname, flags);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		if (flags == 0)
+		{
+			return ::unlink(pathname);
+		}
+#if defined(AT_REMOVEDIR)
+		if (flags == AT_REMOVEDIR)
+		{
+			return ::rmdir(pathname);
+		}
+#endif
+	}
+	return libc_at_unsupported();
+}
+
+[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern posix_ssize_t libc_readlinkat(int dirfd, char const *pathname, char *buf, ::std::size_t bufsiz) noexcept __asm__("_readlinkat");
+
+inline posix_ssize_t libc_readlinkat_checked(int dirfd, char const *pathname, char *buf, ::std::size_t bufsiz) noexcept
+{
+	if (libc_at_unsupported_platform()) [[unlikely]]
+	{
+		return libc_at_unsupported_ssize();
+	}
+#if FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
+	{
+		return libc_readlinkat(dirfd, pathname, buf, bufsiz);
+	}
+#else
+	return libc_readlinkat(dirfd, pathname, buf, bufsiz);
+#endif
+	if (libc_is_at_fdcwd(dirfd))
+	{
+		return static_cast<posix_ssize_t>(::readlink(pathname, buf, bufsiz));
+	}
+	return libc_at_unsupported_ssize();
+}
 #else
 extern int libc_faccessat(int dirfd, char const *pathname, int mode, int flags) noexcept __asm__("faccessat");
 extern int libc_renameat(int olddirfd, char const *oldpath, int newdirfd, char const *newpath) noexcept
@@ -41,6 +427,66 @@ extern int libc_mkdirat(int dirfd, char const *pathname, mode_t mode) noexcept _
 extern int libc_mknodat(int dirfd, char const *pathname, mode_t mode, dev_t dev) noexcept __asm__("mknodat");
 extern int libc_unlinkat(int dirfd, char const *pathname, int flags) noexcept __asm__("unlinkat");
 extern posix_ssize_t libc_readlinkat(int dirfd, char const *pathname, char *buf, ::std::size_t bufsiz) noexcept __asm__("readlinkat");
+
+inline int libc_faccessat_checked(int dirfd, char const *pathname, int mode, int flags) noexcept
+{
+	return libc_faccessat(dirfd, pathname, mode, flags);
+}
+
+inline int libc_renameat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath) noexcept
+{
+	return libc_renameat(olddirfd, oldpath, newdirfd, newpath);
+}
+
+inline int libc_linkat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath, int flags) noexcept
+{
+	return libc_linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+}
+
+inline int libc_symlinkat_checked(char const *oldpath, int newdirfd, char const *newpath) noexcept
+{
+	return libc_symlinkat(oldpath, newdirfd, newpath);
+}
+
+inline int libc_fchmodat_checked(int dirfd, char const *pathname, mode_t mode, int flags) noexcept
+{
+	return libc_fchmodat(dirfd, pathname, mode, flags);
+}
+
+inline int libc_utimensat_checked(int dirfd, char const *pathname, struct timespec const *times, int flags) noexcept
+{
+	return libc_utimensat(dirfd, pathname, times, flags);
+}
+
+inline int libc_fchownat_checked(int dirfd, char const *pathname, uid_t owner, gid_t group, int flags) noexcept
+{
+	return libc_fchownat(dirfd, pathname, owner, group, flags);
+}
+
+inline int libc_fstatat_checked(int dirfd, char const *pathname, struct stat *buf, int flags) noexcept
+{
+	return libc_fstatat(dirfd, pathname, buf, flags);
+}
+
+inline int libc_mkdirat_checked(int dirfd, char const *pathname, mode_t mode) noexcept
+{
+	return libc_mkdirat(dirfd, pathname, mode);
+}
+
+inline int libc_mknodat_checked(int dirfd, char const *pathname, mode_t mode, dev_t dev) noexcept
+{
+	return libc_mknodat(dirfd, pathname, mode, dev);
+}
+
+inline int libc_unlinkat_checked(int dirfd, char const *pathname, int flags) noexcept
+{
+	return libc_unlinkat(dirfd, pathname, flags);
+}
+
+inline posix_ssize_t libc_readlinkat_checked(int dirfd, char const *pathname, char *buf, ::std::size_t bufsiz) noexcept
+{
+	return libc_readlinkat(dirfd, pathname, buf, bufsiz);
+}
 #endif
 } // namespace posix
 
@@ -131,7 +577,7 @@ inline void posix_renameat_impl(int olddirfd, char const *oldpath, int newdirfd,
 #if defined(__linux__) && defined(__NR_renameat)
 	system_call_throw_error(system_call<__NR_renameat, int>(olddirfd, oldpath, newdirfd, newpath));
 #else
-	if (::fast_io::posix::libc_renameat(olddirfd, oldpath, newdirfd, newpath) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_renameat_checked(olddirfd, oldpath, newdirfd, newpath) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -143,7 +589,7 @@ inline void posix_linkat_impl(int olddirfd, char const *oldpath, int newdirfd, c
 #if defined(__linux__) && defined(__NR_linkat)
 	system_call_throw_error(system_call<__NR_linkat, int>(olddirfd, oldpath, newdirfd, newpath, flags));
 #else
-	if (::fast_io::posix::libc_linkat(olddirfd, oldpath, newdirfd, newpath, flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_linkat_checked(olddirfd, oldpath, newdirfd, newpath, flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -169,7 +615,7 @@ inline void posix_symlinkat_impl(char const *oldpath, int newdirfd, char const *
 #if defined(__linux__) && defined(__NR_symlinkat)
 	system_call_throw_error(system_call<__NR_symlinkat, int>(oldpath, newdirfd, newpath));
 #else
-	if (::fast_io::posix::libc_symlinkat(oldpath, newdirfd, newpath) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_symlinkat_checked(oldpath, newdirfd, newpath) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -192,7 +638,7 @@ inline void posix_faccessat_impl(int dirfd, char const *pathname, int mode, int 
 #elif defined(__linux__) && defined(__NR_faccessat)
 	if (flags != 0)
 	{
-		if (::fast_io::posix::libc_faccessat(dirfd, pathname, mode, flags) == -1) [[unlikely]]
+		if (::fast_io::posix::libc_faccessat_checked(dirfd, pathname, mode, flags) == -1) [[unlikely]]
 		{
 			throw_posix_error();
 		}
@@ -202,7 +648,7 @@ inline void posix_faccessat_impl(int dirfd, char const *pathname, int mode, int 
 		system_call_throw_error(system_call<__NR_faccessat, int>(dirfd, pathname, mode));
 	}
 #else
-	if (::fast_io::posix::libc_faccessat(dirfd, pathname, mode, flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_faccessat_checked(dirfd, pathname, mode, flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -236,7 +682,7 @@ inline void posix_fchownat_impl(int dirfd, char const *pathname, uintmax_t owner
 #if defined(__linux__) && defined(__NR_fchownat)
 	system_call_throw_error(system_call<__NR_fchownat, int>(dirfd, pathname, static_cast<uid_t>(owner), static_cast<gid_t>(group), flags));
 #else
-	if (::fast_io::posix::libc_fchownat(dirfd, pathname, static_cast<uid_t>(owner), static_cast<gid_t>(group), flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fchownat_checked(dirfd, pathname, static_cast<uid_t>(owner), static_cast<gid_t>(group), flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -258,7 +704,7 @@ inline void posix_fchmodat_impl(int dirfd, char const *pathname, mode_t mode, in
 #elif defined(__linux__) && defined(__NR_fchmodat)
 	if (flags != 0)
 	{
-		if (::fast_io::posix::libc_fchmodat(dirfd, pathname, mode, flags) == -1) [[unlikely]]
+		if (::fast_io::posix::libc_fchmodat_checked(dirfd, pathname, mode, flags) == -1) [[unlikely]]
 		{
 			throw_posix_error();
 		}
@@ -268,7 +714,7 @@ inline void posix_fchmodat_impl(int dirfd, char const *pathname, mode_t mode, in
 		system_call_throw_error(system_call<__NR_fchmodat, int>(dirfd, pathname, mode));
 	}
 #else
-	if (::fast_io::posix::libc_fchmodat(dirfd, pathname, mode, flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fchmodat_checked(dirfd, pathname, mode, flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -298,7 +744,7 @@ inline posix_file_status posix_fstatat_impl(int dirfd, char const *pathname, int
 							int>(dirfd, pathname, __builtin_addressof(buf), flags));
 
 #else
-	if (::fast_io::posix::libc_fstatat(dirfd, pathname, __builtin_addressof(buf), flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fstatat_checked(dirfd, pathname, __builtin_addressof(buf), flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -306,7 +752,7 @@ inline posix_file_status posix_fstatat_impl(int dirfd, char const *pathname, int
 
 #else
 	struct stat buf;
-	if (::fast_io::posix::libc_fstatat(dirfd, pathname, __builtin_addressof(buf), flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fstatat_checked(dirfd, pathname, __builtin_addressof(buf), flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -319,7 +765,7 @@ inline void posix_mkdirat_impl(int dirfd, char const *pathname, mode_t mode)
 #if defined(__linux__) && defined(__NR_mkdirat)
 	system_call_throw_error(system_call<__NR_mkdirat, int>(dirfd, pathname, mode));
 #else
-	if (::fast_io::posix::libc_mkdirat(dirfd, pathname, mode) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_mkdirat_checked(dirfd, pathname, mode) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -344,7 +790,7 @@ inline void posix_mknodat_impl(int dirfd, char const* pathname, mode_t mode,::st
 #if defined(__linux__) && defined(__NR_mknodat)
 	system_call_throw_error(system_call<__NR_mknodat, int>(dirfd, pathname, mode, static_cast<dev_t>(dev)));
 #else
-	if (::fast_io::posix::libc_mknodat(dirfd, pathname, mode, static_cast<dev_t>(dev)) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_mknodat_checked(dirfd, pathname, mode, static_cast<dev_t>(dev)) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -358,7 +804,7 @@ inline void posix_unlinkat_impl(int dirfd, char const *path, int flags)
 #if defined(__linux__) && defined(__NR_unlinkat)
 	system_call_throw_error(system_call<__NR_unlinkat, int>(dirfd, path, flags));
 #else
-	if (::fast_io::posix::libc_unlinkat(dirfd, path, flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_unlinkat_checked(dirfd, path, flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -467,7 +913,7 @@ inline void posix_utimensat_impl(int dirfd, char const *path, unix_timestamp_opt
 #elif defined(__linux__) && defined(__NR_utimensat)
 	system_call_throw_error(system_call<__NR_utimensat, int>(dirfd, path, tsptr, flags));
 #else
-	if (::fast_io::posix::libc_utimensat(dirfd, path, tsptr, flags) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_utimensat_checked(dirfd, path, tsptr, flags) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -502,7 +948,7 @@ inline ::fast_io::details::basic_ct_string<char_type> posix_readlinkat_impl([[ma
 							int>(dirfd, pathname, __builtin_addressof(buf), AT_SYMLINK_NOFOLLOW));
 
 #else
-	if (::fast_io::posix::libc_fstatat(dirfd, pathname, __builtin_addressof(buf), AT_SYMLINK_NOFOLLOW) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fstatat_checked(dirfd, pathname, __builtin_addressof(buf), AT_SYMLINK_NOFOLLOW) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -510,7 +956,7 @@ inline ::fast_io::details::basic_ct_string<char_type> posix_readlinkat_impl([[ma
 
 #else
 	struct ::stat buf;
-	if (::fast_io::posix::libc_fstatat(dirfd, pathname, __builtin_addressof(buf), AT_SYMLINK_NOFOLLOW) == -1) [[unlikely]]
+	if (::fast_io::posix::libc_fstatat_checked(dirfd, pathname, __builtin_addressof(buf), AT_SYMLINK_NOFOLLOW) == -1) [[unlikely]]
 	{
 		throw_posix_error();
 	}
@@ -526,7 +972,7 @@ inline ::fast_io::details::basic_ct_string<char_type> posix_readlinkat_impl([[ma
 #if defined(__linux__) && defined(__NR_readlinkat)
 			system_call<__NR_readlinkat, posix_ssize_t>(dirfd, pathname, result.data(), symlink_size)
 #else
-			static_cast<posix_ssize_t>(::fast_io::posix::libc_readlinkat(dirfd, pathname, result.data(), symlink_size))
+			static_cast<posix_ssize_t>(::fast_io::posix::libc_readlinkat_checked(dirfd, pathname, result.data(), symlink_size))
 #endif
 		};
 
@@ -554,7 +1000,7 @@ inline ::fast_io::details::basic_ct_string<char_type> posix_readlinkat_impl([[ma
 #if defined(__linux__) && defined(__NR_readlinkat)
 			system_call<__NR_readlinkat, posix_ssize_t>(dirfd, pathname, dynamic_buffer.get(), symlink_size)
 #else
-			static_cast<posix_ssize_t>(::fast_io::posix::libc_readlinkat(dirfd, pathname, dynamic_buffer.get(), symlink_size))
+			static_cast<posix_ssize_t>(::fast_io::posix::libc_readlinkat_checked(dirfd, pathname, dynamic_buffer.get(), symlink_size))
 #endif
 		};
 

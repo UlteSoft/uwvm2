@@ -8,6 +8,7 @@
 #include <functional>
 #include <type_traits>
 // system
+#include <errno.h>
 #include <pthread.h>
 #include <sched.h>
 #include <time.h>
@@ -115,7 +116,21 @@ public:
 #endif
 		auto start_routine = ::fast_io::posix::details::get_thread_start_routine<start_routine_tuple_type>(
 			::std::make_index_sequence<sizeof...(Args) + 1>{});
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+		int ec{ENOSYS};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+		int ec{};
+		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
+		{
+			ec = ::fast_io::noexcept_call(::pthread_create, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple);
+		}
+		else
+		{
+			ec = ENOSYS;
+		}
+#else
 		int ec{::fast_io::noexcept_call(::pthread_create, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple)};
+#endif
 		if (ec != 0) [[unlikely]]
 		{
 			// Creation failed; manual release is required.
@@ -166,7 +181,21 @@ public:
 		{
 			::fast_io::fast_terminate();
 		}
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+		int ec{ENOSYS};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+		int ec{};
+		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
+		{
+			ec = ::fast_io::noexcept_call(::pthread_join, this->id_, nullptr);
+		}
+		else
+		{
+			ec = ENOSYS;
+		}
+#else
 		int ec{::fast_io::noexcept_call(::pthread_join, this->id_, nullptr)};
+#endif
 		if (ec != 0) [[unlikely]]
 		{
 			::fast_io::throw_posix_error(ec);
@@ -180,7 +209,21 @@ public:
 		{
 			::fast_io::fast_terminate();
 		}
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+		int ec{ENOSYS};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+		int ec{};
+		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
+		{
+			ec = ::fast_io::noexcept_call(::pthread_detach, this->id_);
+		}
+		else
+		{
+			ec = ENOSYS;
+		}
+#else
 		int ec{::fast_io::noexcept_call(::pthread_detach, this->id_)};
+#endif
 		if (ec != 0) [[unlikely]]
 		{
 			::fast_io::throw_posix_error(ec);
@@ -234,7 +277,17 @@ inline
 #endif
 	::fast_io::posix::pthread_thread::id get_id() noexcept
 {
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	return {};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
+	{
+		return ::fast_io::noexcept_call(::pthread_self);
+	}
+	return {};
+#else
 	return ::fast_io::noexcept_call(::pthread_self);
+#endif
 }
 
 template <typename Rep, typename Period>
@@ -278,6 +331,27 @@ inline
 		delta.tv_sec = static_cast<::time_t>(ns64 / 1'000'000'000LL);
 		delta.tv_nsec = static_cast<long>(ns64 % 1'000'000'000LL);
 #if defined(CLOCK_REALTIME) && defined(TIMER_ABSTIME)
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+		::fast_io::noexcept_call(::nanosleep, __builtin_addressof(delta), nullptr);
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+		if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+		{
+			::timespec abs_ts{};
+			(void)::fast_io::noexcept_call(::clock_gettime, CLOCK_REALTIME, __builtin_addressof(abs_ts));
+			abs_ts.tv_sec += delta.tv_sec;
+			abs_ts.tv_nsec += delta.tv_nsec;
+			if (abs_ts.tv_nsec >= 1'000'000'000L)
+			{
+				abs_ts.tv_nsec -= 1'000'000'000L;
+				++abs_ts.tv_sec;
+			}
+			::fast_io::noexcept_call(::clock_nanosleep, CLOCK_REALTIME, TIMER_ABSTIME, __builtin_addressof(abs_ts), nullptr);
+		}
+		else
+		{
+			::fast_io::noexcept_call(::nanosleep, __builtin_addressof(delta), nullptr);
+		}
+#else
 		::timespec abs_ts{};
 		(void)::fast_io::noexcept_call(::clock_gettime, CLOCK_REALTIME, __builtin_addressof(abs_ts));
 		abs_ts.tv_sec += delta.tv_sec;
@@ -288,6 +362,7 @@ inline
 			++abs_ts.tv_sec;
 		}
 		::fast_io::noexcept_call(::clock_nanosleep, CLOCK_REALTIME, TIMER_ABSTIME, __builtin_addressof(abs_ts), nullptr);
+#endif
 #else
 		::fast_io::noexcept_call(::nanosleep, __builtin_addressof(delta), nullptr);
 #endif
@@ -343,10 +418,32 @@ inline
 	ts.tv_nsec = static_cast<long>(unix_ts.subseconds / mul_factor);
 
 #if defined(CLOCK_REALTIME) && defined(TIMER_ABSTIME)
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	::timespec now{};
+	now.tv_sec = ::fast_io::noexcept_call(::time, nullptr);
+	now.tv_nsec = 0;
+#else
 	::fast_io::noexcept_call(::clock_nanosleep, CLOCK_REALTIME, TIMER_ABSTIME, __builtin_addressof(ts), nullptr);
+	return;
+#endif
 #else
 	::timespec now{};
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	now.tv_sec = ::fast_io::noexcept_call(::time, nullptr);
+	now.tv_nsec = 0;
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
+	{
+		::fast_io::noexcept_call(::clock_gettime, CLOCK_REALTIME, __builtin_addressof(now));
+	}
+	else
+	{
+		now.tv_sec = ::fast_io::noexcept_call(::time, nullptr);
+		now.tv_nsec = 0;
+	}
+#else
 	::fast_io::noexcept_call(::clock_gettime, CLOCK_REALTIME, __builtin_addressof(now));
+#endif
 
 	if ((ts.tv_sec < now.tv_sec) || (ts.tv_sec == now.tv_sec && ts.tv_nsec <= now.tv_nsec))
 	{

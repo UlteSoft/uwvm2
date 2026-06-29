@@ -9,6 +9,7 @@
 #include "fast_io_hosted.h"
 
 #include "fast_io_dsal/impl/misc/push_warnings.h"
+#include "fast_io_dsal/impl/misc/push_macros.h"
 
 #include "fast_io_i18n/lc.h"
 #include "fast_io_i18n/lc_print.h"
@@ -34,6 +35,7 @@
 #include "fast_io_unit/floating/lc_impl.h"
 #endif
 
+#include "fast_io_dsal/impl/misc/pop_macros.h"
 #include "fast_io_dsal/impl/misc/pop_warnings.h"
 
 #endif

@@ -1,5 +1,9 @@
 ﻿#pragma once
 
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <TargetConditionals.h>
+#endif
+
 namespace fast_io
 {
 
@@ -55,7 +59,55 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::f
 #endif
 		= struct iovec const *;
 
-	auto ret{::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off)};
+	::std::ptrdiff_t ret{};
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	for (::std::size_t i{}; i != n; ++i)
+	{
+		auto const len{pscatter[i].len};
+		if (len == 0)
+		{
+			continue;
+		}
+		auto first{static_cast<::std::byte *>(const_cast<void *>(pscatter[i].base))};
+		ret = ::fast_io::noexcept_call(::pread, fd, first, len, off);
+		if (ret == -1)
+		{
+			::fast_io::throw_posix_error();
+		}
+		auto status{scatter_size_to_status(static_cast<::std::size_t>(ret), pscatter + i, n - i)};
+		status.position += i;
+		return status;
+	}
+	return {n, 0};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
+	{
+		ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+	}
+	else
+	{
+		for (::std::size_t i{}; i != n; ++i)
+		{
+			auto const len{pscatter[i].len};
+			if (len == 0)
+			{
+				continue;
+			}
+			auto first{static_cast<::std::byte *>(const_cast<void *>(pscatter[i].base))};
+			ret = ::fast_io::noexcept_call(::pread, fd, first, len, off);
+			if (ret == -1)
+			{
+				::fast_io::throw_posix_error();
+			}
+			auto status{scatter_size_to_status(static_cast<::std::size_t>(ret), pscatter + i, n - i)};
+			status.position += i;
+			return status;
+		}
+		return {n, 0};
+	}
+#else
+	ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+#endif
 	if (ret == -1)
 	{
 		::fast_io::throw_posix_error();
@@ -90,7 +142,55 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pwrite_bytes_impl(int fd, ::
 #endif
 		= struct iovec const *;
 
-	auto ret{::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off)};
+	::std::ptrdiff_t ret{};
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	for (::std::size_t i{}; i != n; ++i)
+	{
+		auto const len{pscatter[i].len};
+		if (len == 0)
+		{
+			continue;
+		}
+		auto first{static_cast<::std::byte const *>(pscatter[i].base)};
+		ret = ::fast_io::noexcept_call(::pwrite, fd, first, len, off);
+		if (ret == -1)
+		{
+			::fast_io::throw_posix_error();
+		}
+		auto status{scatter_size_to_status(static_cast<::std::size_t>(ret), pscatter + i, n - i)};
+		status.position += i;
+		return status;
+	}
+	return {n, 0};
+#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+	if (__builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
+	{
+		ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+	}
+	else
+	{
+		for (::std::size_t i{}; i != n; ++i)
+		{
+			auto const len{pscatter[i].len};
+			if (len == 0)
+			{
+				continue;
+			}
+			auto first{static_cast<::std::byte const *>(pscatter[i].base)};
+			ret = ::fast_io::noexcept_call(::pwrite, fd, first, len, off);
+			if (ret == -1)
+			{
+				::fast_io::throw_posix_error();
+			}
+			auto status{scatter_size_to_status(static_cast<::std::size_t>(ret), pscatter + i, n - i)};
+			status.position += i;
+			return status;
+		}
+		return {n, 0};
+	}
+#else
+	ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+#endif
 	if (ret == -1)
 	{
 		::fast_io::throw_posix_error();

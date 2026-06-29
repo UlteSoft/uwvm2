@@ -2,6 +2,11 @@
 #if __has_include(<initializer_list>)
 #include <initializer_list>
 #endif
+#include <errno.h>
+
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <TargetConditionals.h>
+#endif
 
 namespace fast_io
 {
@@ -13,7 +18,52 @@ namespace posix
 // parameters for the exec functions may seem to be the natural choice, given that these functions do not modify either the array of pointers or the characters to which the
 // function points, but this would disallow existing correct code. Instead, only the array of pointers is noted as constant.
 
-#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) || (defined(__MSDOS__) || defined(__DJGPP__))
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#if (defined(TARGET_OS_TV) && TARGET_OS_TV) || (defined(TARGET_OS_WATCH) && TARGET_OS_WATCH)
+inline int libc_execve(char const *, char *const *, char *const *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+inline pid_t libc_fork() noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+inline pid_t libc_vfork() noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#else
+[[clang::availability(tvos, unavailable), clang::availability(watchos, unavailable)]]
+extern int libc_execve(char const *pathname, char *const *argv, char *const *envp) noexcept __asm__("_execve");
+[[clang::availability(tvos, unavailable), clang::availability(watchos, unavailable)]]
+extern pid_t libc_fork() noexcept __asm__("_fork");
+[[clang::availability(tvos, unavailable), clang::availability(watchos, unavailable)]]
+extern pid_t libc_vfork() noexcept __asm__("_vfork");
+#endif
+
+extern int libc_kill(pid_t pid, int sig) noexcept __asm__("_kill");
+extern pid_t libc_setsid() noexcept __asm__("_setsid");
+extern pid_t libc_waitpid(pid_t pid, int *status, int options) noexcept __asm__("_waitpid");
+[[noreturn]] extern void libc_exit(int status) noexcept __asm__("__Exit");
+[[noreturn]] extern void libc_exit2(int status) noexcept __asm__("__exit");
+
+inline int libc_fexecve(int, char *const *, char *const *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+inline int libc_execveat(int, char const *, char *const *, char *const *, int) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#elif defined(__MSDOS__) || defined(__DJGPP__)
 extern int libc_execve(char const *pathname, char *const *argv, char *const *envp) noexcept __asm__("_execve");
 extern int libc_fexecve(int fd, char *const *argv, char *const *envp) noexcept __asm__("_fexecve");
 extern int libc_execveat(int dirfd, char const *pathname, char *const *argv, char *const *envp, int flags) noexcept __asm__("_execveat");

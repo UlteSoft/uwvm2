@@ -25,6 +25,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cerrno>
 # include <climits>
 # include <cstring>
 # include <limits>
@@ -123,13 +124,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
                 ;
 
+# if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
         extern int fdatasync(int fd) noexcept
-# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if !(defined(__MSDOS__) || defined(__DJGPP__))
             __asm__("fdatasync")
-# else
+#  else
             __asm__("_fdatasync")
-# endif
+#  endif
                 ;
+# endif
 
         extern int fsync(int fd) noexcept
 # if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
@@ -141,13 +144,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
 # if !(defined(__MSDOS__) || defined(__DJGPP__))
         // POSIX 2008
-        extern int futimens(int fd, const struct ::timespec times[2]) noexcept
-#  if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
-            __asm__("futimens")
+#  if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+        [[clang::availability(macos, introduced = 10.13),
+          clang::availability(ios, introduced = 11.0),
+          clang::availability(tvos, introduced = 11.0),
+          clang::availability(watchos, introduced = 4.0)]] extern int libc_futimens(int fd, const struct ::timespec times[2]) noexcept __asm__("_futimens");
+
+        extern int libc_futimes(int fd, const struct ::timeval times[2]) noexcept __asm__("_futimes");
+
+        inline constexpr int futimens_fallback_to_futimes(int fd, const struct ::timespec times[2]) noexcept
+        {
+            if(times == nullptr) { return libc_futimes(fd, nullptr); }
+            struct ::timeval timeval_times[2]{};
+            for(::std::size_t i{}; i != 2uz; ++i)
+            {
+#   if defined(UTIME_NOW)
+                if(times[i].tv_nsec == UTIME_NOW)
+                {
+                    errno = ENOSYS;
+                    return -1;
+                }
+#   endif
+#   if defined(UTIME_OMIT)
+                if(times[i].tv_nsec == UTIME_OMIT)
+                {
+                    errno = ENOSYS;
+                    return -1;
+                }
+#   endif
+                if(times[i].tv_nsec < 0 || times[i].tv_nsec >= 1'000'000'000L)
+                {
+                    errno = EINVAL;
+                    return -1;
+                }
+                timeval_times[i].tv_sec = times[i].tv_sec;
+                timeval_times[i].tv_usec = static_cast<decltype(timeval_times[i].tv_usec)>(times[i].tv_nsec / 1000L);
+            }
+            return libc_futimes(fd, timeval_times);
+        }
+
+        inline constexpr int futimens(int fd, const struct ::timespec times[2]) noexcept
+        {
+#   if UWVM_HAS_BUILTIN(__builtin_available)
+            if(__builtin_available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)) [[likely]] { return libc_futimens(fd, times); }
+            else
+            {
+                return futimens_fallback_to_futimes(fd, times);
+            }
+#   else
+            return libc_futimens(fd, times);
+#   endif
+        }
 #  else
-            __asm__("_futimens")
+        extern int futimens(int fd, const struct ::timespec times[2]) noexcept __asm__("futimens");
 #  endif
-                ;
 # endif
 
         // POSIX 2001

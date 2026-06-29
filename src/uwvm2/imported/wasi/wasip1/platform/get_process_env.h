@@ -51,7 +51,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::platform
     {
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
         // Darwin does not provide an `environ` function; here we use `_NSGetEnviron` to obtain it.
-        // _NSGetEnviron is supported starting with the next release, so it is fully compatible with forced static symbol linking.
         extern char*** _NSGetEnviron() noexcept __asm__("__NSGetEnviron");
 #elif defined(__MSDOS__) || defined(__DJGPP__)
         // djgpp only provides `char** _environ`. For consistency, a symbolic link is used here.

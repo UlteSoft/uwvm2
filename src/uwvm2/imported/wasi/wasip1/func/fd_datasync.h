@@ -431,6 +431,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
+#  elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+
+        auto const result_fsync{::uwvm2::imported::wasi::wasip1::func::posix::fsync(curr_fd_native_handle)};
+        if(result_fsync == -1) [[unlikely]]
+        {
+            switch(errno)
+            {
+                // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                // instead.
+                case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                case ENOSPC: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enospc;
+                case EFBIG: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efbig;
+                case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
+                case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EDQUOT)
+                case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
+#   endif
+                case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+#   if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
+                case EWOULDBLOCK: [[fallthrough]];
+#   endif
+                case EAGAIN: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
+                case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(EBUSY)
+                case EBUSY: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebusy;
+#   endif
+                default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+        }
+
 #  else
 
         auto const result_fdatasync{::uwvm2::imported::wasi::wasip1::func::posix::fdatasync(curr_fd_native_handle)};
@@ -535,4 +574,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
-
