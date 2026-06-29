@@ -39,14 +39,6 @@ inline posix_ssize_t libc_at_unsupported_ssize() noexcept
 	return -1;
 }
 
-inline bool libc_at_unsupported_platform() noexcept
-{
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-	return true;
-#endif
-	return false;
-}
-
 inline bool libc_timespec_pair_to_timeval_pair(struct timeval timeval_times[2], struct timespec const times[2]) noexcept
 {
 	for (::std::size_t i{}; i != 2u; ++i)
@@ -99,10 +91,6 @@ extern int libc_faccessat(int dirfd, char const *pathname, int mode, int flags) 
 
 inline int libc_faccessat_checked(int dirfd, char const *pathname, int mode, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -124,10 +112,6 @@ extern int libc_renameat(int olddirfd, char const *oldpath, int newdirfd, char c
 
 inline int libc_renameat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -149,10 +133,6 @@ extern int libc_linkat(int olddirfd, char const *oldpath, int newdirfd, char con
 
 inline int libc_linkat_checked(int olddirfd, char const *oldpath, int newdirfd, char const *newpath, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -173,10 +153,6 @@ extern int libc_symlinkat(char const *oldpath, int newdirfd, char const *newpath
 
 inline int libc_symlinkat_checked(char const *oldpath, int newdirfd, char const *newpath) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -197,10 +173,6 @@ extern int libc_fchmodat(int dirfd, char const *pathname, mode_t mode, int flags
 
 inline int libc_fchmodat_checked(int dirfd, char const *pathname, mode_t mode, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -223,10 +195,6 @@ extern int libc_utimensat(int dirfd, char const *pathname, struct timespec const
 
 inline int libc_utimensat_checked(int dirfd, char const *pathname, struct timespec const *times, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)) [[likely]]
 	{
@@ -244,10 +212,6 @@ extern int libc_fchownat(int dirfd, char const *pathname, uid_t owner, gid_t gro
 
 inline int libc_fchownat_checked(int dirfd, char const *pathname, uid_t owner, gid_t group, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -277,10 +241,6 @@ extern int libc_fstatat(int dirfd, char const *pathname, struct stat *buf, int f
 
 inline int libc_fstatat_checked(int dirfd, char const *pathname, struct stat *buf, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -310,10 +270,6 @@ extern int libc_mkdirat(int dirfd, char const *pathname, mode_t mode) noexcept _
 
 inline int libc_mkdirat_checked(int dirfd, char const *pathname, mode_t mode) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -335,10 +291,6 @@ extern int libc_mknodat(int dirfd, char const *pathname, mode_t mode, dev_t dev)
 
 inline int libc_mknodat_checked(int dirfd, char const *pathname, mode_t mode, dev_t dev) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) [[likely]]
 	{
@@ -359,10 +311,6 @@ extern int libc_unlinkat(int dirfd, char const *pathname, int flags) noexcept __
 
 inline int libc_unlinkat_checked(int dirfd, char const *pathname, int flags) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
@@ -392,10 +340,6 @@ extern posix_ssize_t libc_readlinkat(int dirfd, char const *pathname, char *buf,
 
 inline posix_ssize_t libc_readlinkat_checked(int dirfd, char const *pathname, char *buf, ::std::size_t bufsiz) noexcept
 {
-	if (libc_at_unsupported_platform()) [[unlikely]]
-	{
-		return libc_at_unsupported_ssize();
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{

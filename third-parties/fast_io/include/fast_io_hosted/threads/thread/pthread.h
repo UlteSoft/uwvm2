@@ -14,6 +14,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include <TargetConditionals.h>
+#endif
+
 namespace fast_io
 {
 
@@ -116,9 +120,7 @@ public:
 #endif
 		auto start_routine = ::fast_io::posix::details::get_thread_start_routine<start_routine_tuple_type>(
 			::std::make_index_sequence<sizeof...(Args) + 1>{});
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-		int ec{ENOSYS};
-#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 		int ec{};
 		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
 		{
@@ -181,9 +183,7 @@ public:
 		{
 			::fast_io::fast_terminate();
 		}
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-		int ec{ENOSYS};
-#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 		int ec{};
 		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
 		{
@@ -209,9 +209,7 @@ public:
 		{
 			::fast_io::fast_terminate();
 		}
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-		int ec{ENOSYS};
-#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 		int ec{};
 		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
 		{
@@ -277,9 +275,7 @@ inline
 #endif
 	::fast_io::posix::pthread_thread::id get_id() noexcept
 {
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-	return {};
-#elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
 	{
 		return ::fast_io::noexcept_call(::pthread_self);

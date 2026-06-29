@@ -80,7 +80,7 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::f
 	}
 	return {n, 0};
 #elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
-	if (__builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
+	if (__builtin_available(macOS 10.16, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
 	{
 		ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
 	}
@@ -163,7 +163,7 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pwrite_bytes_impl(int fd, ::
 	}
 	return {n, 0};
 #elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
-	if (__builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
+	if (__builtin_available(macOS 10.16, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
 	{
 		ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
 	}

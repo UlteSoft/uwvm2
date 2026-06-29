@@ -13,43 +13,24 @@ namespace posix
 {
 #if !defined(_WIN32) && !defined(__AVR__) && !defined(__MSDOS__)
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+inline int libc_clock_getres_checked(clockid_t, struct timespec *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#else
 [[clang::availability(macos, introduced = 10.12), clang::availability(ios, introduced = 10.0),
   clang::availability(tvos, introduced = 10.0), clang::availability(watchos, introduced = 3.0),
   clang::availability(visionos, unavailable)]]
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_getres");
-[[clang::availability(macos, introduced = 10.12), clang::availability(ios, unavailable),
-  clang::availability(tvos, unavailable), clang::availability(watchos, unavailable),
-  clang::availability(visionos, unavailable)]]
-extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("_clock_settime");
 [[clang::availability(macos, introduced = 10.12), clang::availability(ios, introduced = 10.0),
   clang::availability(tvos, introduced = 10.0), clang::availability(watchos, introduced = 3.0),
   clang::availability(visionos, unavailable)]]
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_gettime");
 
-inline bool libc_clock_getres_or_gettime_unsupported_platform() noexcept
-{
-#if (defined(TARGET_OS_TV) && TARGET_OS_TV) || (defined(TARGET_OS_VISION) && TARGET_OS_VISION)
-	return true;
-#endif
-	return false;
-}
-
-inline bool libc_clock_settime_unsupported_platform() noexcept
-{
-#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || \
-	(defined(TARGET_OS_WATCH) && TARGET_OS_WATCH) || (defined(TARGET_OS_VISION) && TARGET_OS_VISION)
-	return true;
-#endif
-	return false;
-}
-
 inline int libc_clock_getres_checked(clockid_t clk_id, struct timespec *tp) noexcept
 {
-	if (libc_clock_getres_or_gettime_unsupported_platform()) [[unlikely]]
-	{
-		errno = ENOSYS;
-		return -1;
-	}
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
 	{
@@ -61,15 +42,21 @@ inline int libc_clock_getres_checked(clockid_t clk_id, struct timespec *tp) noex
 	errno = ENOSYS;
 	return -1;
 }
+#endif
+
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || \
+	(defined(TARGET_OS_WATCH) && TARGET_OS_WATCH) || (defined(TARGET_OS_VISION) && TARGET_OS_VISION)
+inline int libc_clock_settime_checked(clockid_t, struct timespec const *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#else
+[[clang::availability(macos, introduced = 10.12)]]
+extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("_clock_settime");
 
 inline int libc_clock_settime_checked(clockid_t clk_id, struct timespec const *tp) noexcept
 {
-	if (libc_clock_settime_unsupported_platform()) [[unlikely]]
-	{
-		errno = ENOSYS;
-		return -1;
-	}
-
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.12, *)) [[likely]]
 	{
@@ -84,15 +71,17 @@ inline int libc_clock_settime_checked(clockid_t clk_id, struct timespec const *t
 	return libc_clock_settime(clk_id, tp);
 #endif
 }
+#endif
 
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+inline int libc_clock_gettime_checked(clockid_t, struct timespec *) noexcept
+{
+	errno = ENOSYS;
+	return -1;
+}
+#else
 inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noexcept
 {
-	if (libc_clock_getres_or_gettime_unsupported_platform()) [[unlikely]]
-	{
-		errno = ENOSYS;
-		return -1;
-	}
-
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
 	{
@@ -107,6 +96,7 @@ inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noe
 	return libc_clock_gettime(clk_id, tp);
 #endif
 }
+#endif
 #else
 #if defined(_REDIR_TIME64)
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres64");
@@ -172,12 +162,10 @@ inline constexpr auto posix_clock_id_to_native_value(posix_clock_id pcid)
 		throw_win32_error(0x00000057);
 	};
 #else
-#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
-	if (::fast_io::posix::libc_clock_getres_or_gettime_unsupported_platform()) [[unlikely]]
-	{
-		throw_posix_error(ENOSYS);
-	}
-#endif
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && defined(TARGET_OS_VISION) && TARGET_OS_VISION
+	throw_posix_error(ENOSYS);
+	return clockid_t{};
+#else
 #if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)) [[likely]]
 	{
@@ -282,6 +270,7 @@ inline constexpr auto posix_clock_id_to_native_value(posix_clock_id pcid)
 #if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 	}
 	throw_posix_error(ENOSYS);
+#endif
 #endif
 #endif
 }

@@ -1011,28 +1011,9 @@ inline int my_posix_openat(int, char const *, int, mode_t)
 [[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
 extern int my_posix_openat_noexcept(int fd, char const *path, int aflag, ... /*mode_t mode*/) noexcept __asm__("_openat");
 
-inline constexpr bool my_posix_openat_unsupported_platform() noexcept
-{
-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
-	return true;
-#else
-	return false;
-#endif
-}
-
 template <typename... Args>
 inline int my_posix_openat_noexcept_checked(int fd, char const *path, int aflag, Args... args) noexcept
 {
-	if (my_posix_openat_unsupported_platform()) [[unlikely]]
-	{
-		if (fd == AT_FDCWD)
-		{
-			return my_posix_open_noexcept(path, aflag, args...);
-		}
-		errno = ENOSYS;
-		return -1;
-	}
-
 #if FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
 	{
