@@ -32,6 +32,7 @@
 # include "convert.h"
 # include "lazy.h"
 # include "memory.h"
+# include "m3_plus.h"
 # include "numeric.h"
 # include "stack.h"
 # include "wasm1p1.h"
