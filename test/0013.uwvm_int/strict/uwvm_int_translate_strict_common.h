@@ -25,6 +25,7 @@
 #
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/mvp.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/opcode/additions.h>
 # include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/storage.h>
 # include <uwvm2/uwvm/io/impl.h>
@@ -62,8 +63,12 @@ namespace uwvm2test::uwvm_int_strict
 {
     using wasm_op = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     static_assert(sizeof(wasm_op) == 1);
+    using wasm1p1_op = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+    using wasm1p1_numeric_op = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
+    using wasm1p1_simd_op = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_simd;
 
     using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    using wasm_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     namespace compiler = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm;
     namespace optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
@@ -95,11 +100,44 @@ namespace uwvm2test::uwvm_int_strict
         optable::trap_invalid_conversion_to_integer_func = strict_trap_unexpected;
         optable::trap_integer_divide_by_zero_func = strict_trap_unexpected;
         optable::trap_integer_overflow_func = strict_trap_unexpected;
+        optable::trap_table_out_of_bounds_func = strict_trap_unexpected;
     }
 
     [[nodiscard]] constexpr ::std::uint8_t u8(wasm_op op) noexcept
     {
         return static_cast<::std::uint8_t>(op);
+    }
+
+    [[nodiscard]] constexpr ::std::uint8_t u8(wasm1p1_op op) noexcept
+    {
+        return static_cast<::std::uint8_t>(op);
+    }
+
+    [[nodiscard]] constexpr ::std::uint32_t u32(wasm1p1_numeric_op op) noexcept
+    {
+        return static_cast<::std::uint32_t>(op);
+    }
+
+    [[nodiscard]] constexpr ::std::uint32_t u32(wasm1p1_simd_op op) noexcept
+    {
+        return static_cast<::std::uint32_t>(op);
+    }
+
+    [[nodiscard]] inline wasm_feature_parameter_t make_wasm1p1_feature_parameter() noexcept
+    {
+        using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
+        wasm_feature_parameter_t out{};
+        auto& para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out);
+        para.enable_multi_value = true;
+        para.enable_reference_types = true;
+        para.enable_bulk_memory = true;
+        para.enable_sign_extension = true;
+        para.enable_nontrapping_float_to_int = true;
+        para.enable_simd = true;
+        para.explicit_feature_1p1 = true;
+        para.controllable_allow_multi_result_vector = false;
+        para.controllable_allow_multi_table = false;
+        return out;
     }
 
     [[nodiscard]] inline int fail(int code, char const* msg) noexcept
@@ -539,6 +577,16 @@ namespace uwvm2test::uwvm_int_strict
         ::std::vector<::std::uint32_t> func_indices{};
     };
 
+    struct passive_element_segment
+    {
+        ::std::vector<::std::uint32_t> func_indices{};
+    };
+
+    struct passive_data_segment
+    {
+        byte_vec bytes{};
+    };
+
     struct module_builder
     {
         ::std::vector<func_type> types{};
@@ -564,6 +612,8 @@ namespace uwvm2test::uwvm_int_strict
 
         ::std::vector<global_entry> globals{};
         ::std::vector<element_segment> elements{};
+        ::std::vector<passive_element_segment> passive_elements{};
+        ::std::vector<passive_data_segment> passive_datas{};
 
         static void encode_name_utf8(byte_vec& out, char const* ascii)
         {
@@ -813,11 +863,11 @@ namespace uwvm2test::uwvm_int_strict
                 emit_section(7u, sec);
             }
 
-            // element section (9) - MVP encoding: active segments only
-            if(!elements.empty())
+            // element section (9)
+            if(!elements.empty() || !passive_elements.empty())
             {
                 byte_vec sec{};
-                append_u32_leb(sec, static_cast<::std::uint32_t>(elements.size()));
+                append_u32_leb(sec, static_cast<::std::uint32_t>(elements.size() + passive_elements.size()));
                 for(auto const& seg : elements)
                 {
                     append_u32_leb(sec, seg.table_index);
@@ -825,7 +875,22 @@ namespace uwvm2test::uwvm_int_strict
                     append_u32_leb(sec, static_cast<::std::uint32_t>(seg.func_indices.size()));
                     for(auto const idx : seg.func_indices) { append_u32_leb(sec, idx); }
                 }
+                for(auto const& seg : passive_elements)
+                {
+                    append_u32_leb(sec, 1u);  // passive funcref funcidx segment
+                    append_u8(sec, 0u);       // elemkind: funcref
+                    append_u32_leb(sec, static_cast<::std::uint32_t>(seg.func_indices.size()));
+                    for(auto const idx : seg.func_indices) { append_u32_leb(sec, idx); }
+                }
                 emit_section(9u, sec);
+            }
+
+            // data count section (12)
+            if(!passive_datas.empty())
+            {
+                byte_vec sec{};
+                append_u32_leb(sec, static_cast<::std::uint32_t>(passive_datas.size()));
+                emit_section(12u, sec);
             }
 
             // code section (10)
@@ -853,26 +918,49 @@ namespace uwvm2test::uwvm_int_strict
                 emit_section(10u, sec);
             }
 
+            // data section (11)
+            if(!passive_datas.empty())
+            {
+                byte_vec sec{};
+                append_u32_leb(sec, static_cast<::std::uint32_t>(passive_datas.size()));
+                for(auto const& data : passive_datas)
+                {
+                    append_u32_leb(sec, 1u);  // passive
+                    append_u32_leb(sec, static_cast<::std::uint32_t>(data.bytes.size()));
+                    append_bytes(sec, data.bytes);
+                }
+                emit_section(11u, sec);
+            }
+
             return out;
         }
     };
 
-    [[nodiscard]] constexpr ::std::size_t abi_bytes(wasm_value_type t) noexcept
+    template <typename ValueType>
+    [[nodiscard]] constexpr ::std::size_t abi_bytes(ValueType t) noexcept
     {
-        switch(t)
+        using wasm1p1_value_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
+        switch(static_cast<::std::uint_least8_t>(t))
         {
-            case wasm_value_type::i32:
-            case wasm_value_type::f32:
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::i32):
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::f32):
                 return 4uz;
-            case wasm_value_type::i64:
-            case wasm_value_type::f64:
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::i64):
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::f64):
                 return 8uz;
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::v128):
+                return sizeof(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128);
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::funcref):
+                return sizeof(::uwvm2::object::global::wasm_funcref_t);
+            case static_cast<::std::uint_least8_t>(wasm1p1_value_type::externref):
+                return sizeof(::uwvm2::object::global::wasm_externref_t);
             default:
                 return 0uz;
         }
     }
 
-    [[nodiscard]] inline ::std::size_t abi_total_bytes(wasm_value_type const* begin, wasm_value_type const* end) noexcept
+    template <typename ValueType>
+    [[nodiscard]] inline ::std::size_t abi_total_bytes(ValueType const* begin, ValueType const* end) noexcept
     {
         ::std::size_t total{};
         for(auto it = begin; it != end; ++it)
@@ -909,7 +997,8 @@ namespace uwvm2test::uwvm_int_strict
     [[nodiscard]] inline prepared_runtime prepare_runtime_from_wasm(
         byte_vec const& wasm_bytes,
         ::uwvm2::utils::container::u8string_view module_name,
-        ::std::initializer_list<preloaded_wasm_module> preloaded = {})
+        ::std::initializer_list<preloaded_wasm_module> preloaded = {},
+        wasm_feature_parameter_t wasm_feature_parameter = {})
     {
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
@@ -971,12 +1060,13 @@ namespace uwvm2test::uwvm_int_strict
         module_storage = ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin,
                                                                             end,
                                                                             parse_err,
-                                                                            ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
+                                                                            wasm_feature_parameter);
 
         ::uwvm2::uwvm::wasm::storage::execute_wasm = ::uwvm2::uwvm::wasm::type::wasm_file_t{1u};
         ::uwvm2::uwvm::wasm::storage::execute_wasm.file_name = u8"uwvm2test.wasm";
         ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name = module_name;
         ::uwvm2::uwvm::wasm::storage::execute_wasm.binfmt_ver = 1u;
+        ::uwvm2::uwvm::wasm::storage::execute_wasm.wasm_parameter.binfmt1_para = wasm_feature_parameter;
         ::uwvm2::uwvm::wasm::storage::execute_wasm.wasm_module_storage.wasm_binfmt_ver1_storage = ::std::move(module_storage);
 
         if(::uwvm2::uwvm::wasm::loader::construct_all_module_and_check_duplicate_module() != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok)

@@ -34,6 +34,7 @@
 # include "memory.h"
 # include "numeric.h"
 # include "stack.h"
+# include "wasm1p1.h"
 # include "variable.h"
 # include "conbine.h"
 # include "delay_local.h"

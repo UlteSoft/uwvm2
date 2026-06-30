@@ -1157,6 +1157,7 @@ namespace uwvm2::runtime::lib
             call_indirect_table_out_of_bounds,
             call_indirect_null_element,
             call_indirect_type_mismatch,
+            table_out_of_bounds,
             memory_out_of_bounds,
             runtime_invariant_failure,
             // uncatched int error (wasm 3.0, exception)
@@ -1195,6 +1196,10 @@ namespace uwvm2::runtime::lib
                 case trap_kind::call_indirect_type_mismatch:
                 {
                     return ::uwvm2::utils::container::u8string_view{u8"call_indirect: signature mismatch"};
+                }
+                case trap_kind::table_out_of_bounds:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"table access out of bounds"};
                 }
                 case trap_kind::memory_out_of_bounds:
                 {
@@ -11064,6 +11069,9 @@ namespace uwvm2::runtime::lib
 
         UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void trap_table_out_of_bounds() noexcept
+        { trap_fatal(trap_kind::table_out_of_bounds); }
+
         UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
             trap_memory_out_of_bounds(::uwvm2::object::memory::error::memory_error_t const& memerr) noexcept
         { print_memory_out_of_bounds_trap(memerr); }
@@ -11562,6 +11570,7 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::trap_table_out_of_bounds_func = trap_table_out_of_bounds;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_memory_out_of_bounds_func = trap_memory_out_of_bounds;
 
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
@@ -12201,12 +12210,15 @@ namespace uwvm2::runtime::lib
                                                                  u8"\". ");
                         }
                         auto const uwvm_int_translation_start_time{runtime_compile_threads_verbose_now()};
+                        auto const wasm_feature_parameter{find_lazy_validator_feature_parameter_storage(rec.module_name)};
+                        if(wasm_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                         rec.compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm<kTranslateOpt>(
                             *rec.runtime_module,
                             opt,
                             err,
                             effective_module_extra_compile_threads,
-                            effective_compile_task_split_conf);
+                            effective_compile_task_split_conf,
+                            wasm_feature_parameter);
 
                         runtime_compile_threads_verbose_done(uwvm_int_translation_start_time,
                                                              u8"Runtime full translation for module \"",
@@ -12726,8 +12738,9 @@ namespace uwvm2::runtime::lib
                 rec.lazy_compile_options.validation_mode = lazy_validation_mode;
                 rec.lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
                 rec.lazy_compile_options.validator_feature_parameter = find_lazy_validator_feature_parameter_storage(rec.module_name);
-                if(lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
-                   (rec.lazy_compile_options.validator_module_storage == nullptr || rec.lazy_compile_options.validator_feature_parameter == nullptr)) [[unlikely]]
+                if(rec.lazy_compile_options.validator_feature_parameter == nullptr ||
+                   (lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile && rec.lazy_compile_options.validator_module_storage == nullptr))
+                    [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
@@ -12741,7 +12754,8 @@ namespace uwvm2::runtime::lib
                         ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::initialize_lazy_module_storage(*rec.runtime_module,
                                                                                                                              opt,
                                                                                                                              err,
-                                                                                                                             split_config);
+                                                                                                                             split_config,
+                                                                                                                             rec.lazy_compile_options.validator_feature_parameter);
                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error)
@@ -13152,8 +13166,9 @@ namespace uwvm2::runtime::lib
                     rec.lazy_compile_options.validation_mode = interpreter_lazy_validation_mode;
                     rec.lazy_compile_options.validator_module_storage = rec.llvm_jit_lazy_compile_options.validator_module_storage;
                     rec.lazy_compile_options.validator_feature_parameter = rec.llvm_jit_lazy_compile_options.validator_feature_parameter;
-                    if(interpreter_lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
-                       (rec.lazy_compile_options.validator_module_storage == nullptr || rec.lazy_compile_options.validator_feature_parameter == nullptr)) [[unlikely]]
+                    if(rec.lazy_compile_options.validator_feature_parameter == nullptr ||
+                       (interpreter_lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
+                        rec.lazy_compile_options.validator_module_storage == nullptr)) [[unlikely]]
                     {
                         ::fast_io::fast_terminate();
                     }
@@ -13167,7 +13182,8 @@ namespace uwvm2::runtime::lib
                             ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::initialize_lazy_module_storage(*rec.runtime_module,
                                                                                                                                  interpreter_opt,
                                                                                                                                  err,
-                                                                                                                                 interpreter_split_config);
+                                                                                                                                 interpreter_split_config,
+                                                                                                                                 rec.lazy_compile_options.validator_feature_parameter);
                     }
 #  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error)

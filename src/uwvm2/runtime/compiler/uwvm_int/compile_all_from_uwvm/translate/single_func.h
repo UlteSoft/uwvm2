@@ -18,6 +18,7 @@ struct compile_task_split_config
 namespace details
 {
     using full_function_symbol_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     struct local_function_task_group
     {
@@ -205,6 +206,7 @@ namespace details
                                                            [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                            full_function_symbol_t& storage,
                                                            ::std::size_t compile_local_function_idx,
+                                                           parser_feature_parameter_t const* wasm_feature_parameter,
                                                            ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS{
 // These include fragments are intentionally expanded inside the function body: they share a large
 // translation context by lexical scope while keeping context setup, emit helpers, and dispatch logic
@@ -221,11 +223,12 @@ namespace details
                                                                  [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                                  full_function_symbol_t& storage,
                                                                  local_function_task_group task_group,
+                                                                 parser_feature_parameter_t const* wasm_feature_parameter,
                                                                  ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         for(::std::size_t local_function_idx{task_group.begin_index}; local_function_idx != task_group.end_index; ++local_function_idx)
         {
-            compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, err);
+            compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, wasm_feature_parameter, err);
         }
     }
 
@@ -269,6 +272,7 @@ namespace details
                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                          full_function_symbol_t& storage,
                                                          parallel_compile_failure_state& failure_state,
+                                                         parser_feature_parameter_t const* wasm_feature_parameter,
                                                          local_function_task_group task_group)
     {
         // Each scheduled task compiles a contiguous group and reports failure through shared state;
@@ -283,7 +287,7 @@ namespace details
         try
 #endif
         {
-            compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, local_err);
+            compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, wasm_feature_parameter, local_err);
         }
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error const&)
@@ -362,7 +366,8 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
                           [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                           ::uwvm2::validation::error::code_validation_error_impl& err,
                           ::std::size_t extra_compile_threads,
-                          compile_task_split_config split_config = {}) UWVM_THROWS
+                          compile_task_split_config split_config = {},
+                          details::parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
 {
     // Module compilation happens in two phases: translate all local bodies first, then complete
     // call-info metadata once every compiled function record has a stable address.
@@ -377,7 +382,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
     {
         for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
         {
-            details::compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, err);
+            details::compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, wasm_feature_parameter, err);
         }
         details::aggregate_local_function_storage(storage);
 
@@ -399,7 +404,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
     {
         for(auto const& task_group: task_groups)
         {
-            details::compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, err);
+            details::compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, wasm_feature_parameter, err);
         }
     }
     else
@@ -409,7 +414,13 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
         details::parallel_compile_failure_state failure_state{};
         for(auto const& task_group: task_groups)
         {
-            auto task{details::make_compile_all_from_uwvm_local_func_group_task<CompileOption>(curr_module, options, storage, failure_state, task_group)};
+            auto task{details::make_compile_all_from_uwvm_local_func_group_task<CompileOption>(
+                curr_module,
+                options,
+                storage,
+                failure_state,
+                wasm_feature_parameter,
+                task_group)};
             ::std::construct_at(task_batch.handles.buffer + task_batch.handle_count, task.release());
             ++task_batch.handle_count;
         }
@@ -442,5 +453,6 @@ template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_transl
 inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t
     compile_all_from_uwvm_single_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                       [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
-                                      ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
-{ return compile_all_from_uwvm<CompileOption>(curr_module, options, err, 0uz); }
+                                      ::uwvm2::validation::error::code_validation_error_impl& err,
+                                      details::parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
+{ return compile_all_from_uwvm<CompileOption>(curr_module, options, err, 0uz, {}, wasm_feature_parameter); }

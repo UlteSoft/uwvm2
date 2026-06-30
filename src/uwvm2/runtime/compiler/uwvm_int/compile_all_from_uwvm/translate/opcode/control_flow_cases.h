@@ -469,7 +469,7 @@ case wasm1_code::if_:
 
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"if", 1uz); }
 
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(auto const cond{try_pop_concrete_operand()}; !operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
@@ -695,14 +695,14 @@ case wasm1_code::else_:
         for(::std::size_t i{}; i != expected_count; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
                 err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
                 err.err_selectable.if_then_result_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.if_then_result_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.if_then_result_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::if_then_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -880,15 +880,15 @@ case wasm1_code::end:
         for(::std::size_t i{}; i != expected_count; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.end_result_mismatch.block_kind = block_kind;
                 err.err_selectable.end_result_mismatch.expected_count = expected_count;
                 err.err_selectable.end_result_mismatch.actual_count = actual_count;
                 err.err_selectable.end_result_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.end_result_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.end_result_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::end_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }

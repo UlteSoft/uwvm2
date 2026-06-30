@@ -9,6 +9,14 @@ using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 using wasm_byte = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
 using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
 using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
+using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
+using wasm_v128_t = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128;
+using wasm_funcref_t = ::uwvm2::object::global::wasm_funcref_t;
+using wasm_externref_t = ::uwvm2::object::global::wasm_externref_t;
+
+parser_feature_parameter_t const default_wasm_feature_parameter{};
+auto const& effective_wasm_feature_parameter{wasm_feature_parameter == nullptr ? default_wasm_feature_parameter : *wasm_feature_parameter};
+[[maybe_unused]] auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(effective_wasm_feature_parameter)};
 
 // no necessary to set err to default
 
@@ -28,7 +36,10 @@ struct block_result_type
 };
 
 struct operand_stack_storage_t
-{ wasm_value_type type{}; };
+{
+    wasm_value_type type{};
+    bool is_unknown{};
+};
 
 struct block_t
 {
@@ -218,9 +229,9 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count_with_internal);
 
     using local_offset_t = ::std::size_t;
-    constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
+    constexpr local_offset_t local_slot_size{sizeof(wasm_v128_t)};
     static_assert(local_slot_size != 0uz);
-    constexpr local_offset_t internal_temp_local_size{8uz};
+    constexpr local_offset_t internal_temp_local_size{sizeof(wasm_v128_t)};
     static_assert(local_slot_size == internal_temp_local_size);
 
     // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
@@ -245,6 +256,18 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
                                                   case wasm_value_type::f64:
                                                   {
                                                       return 8uz;
+                                                  }
+                                                  case wasm_value_type::v128:
+                                                  {
+                                                      return sizeof(wasm_v128_t);
+                                                  }
+                                                  case wasm_value_type::funcref:
+                                                  {
+                                                      return sizeof(wasm_funcref_t);
+                                                  }
+                                                  case wasm_value_type::externref:
+                                                  {
+                                                      return sizeof(wasm_externref_t);
                                                   }
                                                   [[unlikely]] default:
                                                   {
@@ -315,6 +338,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     {
         bool from_stack{};
         curr_operand_stack_value_type type{};
+        bool is_unknown{};
     };
 
     auto const curr_frame_operand_stack_base{[&]() constexpr noexcept -> ::std::size_t
@@ -344,21 +368,36 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     auto const try_pop_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                         {
                                             if(concrete_operand_count() == 0uz) { return {}; }
-                                            auto const vt{operand_stack.back_unchecked().type};
+                                            auto const operand{operand_stack.back_unchecked()};
                                             operand_stack_pop_unchecked();
-                                            return {.from_stack = true, .type = vt};
+                                            return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                         }};
 
     auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                          {
                                              if(concrete_operand_count() == 0uz) { return {}; }
-                                             return {.from_stack = true, .type = operand_stack.back_unchecked().type};
+                                             auto const operand{operand_stack.back_unchecked()};
+                                             return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                          }};
 
     [[maybe_unused]] auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr noexcept
                                                                 {
                                                                     while(count-- != 0uz && concrete_operand_count() != 0uz) { operand_stack_pop_unchecked(); }
                                                                 }};
+
+    auto const operand_type_matches{[](concrete_operand_t operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                    { return !operand.from_stack || operand.is_unknown || operand.type == expected_type; }};
+
+    auto const stack_entry_type_matches{[](operand_stack_storage_t operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                        { return operand.is_unknown || operand.type == expected_type; }};
+
+    [[maybe_unused]] auto const push_unknown_operand{[&]() constexpr UWVM_THROWS
+                                                     {
+                                                         // Unknown stack values only model polymorphic validation. Give them a
+                                                         // concrete storage type so byte-size accounting remains well-defined.
+                                                         operand_stack_push(curr_operand_stack_value_type::i32);
+                                                         operand_stack.back_unchecked().is_unknown = true;
+                                                     }};
 
     auto const sync_type_stacks_from_codegen_snapshot{[&](curr_operand_stack_type const& snapshot) constexpr UWVM_THROWS
                                                       {

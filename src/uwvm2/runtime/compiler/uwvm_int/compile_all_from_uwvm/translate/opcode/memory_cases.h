@@ -1422,7 +1422,7 @@ case wasm1_code::memory_grow:
 
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
 
-    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != wasm_value_type_u::i32) [[unlikely]]
+    if(auto const delta{try_pop_concrete_operand()}; !operand_type_matches(delta, wasm_value_type_u::i32)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_value_type(delta.type);

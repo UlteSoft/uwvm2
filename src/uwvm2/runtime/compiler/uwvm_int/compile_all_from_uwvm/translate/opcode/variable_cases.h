@@ -2447,7 +2447,7 @@ case wasm1_code::local_set:
     {
         have_set_operand = true;
         set_operand_type = value.type;
-        if(set_operand_type != curr_local_type) [[unlikely]]
+        if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
@@ -3173,7 +3173,7 @@ case wasm1_code::local_tee:
     }
     else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
-        if(value.type != curr_local_type) [[unlikely]]
+        if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
@@ -3992,6 +3992,27 @@ case wasm1_code::global_get:
                 emit_imm_to(bytecode, global_p);
                 break;
             }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
+            case curr_operand_stack_value_type::funcref:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
+            case curr_operand_stack_value_type::externref:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
             [[unlikely]] default:
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -4097,7 +4118,7 @@ case wasm1_code::global_set:
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"global.set", 1uz); }
     else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
-        if(value.type != curr_global_type) [[unlikely]]
+        if(!operand_type_matches(value, curr_global_type)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
@@ -4137,6 +4158,27 @@ case wasm1_code::global_set:
             case curr_operand_stack_value_type::f64:
             {
                 emit_opfunc_to(bytecode, translate::get_uwvmint_global_set_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
+            case curr_operand_stack_value_type::funcref:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, global_p);
+                break;
+            }
+            case curr_operand_stack_value_type::externref:
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
                 emit_imm_to(bytecode, global_p);
                 break;
             }

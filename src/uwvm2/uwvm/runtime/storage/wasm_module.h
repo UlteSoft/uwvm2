@@ -679,6 +679,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // element
         ::uwvm2::utils::container::vector<local_defined_element_storage_t> local_defined_element_vec_storage{};
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> element_expr_funcidx_vec_storage{};
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> declared_ref_funcidx_vec_storage{};
 
         // code
         ::uwvm2::utils::container::vector<local_defined_code_storage_t> local_defined_code_vec_storage{};
@@ -721,6 +722,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>
@@ -754,6 +757,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<

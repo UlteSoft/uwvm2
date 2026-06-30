@@ -2856,6 +2856,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             using table_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>;
             using memory_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>;
             using global_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>;
+            using export_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>;
             using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
             using code_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>;
             using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
@@ -2867,6 +2868,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<table_section_storage_t>(module_storage.sections)};
             auto const& memorysec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<memory_section_storage_t>(module_storage.sections)};
             auto const& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<global_section_storage_t>(module_storage.sections)};
+            auto const& exportsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<export_section_storage_t>(module_storage.sections)};
             auto const& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<element_section_storage_t>(module_storage.sections)};
             auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<code_section_storage_t>(module_storage.sections)};
             auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_section_storage_t>(module_storage.sections)};
@@ -3595,6 +3597,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     emit_local_memory_init_verbose(u8"init_by_page_count done", memory_idx, memory_type.limits, rec.effective_limits, runtime_page_size_bytes);
 
                     ++memory_idx;
+                }
+            }
+
+            // Declared refs for wasm1.1 `ref.func` validation. This mirrors the standard validator's export/global/element collection.
+            {
+                out.declared_ref_funcidx_vec_storage.clear();
+                auto append_declared_ref{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_idx)
+                {
+                    for(auto const declared_idx: out.declared_ref_funcidx_vec_storage)
+                    {
+                        if(declared_idx == func_idx) { return; }
+                    }
+                    out.declared_ref_funcidx_vec_storage.push_back(func_idx);
+                }};
+                auto collect_const_expr_refs{[&](auto const& expr)
+                {
+                    for(auto const& op: expr.opcodes)
+                    {
+                        if(op.opcode == static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD2u))
+                        {
+                            append_declared_ref(op.storage.ref_func_idx);
+                        }
+                    }
+                }};
+
+                for(auto const& exp: exportsec.exports)
+                {
+                    if(exp.exports.type == ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func)
+                    {
+                        append_declared_ref(exp.exports.storage.func_idx);
+                    }
+                }
+
+                for(auto const& local_global: globalsec.local_globals) { collect_const_expr_refs(local_global.expr); }
+
+                for(auto const& elem: elemsec.elems)
+                {
+                    auto const& elem_segment{elem.storage.segment};
+                    for(auto const func_idx: elem_segment.vec_funcidx) { append_declared_ref(func_idx); }
+                    for(auto const& expr: elem_segment.vec_expr) { collect_const_expr_refs(expr); }
                 }
             }
 

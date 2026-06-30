@@ -45,6 +45,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
     {
         wasm_null,
         wasm_func,
+        wasm_func_imported,
+        wasm_func_defined,
         wasm_extern,
 #if 0
         /// @warning Extension point: wasm3 GC reference kinds live here once the runtime representation is ready.

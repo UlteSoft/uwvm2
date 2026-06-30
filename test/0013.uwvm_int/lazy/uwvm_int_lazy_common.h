@@ -93,6 +93,7 @@ namespace uwvm2test::uwvm_int_lazy
         optable::trap_invalid_conversion_to_integer_func = terminate_trap_callback;
         optable::trap_integer_divide_by_zero_func = terminate_trap_callback;
         optable::trap_integer_overflow_func = terminate_trap_callback;
+        optable::trap_table_out_of_bounds_func = terminate_trap_callback;
         optable::call_func = terminate_call_callback;
         optable::call_indirect_func = terminate_call_indirect_callback;
 #endif
@@ -396,6 +397,31 @@ namespace uwvm2test::uwvm_int_lazy
         return ::std::addressof(wf->wasm_module_storage.wasm_binfmt_ver1_storage);
     }
 
+    [[nodiscard]] inline strict::wasm_feature_parameter_t const*
+        find_validator_feature_parameter_storage(::uwvm2::utils::container::u8string_view module_name) noexcept
+    {
+        auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+        if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) { return nullptr; }
+
+        using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+        auto const& am{it->second};
+        if(am.type != module_type_t::exec_wasm && am.type != module_type_t::preloaded_wasm) { return nullptr; }
+
+        auto const wf{am.module_storage_ptr.wf};
+        if(wf == nullptr || wf->binfmt_ver != 1u) { return nullptr; }
+        return ::std::addressof(wf->wasm_parameter.binfmt1_para);
+    }
+
+    [[nodiscard]] inline strict::wasm_feature_parameter_t const*
+        find_validator_feature_parameter_storage(runtime_module_t const& rt) noexcept
+    {
+        for(auto const& [module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+        {
+            if(::std::addressof(curr_rt) == ::std::addressof(rt)) { return find_validator_feature_parameter_storage(module_name); }
+        }
+        return nullptr;
+    }
+
     [[nodiscard]] inline lazy_split_config_t small_code_size_split_config() noexcept
     {
 #if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
@@ -411,7 +437,13 @@ namespace uwvm2test::uwvm_int_lazy
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
         backend_compile_option_t cop{};
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         auto storage{lazy::initialize_lazy_module_storage(rt, cop, err, cfg)};
+#else
+        auto const* const wasm_feature_parameter{find_validator_feature_parameter_storage(rt)};
+        if(wasm_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto storage{lazy::initialize_lazy_module_storage(rt, cop, err, cfg, wasm_feature_parameter)};
+#endif
         if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
         return storage;
     }
@@ -427,6 +459,7 @@ namespace uwvm2test::uwvm_int_lazy
         options.compile_options = cop;
         options.validation_mode = mode;
         options.validator_module_storage = mode == lazy_validation_mode_t::validate_on_lazy_compile ? find_validator_module_storage(module_name) : nullptr;
+        options.validator_feature_parameter = find_validator_feature_parameter_storage(module_name);
         return options;
     }
 

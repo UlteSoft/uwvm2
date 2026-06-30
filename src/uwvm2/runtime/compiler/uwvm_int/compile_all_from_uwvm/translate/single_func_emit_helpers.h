@@ -291,6 +291,12 @@ auto const runtime_log_vt_name{[]([[maybe_unused]] curr_operand_stack_value_type
                                        case curr_operand_stack_value_type::f32: return u8"f32";
                                        case curr_operand_stack_value_type::f64:
                                            return u8"f64";
+                                       case curr_operand_stack_value_type::v128:
+                                           return u8"v128";
+                                       case curr_operand_stack_value_type::funcref:
+                                           return u8"funcref";
+                                       case curr_operand_stack_value_type::externref:
+                                           return u8"externref";
                                        [[unlikely]] default:
                                            return u8"?";
                                    }
@@ -554,6 +560,10 @@ auto const emit_opfunc_to{[&](bytecode_vec_t& dst, auto fptr) constexpr UWVM_THR
                                                               {
                                                                   return stacktop_cache_f64_count;
                                                               }
+                                                              case curr_operand_stack_value_type::v128:
+                                                              {
+                                                                  return stacktop_cache_f64_count;
+                                                              }
                                                               [[unlikely]] default:
                                                               {
                                                                   return stacktop_cache_i32_count;
@@ -590,6 +600,10 @@ constexpr auto stacktop_range_begin_pos{[](curr_operand_stack_value_type vt) con
                                                 {
                                                     return CompileOption.f64_stack_top_begin_pos;
                                                 }
+                                                case curr_operand_stack_value_type::v128:
+                                                {
+                                                    return CompileOption.v128_stack_top_begin_pos;
+                                                }
                                                 [[unlikely]] default:
                                                 {
                                                     return SIZE_MAX;
@@ -616,6 +630,10 @@ constexpr auto stacktop_range_end_pos{[](curr_operand_stack_value_type vt) const
                                               case curr_operand_stack_value_type::f64:
                                               {
                                                   return CompileOption.f64_stack_top_end_pos;
+                                              }
+                                              case curr_operand_stack_value_type::v128:
+                                              {
+                                                  return CompileOption.v128_stack_top_end_pos;
                                               }
                                               [[unlikely]] default:
                                               {
@@ -644,6 +662,10 @@ constexpr auto stacktop_range_end_pos{[](curr_operand_stack_value_type vt) const
                                                                 {
                                                                     return CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos;
                                                                 }
+                                                                case curr_operand_stack_value_type::v128:
+                                                                {
+                                                                    return CompileOption.v128_stack_top_begin_pos != CompileOption.v128_stack_top_end_pos;
+                                                                }
                                                                 [[unlikely]] default:
                                                                 {
                                                                     return false;
@@ -665,6 +687,8 @@ constexpr auto stacktop_range_end_pos{[](curr_operand_stack_value_type vt) const
                                                                                                 return CompileOption.f32_stack_top_begin_pos;
                                                                                             case curr_operand_stack_value_type::f64:
                                                                                                 return CompileOption.f64_stack_top_begin_pos;
+                                                                                            case curr_operand_stack_value_type::v128:
+                                                                                                return CompileOption.v128_stack_top_begin_pos;
                                                                                             [[unlikely]] default:
                                                                                                 return SIZE_MAX;
                                                                                         }
@@ -682,6 +706,8 @@ constexpr auto stacktop_range_end_pos{[](curr_operand_stack_value_type vt) const
                                                                                               return CompileOption.f32_stack_top_end_pos;
                                                                                           case curr_operand_stack_value_type::f64:
                                                                                               return CompileOption.f64_stack_top_end_pos;
+                                                                                          case curr_operand_stack_value_type::v128:
+                                                                                              return CompileOption.v128_stack_top_end_pos;
                                                                                           [[unlikely]] default:
                                                                                               return SIZE_MAX;
                                                                                       }
@@ -707,6 +733,10 @@ auto const stacktop_cache_count_ref_for_vt{[&](curr_operand_stack_value_type vt)
                                                        return stacktop_cache_f32_count;
                                                    }
                                                    case curr_operand_stack_value_type::f64:
+                                                   {
+                                                       return stacktop_cache_f64_count;
+                                                   }
+                                                   case curr_operand_stack_value_type::v128:
                                                    {
                                                        return stacktop_cache_f64_count;
                                                    }
@@ -737,7 +767,7 @@ auto const stacktop_cache_count_for_range{
         {
             sum += stacktop_cache_f64_count;
         }
-        // Note: wasm1 codegen never produces v128 values, so no v128 cache-count here.
+        // v128 shares the f64/fp-simd ring counter; do not add a second count for the same physical range.
         return sum;
     }};
 
@@ -1066,6 +1096,17 @@ auto const emit_stacktop_spill1_typed_to{
                             interpreter_tuple));
                     break;
                 }
+                case curr_operand_stack_value_type::v128:
+                {
+                    if constexpr(stacktop_v128_enabled)
+                    {
+                        emit_opfunc_to(
+                            dst,
+                            translate::get_uwvmint_stacktop_to_operand_stack_typed_single_fptr_from_tuple<CompileOption, wasm_v128_t>(slot,
+                                                                                                                                    interpreter_tuple));
+                    }
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1327,6 +1368,33 @@ auto const emit_stacktop_spill1_typed_to{
                 }
                 break;
             }
+            case curr_operand_stack_value_type::v128:
+            {
+                if constexpr(stacktop_v128_enabled)
+                {
+                    tmp_currpos.v128_stack_top_curr_pos = start_pos;
+                    remain.v128_stack_top_remain_size = count;
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+                    {
+                        ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                             u8"[uwvm-int-translator] fn=",
+                                             function_index,
+                                             u8" event=stacktop.spillN | vt=v128 start=",
+                                             start_pos,
+                                             u8" remain(v128)=",
+                                             count,
+                                             u8" currpos(v128)=",
+                                             curr_stacktop.v128_stack_top_curr_pos,
+                                             u8"\n");
+                    }
+                    emit_opfunc_to(dst,
+                                   translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<CompileOption, wasm_v128_t>(tmp_currpos,
+                                                                                                                                remain,
+                                                                                                                                interpreter_tuple));
+                    return;
+                }
+                break;
+            }
             [[unlikely]] default:
             {
                 break;
@@ -1396,6 +1464,17 @@ auto const emit_stacktop_fill1_typed_to{
                                                                                                       ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(
                             slot,
                             interpreter_tuple));
+                    break;
+                }
+                case curr_operand_stack_value_type::v128:
+                {
+                    if constexpr(stacktop_v128_enabled)
+                    {
+                        emit_opfunc_to(
+                            dst,
+                            translate::get_uwvmint_operand_stack_to_stacktop_typed_single_fptr_from_tuple<CompileOption, wasm_v128_t>(slot,
+                                                                                                                                    interpreter_tuple));
+                    }
                     break;
                 }
                 [[unlikely]] default:
@@ -1539,6 +1618,33 @@ auto const emit_stacktop_fill1_typed_to{
                             tmp_currpos,
                             remain,
                             interpreter_tuple));
+                    return;
+                }
+                break;
+            }
+            case curr_operand_stack_value_type::v128:
+            {
+                if constexpr(stacktop_v128_enabled)
+                {
+                    tmp_currpos.v128_stack_top_curr_pos = start_pos;
+                    remain.v128_stack_top_remain_size = count;
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
+                    {
+                        ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                             u8"[uwvm-int-translator] fn=",
+                                             function_index,
+                                             u8" event=stacktop.fillN | vt=v128 start=",
+                                             start_pos,
+                                             u8" remain(v128)=",
+                                             count,
+                                             u8" currpos(v128)=",
+                                             curr_stacktop.v128_stack_top_curr_pos,
+                                             u8"\n");
+                    }
+                    emit_opfunc_to(dst,
+                                   translate::get_uwvmint_operand_stack_to_stacktop_fptr_from_tuple<CompileOption, wasm_v128_t>(tmp_currpos,
+                                                                                                                                remain,
+                                                                                                                                interpreter_tuple));
                     return;
                 }
                 break;
@@ -1694,6 +1800,11 @@ auto const stacktop_fill_one_from_memory_to{[&](bytecode_vec_t& dst) constexpr U
 auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                         {
                                             if constexpr(!stacktop_enabled) { return; }
+                                            if(!stacktop_enabled_for_vt(vt))
+                                            {
+                                                while(stacktop_cache_count != 0uz) { stacktop_spill_one_deepest_to(dst); }
+                                                return;
+                                            }
 
                                             ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                             ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
@@ -1764,6 +1875,11 @@ auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_st
 auto const stacktop_commit_push1_typed{[&](curr_operand_stack_value_type vt) constexpr noexcept
                                        {
                                            if constexpr(!stacktop_enabled) { return; }
+                                           if(!stacktop_enabled_for_vt(vt))
+                                           {
+                                               ++stacktop_memory_count;
+                                               return;
+                                           }
 
                                            ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                            ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
@@ -1820,6 +1936,15 @@ auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
 
                                              // Pop i-th value from top (type stack is updated by the caller after this commit).
                                              auto const vt{codegen_operand_stack.index_unchecked((codegen_operand_stack.size() - 1uz) - i).type};
+
+                                             if(!stacktop_enabled_for_vt(vt))
+                                             {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                 if(stacktop_memory_count == 0uz) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+                                                 if(stacktop_memory_count != 0uz) { --stacktop_memory_count; }
+                                                 continue;
+                                             }
 
                                              ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                              ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
@@ -2209,10 +2334,10 @@ auto const stacktop_after_pop_n_if_reachable{[&](bytecode_vec_t& dst, ::std::siz
     }};
 
 // Pop+push modeling (used for cross-range ops like f32.cmp -> i32 when i32 range is disjoint from f32 range).
-[[maybe_unused]] auto const stacktop_after_pop_n_push1_typed_if_reachable{
-    [&](bytecode_vec_t& dst, ::std::size_t pop_n, curr_operand_stack_value_type push_type) constexpr UWVM_THROWS
-    {
-        if constexpr(!stacktop_enabled) { return; }
+	[[maybe_unused]] auto const stacktop_after_pop_n_push1_typed_if_reachable{
+	    [&](bytecode_vec_t& dst, ::std::size_t pop_n, curr_operand_stack_value_type push_type) constexpr UWVM_THROWS
+	    {
+	        if constexpr(!stacktop_enabled) { return; }
         else
         {
             if(is_polymorphic) { return; }
@@ -2224,12 +2349,28 @@ auto const stacktop_after_pop_n_if_reachable{[&](bytecode_vec_t& dst, ::std::siz
             stacktop_prepare_push1_typed(dst, push_type);
             stacktop_commit_push1_typed(push_type);
             codegen_stack_push(push_type);
-            stacktop_fill_to_canonical(dst);
-        }
-    }};
+	            stacktop_fill_to_canonical(dst);
+	        }
+	    }};
 
-// Pop+push modeling without emitting any fill ops (used to keep `br_if` fusion candidates contiguous).
-[[maybe_unused]] auto const stacktop_after_pop_n_push1_typed_no_fill_if_reachable{
+	// Pop+push modeling for opfuncs that have already written the result to operand-stack memory.
+	[[maybe_unused]] auto const stacktop_after_pop_n_push1_memory_typed_if_reachable{
+	    [&](bytecode_vec_t& dst, ::std::size_t pop_n, curr_operand_stack_value_type push_type) constexpr UWVM_THROWS
+	    {
+	        if constexpr(!stacktop_enabled) { return; }
+	        else
+	        {
+	            if(is_polymorphic) { return; }
+	            stacktop_commit_pop_n(pop_n);
+	            codegen_stack_pop_n(pop_n);
+	            ++stacktop_memory_count;
+	            codegen_stack_push(push_type);
+	            stacktop_fill_to_canonical(dst);
+	        }
+	    }};
+
+	// Pop+push modeling without emitting any fill ops (used to keep `br_if` fusion candidates contiguous).
+	[[maybe_unused]] auto const stacktop_after_pop_n_push1_typed_no_fill_if_reachable{
     [&](::std::size_t pop_n, curr_operand_stack_value_type push_type) constexpr noexcept
     {
         if constexpr(!stacktop_enabled) { return; }
@@ -2285,6 +2426,21 @@ auto const emit_drop_typed_to{
                     case curr_operand_stack_value_type::f64:
                     {
                         emit_opfunc_to(dst, translate::get_uwvmint_drop_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        return;
+                    }
+                    case curr_operand_stack_value_type::v128:
+                    {
+                        emit_opfunc_to(dst, translate::get_uwvmint_drop_v128_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        return;
+                    }
+                    case curr_operand_stack_value_type::funcref:
+                    {
+                        emit_opfunc_to(dst, translate::get_uwvmint_drop_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        return;
+                    }
+                    case curr_operand_stack_value_type::externref:
+                    {
+                        emit_opfunc_to(dst, translate::get_uwvmint_drop_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         return;
                     }
                     [[unlikely]] default:
@@ -2358,6 +2514,11 @@ auto const emit_drop_typed_to{
                     case curr_operand_stack_value_type::f64:
                     {
                         emit_opfunc_to(dst, translate::get_uwvmint_drop_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        return;
+                    }
+                    case curr_operand_stack_value_type::v128:
+                    {
+                        emit_opfunc_to(dst, translate::get_uwvmint_drop_v128_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         return;
                     }
                     [[unlikely]] default:
@@ -2703,6 +2864,26 @@ auto const emit_local_get_typed_to{
                 case curr_operand_stack_value_type::f64:
                 {
                     emit_opfunc_to(dst, translate::get_uwvmint_local_get_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                    emit_imm_to(dst, off);
+                    break;
+                }
+                case curr_operand_stack_value_type::v128:
+                {
+                    emit_opfunc_to(dst, translate::get_uwvmint_local_get_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                    emit_imm_to(dst, off);
+                    break;
+                }
+                case curr_operand_stack_value_type::funcref:
+                {
+                    emit_opfunc_to(dst,
+                                   translate::get_uwvmint_local_get_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                    emit_imm_to(dst, off);
+                    break;
+                }
+                case curr_operand_stack_value_type::externref:
+                {
+                    emit_opfunc_to(dst,
+                                   translate::get_uwvmint_local_get_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
                     emit_imm_to(dst, off);
                     break;
                 }
@@ -3101,6 +3282,24 @@ auto const emit_local_set_typed_to{
                 emit_imm_to(dst, off);
                 break;
             }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::funcref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::externref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
             [[unlikely]] default:
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -3161,6 +3360,24 @@ auto const emit_local_set_typed_to{
                 emit_imm_to(dst, off);
                 break;
             }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::funcref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::externref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_set_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
             [[unlikely]] default:
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -3218,6 +3435,24 @@ auto const emit_local_tee_typed_to{
             case curr_operand_stack_value_type::f64:
             {
                 emit_opfunc_to(dst, translate::get_uwvmint_local_tee_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_tee_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::funcref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_tee_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(dst, off);
+                break;
+            }
+            case curr_operand_stack_value_type::externref:
+            {
+                emit_opfunc_to(dst, translate::get_uwvmint_local_tee_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
                 emit_imm_to(dst, off);
                 break;
             }
