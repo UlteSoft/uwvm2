@@ -17,6 +17,8 @@ auto const func_end_label_id{new_label(false)};
 
 // function block (label/result type is the function result)
 control_flow_stack.push_back({
+    .label = {.begin = curr_func_type.result.begin, .end = curr_func_type.result.end},
+    .start = {},
     .result = {.begin = curr_func_type.result.begin, .end = curr_func_type.result.end},
     .operand_stack_base = 0uz,
     .type = block_type::function,
@@ -149,6 +151,120 @@ auto const ensure_wasm1p1_value_type_enabled{
         }
     }};
 
+auto const parse_block_type{
+    [&](::std::byte const* op_begin, ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS -> block_signature_t
+    {
+        if(code_curr == code_end) [[unlikely]]
+        {
+            err.err_curr = op_begin;
+            err.err_code = code_validation_error_code::missing_block_type;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
+        }
+
+        auto const blocktype_begin{code_curr};
+        auto const blocktype{read_leb128.template operator()<wasm_i64>(code_curr, code_end, op_begin, op_name)};
+        auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
+
+        if(blocktype_encoded_size > 5uz) [[unlikely]]
+        {
+            wasm_byte first_blocktype_byte{};
+            ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
+#if CHAR_BIT > 8
+            first_blocktype_byte = static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+#endif
+            err.err_curr = op_begin;
+            err.err_selectable.u8 = first_blocktype_byte;
+            err.err_code = code_validation_error_code::illegal_block_type;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
+        switch(blocktype)
+        {
+            case -64:
+            {
+                return {};
+            }
+            case -1:
+            {
+                return {.result = {i32_result_arr, i32_result_arr + 1u}};
+            }
+            case -2:
+            {
+                return {.result = {i64_result_arr, i64_result_arr + 1u}};
+            }
+            case -3:
+            {
+                return {.result = {f32_result_arr, f32_result_arr + 1u}};
+            }
+            case -4:
+            {
+                return {.result = {f64_result_arr, f64_result_arr + 1u}};
+            }
+            case -5:
+            {
+                ensure_wasm1p1_value_type_enabled(
+                    op_begin, curr_operand_stack_value_type::v128, ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                return {.result = {v128_result_arr, v128_result_arr + 1u}};
+            }
+            case -16:
+            {
+                ensure_wasm1p1_value_type_enabled(
+                    op_begin, curr_operand_stack_value_type::funcref, ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                return {.result = {funcref_result_arr, funcref_result_arr + 1u}};
+            }
+            case -17:
+            {
+                ensure_wasm1p1_value_type_enabled(
+                    op_begin, curr_operand_stack_value_type::externref, ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                return {.result = {externref_result_arr, externref_result_arr + 1u}};
+            }
+            default:
+            {
+                break;
+            }
+        }
+
+        if(blocktype >= 0)
+        {
+            if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+            {
+                fail_wasm1p1_feature_required(op_begin,
+                                              static_cast<wasm_u32>(blocktype),
+                                              ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value,
+                                              ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+            }
+
+            auto const types_begin{curr_module.type_section_storage.type_section_begin};
+            auto const types_end{curr_module.type_section_storage.type_section_end};
+            auto const all_type_count_uz{
+                (types_begin == nullptr || types_end == nullptr) ? 0uz : static_cast<::std::size_t>(types_end - types_begin)};
+            if(static_cast<::std::uint_least64_t>(blocktype) > ::std::numeric_limits<wasm_u32>::max() ||
+               static_cast<::std::size_t>(blocktype) >= all_type_count_uz) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.illegal_type_index.type_index = blocktype > 0 ? static_cast<wasm_u32>(blocktype) : 0u;
+                err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
+                err.err_code = code_validation_error_code::illegal_type_index;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            auto const& block_func_type{types_begin[static_cast<::std::size_t>(blocktype)]};
+            return {.start = {block_func_type.parameter.begin, block_func_type.parameter.end},
+                    .result = {block_func_type.result.begin, block_func_type.result.end}};
+        }
+
+        wasm_byte first_blocktype_byte{};
+        ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
+#if CHAR_BIT > 8
+        first_blocktype_byte = static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+#endif
+        err.err_curr = op_begin;
+        err.err_selectable.u8 = first_blocktype_byte;
+        err.err_code = code_validation_error_code::illegal_block_type;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        return {};
+    }};
+
 auto const validate_numeric_unary_stack_effect{
     [&](::std::byte const* op_begin,
         ::uwvm2::utils::container::u8string_view op_name,
@@ -197,6 +313,38 @@ auto const validate_numeric_unary_stack_effect{
         }
 
         pop_available_concrete_operands(expected_count);
+    }};
+
+auto const enter_control_frame{
+    [&](::std::byte const* op_begin,
+        ::uwvm2::utils::container::u8string_view op_name,
+        block_type type,
+        block_signature_t signature,
+        ::std::size_t start_label_id,
+        ::std::size_t end_label_id,
+        ::std::size_t else_label_id,
+        ::std::byte const* wasm_code_curr_at_start_label = nullptr) constexpr UWVM_THROWS -> ::std::size_t
+    {
+        pop_expected_operands(op_begin, op_name, signature.start);
+
+        auto const base{operand_stack.size()};
+        auto const label{type == block_type::loop ? signature.start : signature.result};
+        for(auto curr{signature.start.begin}; curr != signature.start.end; ++curr) { operand_stack_push(*curr); }
+
+        control_flow_stack.push_back({.label = label,
+                                      .start = signature.start,
+                                      .result = signature.result,
+                                      .operand_stack_base = base,
+                                      .type = type,
+                                      .polymorphic_base = is_polymorphic,
+                                      .then_polymorphic_end = false,
+                                      .start_label_id = start_label_id,
+                                      .end_label_id = end_label_id,
+                                      .else_label_id = else_label_id,
+                                      .wasm_code_curr_at_start_label = wasm_code_curr_at_start_label});
+
+        is_polymorphic = false;
+        return base;
     }};
 
 auto const validate_i32_operands{

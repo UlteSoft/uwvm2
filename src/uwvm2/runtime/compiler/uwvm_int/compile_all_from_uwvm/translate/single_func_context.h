@@ -35,6 +35,12 @@ struct block_result_type
     wasm_value_type const* end{};
 };
 
+struct block_signature_t
+{
+    block_result_type start{};
+    block_result_type result{};
+};
+
 struct operand_stack_storage_t
 {
     wasm_value_type type{};
@@ -43,6 +49,8 @@ struct operand_stack_storage_t
 
 struct block_t
 {
+    block_result_type label{};
+    block_result_type start{};
     block_result_type result{};
     ::std::size_t operand_stack_base{};
     block_type type{};
@@ -222,9 +230,29 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
 
-    // Translation uses one internal temporary local slot to preserve single-value block results across stack-unwind branches
+    // Translation uses internal temporary local slots to preserve branch arguments across stack-unwind branches
     // (e.g., `br`/`br_if`/`br_table` when `target_base + arity` is not equal to current stack size).
-    constexpr wasm_u32 internal_temp_local_count{1u};
+    auto max_internal_temp_local_count{static_cast<::std::size_t>(curr_func_type.result.end - curr_func_type.result.begin)};
+    auto const type_section_begin_for_temp{curr_module.type_section_storage.type_section_begin};
+    auto const type_section_end_for_temp{curr_module.type_section_storage.type_section_end};
+    if(type_section_begin_for_temp != nullptr && type_section_end_for_temp != nullptr)
+    {
+        for(auto type_curr{type_section_begin_for_temp}; type_curr != type_section_end_for_temp; ++type_curr)
+        {
+            auto const param_count{static_cast<::std::size_t>(type_curr->parameter.end - type_curr->parameter.begin)};
+            auto const result_count{static_cast<::std::size_t>(type_curr->result.end - type_curr->result.begin)};
+            if(param_count > max_internal_temp_local_count) { max_internal_temp_local_count = param_count; }
+            if(result_count > max_internal_temp_local_count) { max_internal_temp_local_count = result_count; }
+        }
+    }
+    if(max_internal_temp_local_count == 0uz) { max_internal_temp_local_count = 1uz; }
+    if(max_internal_temp_local_count > static_cast<::std::size_t>(::std::numeric_limits<wasm_u32>::max()) ||
+       static_cast<::std::size_t>(all_local_count) >
+           static_cast<::std::size_t>(::std::numeric_limits<wasm_u32>::max()) - max_internal_temp_local_count) [[unlikely]]
+    {
+        ::fast_io::fast_terminate();
+    }
+    wasm_u32 const internal_temp_local_count{static_cast<wasm_u32>(max_internal_temp_local_count)};
     wasm_u32 all_local_count_with_internal{all_local_count + internal_temp_local_count};
     local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count_with_internal);
 
@@ -484,10 +512,16 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
         ::fast_io::fast_terminate();
     }
 
-    // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
-    // Safe: reserved `all_local_count_with_internal` above.
-    local_offsets.push_back_unchecked(local_bytes);
-    local_bytes_add(local_bytes, internal_temp_local_size);
+    // Internal temp locals come last and each slot is wide enough for any wasm1p1 value.
+    ::uwvm2::utils::container::vector<local_offset_t> internal_temp_local_offsets{};
+    internal_temp_local_offsets.reserve(static_cast<::std::size_t>(internal_temp_local_count));
+    for(wasm_u32 i{}; i != internal_temp_local_count; ++i)
+    {
+        // Safe: reserved `all_local_count_with_internal` above.
+        local_offsets.push_back_unchecked(local_bytes);
+        internal_temp_local_offsets.push_back_unchecked(local_bytes);
+        local_bytes_add(local_bytes, internal_temp_local_size);
+    }
 
     local_func_symbol.local_bytes_max = local_bytes;
 
@@ -520,7 +554,9 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
                                                       }};
 
     // Internal temp local is the first slot after all Wasm-visible locals.
-    local_offset_t const internal_temp_local_off{local_offset_from_index(all_local_count)};
+    local_offset_t const internal_temp_local_off{internal_temp_local_offsets.index_unchecked(0uz)};
+    local_offset_t const internal_temp_local_bytes{
+        static_cast<local_offset_t>(static_cast<::std::size_t>(internal_temp_local_count) * static_cast<::std::size_t>(internal_temp_local_size))};
     // Parameters occupy the prefix of the locals buffer and are populated by memcpy at runtime.
     // Non-parameter locals must be zero-initialized by the Wasm spec, but we can skip zeroing trailing locals
     // that are never read (no `local.get`).

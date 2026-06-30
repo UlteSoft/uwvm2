@@ -16,8 +16,7 @@ namespace
         // f0: (param i32) (result i32) -> 123 (for param!=0)
         //
         // With stacktop caching enabled and v128 used as the float-carrier register class, the translator should still
-        // emit the loop-entry `br_stacktop_transform_to_begin` sequence for branches that target the loop header when
-        // the cache is non-empty.
+        // emit a loop re-entry stacktop transform when branches target the loop header while the cache is non-empty.
         {
             func_type ty{{k_val_i32}, {k_val_i32}};
             func_body fb{};
@@ -62,7 +61,7 @@ namespace
     }
 
     template <optable::uwvm_interpreter_translate_option_t CompileOption, typename ByteStorage>
-    [[nodiscard]] bool bytecode_contains_any_br_stacktop_transform(ByteStorage const& bc) noexcept
+    [[nodiscard]] bool bytecode_contains_any_loop_reentry_stacktop_transform(ByteStorage const& bc) noexcept
     {
 #if !defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         (void)bc;
@@ -106,7 +105,13 @@ namespace
         constexpr auto f45 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
         constexpr auto f46 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
 
-        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46);
+        constexpr auto n35 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c35, tuple);
+        constexpr auto n36 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c36, tuple);
+        constexpr auto n45 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
+        constexpr auto n46 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
+
+        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46) ||
+               bytecode_contains_fptr(bc, n35) || bytecode_contains_fptr(bc, n36) || bytecode_contains_fptr(bc, n45) || bytecode_contains_fptr(bc, n46);
 #endif
     }
 
@@ -160,7 +165,7 @@ namespace
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
             UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
-            UWVM2TEST_REQUIRE(bytecode_contains_any_br_stacktop_transform<opt>(cm.local_funcs.index_unchecked(0).op.operands));
+            UWVM2TEST_REQUIRE(bytecode_contains_any_loop_reentry_stacktop_transform<opt>(cm.local_funcs.index_unchecked(0).op.operands));
 
             using Runner = interpreter_runner<opt>;
             UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
@@ -179,4 +184,3 @@ int main()
 {
     return test_translate_cf_stacktop_transform_v128_carrier();
 }
-

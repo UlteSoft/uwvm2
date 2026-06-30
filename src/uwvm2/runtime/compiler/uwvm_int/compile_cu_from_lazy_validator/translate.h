@@ -374,6 +374,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             return value;
         }
 
+        inline constexpr void ensure_lazy_wasm1p1_value_type_enabled(
+            ::std::byte const* op_begin,
+            wasm_byte type_byte,
+            parser_feature_parameter_t const& wasm_feature_parameter,
+            ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject,
+            ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type_byte)};
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(vt)) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.wasm1p1_invalid_reference_type.value = type_byte;
+                err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::features::value_type_enabled(vt, wasm_feature_parameter)) [[unlikely]]
+            {
+                auto const feature{vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128
+                                       ? ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd
+                                       : ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types};
+                fail_lazy_feature_required(op_begin, err, type_byte, feature, subject);
+            }
+        }
+
         inline constexpr void skip_reserved_memory_index_byte(::std::byte const*& code_curr,
                                                               ::std::byte const* code_end,
                                                               ::std::byte const* op_begin,
@@ -384,6 +409,114 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 fail_lazy_split(op_begin, code_validation_error_code::invalid_memory_index, err, ::fast_io::parse_code::end_of_file);
             }
             ++code_curr;
+        }
+
+        inline constexpr void skip_wasm1p1_block_type(::std::byte const*& code_curr,
+                                                      ::std::byte const* code_end,
+                                                      ::std::byte const* op_begin,
+                                                      runtime_module_storage_t const& curr_module,
+                                                      parser_feature_parameter_t const& wasm_feature_parameter,
+                                                      ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            if(code_curr == code_end) [[unlikely]]
+            {
+                fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
+            }
+
+            auto const blocktype_begin{code_curr};
+            auto const blocktype{
+                read_leb128_immediate<wasm_i64>(code_curr, code_end, op_begin, code_validation_error_code::illegal_block_type, err)};
+            auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
+
+            auto const fail_illegal_block_type{[&]() constexpr UWVM_THROWS
+                                               {
+                                                   wasm_byte first_blocktype_byte{};
+                                                   ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
+#if CHAR_BIT > 8
+                                                   first_blocktype_byte =
+                                                       static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+#endif
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.u8 = first_blocktype_byte;
+                                                   err.err_code = code_validation_error_code::illegal_block_type;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }};
+
+            if(blocktype_encoded_size > 5uz) [[unlikely]] { fail_illegal_block_type(); }
+
+            auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+            switch(blocktype)
+            {
+                case -64:
+                case -1:
+                case -2:
+                case -3:
+                case -4:
+                {
+                    return;
+                }
+                case -5:
+                {
+                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    {
+                        fail_lazy_feature_required(op_begin,
+                                                   err,
+                                                   static_cast<::std::uint_least32_t>(static_cast<wasm_byte>(
+                                                       ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)),
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd,
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+                    return;
+                }
+                case -16:
+                case -17:
+                {
+                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    {
+                        auto const vt{blocktype == -16 ? ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref
+                                                       : ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref};
+                        fail_lazy_feature_required(op_begin,
+                                                   err,
+                                                   static_cast<::std::uint_least32_t>(static_cast<wasm_byte>(vt)),
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+                    return;
+                }
+                default:
+                {
+                    break;
+                }
+            }
+
+            if(blocktype >= 0)
+            {
+                if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+                {
+                    fail_lazy_feature_required(op_begin,
+                                               err,
+                                               static_cast<::std::uint_least32_t>(static_cast<wasm_u32>(blocktype)),
+                                               ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value,
+                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                }
+
+                auto const types_begin{curr_module.type_section_storage.type_section_begin};
+                auto const types_end{curr_module.type_section_storage.type_section_end};
+                auto const all_type_count_uz{
+                    (types_begin == nullptr || types_end == nullptr) ? 0uz : static_cast<::std::size_t>(types_end - types_begin)};
+                if(static_cast<::std::uint_least64_t>(blocktype) > ::std::numeric_limits<wasm_u32>::max() ||
+                   static_cast<::std::size_t>(blocktype) >= all_type_count_uz) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.illegal_type_index.type_index = blocktype > 0 ? static_cast<wasm_u32>(blocktype) : 0u;
+                    err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
+                    err.err_code = code_validation_error_code::illegal_type_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+                return;
+            }
+
+            fail_illegal_block_type();
         }
 
         inline constexpr ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
@@ -706,7 +839,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             {
                                 fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err);
                             }
-                            (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                            auto const result_type_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            ensure_lazy_wasm1p1_value_type_enabled(op_begin,
+                                                                    result_type_byte,
+                                                                    wasm_feature_parameter,
+                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction,
+                                                                    err);
                             return;
                         }
                         case opcode_byte(wasm1p1_code::table_get):
@@ -749,7 +887,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                            ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                                                            ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null);
                             }
-                            (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                            auto const rt_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            auto const rt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(rt_byte)};
+                            using reference_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type;
+                            if(rt != reference_type::funcref && rt != reference_type::externref) [[unlikely]]
+                            {
+                                err.err_curr = op_begin;
+                                err.err_selectable.wasm1p1_invalid_reference_type.value = rt_byte;
+                                err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            }
+                            ensure_lazy_wasm1p1_value_type_enabled(
+                                op_begin,
+                                static_cast<wasm_byte>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(rt)),
+                                wasm_feature_parameter,
+                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type,
+                                err);
                             return;
                         }
                         case opcode_byte(wasm1p1_code::ref_is_null):
@@ -1345,16 +1498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
 
-                        if(code_curr == code_end) [[unlikely]]
-                        {
-                            fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
-                        }
-
-                        // block blocktype ...
-                        // [     safe    ] unsafe (could be the section_end)
-                        //       ^^ code_curr
-
-                        ++code_curr;
+                        skip_wasm1p1_block_type(code_curr, code_end, op_begin, curr_module, wasm_feature_parameter, err);
 
                         // block blocktype ...
                         // [     safe    ] unsafe (could be the section_end)

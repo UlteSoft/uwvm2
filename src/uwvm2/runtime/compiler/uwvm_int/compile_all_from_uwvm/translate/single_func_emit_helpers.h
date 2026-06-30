@@ -3468,6 +3468,52 @@ auto const emit_local_tee_typed_to{
         return site;
     }};
 
+[[maybe_unused]] auto const emit_preserve_top_values_drop_to_base_restore{
+    [&](bytecode_vec_t& dst,
+        block_result_type value_types,
+        ::std::size_t target_base,
+        ::std::size_t original_stack_size,
+        bool fill_to_canonical_before_restore) constexpr UWVM_THROWS
+    {
+        auto const value_count{static_cast<::std::size_t>(value_types.end - value_types.begin)};
+        if(value_count == 0uz)
+        {
+            if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(dst, target_base); }
+            else
+            {
+                for(::std::size_t i{original_stack_size}; i-- > target_base;) { emit_drop_typed_to_no_fill(dst, operand_stack.index_unchecked(i).type); }
+            }
+            return;
+        }
+
+        if(value_count > internal_temp_local_offsets.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        for(::std::size_t i{value_count}; i-- != 0uz;)
+        {
+            emit_local_set_typed_to_no_fill(dst, value_types.begin[i], internal_temp_local_offsets.index_unchecked(i));
+        }
+
+        if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(dst, target_base); }
+        else
+        {
+            auto const first_preserved_index{original_stack_size - value_count};
+            for(::std::size_t i{first_preserved_index}; i-- > target_base;) { emit_drop_typed_to_no_fill(dst, operand_stack.index_unchecked(i).type); }
+        }
+
+        if(fill_to_canonical_before_restore)
+        {
+            if constexpr(stacktop_enabled)
+            {
+                if constexpr(!strict_cf_entry_like_call) { stacktop_fill_to_canonical(dst); }
+            }
+        }
+
+        for(::std::size_t i{}; i != value_count; ++i)
+        {
+            emit_local_get_typed_to(dst, value_types.begin[i], internal_temp_local_offsets.index_unchecked(i));
+        }
+    }};
+
 // Branch emission records a relative-offset placeholder rather than computing it immediately because
 // targets may be in thunks appended after main bytecode.
 auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_is_thunk) constexpr UWVM_THROWS

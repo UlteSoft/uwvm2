@@ -62,17 +62,9 @@ case wasm1_code::return_:
         }
         else
         {
-            auto const result_type{func_frame.result.begin[0]};
-
-            if(curr_size - target_base > 1uz)
+            if(curr_size > target_base + return_arity)
             {
-                emit_local_set_typed_to_no_fill(bytecode, result_type, internal_temp_local_off);
-                if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(bytecode, target_base); }
-                else
-                {
-                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;) { emit_drop_typed_to_no_fill(bytecode, operand_stack.index_unchecked(i).type); }
-                }
-                emit_local_get_typed_to(bytecode, result_type, internal_temp_local_off);
+                emit_preserve_top_values_drop_to_base_restore(bytecode, func_frame.result, target_base, curr_size, false);
             }
 
             emit_return_to(bytecode);
