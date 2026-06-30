@@ -670,7 +670,9 @@ case opcode_byte(wasm1p1_code::simd_prefix):
                                      stacktop_flush_all_to_operand_stack(bytecode);
                                      emit_opfunc_to(bytecode,
                                                     translate::get_uwvmint_simd_full_shuffle_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                                     for(auto lane: lanes) { emit_imm_to(bytecode, lane); }
+                                     auto const controls{simd_opt::make_shuffle_controls(lanes)};
+                                     for(auto lane: controls.lhs) { emit_imm_to(bytecode, lane); }
+                                     for(auto lane: controls.rhs) { emit_imm_to(bytecode, lane); }
                                      stacktop_after_pop_n_push1_memory_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::v128);
                                  }};
 

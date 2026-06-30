@@ -1056,6 +1056,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr U lane_bool(bool v) noexcept
         { return v ? lane_true<U>() : U{}; }
 
+        template <typename FloatT>
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_roundeven(FloatT x) noexcept
+        {
+# if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
+            return __builtin_elementwise_roundeven(x);
+# else
+            if(::std::isnan(x) || ::std::isinf(x) || x == FloatT{}) { return x; }
+
+            auto const t{::std::trunc(x)};
+            auto const frac_abs{::std::fabs(x - t)};
+            if(frac_abs < static_cast<FloatT>(0.5)) { return t; }
+
+            auto const step{::std::copysign(FloatT{1}, x)};
+            if(frac_abs > static_cast<FloatT>(0.5)) { return static_cast<FloatT>(t + step); }
+
+            auto const half_t{static_cast<FloatT>(t * static_cast<FloatT>(0.5))};
+            return ::std::trunc(half_t) == half_t ? t : static_cast<FloatT>(t + step);
+# endif
+        }
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr lane_array<wasm_f64, 2uz> load_f64x2_lanes(wasm_v128 v) noexcept
         {
             auto const bits{load_uint_lanes<u64, 2uz>(v)};
@@ -1222,6 +1242,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_pmax(FloatT a, FloatT b) noexcept
         { return a < b ? b : a; }
+
+        struct shuffle_controls
+        {
+            u8 lhs[16];
+            u8 rhs[16];
+        };
+
+        static_assert(sizeof(shuffle_controls) == 32uz);
+
+        template <typename LaneT>
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr shuffle_controls make_shuffle_controls(LaneT const(&lanes_imm)[16]) noexcept
+        {
+            shuffle_controls out{};  // init
+            for(::std::size_t i{}; i != 16uz; ++i)
+            {
+                auto const lane{static_cast<u8>(lanes_imm[i])};
+                out.lhs[i] = lane < 16u ? lane : u8{0x80u};
+                out.rhs[i] = lane >= 16u ? static_cast<u8>(lane - 16u) : u8{0x80u};
+            }
+            return out;
+        }
 
         template <simd_code Op>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_splat_i32(wasm_i32 v) noexcept
@@ -1543,32 +1584,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_shuffle(wasm_v128 lhs, wasm_v128 rhs, u8 const lanes_imm[16]) noexcept
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_shuffle(wasm_v128 lhs, wasm_v128 rhs, shuffle_controls const& controls) noexcept
         {
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128)
-            v128_u8x16 control;  // no init
-            ::std::memcpy(::std::addressof(control), lanes_imm, sizeof(control));
-            auto const lhs_zero{::std::bit_cast<v128_u8x16>(control > vec_splat<v128_u8x16>(u8{15}))};
-            auto const rhs_zero{::std::bit_cast<v128_u8x16>(control < vec_splat<v128_u8x16>(u8{16}))};
-            auto const lhs_control{static_cast<v128_u8x16>((control & vec_splat<v128_u8x16>(u8{15})) | (lhs_zero & vec_splat<v128_u8x16>(u8{0x80})))};
-            auto const rhs_control{static_cast<v128_u8x16>(((control - vec_splat<v128_u8x16>(u8{16})) & vec_splat<v128_u8x16>(u8{15})) |
-                                                           (rhs_zero & vec_splat<v128_u8x16>(u8{0x80})))};
+            v128_u8x16 lhs_control;  // no init
+            v128_u8x16 rhs_control;  // no init
+            ::std::memcpy(::std::addressof(lhs_control), controls.lhs, sizeof(lhs_control));
+            ::std::memcpy(::std::addressof(rhs_control), controls.rhs, sizeof(rhs_control));
             auto const l{::std::bit_cast<v128_u8x16>(__builtin_ia32_pshufb128(v128_to_vec<v128_u8x16>(lhs), lhs_control))};
             auto const r{::std::bit_cast<v128_u8x16>(__builtin_ia32_pshufb128(v128_to_vec<v128_u8x16>(rhs), rhs_control))};
             return vec_to_v128(l | r);
 # elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) &&                                                \
      UWVM_HAS_BUILTIN(__builtin_aarch64_qtbl1v16qi_uuu)
-            v128_u8x16 control;  // no init
-            ::std::memcpy(::std::addressof(control), lanes_imm, sizeof(control));
-            auto const l{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(lhs), control)};
-            auto const r{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(rhs), static_cast<v128_u8x16>(control - vec_splat<v128_u8x16>(u8{16})))};
+            v128_u8x16 lhs_control;  // no init
+            v128_u8x16 rhs_control;  // no init
+            ::std::memcpy(::std::addressof(lhs_control), controls.lhs, sizeof(lhs_control));
+            ::std::memcpy(::std::addressof(rhs_control), controls.rhs, sizeof(rhs_control));
+            auto const l{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(lhs), lhs_control)};
+            auto const r{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(rhs), rhs_control)};
             return vec_to_v128(l | r);
 # elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vqtbl1q_v)
-            v128_u8x16 control;  // no init
-            ::std::memcpy(::std::addressof(control), lanes_imm, sizeof(control));
+            v128_u8x16 lhs_control;  // no init
+            v128_u8x16 rhs_control;  // no init
+            ::std::memcpy(::std::addressof(lhs_control), controls.lhs, sizeof(lhs_control));
+            ::std::memcpy(::std::addressof(rhs_control), controls.rhs, sizeof(rhs_control));
             auto const l{::std::bit_cast<v128_u8x16>(
-                __builtin_neon_vqtbl1q_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_u8x16>(lhs)), ::std::bit_cast<v128_i8x16>(control), 48))};
-            auto const rhs_control{static_cast<v128_u8x16>(control - vec_splat<v128_u8x16>(u8{16}))};
+                __builtin_neon_vqtbl1q_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_u8x16>(lhs)), ::std::bit_cast<v128_i8x16>(lhs_control), 48))};
             auto const r{::std::bit_cast<v128_u8x16>(
                 __builtin_neon_vqtbl1q_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_u8x16>(rhs)), ::std::bit_cast<v128_i8x16>(rhs_control), 48))};
             return vec_to_v128(l | r);
@@ -1578,8 +1619,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             lane_array<u8, 16uz> out{};  // init
             for(::std::size_t i{}; i != 16uz; ++i)
             {
-                auto const lane{lanes_imm[i]};
-                out.lane[i] = lane < 16u ? l.lane[lane] : r.lane[lane - 16u];
+                auto const lhs_lane{controls.lhs[i]};
+                auto const rhs_lane{controls.rhs[i]};
+                out.lane[i] = lhs_lane < 16u ? l.lane[lhs_lane] : (rhs_lane < 16u ? r.lane[rhs_lane] : u8{});
             }
             return store_uint_lanes<u8, 16uz>(out);
 # endif
@@ -1590,8 +1632,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128)
             auto const values{v128_to_vec<v128_u8x16>(lhs)};
             auto const indices{v128_to_vec<v128_u8x16>(rhs)};
-            auto const hi_mask{::std::bit_cast<v128_u8x16>(indices > vec_splat<v128_u8x16>(u8{15}))};
-            auto const control{static_cast<v128_u8x16>((indices & vec_splat<v128_u8x16>(u8{15})) | (hi_mask & vec_splat<v128_u8x16>(u8{0x80})))};
+            auto const signed_indices{::std::bit_cast<v128_i8x16>(indices)};
+            auto const over15{::std::bit_cast<v128_u8x16>(signed_indices > vec_splat<v128_i8x16>(s8{15}))};
+            auto const control{static_cast<v128_u8x16>(indices | over15)};
             return vec_to_v128(::std::bit_cast<v128_u8x16>(__builtin_ia32_pshufb128(values, control)));
 # elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) &&                                                \
      UWVM_HAS_BUILTIN(__builtin_aarch64_qtbl1v16qi_uuu)
@@ -1943,6 +1986,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return vec_to_v128(__builtin_convertvector(v128_to_vec<v128_u32x4>(v), v128_f32x4));
                 }
 #  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_sqrt)
+                else if constexpr(Op == simd_code::f32x4_sqrt) { return vec_to_v128(__builtin_elementwise_sqrt(v128_to_vec<v128_f32x4>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_ceil)
+                else if constexpr(Op == simd_code::f32x4_ceil) { return vec_to_v128(__builtin_elementwise_ceil(v128_to_vec<v128_f32x4>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_floor)
+                else if constexpr(Op == simd_code::f32x4_floor) { return vec_to_v128(__builtin_elementwise_floor(v128_to_vec<v128_f32x4>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_trunc)
+                else if constexpr(Op == simd_code::f32x4_trunc) { return vec_to_v128(__builtin_elementwise_trunc(v128_to_vec<v128_f32x4>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
+                else if constexpr(Op == simd_code::f32x4_nearest) { return vec_to_v128(__builtin_elementwise_roundeven(v128_to_vec<v128_f32x4>(v))); }
+#  endif
 # endif
                 lane_array<wasm_f32, 4uz> out{};  // init
                 if constexpr(Op == simd_code::f32x4_convert_i32x4_s || Op == simd_code::f32x4_convert_i32x4_u)
@@ -1976,7 +2034,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         else if constexpr(Op == simd_code::f32x4_ceil) { out.lane[i] = ::std::ceil(in.lane[i]); }
                         else if constexpr(Op == simd_code::f32x4_floor) { out.lane[i] = ::std::floor(in.lane[i]); }
                         else if constexpr(Op == simd_code::f32x4_trunc) { out.lane[i] = ::std::trunc(in.lane[i]); }
-                        else if constexpr(Op == simd_code::f32x4_nearest) { out.lane[i] = ::std::nearbyint(in.lane[i]); }
+                        else if constexpr(Op == simd_code::f32x4_nearest) { out.lane[i] = wasm_roundeven(in.lane[i]); }
                         else
                         {
                             static_assert(Op != Op, "unhandled f32x4 unary opcode");
@@ -2000,6 +2058,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     return vec_to_v128(v128_to_vec<v128_u64x2>(v) ^ vec_splat<v128_u64x2>(u64{0x8000000000000000ull}));
                 }
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_sqrt)
+                else if constexpr(Op == simd_code::f64x2_sqrt) { return vec_to_v128(__builtin_elementwise_sqrt(v128_to_vec<v128_f64x2>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_ceil)
+                else if constexpr(Op == simd_code::f64x2_ceil) { return vec_to_v128(__builtin_elementwise_ceil(v128_to_vec<v128_f64x2>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_floor)
+                else if constexpr(Op == simd_code::f64x2_floor) { return vec_to_v128(__builtin_elementwise_floor(v128_to_vec<v128_f64x2>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_trunc)
+                else if constexpr(Op == simd_code::f64x2_trunc) { return vec_to_v128(__builtin_elementwise_trunc(v128_to_vec<v128_f64x2>(v))); }
+#  endif
+#  if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
+                else if constexpr(Op == simd_code::f64x2_nearest) { return vec_to_v128(__builtin_elementwise_roundeven(v128_to_vec<v128_f64x2>(v))); }
+#  endif
 # endif
                 lane_array<wasm_f64, 2uz> out{};  // init
                 if constexpr(Op == simd_code::f64x2_promote_low_f32x4)
@@ -2033,7 +2106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         else if constexpr(Op == simd_code::f64x2_ceil) { out.lane[i] = ::std::ceil(in.lane[i]); }
                         else if constexpr(Op == simd_code::f64x2_floor) { out.lane[i] = ::std::floor(in.lane[i]); }
                         else if constexpr(Op == simd_code::f64x2_trunc) { out.lane[i] = ::std::trunc(in.lane[i]); }
-                        else if constexpr(Op == simd_code::f64x2_nearest) { out.lane[i] = ::std::nearbyint(in.lane[i]); }
+                        else if constexpr(Op == simd_code::f64x2_nearest) { out.lane[i] = wasm_roundeven(in.lane[i]); }
                         else
                         {
                             static_assert(Op != Op, "unhandled f64x2 unary opcode");
@@ -2608,7 +2681,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         auto const lb{::std::bit_cast<v128_u32x4>(l)};
                         auto const rb{::std::bit_cast<v128_u32x4>(r)};
-                        if constexpr(Op == simd_code::f32x4_pmin) { return vec_to_v128(vec_select(lb, rb, l < r)); }
+                        if constexpr(Op == simd_code::f32x4_pmin) { return vec_to_v128(vec_select(rb, lb, r < l)); }
                         else if constexpr(Op == simd_code::f32x4_pmax) { return vec_to_v128(vec_select(rb, lb, l < r)); }
                         else
                         {
@@ -2657,7 +2730,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         auto const lb{::std::bit_cast<v128_u64x2>(l)};
                         auto const rb{::std::bit_cast<v128_u64x2>(r)};
-                        if constexpr(Op == simd_code::f64x2_pmin) { return vec_to_v128(vec_select(lb, rb, l < r)); }
+                        if constexpr(Op == simd_code::f64x2_pmin) { return vec_to_v128(vec_select(rb, lb, r < l)); }
                         else if constexpr(Op == simd_code::f64x2_pmax) { return vec_to_v128(vec_select(rb, lb, l < r)); }
                         else
                         {
@@ -2974,25 +3047,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t simd_memory_access_size() noexcept
         {
             if constexpr(Op == simd_code::v128_load || Op == simd_code::v128_store) { return 16uz; }
-            else if constexpr(Op == simd_code::v128_load8x8_s || Op == simd_code::v128_load8x8_u || Op == simd_code::v128_load8_splat ||
-                              Op == simd_code::v128_load8_lane || Op == simd_code::v128_store8_lane)
+            else if constexpr(Op == simd_code::v128_load8x8_s || Op == simd_code::v128_load8x8_u ||
+                              Op == simd_code::v128_load16x4_s || Op == simd_code::v128_load16x4_u ||
+                              Op == simd_code::v128_load32x2_s || Op == simd_code::v128_load32x2_u ||
+                              Op == simd_code::v128_load64_splat || Op == simd_code::v128_load64_zero ||
+                              Op == simd_code::v128_load64_lane || Op == simd_code::v128_store64_lane)
             {
-                return 1uz;
+                return 8uz;
             }
-            else if constexpr(Op == simd_code::v128_load16x4_s || Op == simd_code::v128_load16x4_u || Op == simd_code::v128_load16_splat ||
-                              Op == simd_code::v128_load16_lane || Op == simd_code::v128_store16_lane)
-            {
-                return 2uz;
-            }
-            else if constexpr(Op == simd_code::v128_load32x2_s || Op == simd_code::v128_load32x2_u || Op == simd_code::v128_load32_splat ||
-                              Op == simd_code::v128_load32_zero || Op == simd_code::v128_load32_lane || Op == simd_code::v128_store32_lane)
+            else if constexpr(Op == simd_code::v128_load32_splat || Op == simd_code::v128_load32_zero ||
+                              Op == simd_code::v128_load32_lane || Op == simd_code::v128_store32_lane)
             {
                 return 4uz;
             }
-            else if constexpr(Op == simd_code::v128_load64_splat || Op == simd_code::v128_load64_zero || Op == simd_code::v128_load64_lane ||
-                              Op == simd_code::v128_store64_lane)
+            else if constexpr(Op == simd_code::v128_load16_splat || Op == simd_code::v128_load16_lane || Op == simd_code::v128_store16_lane)
             {
-                return 8uz;
+                return 2uz;
+            }
+            else if constexpr(Op == simd_code::v128_load8_splat || Op == simd_code::v128_load8_lane || Op == simd_code::v128_store8_lane)
+            {
+                return 1uz;
             }
             else
             {
@@ -3808,12 +3882,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_simd_full_shuffle(Type... type) UWVM_THROWS
     {
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
-        wasm1p1_simd_details::u8 lanes[16]{};  // init
-        ::std::memcpy(lanes, type...[0], sizeof(lanes));
-        type...[0] += sizeof(lanes);
+        wasm1p1_simd_details::shuffle_controls controls;  // no init
+        ::std::memcpy(::std::addressof(controls), type...[0], sizeof(controls));
+        type...[0] += sizeof(controls);
         auto const rhs{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(type...)};
         auto const lhs{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(type...)};
-        auto const out{wasm1p1_simd_details::eval_shuffle(lhs, rhs, lanes)};
+        auto const out{wasm1p1_simd_details::eval_shuffle(lhs, rhs, controls)};
         wasm1p1_simd_details::push_to_memory_stack(out, type...[1u]);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -3826,12 +3900,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_simd_full_shuffle(TypeRef & ... typeref) UWVM_THROWS
     {
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
-        wasm1p1_simd_details::u8 lanes[16]{};  // init
-        ::std::memcpy(lanes, typeref...[0], sizeof(lanes));
-        typeref...[0] += sizeof(lanes);
+        wasm1p1_simd_details::shuffle_controls controls;  // no init
+        ::std::memcpy(::std::addressof(controls), typeref...[0], sizeof(controls));
+        typeref...[0] += sizeof(controls);
         auto const rhs{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(typeref...)};
         auto const lhs{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(typeref...)};
-        auto const out{wasm1p1_simd_details::eval_shuffle(lhs, rhs, lanes)};
+        auto const out{wasm1p1_simd_details::eval_shuffle(lhs, rhs, controls)};
         wasm1p1_simd_details::push_to_memory_stack(out, typeref...[1u]);
     }
 
