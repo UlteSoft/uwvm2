@@ -492,7 +492,52 @@ namespace
                                                                all_features,
                                                                all_features,
                                                                errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_ref_func_undeclared_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_ref_func_feature"),
+                                                               all_features,
+                                                               ref_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_ref_func_undeclared_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_ref_func_undeclared"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::wasm1p1_undeclared_ref_func) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_memory_init_data_index_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_memory_init_feature"),
+                                                               all_features,
+                                                               bulk_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_memory_init_data_index_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_memory_init_data"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::illegal_data_index) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_table_init_elem_index_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_table_init_feature"),
+                                                               all_features,
+                                                               bulk_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_table_init_elem_index_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_table_init_elem"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::illegal_element_index) == 0);
 
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_valid_polymorphic_wasm1p1_combo_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_polymorphic_ref_feature"),
+                                                               all_features,
+                                                               ref_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_valid_polymorphic_wasm1p1_combo_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_polymorphic_simd_feature"),
+                                                               all_features,
+                                                               simd_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_valid_polymorphic_wasm1p1_combo_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_polymorphic_bulk_feature"),
+                                                               all_features,
+                                                               bulk_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
         UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_valid_polymorphic_wasm1p1_combo_module(),
                                                                literal_view(u8"uwvm2test_lazy_full_polymorphic_combo"),
                                                                all_features,
