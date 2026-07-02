@@ -5393,6 +5393,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         case wasm1p1_simd_code::i16x8_extend_high_i8x16_s: [[fallthrough]];
                         case wasm1p1_simd_code::i16x8_extend_low_i8x16_u: [[fallthrough]];
                         case wasm1p1_simd_code::i16x8_extend_high_i8x16_u: [[fallthrough]];
+                        case wasm1p1_simd_code::f64x2_ceil: [[fallthrough]];
+                        case wasm1p1_simd_code::f64x2_floor: [[fallthrough]];
+                        case wasm1p1_simd_code::f64x2_trunc: [[fallthrough]];
                         case wasm1p1_simd_code::f64x2_nearest: [[fallthrough]];
                         case wasm1p1_simd_code::i32x4_abs: [[fallthrough]];
                         case wasm1p1_simd_code::i32x4_neg: [[fallthrough]];
