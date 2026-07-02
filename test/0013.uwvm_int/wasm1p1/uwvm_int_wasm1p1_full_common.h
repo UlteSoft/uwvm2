@@ -36,7 +36,8 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         k_fn_simd_memory_select = 8uz,
         k_fn_simd_all_forms = 9uz,
         k_fn_cross_feature_mix = 10uz,
-        k_fn_count = 11uz,
+        k_fn_control_loop_mix = 11uz,
+        k_fn_count = 12uz,
     };
 
     [[nodiscard]] inline byte_vec pack_i32_i64(::std::int32_t a, ::std::int64_t b)
@@ -968,6 +969,110 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        {
+            func_type ty{{}, {strict::k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({2u, strict::k_val_i32});
+            auto& c{fb.code};
+
+            op(c, wasm_op::i32_const);
+            i32(c, 0);
+            op(c, wasm_op::local_set);
+            u32(c, 0u);
+
+            op(c, wasm_op::i32_const);
+            i32(c, 3);
+            op(c, wasm_op::local_set);
+            u32(c, 1u);
+
+            op(c, wasm_op::block);
+            strict::append_u8(c, strict::k_block_empty);
+            op(c, wasm_op::loop);
+            strict::append_u8(c, strict::k_block_empty);
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i32_const);
+            i32(c, 240);
+            op(c, wasm_op::i32_add);
+            op1p1(c, wasm1p1_op::i32_extend8_s);
+            op(c, wasm_op::i32_add);
+            op(c, wasm_op::local_set);
+            u32(c, 0u);
+
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i32_const);
+            i32(c, 1);
+            op(c, wasm_op::i32_sub);
+            op(c, wasm_op::local_tee);
+            u32(c, 1u);
+            op(c, wasm_op::br_if);
+            u32(c, 0u);
+
+            op(c, wasm_op::end);
+            op(c, wasm_op::end);
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            v128_i32x4_const(c, 42u, 0u, 0u, 0u);
+            simd(c, wasm1p1_simd_op::i32x4_extract_lane);
+            strict::append_u8(c, 0u);
+            op(c, wasm_op::i32_add);
+
+            op(c, wasm_op::i32_const);
+            i32(c, 192);
+            op(c, wasm_op::i32_const);
+            i32(c, 5);
+            op(c, wasm_op::i32_const);
+            i32(c, 1);
+            ext(c, wasm1p1_numeric_op::memory_fill);
+            strict::append_u8(c, 0u);
+
+            op(c, wasm_op::i32_const);
+            i32(c, 0);
+            op(c, wasm_op::i32_load8_u);
+            u32(c, 0u);
+            u32(c, 192u);
+            op(c, wasm_op::i32_add);
+
+            op(c, wasm_op::i32_const);
+            i32(c, 4);
+            op1p1(c, wasm1p1_op::ref_func);
+            u32(c, static_cast<::std::uint32_t>(k_fn_target_b));
+            op1p1(c, wasm1p1_op::table_set);
+            u32(c, 0u);
+
+            op(c, wasm_op::i32_const);
+            i32(c, 4);
+            op1p1(c, wasm1p1_op::table_get);
+            u32(c, 0u);
+            op1p1(c, wasm1p1_op::ref_is_null);
+            op(c, wasm_op::i32_add);
+
+            op(c, wasm_op::f64_const);
+            f64(c, 7.9);
+            ext(c, wasm1p1_numeric_op::i32_trunc_sat_f64_s);
+            op(c, wasm_op::i32_add);
+
+            op1p1(c, wasm1p1_op::ref_func);
+            u32(c, static_cast<::std::uint32_t>(k_fn_target_a));
+            op1p1(c, wasm1p1_op::ref_null);
+            strict::append_u8(c, strict::k_ref_funcref);
+            op(c, wasm_op::i32_const);
+            i32(c, 0);
+            op1p1(c, wasm1p1_op::select_t);
+            u32(c, 1u);
+            strict::append_u8(c, strict::k_ref_funcref);
+            op1p1(c, wasm1p1_op::ref_is_null);
+            op(c, wasm_op::i32_add);
+
+            op(c, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -1306,6 +1411,33 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
     }
 
+    [[nodiscard]] inline byte_vec build_invalid_polymorphic_simd_lane_module()
+    {
+        module_builder mb{};
+        func_type ty{{}, {}};
+        func_body fb{};
+        append_op(fb.code, wasm_op::unreachable);
+        append_simd_op(fb.code, wasm1p1_simd_op::i32x4_extract_lane);
+        strict::append_u8(fb.code, 4u);
+        append_op(fb.code, wasm_op::drop);
+        append_op(fb.code, wasm_op::end);
+        return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
+    }
+
+    [[nodiscard]] inline byte_vec build_invalid_polymorphic_simd_no_memory_module()
+    {
+        module_builder mb{};
+        func_type ty{{}, {}};
+        func_body fb{};
+        append_op(fb.code, wasm_op::unreachable);
+        append_simd_op(fb.code, wasm1p1_simd_op::v128_load);
+        strict::append_u32_leb(fb.code, 4u);
+        strict::append_u32_leb(fb.code, 0u);
+        append_op(fb.code, wasm_op::drop);
+        append_op(fb.code, wasm_op::end);
+        return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
+    }
+
     [[nodiscard]] inline byte_vec build_invalid_ref_feature_masks_ref_type_module()
     {
         module_builder mb{};
@@ -1461,6 +1593,11 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         {
             auto rr{run_func(k_fn_cross_feature_mix, strict::pack_no_params())};
             UWVM2TEST_REQUIRE(strict::load_i32(rr.results) == 17);
+        }
+
+        {
+            auto rr{run_func(k_fn_control_loop_mix, strict::pack_no_params())};
+            UWVM2TEST_REQUIRE(strict::load_i32(rr.results) == 13);
         }
 
         (void)rt;

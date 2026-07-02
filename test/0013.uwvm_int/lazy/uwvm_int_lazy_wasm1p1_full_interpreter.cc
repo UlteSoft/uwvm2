@@ -477,6 +477,21 @@ namespace
                                                                all_features,
                                                                all_features,
                                                                errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_simd_lane_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_simd_feature_masks_lane"),
+                                                               all_features,
+                                                               simd_disabled_features,
+                                                               errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_simd_lane_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_simd_lane"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::invalid_const_immediate) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_polymorphic_simd_no_memory_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_poly_simd_no_memory"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::no_memory) == 0);
 
         UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_valid_polymorphic_wasm1p1_combo_module(),
                                                                literal_view(u8"uwvm2test_lazy_full_polymorphic_combo"),
