@@ -35,7 +35,6 @@ export import :control;
 export import :convert;
 export import :lazy;
 export import :memory;
-export import :m3_plus;
 export import :wasm1p1;
 export import :numeric;
 export import :stack;
