@@ -555,7 +555,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     // Internal temp local is the first slot after all Wasm-visible locals.
     local_offset_t const internal_temp_local_off{internal_temp_local_offsets.index_unchecked(0uz)};
-    local_offset_t const internal_temp_local_bytes{
+    [[maybe_unused]] local_offset_t const internal_temp_local_bytes{
         static_cast<local_offset_t>(static_cast<::std::size_t>(internal_temp_local_count) * static_cast<::std::size_t>(internal_temp_local_size))};
     // Parameters occupy the prefix of the locals buffer and are populated by memcpy at runtime.
     // Non-parameter locals must be zero-initialized by the Wasm spec, but we can skip zeroing trailing locals
