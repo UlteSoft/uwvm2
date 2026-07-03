@@ -174,6 +174,23 @@ inline constexpr bool char_digit_to_literal(my_make_unsigned_t<char_type> &ch) n
 				ch = static_cast<unsigned_char_type>(digit);
 				return base <= digit;
 			}
+			else if constexpr (base == 16)
+			{
+				auto const cch{static_cast<char_type>(ch)};
+				using family = ::fast_io::char_category::char_category_family;
+				if (!::fast_io::char_category::char_category_traits<family::c_xdigit, false>::char_is(cch))
+				{
+					return true;
+				}
+				if (::fast_io::char_category::char_category_traits<family::c_digit, false>::char_is(cch))
+				{
+					ch -= static_cast<unsigned_char_type>(::fast_io::char_literal_v<u8'0', char_type>);
+					return false;
+				}
+				auto const lower{::fast_io::char_category::to_c_lower(cch)};
+				ch = static_cast<unsigned_char_type>(lower - ::fast_io::char_literal_v<u8'a', char_type> + 10u);
+				return false;
+			}
 
 			constexpr unsigned_char_type mns{base - 10};
 			unsigned_char_type ch2(ch);
@@ -273,6 +290,15 @@ inline constexpr bool char_is_digit(my_make_unsigned_t<char_type> ch) noexcept
 			if constexpr (sizeof(char_type) == sizeof(char8_t))
 			{
 				return ::fast_io::details::sto_ascii_digit_table_lookup<char_type>(ch) < base;
+			}
+			else if constexpr (base == 16)
+			{
+				unsigned_char_type digit(ch);
+				digit -= u8'0';
+				unsigned_char_type alpha(ch);
+				alpha |= static_cast<unsigned_char_type>(0x20u);
+				alpha -= u8'a';
+				return (digit < 10u) | (alpha < 6u);
 			}
 
 			constexpr unsigned_char_type mns{base - 10};

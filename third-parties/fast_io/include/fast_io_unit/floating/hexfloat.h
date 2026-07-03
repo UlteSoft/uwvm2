@@ -31,30 +31,237 @@ inline constexpr Iter with_sign_prt_rsv_exponent_hex_impl(Iter iter, ::std::int_
 }
 
 template <::std::integral char_type>
-[[nodiscard]] inline constexpr bool scan_hexfloat_digit(char_type ch, ::std::uint_least8_t &digit) noexcept
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr bool scan_hexfloat_digit(char_type ch, char8_t &digit) noexcept
 {
-	constexpr auto zero{::fast_io::char_literal_v<u8'0', char_type>};
-	constexpr auto nine{::fast_io::char_literal_v<u8'9', char_type>};
-	constexpr auto lower_a{::fast_io::char_literal_v<u8'a', char_type>};
-	constexpr auto lower_f{::fast_io::char_literal_v<u8'f', char_type>};
-	constexpr auto upper_a{::fast_io::char_literal_v<u8'A', char_type>};
-	constexpr auto upper_f{::fast_io::char_literal_v<u8'F', char_type>};
-	if (zero <= ch && ch <= nine)
+	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+	auto uch{static_cast<unsigned_char_type>(ch)};
+	if (::fast_io::details::char_digit_to_literal<16, char_type>(uch))
 	{
-		digit = static_cast<::std::uint_least8_t>(ch - zero);
-		return true;
+		return false;
 	}
-	if (lower_a <= ch && ch <= lower_f)
+	digit = static_cast<char8_t>(uch);
+	return true;
+}
+
+template <::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr bool scan_hexfloat_decimal_digit(char_type ch, char8_t &digit) noexcept
+{
+	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+	auto uch{static_cast<unsigned_char_type>(ch)};
+	if (::fast_io::details::char_digit_to_literal<10, char_type>(uch))
 	{
-		digit = static_cast<::std::uint_least8_t>(ch - lower_a + 10u);
-		return true;
+		return false;
 	}
-	if (upper_a <= ch && ch <= upper_f)
+	digit = static_cast<char8_t>(uch);
+	return true;
+}
+
+struct scan_hexfloat_significand_state
+{
+	bool has_digit{};
+	bool has_nonzero_digit{};
+	::std::uint_least64_t stored{};
+	::std::size_t stored_hex_digits{};
+	::std::int_least64_t significant_hex_digits{};
+	::std::int_least64_t fractional_hex_digits{};
+	bool truncated_nonzero{};
+};
+
+template <::std::size_t stored_hex_digits_limit>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void scan_hexfloat_append_digit(scan_hexfloat_significand_state &state, bool after_decimal,
+												 char8_t digit) noexcept
+{
+	state.has_digit = true;
+	if (after_decimal)
 	{
-		digit = static_cast<::std::uint_least8_t>(ch - upper_a + 10u);
-		return true;
+		++state.fractional_hex_digits;
 	}
-	return false;
+	if (!state.has_nonzero_digit)
+	{
+		if (digit == 0u)
+		{
+			return;
+		}
+		state.has_nonzero_digit = true;
+	}
+	++state.significant_hex_digits;
+	if (state.stored_hex_digits != stored_hex_digits_limit)
+	{
+		state.stored = (state.stored << 4u) | digit;
+		++state.stored_hex_digits;
+	}
+	else if (digit != 0u)
+	{
+		state.truncated_nonzero = true;
+	}
+}
+
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void scan_hexfloat_ascii8_pack(::std::uint_least64_t val, ::std::uint_least64_t &nibbles,
+												::std::uint_least64_t &packed) noexcept
+{
+	val -= 0x3030303030303030;
+	nibbles = (val & 0x0f0f0f0f0f0f0f0f) + ((val & 0x1010101010101010) >> 4) * 9u;
+	constexpr ::std::uint_least64_t mask{0x000000FF000000FF};
+	constexpr ::std::uint_least64_t pow_base_2{
+		::fast_io::details::compile_pow_n<::std::uint_least64_t, 16, 2>};
+	constexpr ::std::uint_least64_t pow_base_4{
+		::fast_io::details::compile_pow_n<::std::uint_least64_t, 16, 4>};
+	constexpr ::std::uint_least64_t pow_base_6{
+		::fast_io::details::compile_pow_n<::std::uint_least64_t, 16, 6>};
+	constexpr ::std::uint_least64_t mul1{pow_base_2 + (pow_base_6 << 32u)};
+	constexpr ::std::uint_least64_t mul2{1u + (pow_base_4 << 32u)};
+	auto folded{(nibbles * 16u) + (nibbles >> 8u)};
+	packed = (((folded & mask) * mul1) + (((folded >> 16u) & mask) * mul2)) >> 32u;
+}
+
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr bool scan_hexfloat_ascii8_nibbles(::std::uint_least64_t val,
+																 ::std::uint_least64_t &nibbles,
+																 ::std::uint_least64_t &packed) noexcept
+{
+	constexpr ::std::uint_least64_t first_bound1{0x3939393939393939};
+	constexpr ::std::uint_least64_t first_bound2{0x1919191919191919};
+	auto const invalid{((((val + 0x4646464646464646) | (val - 0x3030303030303030)) &
+						 ((val + first_bound1) | (val - 0x4040404040404040)) &
+						 ((val + first_bound2) | (val - 0x6060606060606060))) |
+						~(((val + 0x3f3f3f3f3f3f3f3f) | (val - 0x4040404040404040)) &
+						  ((val + 0x1f1f1f1f1f1f1f1f) | (val - 0x6060606060606060)))) &
+					   0x8080808080808080};
+	if (invalid)
+	{
+		return false;
+	}
+	::fast_io::details::scan_hexfloat_ascii8_pack(val, nibbles, packed);
+	return true;
+}
+
+template <::std::size_t stored_hex_digits_limit>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void scan_hexfloat_append_ascii8(scan_hexfloat_significand_state &state, bool after_decimal,
+												  ::std::uint_least64_t nibbles,
+												  ::std::uint_least64_t packed) noexcept
+{
+	state.has_digit = true;
+	if (after_decimal)
+	{
+		state.fractional_hex_digits += 8u;
+	}
+	::std::uint_least64_t significant_digits{8u};
+	if (!state.has_nonzero_digit)
+	{
+		auto const nonzero_high{(nibbles + 0x7f7f7f7f7f7f7f7f) & 0x8080808080808080};
+		if (nonzero_high == 0)
+		{
+			return;
+		}
+		significant_digits -= ::std::countr_zero(nonzero_high) >> 3u;
+		state.has_nonzero_digit = true;
+	}
+	state.significant_hex_digits += static_cast<::std::int_least64_t>(significant_digits);
+	if (state.stored_hex_digits == stored_hex_digits_limit)
+	{
+		if (packed != 0)
+		{
+			state.truncated_nonzero = true;
+		}
+		return;
+	}
+	auto available{stored_hex_digits_limit - state.stored_hex_digits};
+	if (significant_digits <= available)
+	{
+		state.stored = (state.stored << static_cast<unsigned>(significant_digits * 4u)) | packed;
+		state.stored_hex_digits += static_cast<::std::size_t>(significant_digits);
+		return;
+	}
+	auto const truncated_digits{significant_digits - available};
+	auto const truncated_bits{static_cast<unsigned>(truncated_digits * 4u)};
+	state.stored = (state.stored << static_cast<unsigned>(available * 4u)) | (packed >> truncated_bits);
+	state.stored_hex_digits = stored_hex_digits_limit;
+	if ((packed & ((::std::uint_least64_t{1} << truncated_bits) - 1u)) != 0)
+	{
+		state.truncated_nonzero = true;
+	}
+}
+
+template <::std::size_t stored_hex_digits_limit, ::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type const *scan_hexfloat_significand_run(char_type const *first, char_type const *last,
+																bool after_decimal,
+																scan_hexfloat_significand_state &state) noexcept
+{
+#ifdef __cpp_if_consteval
+	if !consteval
+#else
+	if (!__builtin_is_constant_evaluated())
+#endif
+	{
+		if constexpr (!::fast_io::details::is_ebcdic<char_type> && sizeof(char_type) == sizeof(char8_t) &&
+					  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
+		{
+			for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
+			{
+				::std::uint_least64_t val;
+				::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+				if constexpr (::std::endian::little != ::std::endian::native)
+				{
+					val = ::fast_io::little_endian(val);
+				}
+				::std::uint_least64_t nibbles{};
+				::std::uint_least64_t packed{};
+				if (!::fast_io::details::scan_hexfloat_ascii8_nibbles(val, nibbles, packed))
+				{
+					break;
+				}
+				::fast_io::details::scan_hexfloat_append_ascii8<stored_hex_digits_limit>(state, after_decimal, nibbles,
+																						 packed);
+				first += sizeof(::std::uint_least64_t);
+			}
+		}
+	}
+	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+	for (; first != last; ++first)
+	{
+		auto uch{static_cast<unsigned_char_type>(*first)};
+		if (::fast_io::details::char_digit_to_literal<16, char_type>(uch))
+		{
+			break;
+		}
+		::fast_io::details::scan_hexfloat_append_digit<stored_hex_digits_limit>(state, after_decimal,
+																				static_cast<char8_t>(uch));
+	}
+	return first;
 }
 
 template <::std::integral char_type>
@@ -67,8 +274,6 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 	}
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
 	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
-	constexpr auto zero{::fast_io::char_literal_v<u8'0', char_type>};
-	constexpr auto nine{::fast_io::char_literal_v<u8'9', char_type>};
 	bool negative{};
 	if (*first == minus)
 	{
@@ -79,16 +284,17 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 	{
 		++first;
 	}
-	if (first == last || *first < zero || nine < *first)
+	char8_t first_digit{};
+	if (first == last || !::fast_io::details::scan_hexfloat_decimal_digit(*first, first_digit))
 	{
 		return {first, ::fast_io::parse_code::invalid};
 	}
 	constexpr auto exponent_limit{static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::int_least64_t>::max)())};
 	::std::uint_least64_t value{};
 	bool overflow{};
-	while (first != last && zero <= *first && *first <= nine)
+	do
 	{
-		auto const digit{static_cast<::std::uint_least64_t>(*first - zero)};
+		auto const digit{static_cast<::std::uint_least64_t>(first_digit)};
 		if (value > (exponent_limit - digit) / 10u)
 		{
 			value = exponent_limit;
@@ -99,7 +305,7 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 			value = value * 10u + digit;
 		}
 		++first;
-	}
+	} while (first != last && ::fast_io::details::scan_hexfloat_decimal_digit(*first, first_digit));
 	exponent = negative ? -static_cast<::std::int_least64_t>(value) : static_cast<::std::int_least64_t>(value);
 	return {first, ::fast_io::parse_code::ok};
 }
@@ -233,8 +439,13 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
 		  ::fast_io::details::my_floating_point T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr ::fast_io::parse_result<char_type const *>
-scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *end, T &value) noexcept
+scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type const *end, T &value) noexcept
 {
 	using trait = ::fast_io::details::iec559_traits<T>;
 	constexpr ::std::size_t precision_bits{trait::mbits + 1u};
@@ -261,70 +472,21 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		first += 2;
 	}
 
-	bool has_digit{};
-	bool has_nonzero_digit{};
-	::std::uint_least64_t stored{};
-	::std::size_t stored_hex_digits{};
-	::std::int_least64_t significant_hex_digits{};
-	::std::int_least64_t fractional_hex_digits{};
-	bool truncated_nonzero{};
-	auto const append_digit{[&]([[maybe_unused]] bool after_decimal, ::std::uint_least8_t digit) constexpr noexcept
-	{
-		has_digit = true;
-		if (after_decimal)
-		{
-			++fractional_hex_digits;
-		}
-		if (!has_nonzero_digit)
-		{
-			if (digit == 0u)
-			{
-				return;
-			}
-			has_nonzero_digit = true;
-		}
-		++significant_hex_digits;
-		if (stored_hex_digits != stored_hex_digits_limit)
-		{
-			stored = (stored << 4u) | digit;
-			++stored_hex_digits;
-		}
-		else if (digit != 0u)
-		{
-			truncated_nonzero = true;
-		}
-	}};
-
-	while (first != end)
-	{
-		::std::uint_least8_t digit{};
-		if (!::fast_io::details::scan_hexfloat_digit(*first, digit))
-		{
-			break;
-		}
-		append_digit(false, digit);
-		++first;
-	}
+	::fast_io::details::scan_hexfloat_significand_state significand_state;
+	first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, false,
+																					   significand_state);
 
 	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
 	if (first != end && *first == dot)
 	{
 		++first;
-		while (first != end)
-		{
-			::std::uint_least8_t digit{};
-			if (!::fast_io::details::scan_hexfloat_digit(*first, digit))
-			{
-				break;
-			}
-			append_digit(true, digit);
-			++first;
-		}
+		first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, true,
+																						   significand_state);
 	}
 
 	constexpr auto lower_p{::fast_io::char_literal_v<u8'p', char_type>};
 	constexpr auto upper_p{::fast_io::char_literal_v<u8'P', char_type>};
-	if (!has_digit || first == end || (*first != lower_p && *first != upper_p))
+	if (!significand_state.has_digit || first == end || (*first != lower_p && *first != upper_p))
 	{
 		return {first, ::fast_io::parse_code::invalid};
 	}
@@ -336,7 +498,7 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		return exponent_result;
 	}
 
-	if (!has_nonzero_digit)
+	if (!significand_state.has_nonzero_digit)
 	{
 		value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
 		return {exponent_result.iter, ::fast_io::parse_code::ok};
@@ -344,11 +506,98 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 
 	constexpr auto int64_max{(::std::numeric_limits<::std::int_least64_t>::max)()};
 	constexpr auto int64_min{(::std::numeric_limits<::std::int_least64_t>::min)()};
-	auto const fractional_exponent{fractional_hex_digits > int64_max / 4 ? int64_max : fractional_hex_digits * 4};
+	auto const fractional_exponent{significand_state.fractional_hex_digits > int64_max / 4
+									   ? int64_max
+									   : significand_state.fractional_hex_digits * 4};
 	auto const binary_exponent{exponent < int64_min + fractional_exponent ? int64_min : exponent - fractional_exponent};
 	return {exponent_result.iter,
-			::fast_io::details::scan_hexfloat_assign_ieee_result(value, negative, stored, stored_hex_digits,
-																 significant_hex_digits, truncated_nonzero, binary_exponent)};
+			::fast_io::details::scan_hexfloat_assign_ieee_result(
+				value, negative, significand_state.stored, significand_state.stored_hex_digits,
+				significand_state.significant_hex_digits, significand_state.truncated_nonzero, binary_exponent)};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  ::fast_io::details::my_floating_point T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr ::fast_io::parse_result<char_type const *>
+scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *end, T &value) noexcept
+{
+	if constexpr (sizeof(char_type) != sizeof(char8_t))
+	{
+		return ::fast_io::details::scan_hexfloat_contiguous_scalar_define_impl<char_type, flags>(begin, end, value);
+	}
+	using trait = ::fast_io::details::iec559_traits<T>;
+	constexpr ::std::size_t precision_bits{trait::mbits + 1u};
+	constexpr ::std::size_t stored_hex_digits_limit{(precision_bits + 7u) / 4u};
+	auto first{begin};
+	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
+	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
+	bool negative{};
+	if (first != end && (*first == minus || *first == plus))
+	{
+		negative = *first == minus;
+		++first;
+	}
+
+	if constexpr (flags.showbase)
+	{
+		constexpr auto zero{::fast_io::char_literal_v<u8'0', char_type>};
+		constexpr auto lower_x{::fast_io::char_literal_v<u8'x', char_type>};
+		constexpr auto upper_x{::fast_io::char_literal_v<u8'X', char_type>};
+		if (end - first < 2 || first[0] != zero || (first[1] != lower_x && first[1] != upper_x))
+		{
+			return {begin, ::fast_io::parse_code::invalid};
+		}
+		first += 2;
+	}
+
+	::fast_io::details::scan_hexfloat_significand_state significand_state;
+	first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, false,
+																					   significand_state);
+
+	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
+	if (first != end && *first == dot)
+	{
+		++first;
+		first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, true,
+																						   significand_state);
+	}
+
+	constexpr auto lower_p{::fast_io::char_literal_v<u8'p', char_type>};
+	constexpr auto upper_p{::fast_io::char_literal_v<u8'P', char_type>};
+	if (!significand_state.has_digit || first == end || (*first != lower_p && *first != upper_p))
+	{
+		return {first, ::fast_io::parse_code::invalid};
+	}
+	++first;
+	::std::int_least64_t exponent{};
+	auto const exponent_result{::fast_io::details::scan_hexfloat_exponent(first, end, exponent)};
+	if (exponent_result.code != ::fast_io::parse_code::ok)
+	{
+		return exponent_result;
+	}
+
+	if (!significand_state.has_nonzero_digit)
+	{
+		value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
+		return {exponent_result.iter, ::fast_io::parse_code::ok};
+	}
+
+	constexpr auto int64_max{(::std::numeric_limits<::std::int_least64_t>::max)()};
+	constexpr auto int64_min{(::std::numeric_limits<::std::int_least64_t>::min)()};
+	auto const fractional_exponent{significand_state.fractional_hex_digits > int64_max / 4
+									   ? int64_max
+									   : significand_state.fractional_hex_digits * 4};
+	auto const binary_exponent{exponent < int64_min + fractional_exponent ? int64_min
+																		  : exponent - fractional_exponent};
+	return {exponent_result.iter,
+			::fast_io::details::scan_hexfloat_assign_ieee_result(
+				value, negative, significand_state.stored, significand_state.stored_hex_digits,
+				significand_state.significant_hex_digits, significand_state.truncated_nonzero, binary_exponent)};
 }
 
 template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e, bool comma,
@@ -364,7 +613,7 @@ inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f
 	auto [mantissa, exponent, sign] = get_punned_result(f);
 	constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 	constexpr ::std::int_least32_t minus_bias{-static_cast<::std::int_least32_t>(bias)};
-	constexpr ::std::uint_least32_t makeup_bits{((mbits / 4 + 1) * 4 - mbits) % 4}; // Thanks jk-jeon for the formula
+	constexpr ::std::uint_least32_t makeup_bits{((mbits / 4u + 1u) * 4u - mbits) % 4u}; // Thanks jk-jeon for the formula
 	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if (exponent == exponent_mask_u32)
 	{
@@ -447,6 +696,11 @@ hexfloat0x_get(scalar_type &t) noexcept
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
 		  ::fast_io::details::my_floating_point T>
 	requires(flags.floating == ::fast_io::manipulators::floating_format::hexfloat)
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr ::fast_io::parse_result<char_type const *>
 scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
 					   char_type const *begin, char_type const *end,
