@@ -66,6 +66,138 @@ template <::std::integral char_type>
 	return true;
 }
 
+template <char8_t lower, char8_t upper, ::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr bool scan_hexfloat_caseless_equal(char_type ch) noexcept
+{
+	return ch == ::fast_io::char_literal_v<lower, char_type> || ch == ::fast_io::char_literal_v<upper, char_type>;
+}
+
+template <::std::integral char_type>
+struct scan_hexfloat_special_result
+{
+	char_type const *iter{};
+	::fast_io::parse_code code{};
+	bool matched{};
+};
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool scan_hexfloat_nan_sequence_ind(char_type const *first,
+																   char_type const *last) noexcept
+{
+	return last - first == 3 &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(first[0]) &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(first[1]) &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'd', u8'D'>(first[2]);
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool scan_hexfloat_nan_sequence_snan(char_type const *first,
+																	char_type const *last) noexcept
+{
+	return last - first == 4 &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8's', u8'S'>(first[0]) &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(first[1]) &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'a', u8'A'>(first[2]) &&
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(first[3]);
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool scan_hexfloat_nan_sequence_char(char_type ch) noexcept
+{
+	using family = ::fast_io::char_category::char_category_family;
+	return ch == ::fast_io::char_literal_v<u8'_', char_type> ||
+		   ::fast_io::char_category::char_category_traits<family::c_alnum, false>::char_is(ch);
+}
+
+template <bool nan_parse_sign, ::fast_io::manipulators::floating_nan_payload_scan nan_payload_scan,
+		  ::std::integral char_type, ::fast_io::details::my_floating_point T>
+[[nodiscard]] inline constexpr scan_hexfloat_special_result<char_type>
+scan_hexfloat_special_value(char_type const *first, char_type const *end, bool negative, T &value) noexcept
+{
+	if (first == end)
+	{
+		return {};
+	}
+	if (::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(*first))
+	{
+		if (end - first < 3 ||
+			!::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(first[1]) ||
+			!::fast_io::details::scan_hexfloat_caseless_equal<u8'f', u8'F'>(first[2]))
+		{
+			return {first, ::fast_io::parse_code::invalid, true};
+		}
+		auto iter{first + 3};
+		if (end - iter >= 5 &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(iter[0]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(iter[1]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(iter[2]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8't', u8'T'>(iter[3]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'y', u8'Y'>(iter[4]))
+		{
+			iter += 5;
+		}
+		value = ::fast_io::details::fp_make_infinity<T>(negative);
+		return {iter, ::fast_io::parse_code::ok, true};
+	}
+	if (::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(*first))
+	{
+		if (end - first < 3 ||
+			!::fast_io::details::scan_hexfloat_caseless_equal<u8'a', u8'A'>(first[1]) ||
+			!::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(first[2]))
+		{
+			return {first, ::fast_io::parse_code::invalid, true};
+		}
+		auto iter{first + 3};
+		bool indeterminate{};
+		bool signaling{};
+		if constexpr (nan_payload_scan != ::fast_io::manipulators::floating_nan_payload_scan::none)
+		{
+			if (iter != end && *iter == ::fast_io::char_literal_v<u8'(', char_type>)
+			{
+				auto const *seq_begin{iter + 1};
+				for (auto scan{seq_begin}; scan != end; ++scan)
+				{
+					if (*scan == ::fast_io::char_literal_v<u8')', char_type>)
+					{
+						if constexpr (nan_payload_scan ==
+									  ::fast_io::manipulators::floating_nan_payload_scan::preserve)
+						{
+							indeterminate =
+								::fast_io::details::scan_hexfloat_nan_sequence_ind(seq_begin, scan);
+							signaling = ::fast_io::details::scan_hexfloat_nan_sequence_snan(seq_begin, scan);
+						}
+						iter = scan + 1;
+						break;
+					}
+					if (!::fast_io::details::scan_hexfloat_nan_sequence_char(*scan))
+					{
+						break;
+					}
+				}
+			}
+		}
+		if (indeterminate)
+		{
+			value = ::fast_io::details::fp_make_nan<T, false, true>(true);
+		}
+		else if (signaling)
+		{
+			value = ::fast_io::details::fp_make_nan<T, true, false>(nan_parse_sign && negative);
+		}
+		else
+		{
+			value = ::fast_io::details::fp_make_nan<T, false, false>(nan_parse_sign && negative);
+		}
+		return {iter, ::fast_io::parse_code::ok, true};
+	}
+	return {};
+}
+
 struct scan_hexfloat_significand_state
 {
 	bool has_digit{};
@@ -460,6 +592,14 @@ scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type co
 		++first;
 	}
 
+	auto const special_result{
+		::fast_io::details::scan_hexfloat_special_value<flags.nan_parse_sign, flags.nan_payload_scan>(
+			first, end, negative, value)};
+	if (special_result.matched)
+	{
+		return {special_result.iter, special_result.code};
+	}
+
 	if constexpr (flags.showbase)
 	{
 		constexpr auto zero{::fast_io::char_literal_v<u8'0', char_type>};
@@ -543,6 +683,14 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		++first;
 	}
 
+	auto const special_result{
+		::fast_io::details::scan_hexfloat_special_value<flags.nan_parse_sign, flags.nan_payload_scan>(
+			first, end, negative, value)};
+	if (special_result.matched)
+	{
+		return {special_result.iter, special_result.code};
+	}
+
 	if constexpr (flags.showbase)
 	{
 		constexpr auto zero{::fast_io::char_literal_v<u8'0', char_type>};
@@ -601,7 +749,7 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 }
 
 template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e, bool comma,
-		  typename flt, ::std::integral char_type>
+		  bool nan_show_sign = true, bool nan_show_type = false, typename flt, ::std::integral char_type>
 inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f) noexcept
 {
 	using trait = iec559_traits<flt>;
@@ -614,11 +762,11 @@ inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f
 	constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 	constexpr ::std::int_least32_t minus_bias{-static_cast<::std::int_least32_t>(bias)};
 	constexpr ::std::uint_least32_t makeup_bits{((mbits / 4u + 1u) * 4u - mbits) % 4u}; // Thanks jk-jeon for the formula
-	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if (exponent == exponent_mask_u32)
 	{
-		return prsv_fp_nan_impl<uppercase>(iter, mantissa);
+		return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
 	}
+	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if constexpr (showbase)
 	{
 		iter = print_reserve_show_base_impl<16, showbase_uppercase, false>(iter);
@@ -676,7 +824,7 @@ inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase 
 																	  .noskipws = noskipws,
 																	  .floating = ::fast_io::manipulators::floating_format::hexfloat},
 								scalar_type &>
-hexfloat_get(scalar_type &t) noexcept
+	hexfloat_get(scalar_type &t) noexcept
 {
 	return {t};
 }
@@ -686,7 +834,7 @@ inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase 
 																	  .noskipws = noskipws,
 																	  .floating = ::fast_io::manipulators::floating_format::hexfloat},
 								scalar_type &>
-hexfloat0x_get(scalar_type &t) noexcept
+	hexfloat0x_get(scalar_type &t) noexcept
 {
 	return {t};
 }

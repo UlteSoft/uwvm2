@@ -47,6 +47,13 @@ enum class floating_format : char8_t
 	hexfloat
 };
 
+enum class floating_nan_payload_scan : ::std::uint_fast8_t
+{
+	none,
+	consume,
+	preserve
+};
+
 enum class lc_time_flag : ::std::uint_least8_t
 {
 	none,
@@ -151,6 +158,10 @@ struct scalar_flags
 #endif
 	bool line{};
 	percentage_flag percentage{};
+	bool nan_show_sign{true};
+	bool nan_show_type{};
+	bool nan_parse_sign{true};
+	floating_nan_payload_scan nan_payload_scan{floating_nan_payload_scan::consume};
 };
 
 inline constexpr scalar_flags integral_default_scalar_flags{};

@@ -679,26 +679,27 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 }
 
 template <bool showpos, bool uppercase, bool uppercase_e, bool comma, ::fast_io::manipulators::floating_format mt,
-		  typename flt, ::std::integral char_type>
+		  bool nan_show_sign = true, bool nan_show_type = false, typename flt, ::std::integral char_type>
 inline constexpr char_type *print_rsvflt_define_impl(char_type *iter, flt f) noexcept
 {
 	if constexpr (::fast_io::manipulators::floating_format::fixed == mt && uppercase_e)
 	{
-		return print_rsvflt_define_impl<showpos, uppercase, false, comma, mt>(iter, f);
+		return print_rsvflt_define_impl<showpos, uppercase, false, comma, mt, nan_show_sign, nan_show_type>(iter, f);
 	}
 	else
 	{
 		using trait = iec559_traits<flt>;
 		using mantissa_type = typename trait::mantissa_type;
+		constexpr ::std::size_t mbits{trait::mbits};
 		constexpr ::std::size_t ebits{trait::ebits};
 		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
 		constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 		auto [mantissa, exponent, sign] = get_punned_result(f);
-		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 		if (exponent == exponent_mask_u32)
 		{
-			return prsv_fp_nan_impl<uppercase>(iter, mantissa != 0u);
+			return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
 		}
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 		if (!mantissa && !exponent)
 		{
 			if constexpr (mt != ::fast_io::manipulators::floating_format::scientific)

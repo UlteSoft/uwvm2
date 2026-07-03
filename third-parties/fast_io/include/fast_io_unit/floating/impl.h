@@ -30,16 +30,21 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_t<fla
 #if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
 			if constexpr (sizeof(flt) > sizeof(double))
 			{
-				return details::print_rsvhexfloat_size_cache<flags.showbase, __uint128_t>;
+				return details::print_rsv_fp_size_with_special_cache<
+					details::print_rsvhexfloat_size_cache<flags.showbase, __uint128_t>, flags.nan_show_type>;
 			}
 			else
 #endif
-				return details::print_rsvhexfloat_size_cache<flags.showbase,
-															 typename details::iec559_traits<double>::mantissa_type>;
+				return details::print_rsv_fp_size_with_special_cache<
+					details::print_rsvhexfloat_size_cache<flags.showbase,
+														  typename details::iec559_traits<double>::mantissa_type>,
+					flags.nan_show_type>;
 		}
 		else
 		{
-			return details::print_rsvhexfloat_size_cache<flags.showbase, typename trait::mantissa_type>;
+			return details::print_rsv_fp_size_with_special_cache<
+				details::print_rsvhexfloat_size_cache<flags.showbase, typename trait::mantissa_type>,
+				flags.nan_show_type>;
 		}
 	}
 	else
@@ -47,7 +52,8 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_t<fla
 		if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double> &&
 					  sizeof(flt) == sizeof(double)) // this is the case on xxx-windows-msvc
 		{
-			return details::print_rsv_cache<double, flags.floating>;
+			return details::print_rsv_fp_size_with_special_cache<details::print_rsv_cache<double, flags.floating>,
+																 flags.nan_show_type>;
 		}
 		static_assert((::std::same_as<::std::remove_cvref_t<flt>, double> ||
 					   ::std::same_as<::std::remove_cvref_t<flt>, float>
@@ -59,7 +65,8 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_t<fla
 #endif
 					   ),
 					  "currently only support iec559 float32 and float64, sorry");
-		return details::print_rsv_cache<::std::remove_cvref_t<flt>, flags.floating>;
+		return details::print_rsv_fp_size_with_special_cache<
+			details::print_rsv_cache<::std::remove_cvref_t<flt>, flags.floating>, flags.nan_show_type>;
 	}
 }
 
@@ -85,19 +92,22 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 			if constexpr (sizeof(flt) > sizeof(double))
 			{
 				return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-															  flags.uppercase, flags.uppercase_e, flags.comma>(
+															  flags.uppercase, flags.uppercase_e, flags.comma,
+															  flags.nan_show_sign, flags.nan_show_type>(
 					iter, static_cast<__float128>(f.reference));
 			}
 			else
 #endif
 				return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-															  flags.uppercase, flags.uppercase_e, flags.comma>(
+															  flags.uppercase, flags.uppercase_e, flags.comma,
+															  flags.nan_show_sign, flags.nan_show_type>(
 					iter, static_cast<double>(f.reference));
 		}
 		else
 		{
 			return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-														  flags.uppercase, flags.uppercase_e, flags.comma>(iter,
+														  flags.uppercase, flags.uppercase_e, flags.comma,
+														  flags.nan_show_sign, flags.nan_show_type>(iter,
 																										   f.reference);
 		}
 	}
@@ -107,7 +117,8 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 					  sizeof(flt) == sizeof(double)) // this is the case on xxx-windows-msvc
 		{
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating>(iter, static_cast<double>(f.reference));
+													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(
+				iter, static_cast<double>(f.reference));
 		}
 		else
 		{
@@ -123,7 +134,8 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 						   ),
 						  "currently only support iec559 float32 and float64, sorry");
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating>(iter, f.reference);
+													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(iter,
+																											  f.reference);
 		}
 	}
 }
@@ -206,19 +218,22 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 			if constexpr (sizeof(flt) > sizeof(double))
 			{
 				return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-															  flags.uppercase, flags.uppercase_e, flags.comma>(
+															  flags.uppercase, flags.uppercase_e, flags.comma,
+															  flags.nan_show_sign, flags.nan_show_type>(
 					iter, static_cast<__float128>(f.reference));
 			}
 			else
 #endif
 				return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-															  flags.uppercase, flags.uppercase_e, flags.comma>(
+															  flags.uppercase, flags.uppercase_e, flags.comma,
+															  flags.nan_show_sign, flags.nan_show_type>(
 					iter, static_cast<double>(f.reference));
 		}
 		else
 		{
 			return details::print_rsvhexfloat_define_impl<flags.showbase, flags.uppercase_showbase, flags.showpos,
-														  flags.uppercase, flags.uppercase_e, flags.comma>(iter,
+														  flags.uppercase, flags.uppercase_e, flags.comma,
+														  flags.nan_show_sign, flags.nan_show_type>(iter,
 																										   f.reference);
 		}
 	}
@@ -228,7 +243,8 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 					  sizeof(flt) == sizeof(double)) // this is the case on xxx-windows-msvc
 		{
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating>(iter, static_cast<double>(f.reference));
+													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(
+				iter, static_cast<double>(f.reference));
 		}
 		else
 		{
@@ -244,7 +260,8 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 						   ),
 						  "currently only support iec559 float32 and float64, sorry");
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating>(iter, f.reference);
+													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(iter,
+																											  f.reference);
 		}
 	}
 }

@@ -196,107 +196,305 @@ struct iec559_rep
 	::std::int_least32_t e;
 };
 
+template <bool nan_show_type>
+inline constexpr ::std::size_t print_rsv_fp_special_size_cache{nan_show_type ? 10u : 4u};
+
+template <::std::size_t normal_size, bool nan_show_type>
+inline constexpr ::std::size_t print_rsv_fp_size_with_special_cache{
+	normal_size < print_rsv_fp_special_size_cache<nan_show_type> ? print_rsv_fp_special_size_cache<nan_show_type>
+																 : normal_size};
+
+template <bool showpos, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_sign_impl(char_type *iter, bool sign) noexcept;
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_inf_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"INF", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"INF", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"inf", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"inf", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"NAN", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"NAN", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"nan", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"nan", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_ind_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(IND)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(IND)", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(ind)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(ind)", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_snan_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(SNAN)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(SNAN)", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(snan)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(snan)", iter);
+		}
+	}
+}
+
+template <typename mantissa_type, ::std::size_t mbits>
+inline constexpr mantissa_type fp_quiet_nan_mantissa_mask() noexcept
+{
+	return static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits - 1u));
+}
+
+template <typename mantissa_type, ::std::size_t mbits>
+inline constexpr bool fp_nan_is_signaling(mantissa_type mantissa) noexcept
+{
+	return mantissa != 0 && (mantissa & fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()) == 0;
+}
+
+template <typename flt>
+inline constexpr flt fp_make_infinity(bool sign) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+	mantissa_type bits{static_cast<mantissa_type>(exponent_mask << mbits)};
+	if (sign)
+	{
+		bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+	}
+	return bit_cast<flt>(bits);
+}
+
+template <typename flt, bool signaling = false, bool indeterminate = false>
+inline constexpr flt fp_make_nan(bool sign) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+	constexpr mantissa_type quiet_bit{fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()};
+	mantissa_type mantissa{signaling ? static_cast<mantissa_type>(1) : quiet_bit};
+	mantissa_type bits{static_cast<mantissa_type>((exponent_mask << mbits) | mantissa)};
+	if (sign || indeterminate)
+	{
+		bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+	}
+	return bit_cast<flt>(bits);
+}
+
 template <bool uppercase, ::std::integral char_type>
 inline constexpr char_type *prsv_fp_nan_impl(char_type *iter, bool isnan) noexcept
 {
 	if (isnan)
 	{
-		if constexpr (uppercase)
-		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"NAN", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"NAN", iter);
-			}
-		}
-		else
-		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"nan", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"nan", iter);
-			}
-		}
+		return prsv_fp_nan_literal_impl<uppercase>(iter);
 	}
-	else
+	return prsv_fp_inf_literal_impl<uppercase>(iter);
+}
+
+template <bool showpos, bool uppercase, bool nan_show_sign, bool nan_show_type, ::std::size_t mbits,
+		  typename mantissa_type, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_impl(char_type *iter, mantissa_type mantissa, bool sign) noexcept
+{
+	if (mantissa == 0)
 	{
-		if constexpr (uppercase)
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+		return prsv_fp_inf_literal_impl<uppercase>(iter);
+	}
+
+	if constexpr (nan_show_sign)
+	{
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+	}
+	iter = prsv_fp_nan_literal_impl<uppercase>(iter);
+	if constexpr (nan_show_type)
+	{
+		constexpr mantissa_type quiet_bit{fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()};
+		if (sign && mantissa == quiet_bit)
 		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"INF", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"INF", iter);
-			}
+			return prsv_fp_nan_ind_literal_impl<uppercase>(iter);
 		}
-		else
+		if (fp_nan_is_signaling<mantissa_type, mbits>(mantissa))
 		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"inf", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"inf", iter);
-			}
+			return prsv_fp_nan_snan_literal_impl<uppercase>(iter);
 		}
 	}
+	return iter;
 }
 
 template <bool uppercase, ::std::integral char_type>
