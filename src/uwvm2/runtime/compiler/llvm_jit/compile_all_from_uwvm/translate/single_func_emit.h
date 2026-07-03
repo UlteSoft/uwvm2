@@ -3236,6 +3236,132 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
     }
 }
 
+[[nodiscard]] inline constexpr ::std::uint_least32_t llvm_jit_wasm_i32_bits_to_u32(runtime_wasm_i32 value) noexcept
+{
+    using unsigned_wasm_i32 = ::std::uint32_t;
+    static_assert(sizeof(unsigned_wasm_i32) == sizeof(runtime_wasm_i32));
+    return ::std::bit_cast<unsigned_wasm_i32>(value);
+}
+
+[[nodiscard]] inline constexpr bool llvm_jit_bulk_memory_range_oob(::std::size_t begin, ::std::size_t len, ::std::size_t bound) noexcept
+{ return begin > bound || len > bound - begin; }
+
+template <typename MemoryT, typename Fn>
+[[nodiscard]] inline constexpr bool llvm_jit_with_bulk_memory_snapshot(MemoryT const& memory, Fn&& fn) noexcept
+{
+    if constexpr(MemoryT::can_mmap)
+    {
+        return ::uwvm2::object::memory::linear::with_memory_access_snapshot(memory,
+                                                                            [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                                            { return fn(memory_begin, memory_length); });
+    }
+    else if constexpr(MemoryT::support_multi_thread)
+    {
+#if __cpp_lib_atomic_wait >= 201907L
+        [[maybe_unused]] ::uwvm2::object::memory::linear::memory_operation_guard_t guard{memory.growing_flag_p, memory.active_ops_p};
+#else
+        static_assert(!MemoryT::support_multi_thread);
+#endif
+        return fn(memory.memory_begin, memory.memory_length);
+    }
+    else
+    {
+        return fn(memory.memory_begin, memory.memory_length);
+    }
+}
+
+inline constexpr void llvm_jit_memory_copy_bridge(::std::uintptr_t memory_address,
+                                                  runtime_wasm_i32 dst_i32,
+                                                  runtime_wasm_i32 src_i32,
+                                                  runtime_wasm_i32 len_i32) noexcept
+{
+    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    auto const dst{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(dst_i32))};
+    auto const src{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(src_i32))};
+    auto const len{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(len_i32))};
+
+    if(memory_p == nullptr) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap(0uz, 0u, {.offset = dst, .offset_65_bit = false}, 0uz, len);
+    }
+
+    static_cast<void>(llvm_jit_with_bulk_memory_snapshot(*memory_p,
+                                                         [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                         {
+                                                             if(llvm_jit_bulk_memory_range_oob(src, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = src, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(llvm_jit_bulk_memory_range_oob(dst, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = dst, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(len != 0uz)
+                                                             {
+                                                                 if(memory_begin == nullptr) [[unlikely]]
+                                                                 {
+                                                                     llvm_jit_memory_bridge_trap(0uz,
+                                                                                                 0u,
+                                                                                                 {.offset = dst, .offset_65_bit = false},
+                                                                                                 memory_length,
+                                                                                                 len);
+                                                                 }
+                                                                 ::std::memmove(memory_begin + dst, memory_begin + src, len);
+                                                             }
+                                                             return true;
+                                                         }));
+}
+
+inline constexpr void llvm_jit_memory_fill_bridge(::std::uintptr_t memory_address,
+                                                  runtime_wasm_i32 dst_i32,
+                                                  runtime_wasm_i32 value_i32,
+                                                  runtime_wasm_i32 len_i32) noexcept
+{
+    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    auto const dst{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(dst_i32))};
+    auto const value{static_cast<int>(static_cast<unsigned char>(llvm_jit_wasm_i32_bits_to_u32(value_i32)))};
+    auto const len{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(len_i32))};
+
+    if(memory_p == nullptr) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap(0uz, 0u, {.offset = dst, .offset_65_bit = false}, 0uz, len);
+    }
+
+    static_cast<void>(llvm_jit_with_bulk_memory_snapshot(*memory_p,
+                                                         [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                         {
+                                                             if(llvm_jit_bulk_memory_range_oob(dst, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = dst, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(len != 0uz)
+                                                             {
+                                                                 if(memory_begin == nullptr) [[unlikely]]
+                                                                 {
+                                                                     llvm_jit_memory_bridge_trap(0uz,
+                                                                                                 0u,
+                                                                                                 {.offset = dst, .offset_65_bit = false},
+                                                                                                 memory_length,
+                                                                                                 len);
+                                                                 }
+                                                                 ::std::memset(memory_begin + dst, value, len);
+                                                             }
+                                                             return true;
+                                                         }));
+}
+
 // Acquire a best-effort address/length snapshot for a local-imported memory.  This is used only for memory.size-style
 // queries; actual loads/stores stay on bridge functions so provider locks do not outlive the snapshot.
 [[nodiscard]] inline constexpr bool llvm_jit_local_imported_memory_snapshot_bridge(::std::uintptr_t local_imported_module_address,
@@ -6260,6 +6386,8 @@ template <typename CreateValue>
     auto code_curr{instruction_begin};
     auto const code_end{instruction_end};
     constexpr bool result{};
+    using wasm1p1_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+    using wasm1p1_numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
 
     // Push a typed LLVM value onto the transient operand stack.
     auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) constexpr noexcept
@@ -7529,6 +7657,80 @@ template <typename CreateValue>
                        .template operator()<bridge_function>(static_offset, value_type, llvm_value_type, store_bytes, address.value, value.value) != nullptr;
         }};
 
+    auto const emit_native_memory_copy_bridge_call{
+        [&](::llvm::Value* dst, ::llvm::Value* src, ::llvm::Value* len) constexpr noexcept -> ::llvm::CallInst*
+        {
+            if(!ensure_memory0_access_info() || memory0_access_info.memory_p == nullptr || dst == nullptr || src == nullptr || len == nullptr) [[unlikely]]
+            {
+                return nullptr;
+            }
+
+            auto llvm_void_type{::llvm::Type::getVoidTy(llvm_context)};
+            auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto bridge_function_type{::llvm::FunctionType::get(llvm_void_type, {llvm_intptr_type, llvm_i32_type, llvm_i32_type, llvm_i32_type}, false)};
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_copy_bridge>(bridge_function_type, {memory_address, dst, src, len});
+        }};
+
+    auto const emit_native_memory_fill_bridge_call{
+        [&](::llvm::Value* dst, ::llvm::Value* value, ::llvm::Value* len) constexpr noexcept -> ::llvm::CallInst*
+        {
+            if(!ensure_memory0_access_info() || memory0_access_info.memory_p == nullptr || dst == nullptr || value == nullptr || len == nullptr) [[unlikely]]
+            {
+                return nullptr;
+            }
+
+            auto llvm_void_type{::llvm::Type::getVoidTy(llvm_context)};
+            auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto bridge_function_type{::llvm::FunctionType::get(llvm_void_type, {llvm_intptr_type, llvm_i32_type, llvm_i32_type, llvm_i32_type}, false)};
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_fill_bridge>(bridge_function_type, {memory_address, dst, value, len});
+        }};
+
+    auto const emit_memory_copy_call{[&]() constexpr noexcept -> bool
+                                     {
+                                         if(operand_stack.size() < 3uz) [[unlikely]] { return false; }
+
+                                         auto const len{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const src{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const dst{operand_stack.back()};
+                                         operand_stack.pop_back();
+
+                                         if(dst.type != runtime_operand_stack_value_type::i32 || src.type != runtime_operand_stack_value_type::i32 ||
+                                            len.type != runtime_operand_stack_value_type::i32) [[unlikely]]
+                                         {
+                                             return false;
+                                         }
+
+                                         return emit_native_memory_copy_bridge_call(dst.value, src.value, len.value) != nullptr;
+                                     }};
+
+    auto const emit_memory_fill_call{[&]() constexpr noexcept -> bool
+                                     {
+                                         if(operand_stack.size() < 3uz) [[unlikely]] { return false; }
+
+                                         auto const len{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const value{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const dst{operand_stack.back()};
+                                         operand_stack.pop_back();
+
+                                         if(dst.type != runtime_operand_stack_value_type::i32 || value.type != runtime_operand_stack_value_type::i32 ||
+                                            len.type != runtime_operand_stack_value_type::i32) [[unlikely]]
+                                         {
+                                             return false;
+                                         }
+
+                                         return emit_native_memory_fill_bridge_call(dst.value, value.value, len.value) != nullptr;
+                                     }};
+
     // Complete a Wasm memory.size instruction.
     auto const emit_memory_size_call{[&]() constexpr noexcept -> bool
                                      {
@@ -7660,6 +7862,38 @@ template <typename CreateValue>
                 return code_curr == code_end;
             }
         }
+    }
+
+    if(static_cast<::std::uint_least8_t>(curr_opbase) == static_cast<::std::uint_least8_t>(wasm1p1_code::numeric_prefix))
+    {
+        ++code_curr;
+
+        validation_module_traits_t::wasm_u32 subopcode{};
+        if(!parse_wasm_leb128_immediate(code_curr, code_end, subopcode)) [[unlikely]] { return false; }
+
+        switch(static_cast<wasm1p1_numeric_code>(subopcode))
+        {
+            case wasm1p1_numeric_code::memory_copy:
+            {
+                if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !parse_wasm_reserved_zero_byte(code_curr, code_end) ||
+                   !emit_memory_copy_call()) [[unlikely]]
+                {
+                    return result;
+                }
+                break;
+            }
+            case wasm1p1_numeric_code::memory_fill:
+            {
+                if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_fill_call()) [[unlikely]] { return result; }
+                break;
+            }
+            [[unlikely]] default:
+            {
+                return result;
+            }
+        }
+
+        return code_curr == code_end;
     }
 
     // Main opcode dispatch for opcodes implemented directly in this file.  Larger opcode families live in include files

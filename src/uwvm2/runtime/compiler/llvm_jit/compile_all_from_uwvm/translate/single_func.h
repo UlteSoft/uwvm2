@@ -1521,6 +1521,11 @@ namespace details
                                                        auto const vt{static_cast<runtime_operand_stack_value_type>(blocktype_byte)};
                                                        return is_runtime_wasm_value_type_inline_llvm_jit_scalar(vt);
                                                    }};
+        auto const default_memory_supports_native_bulk_bridge{[&]() constexpr noexcept
+                                                              {
+                                                                  auto const access_info{resolve_runtime_memory_access_info(curr_module, 0u)};
+                                                                  return access_info.memory_p != nullptr;
+                                                              }};
 
         auto code_curr{local_func_storage.code_begin};
         auto const code_end{local_func_storage.code_end};
@@ -1605,6 +1610,26 @@ namespace details
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
                         {
+                            break;
+                        }
+                        case wasm1p1_numeric_code::memory_copy:
+                        {
+                            if(!default_memory_supports_native_bulk_bridge()) { return true; }
+                            if(code_end - code_curr < 2) [[unlikely]] { return true; }
+                            auto const dst_memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
+                            ++code_curr;
+                            auto const src_memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
+                            ++code_curr;
+                            if(dst_memory_index != 0u || src_memory_index != 0u) { return true; }
+                            break;
+                        }
+                        case wasm1p1_numeric_code::memory_fill:
+                        {
+                            if(!default_memory_supports_native_bulk_bridge()) { return true; }
+                            if(code_curr == code_end) [[unlikely]] { return true; }
+                            auto const memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
+                            ++code_curr;
+                            if(memory_index != 0u) { return true; }
                             break;
                         }
                         default:

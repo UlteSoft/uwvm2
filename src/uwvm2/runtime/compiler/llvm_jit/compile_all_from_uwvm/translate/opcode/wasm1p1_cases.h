@@ -363,6 +363,66 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
             }
         }};
 
+    auto const check_memory_index_zero{
+        [&](validation_module_traits_t::wasm_u32 memory_index, ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS
+        {
+            if(all_memory_count == 0u) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.no_memory.op_code_name = op_name;
+                err.err_selectable.no_memory.align = 0u;
+                err.err_selectable.no_memory.offset = 0u;
+                err.err_code = code_validation_error_code::no_memory;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            if(memory_index != 0u) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.illegal_memory_index.memory_index = memory_index;
+                err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
+                err.err_code = code_validation_error_code::illegal_memory_index;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }};
+
+    auto const validate_i32_operands{[&](::uwvm2::utils::container::u8string_view op_name, ::std::size_t operand_count) constexpr UWVM_THROWS
+                                     {
+                                         if(!is_polymorphic && concrete_operand_count() < operand_count) [[unlikely]]
+                                         {
+                                             report_operand_stack_underflow(op_begin, op_name, operand_count);
+                                         }
+
+                                         for(::std::size_t i{}; i != operand_count; ++i)
+                                         {
+                                             auto const operand{try_pop_concrete_operand()};
+                                             if(operand.from_stack && operand.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                             {
+                                                 err.err_curr = op_begin;
+                                                 err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                                                 err.err_selectable.numeric_operand_type_mismatch.expected_type =
+                                                     static_cast<wasm_value_type>(curr_operand_stack_value_type::i32);
+                                                 err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                                                     to_wasm1_diagnostic_value_type(operand.type);
+                                                 err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                             }
+                                         }
+                                     }};
+
+    auto const emit_validated_bulk_memory_instruction{[&]() constexpr noexcept
+                                                      {
+                                                          if(emit_llvm_jit_active)
+                                                          {
+                                                              llvm_jit_instruction_emitted_inline = true;
+                                                              if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr))
+                                                                  [[unlikely]]
+                                                              {
+                                                                  disable_inline_llvm_jit_emission();
+                                                              }
+                                                          }
+                                                      }};
+
     switch(numeric_code)
     {
         case wasm1p1_numeric_code::i32_trunc_sat_f32_s:
@@ -445,6 +505,38 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
                                           0u,
                                           0xffffffffffffffffull);
             break;
+        case wasm1p1_numeric_code::memory_copy:
+        {
+            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            {
+                fail_wasm1p1_feature_required(op_begin,
+                                              subopcode,
+                                              ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                              ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+            }
+            auto const dst_memory_index{read_u8_immediate(code_curr, code_end, op_begin, u8"memory.copy.dst")};
+            check_memory_index_zero(dst_memory_index, u8"memory.copy");
+            auto const src_memory_index{read_u8_immediate(code_curr, code_end, op_begin, u8"memory.copy.src")};
+            check_memory_index_zero(src_memory_index, u8"memory.copy");
+            validate_i32_operands(u8"memory.copy", 3uz);
+            emit_validated_bulk_memory_instruction();
+            break;
+        }
+        case wasm1p1_numeric_code::memory_fill:
+        {
+            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            {
+                fail_wasm1p1_feature_required(op_begin,
+                                              subopcode,
+                                              ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                              ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+            }
+            auto const memory_index{read_u8_immediate(code_curr, code_end, op_begin, u8"memory.fill")};
+            check_memory_index_zero(memory_index, u8"memory.fill");
+            validate_i32_operands(u8"memory.fill", 3uz);
+            emit_validated_bulk_memory_instruction();
+            break;
+        }
         [[unlikely]] default:
             err.err_curr = op_begin;
             err.err_selectable.u8 = static_cast<::std::uint_least8_t>(subopcode);
