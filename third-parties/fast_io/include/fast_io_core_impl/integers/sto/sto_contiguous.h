@@ -7,6 +7,35 @@ namespace fast_io
 namespace details
 {
 
+inline constexpr auto generate_sto_ascii_digit_table() noexcept
+{
+	::fast_io::freestanding::array<char8_t, 256> table;
+	for (auto &e : table)
+	{
+		e = static_cast<char8_t>(0xFFu);
+	}
+	for (::std::size_t i{}; i != 10u; ++i)
+	{
+		table.index_unchecked(static_cast<::std::size_t>(u8'0') + i) = static_cast<char8_t>(i);
+	}
+	for (::std::size_t i{}; i != 26u; ++i)
+	{
+		auto const digit{static_cast<char8_t>(10u + i)};
+		table.index_unchecked(static_cast<::std::size_t>(u8'A') + i) = digit;
+		table.index_unchecked(static_cast<::std::size_t>(u8'a') + i) = digit;
+	}
+	return table;
+}
+
+inline constexpr auto sto_ascii_digit_table{::fast_io::details::generate_sto_ascii_digit_table()};
+
+template <::std::integral char_type>
+	requires(!::fast_io::details::is_ebcdic<char_type>)
+inline constexpr char8_t sto_ascii_digit_table_lookup(my_make_unsigned_t<char_type> ch) noexcept
+{
+	return ::fast_io::details::sto_ascii_digit_table.index_unchecked(static_cast<::std::size_t>(ch));
+}
+
 template <char8_t base, ::std::integral char_type>
 	requires(2 <= base && base <= 36)
 inline constexpr bool char_digit_to_literal(my_make_unsigned_t<char_type> &ch) noexcept
@@ -139,6 +168,13 @@ inline constexpr bool char_digit_to_literal(my_make_unsigned_t<char_type> &ch) n
 		}
 		else
 		{
+			if constexpr (sizeof(char_type) == sizeof(char8_t))
+			{
+				auto const digit{::fast_io::details::sto_ascii_digit_table_lookup<char_type>(ch)};
+				ch = static_cast<unsigned_char_type>(digit);
+				return base <= digit;
+			}
+
 			constexpr unsigned_char_type mns{base - 10};
 			unsigned_char_type ch2(ch);
 			ch2 -= u8'A';
@@ -234,6 +270,11 @@ inline constexpr bool char_is_digit(my_make_unsigned_t<char_type> ch) noexcept
 		}
 		else
 		{
+			if constexpr (sizeof(char_type) == sizeof(char8_t))
+			{
+				return ::fast_io::details::sto_ascii_digit_table_lookup<char_type>(ch) < base;
+			}
+
 			constexpr unsigned_char_type mns{base - 10};
 			unsigned_char_type ch2(ch);
 			ch2 -= u8'A';
@@ -527,8 +568,13 @@ template <char8_t base, my_unsigned_integral T, ::std::size_t n>
 inline constexpr ::fast_io::freestanding::array<T, n> pow_table_n{::fast_io::details::generate_pow_table<base, T, n>()};
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline parse_result<char_type const *>
-runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &res) noexcept
+runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
 {
 	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
 	using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
@@ -545,6 +591,7 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 	}
 
 	auto first_phase_last{first + mn_val};
+	T res{out};
 
 	constexpr bool isebcdic{::fast_io::details::is_ebcdic<char_type>};
 	if constexpr (!isebcdic && (::std::numeric_limits<::std::uint_least64_t>::digits == 64u))
@@ -605,7 +652,9 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 									first += ctrz_cval;
 								}
 #if defined(_MSC_VER) && !defined(__clang__)
-								return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+								auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+								out = res;
+								return ret;
 #else
 								goto nextlabel;
 #endif
@@ -661,7 +710,9 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 									first += ctrz_cval;
 								}
 #if defined(_MSC_VER) && !defined(__clang__)
-								return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+								auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+								out = res;
+								return ret;
 #else
 								goto nextlabel;
 #endif
@@ -721,7 +772,9 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 									first += ctrz_cval;
 								}
 #if defined(_MSC_VER) && !defined(__clang__)
-								return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+								auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+								out = res;
+								return ret;
 #else
 								goto nextlabel;
 #endif
@@ -794,7 +847,9 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 								}
 
 #if defined(_MSC_VER) && !defined(__clang__)
-								return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+								auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+								out = res;
+								return ret;
 #else
 								goto nextlabel;
 #endif
@@ -856,7 +911,9 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 									first += ctrz_cval;
 								}
 #if defined(_MSC_VER) && !defined(__clang__)
-								return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+								auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+								out = res;
+								return ret;
 #else
 								goto nextlabel;
 #endif
@@ -889,12 +946,25 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 [[maybe_unused]] nextlabel:;
 #endif
 
-	return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+	if (first == last)
+	{
+		out = res;
+		return {first, parse_code::ok};
+	}
+
+	auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+	out = res;
+	return ret;
 }
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr parse_result<char_type const *>
-compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &res) noexcept
+compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
 {
 	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
 	using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
@@ -910,6 +980,7 @@ compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type cons
 	}
 
 	auto first_phase_last{first + mn_val};
+	T res{out};
 
 	for (; first != first_phase_last; ++first)
 	{
@@ -922,10 +993,23 @@ compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type cons
 		res += ch;
 	}
 
-	return scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res);
+	if (first == last)
+	{
+		out = res;
+		return {first, parse_code::ok};
+	}
+
+	auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<base, char_type, T>(first, last, res)};
+	out = res;
+	return ret;
 }
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr parse_result<char_type const *>
 scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &res) noexcept
 {
@@ -1011,6 +1095,11 @@ template <::std::integral char_type>
 inline constexpr char_type const *skip_hexdigits(char_type const *first, char_type const *last) noexcept;
 
 template <char8_t base, bool shbase = false, bool skipzero = false, bool oct_c2y = false, ::std::integral char_type, my_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr parse_result<char_type const *>
 scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_type const *last, T &t) noexcept
 {
@@ -1161,6 +1250,11 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 
 template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y, ::std::integral char_type,
 		  details::my_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr parse_result<char_type const *> scan_int_contiguous_define_impl(char_type const *first,
 																				 char_type const *last, T &t) noexcept
 {
