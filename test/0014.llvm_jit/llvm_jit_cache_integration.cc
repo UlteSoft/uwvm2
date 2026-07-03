@@ -61,6 +61,23 @@ namespace
         0x21u, 0x00u, 0x0cu, 0x00u, 0x0bu, 0x0bu, 0x20u, 0x00u, 0x41u, 0x10u, 0x47u, 0x04u,
         0x40u, 0x00u, 0x0bu, 0x41u, 0x02u, 0x0eu, 0x01u, 0x00u, 0x00u, 0x00u, 0x0bu};
 
+    inline constexpr ::std::array<unsigned char, 90uz> wasm1p1_scalar_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u,
+        0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u, 0x0au, 0x3au, 0x01u, 0x38u, 0x00u, 0x41u,
+        0x80u, 0x01u, 0xc0u, 0x41u, 0x80u, 0x7fu, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x42u,
+        0x80u, 0x01u, 0xc2u, 0x42u, 0x80u, 0x7fu, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x41u,
+        0x05u, 0x41u, 0x07u, 0x41u, 0x00u, 0x1cu, 0x01u, 0x7fu, 0x41u, 0x07u, 0x47u, 0x04u,
+        0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u,
+        0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
+        0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
+        0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x01u,
+        0x0au, 0x15u, 0x02u, 0x06u, 0x00u, 0x41u, 0x0au, 0x41u, 0x20u, 0x0bu, 0x0cu, 0x00u,
+        0x10u, 0x00u, 0x6au, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
     struct wasm_fixture_def
     {
         ::std::string_view label{};
@@ -944,6 +961,38 @@ namespace
         return true;
     }
 
+    [[nodiscard]] bool test_wasm1p1_feature_cache_smoke(::std::filesystem::path const& uwvm_path,
+                                                        ::std::filesystem::path const& artifact_dir)
+    {
+        auto const scalar_wasm_path{artifact_dir / "wasm1p1_scalar_start.wasm"};
+        if(!write_fixture(scalar_wasm_path, wasm1p1_scalar_start_wasm.data(), wasm1p1_scalar_start_wasm.size())) { return false; }
+
+        auto const scalar_cache_dir{artifact_dir / "cache-wasm1p1-feature-smoke"};
+        constexpr ::std::string_view wasm1p1_feature_args{
+            "-Rjit --wasm-feature-enable-sign-extension --wasm-feature-enable-nontrapping-float-to-int"};
+        if(!run_cached_mode_twice(uwvm_path,
+                                  artifact_dir,
+                                  scalar_wasm_path,
+                                  scalar_cache_dir,
+                                  wasm1p1_feature_args,
+                                  "wasm1p1_feature_smoke"))
+        {
+            return false;
+        }
+
+        auto const multivalue_wasm_path{artifact_dir / "wasm1p1_multivalue_start.wasm"};
+        if(!write_fixture(multivalue_wasm_path, wasm1p1_multivalue_start_wasm.data(), wasm1p1_multivalue_start_wasm.size())) { return false; }
+
+        auto const multivalue_cache_dir{artifact_dir / "cache-wasm1p1-multivalue-smoke"};
+        constexpr ::std::string_view wasm1p1_multivalue_feature_args{"-Rjit --wasm-feature-enable-multi-value"};
+        return run_cached_mode_twice(uwvm_path,
+                                     artifact_dir,
+                                     multivalue_wasm_path,
+                                     multivalue_cache_dir,
+                                     wasm1p1_multivalue_feature_args,
+                                     "wasm1p1_multivalue_smoke");
+    }
+
     [[nodiscard]] bool test_default_tiered_smoke(::std::filesystem::path const& uwvm_path,
                                                  ::std::filesystem::path const& artifact_dir,
                                                  ::std::filesystem::path const& wasm_path)
@@ -1061,6 +1110,7 @@ int main(int argc, char** argv)
 
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }
+    if(!test_wasm1p1_feature_cache_smoke(uwvm_path, artifact_dir)) { return 1; }
     if(!test_default_tiered_smoke(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_signed_cache_integrity(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_cache_fuzz_recovery(uwvm_path, artifact_dir, wasm_path)) { return 1; }

@@ -58,6 +58,13 @@ for(;;)
                                                     if(emitted_llvm_jit_ir_storage != nullptr) { *emitted_llvm_jit_ir_storage = {}; }
                                                 }};
 
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch"
+#elif defined(__GNUC__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wswitch"
+#endif
     switch(curr_opbase)
     {
 #include "opcode/control_flow_cases.h"
@@ -68,6 +75,7 @@ for(;;)
 #include "opcode/const_compare_cases.h"
 #include "opcode/int_numeric_cases.h"
 #include "opcode/float_numeric_convert_cases.h"
+#include "opcode/wasm1p1_cases.h"
         [[unlikely]] default:
         {
             err.err_curr = code_curr;
@@ -77,6 +85,11 @@ for(;;)
             break;
         }
     }
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#elif defined(__GNUC__)
+# pragma GCC diagnostic pop
+#endif
 
     if(emit_llvm_jit_active && !llvm_jit_instruction_emitted_inline)
     {

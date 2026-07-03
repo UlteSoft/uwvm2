@@ -1026,9 +1026,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const function_index_u32{static_cast<wasm_u32>(function_index)};
             auto const function_name{all_details::get_llvm_wasm_function_name(curr_module, function_index_u32)};
             auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
-            auto const entry_address{resolve_llvm_function_address(*engine, function_name)};
+            auto const& runtime_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
+            if(runtime_func.function_type_ptr == nullptr) [[unlikely]] { return false; }
+            auto const typed_entry_required{all_details::is_runtime_wasm_function_type_inline_llvm_jit_supported(*runtime_func.function_type_ptr)};
+            auto const entry_address{typed_entry_required ? resolve_llvm_function_address(*engine, function_name) : 0u};
             auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
-            if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
+            if(raw_entry_address == 0u || (typed_entry_required && entry_address == 0u)) [[unlikely]] { return false; }
 
             // Reentry wrapper symbols are generated only when the local-function translator discovered tiered loop
             // reentry points.  Preserve descriptor/address index alignment for later lookup by Wasm offset.
@@ -1214,9 +1217,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const function_index_u32{static_cast<wasm_u32>(function_index)};
                 auto const function_name{all_details::get_llvm_wasm_function_name(curr_module, function_index_u32)};
                 auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
-                auto const entry_address{resolve_llvm_function_address(*engine, function_name)};
+                auto const& runtime_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
+                if(runtime_func.function_type_ptr == nullptr) [[unlikely]] { return false; }
+                auto const typed_entry_required{all_details::is_runtime_wasm_function_type_inline_llvm_jit_supported(*runtime_func.function_type_ptr)};
+                auto const entry_address{typed_entry_required ? resolve_llvm_function_address(*engine, function_name) : 0u};
                 auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
-                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
+                if(raw_entry_address == 0u || (typed_entry_required && entry_address == 0u)) [[unlikely]] { return false; }
 
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
                 materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
@@ -1530,6 +1536,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 for(auto const local_function_index: claimed_group) { validate_function_if_needed(curr_module, options, local_function_index, err); }
 
                 compile_option emit_options{options.compile_options};
+                if(emit_options.validator_feature_parameter == nullptr)
+                {
+                    emit_options.validator_feature_parameter = options.validator_feature_parameter;
+                }
                 emit_options.route_wasm_calls_through_runtime_bridge = !use_direct_wasm_calls_for_claimed_group;
                 llvm_jit_module_storage_t llvm_ir_storage{};
                 if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage, emit_options.emit_unwind_call_stack_frames))
@@ -1593,6 +1603,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             validate_function_if_needed(curr_module, options, local_function_index, err);
 
             compile_option emit_options{options.compile_options};
+            if(emit_options.validator_feature_parameter == nullptr)
+            {
+                emit_options.validator_feature_parameter = options.validator_feature_parameter;
+            }
             emit_options.route_wasm_calls_through_runtime_bridge = true;
             llvm_jit_module_storage_t llvm_ir_storage{};
             if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage, emit_options.emit_unwind_call_stack_frames)) [[unlikely]]

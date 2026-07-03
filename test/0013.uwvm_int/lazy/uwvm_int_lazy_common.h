@@ -131,7 +131,7 @@ namespace uwvm2test::uwvm_int_lazy
 #if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         if(local_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
         auto const& materialized{storage.materialized_functions.index_unchecked(local_index)};
-        return materialized.ready && materialized.entry_address != 0u && materialized.raw_entry_address != 0u;
+        return materialized.ready && materialized.raw_entry_address != 0u;
 #else
         if(local_index >= storage.compiled.local_funcs.size()) [[unlikely]] { return false; }
         return !storage.compiled.local_funcs.index_unchecked(local_index).op.operands.empty();

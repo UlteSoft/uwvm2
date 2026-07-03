@@ -25,6 +25,7 @@ module;
 // std
 # include <atomic>
 # include <bit>
+# include <climits>
 # include <concepts>
 # include <coroutine>
 # include <cstddef>

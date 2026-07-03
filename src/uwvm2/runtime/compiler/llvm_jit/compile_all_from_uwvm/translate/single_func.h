@@ -120,6 +120,9 @@ struct compile_option
     // Runtime module id used by generated diagnostics.
     ::std::size_t curr_wasm_id{};
 
+    // Parser feature switches used by the built-in wasm1p1 validator gates. Null means the default disabled feature set.
+    ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t const* validator_feature_parameter{};
+
     // Enables LLVM verifier checks after function/module finalization.
     bool verify_llvm_jit_ir{default_verify_llvm_jit_ir};
 
@@ -188,9 +191,6 @@ namespace details
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct validation_module_traits<::uwvm2::utils::container::tuple<Fs...>>
     {
-        // These aliases intentionally use wasm1 section storage.  This LLVM JIT validation path currently follows
-        // WebAssembly 1.0/MVP section and opcode structure; when proposal-specific sections or types become active, add
-        // the corresponding aliases here and update the opcode validators/emitters together.
         using module_storage_t = ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>;
         using import_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>;
         using type_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>;
@@ -199,16 +199,22 @@ namespace details
         using table_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>;
         using memory_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>;
         using global_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>;
+        using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
+        using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
+        using data_count_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>;
         using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
         using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
     };
 
     using validation_module_traits_t = validation_module_traits<::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_features_t>;
     using validation_module_storage_t = validation_module_traits_t::module_storage_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     // MVP primary opcode enum.  Future prefixed proposal opcodes must not be squeezed into this one-byte dispatch model;
     // extend the dispatch layer when those instructions are enabled.
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
+    using wasm1p1_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+    using wasm1p1_numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
 
     // Finalized scalar operand type used by both the validator and LLVM JIT operand stack.
     using runtime_operand_stack_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
@@ -610,6 +616,12 @@ namespace details
             validation_module.sections)};
         auto& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::global_section_storage_t>(
             validation_module.sections)};
+        auto& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::element_section_storage_t>(
+            validation_module.sections)};
+        auto& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_section_storage_t>(
+            validation_module.sections)};
+        auto& datacountsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_count_section_storage_t>(
+            validation_module.sections)};
 
         {
             auto const type_count{get_runtime_type_section_count(curr_module)};
@@ -727,6 +739,26 @@ namespace details
             globalsec.local_globals.push_back_unchecked(*local_global.local_global_type_ptr);
         }
 
+        elemsec.elems.reserve(curr_module.local_defined_element_vec_storage.size());
+        for(auto const& local_element: curr_module.local_defined_element_vec_storage)
+        {
+            if(local_element.element_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            elemsec.elems.push_back_unchecked(*local_element.element_type_ptr);
+        }
+
+        datasec.datas.reserve(curr_module.local_defined_data_vec_storage.size());
+        for(auto const& local_data: curr_module.local_defined_data_vec_storage)
+        {
+            if(local_data.data_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            datasec.datas.push_back_unchecked(*local_data.data_type_ptr);
+        }
+
+        if(!curr_module.local_defined_data_vec_storage.empty())
+        {
+            datacountsec.present = true;
+            datacountsec.count = checked_cast_size_to_wasm_u32(curr_module.local_defined_data_vec_storage.size());
+        }
+
         return validation_module;
     }
 
@@ -749,6 +781,7 @@ namespace details
                                     bool emit_tiered_loop_reentry_entries = false,
                                     bool emit_call_stack_frames = true,
                                     bool emit_unwind_call_stack_frames = false,
+                                    parser_feature_parameter_t const* validator_feature_parameter = nullptr,
                                     ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
@@ -1031,9 +1064,133 @@ namespace details
                                                                                      emit_unwind_call_stack_frames)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+        using wasm1p1_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+        using wasm1p1_numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
+
+        parser_feature_parameter_t const default_validator_feature_parameter{};
+        auto const& effective_validator_feature_parameter{
+            validator_feature_parameter == nullptr ? default_validator_feature_parameter : *validator_feature_parameter};
+        [[maybe_unused]] auto const& wasm1p1_para{
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(effective_validator_feature_parameter)};
+
+        auto const opcode_byte{[](wasm1p1_code opcode) constexpr noexcept -> validation_module_traits_t::wasm_u32
+                               { return static_cast<validation_module_traits_t::wasm_u32>(static_cast<::std::uint_least8_t>(opcode)); }};
+
+        auto const fail_wasm1p1_feature_required{
+            [&](::std::byte const* op_begin,
+                validation_module_traits_t::wasm_u32 value,
+                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) constexpr UWVM_THROWS
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.wasm1p1_feature_required.value = value;
+                err.err_selectable.wasm1p1_feature_required.feature = feature;
+                err.err_selectable.wasm1p1_feature_required.subject = subject;
+                err.err_code = code_validation_error_code::wasm1p1_feature_required;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }};
+
+        auto const fail_invalid_immediate{
+            [&](::std::byte const* op_begin,
+                ::uwvm2::utils::container::u8string_view op_name,
+                ::fast_io::parse_code pc = ::fast_io::parse_code::invalid) constexpr UWVM_THROWS
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.invalid_const_immediate.op_code_name = op_name;
+                err.err_code = code_validation_error_code::invalid_const_immediate;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(pc);
+            }};
+
+        auto const read_leb128{
+            [&]<typename T>(::std::byte const*& curr,
+                            ::std::byte const* end,
+                            ::std::byte const* op_begin,
+                            ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS -> T
+            {
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                T value{};
+                auto const [next, perr]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(curr),
+                                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(end),
+                                                                 ::fast_io::mnp::leb128_get(value))};
+                if(perr != ::fast_io::parse_code::ok) [[unlikely]] { fail_invalid_immediate(op_begin, op_name, perr); }
+
+                curr = reinterpret_cast<::std::byte const*>(next);
+                return value;
+            }};
+
+        auto const read_u8_immediate{
+            [&](::std::byte const*& curr,
+                ::std::byte const* end,
+                ::std::byte const* op_begin,
+                ::uwvm2::utils::container::u8string_view op_name) constexpr UWVM_THROWS -> ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte
+            {
+                if(curr == end) [[unlikely]] { fail_invalid_immediate(op_begin, op_name, ::fast_io::parse_code::end_of_file); }
+
+                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte value{};
+                ::std::memcpy(::std::addressof(value), curr, sizeof(value));
+#if CHAR_BIT > 8
+                value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(value) & 0xFFu);
+#endif
+                ++curr;
+                return value;
+            }};
+
+        auto const ensure_wasm1p1_value_type_enabled{
+            [&](::std::byte const* op_begin,
+                curr_operand_stack_value_type type,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) constexpr UWVM_THROWS
+            {
+                auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type)};
+                if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(vt)) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.wasm1p1_invalid_reference_type.value =
+                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(type);
+                    err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+
+                if(!::uwvm2::parser::wasm::standard::wasm1p1::features::value_type_enabled(vt, effective_validator_feature_parameter)) [[unlikely]]
+                {
+                    auto const feature{vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128
+                                           ? ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd
+                                           : ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types};
+                    fail_wasm1p1_feature_required(
+                        op_begin, static_cast<validation_module_traits_t::wasm_u32>(static_cast<::std::uint_least8_t>(type)), feature, subject);
+                }
+            }};
 
         // Shared validator for unary numeric opcodes.  The opcode case file supplies the expected operand/result MVP
         // scalar type, while this helper handles stack-polymorphic behavior and diagnostics.
+        auto const validate_numeric_unary_stack_effect{
+            [&](::std::byte const* op_begin,
+                ::uwvm2::utils::container::u8string_view op_name,
+                curr_operand_stack_value_type expected_operand_type,
+                curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
+            {
+                if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
+                {
+                    report_operand_stack_underflow(op_begin, op_name, 1uz);
+                }
+
+                // In polymorphic code the operand may be absent.  Only concrete operands are type-checked; the result is
+                // still pushed to keep later validation stack shapes consistent.
+                auto const operand{try_pop_concrete_operand()};
+
+                if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
+                    err.err_selectable.numeric_operand_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_operand_type);
+                    err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type>(operand.type);
+                    err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+
+                operand_stack_push(result_type);
+            }};
+
         auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view op_name,
                                               curr_operand_stack_value_type expected_operand_type,
                                               curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
@@ -1054,28 +1211,7 @@ namespace details
                                               // [safe]  unsafe (could be the section_end)
                                               //         ^^ code_curr
 
-                                              if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
-                                              {
-                                                  report_operand_stack_underflow(op_begin, op_name, 1uz);
-                                              }
-
-                                              // In polymorphic code the operand may be absent.  Only concrete operands
-                                              // are type-checked; the result is still pushed to keep later validation
-                                              // stack shapes consistent.
-                                              auto const operand{try_pop_concrete_operand()};
-
-                                              if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
-                                              {
-                                                  err.err_curr = op_begin;
-                                                  err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
-                                                  err.err_selectable.numeric_operand_type_mismatch.expected_type =
-                                                      static_cast<wasm_value_type>(expected_operand_type);
-                                                  err.err_selectable.numeric_operand_type_mismatch.actual_type = static_cast<wasm_value_type>(operand.type);
-                                                  err.err_code = code_validation_error_code::numeric_operand_type_mismatch;
-                                                  ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                                              }
-
-                                              operand_stack_push(result_type);
+                                              validate_numeric_unary_stack_effect(op_begin, op_name, expected_operand_type, result_type);
                                           }};
 
         auto const validate_numeric_binary{
@@ -1343,6 +1479,161 @@ namespace details
                 .runtime_module_ptr = ::std::addressof(curr_module)};
     }
 
+    inline constexpr void validate_runtime_local_func_with_standard_wasm1p1_validator(
+        validation_module_storage_t const& validation_module,
+        local_func_storage_t const& local_func_storage,
+        ::uwvm2::validation::error::code_validation_error_impl& err,
+        parser_feature_parameter_t const* validator_feature_parameter) UWVM_THROWS
+    {
+        parser_feature_parameter_t const default_validator_feature_parameter{};
+        auto const& effective_validator_feature_parameter{
+            validator_feature_parameter == nullptr ? default_validator_feature_parameter : *validator_feature_parameter};
+        ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                              validation_module,
+                                                              local_func_storage.function_index,
+                                                              local_func_storage.code_begin,
+                                                              local_func_storage.code_end,
+                                                              err,
+                                                              effective_validator_feature_parameter);
+    }
+
+    [[nodiscard]] inline constexpr bool runtime_local_func_requires_interpreter_fallback(
+        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+        local_func_storage_t const& local_func_storage) noexcept
+    {
+        auto const function_type_ptr{local_func_storage.function_type_ptr};
+        auto const wasm_code_ptr{local_func_storage.wasm_code_ptr};
+        if(function_type_ptr == nullptr || wasm_code_ptr == nullptr || local_func_storage.code_begin == nullptr ||
+           local_func_storage.code_end == nullptr) [[unlikely]]
+        {
+            return true;
+        }
+        if(!is_runtime_wasm_function_type_inline_llvm_jit_supported(*function_type_ptr)) { return true; }
+
+        for(auto const& local_part: wasm_code_ptr->locals)
+        {
+            if(!is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(local_part.type))) { return true; }
+        }
+
+        auto const is_inline_scalar_blocktype_byte{[](::std::uint_least8_t blocktype_byte) constexpr noexcept
+                                                   {
+                                                       if(blocktype_byte == 0x40u) { return true; }
+                                                       auto const vt{static_cast<runtime_operand_stack_value_type>(blocktype_byte)};
+                                                       return is_runtime_wasm_value_type_inline_llvm_jit_scalar(vt);
+                                                   }};
+
+        auto code_curr{local_func_storage.code_begin};
+        auto const code_end{local_func_storage.code_end};
+        while(code_curr < code_end)
+        {
+            ::std::uint_least8_t curr_opcode_byte{};
+            ::std::memcpy(::std::addressof(curr_opcode_byte), code_curr, sizeof(curr_opcode_byte));
+
+            switch(curr_opcode_byte)
+            {
+                case static_cast<::std::uint_least8_t>(wasm1_code::block):
+                case static_cast<::std::uint_least8_t>(wasm1_code::loop):
+                case static_cast<::std::uint_least8_t>(wasm1_code::if_):
+                {
+                    ++code_curr;
+                    if(code_curr == code_end) [[unlikely]] { return true; }
+                    ::std::uint_least8_t blocktype_byte{};
+                    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
+                    ++code_curr;
+                    if(!is_inline_scalar_blocktype_byte(blocktype_byte)) { return true; }
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::call):
+                {
+                    ++code_curr;
+                    validation_module_traits_t::wasm_u32 func_index{};
+                    if(!parse_wasm_leb128_immediate(code_curr, code_end, func_index)) [[unlikely]] { return true; }
+                    auto const callee_type_ptr{resolve_runtime_callee_function_type(curr_module, func_index)};
+                    if(callee_type_ptr == nullptr || !is_runtime_wasm_function_type_inline_llvm_jit_supported(*callee_type_ptr)) { return true; }
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::call_indirect):
+                {
+                    ++code_curr;
+                    validation_module_traits_t::wasm_u32 type_index{};
+                    validation_module_traits_t::wasm_u32 table_index{};
+                    if(!parse_wasm_leb128_immediate(code_curr, code_end, type_index) ||
+                       !parse_wasm_leb128_immediate(code_curr, code_end, table_index)) [[unlikely]]
+                    {
+                        return true;
+                    }
+                    static_cast<void>(table_index);
+                    auto const callee_type_ptr{resolve_runtime_type_section_function_type(curr_module, type_index)};
+                    if(callee_type_ptr == nullptr || !is_runtime_wasm_function_type_inline_llvm_jit_supported(*callee_type_ptr)) { return true; }
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::select_t):
+                {
+                    ++code_curr;
+                    validation_module_traits_t::wasm_u32 result_type_count{};
+                    if(!parse_wasm_leb128_immediate(code_curr, code_end, result_type_count)) [[unlikely]] { return true; }
+                    if(result_type_count == 0u) { break; }
+                    if(result_type_count != 1u || code_curr == code_end) [[unlikely]] { return true; }
+                    ::std::uint_least8_t result_type_byte{};
+                    ::std::memcpy(::std::addressof(result_type_byte), code_curr, sizeof(result_type_byte));
+                    ++code_curr;
+                    if(!is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(result_type_byte))) { return true; }
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::i32_extend8_s):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::i32_extend16_s):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend8_s):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend16_s):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend32_s):
+                {
+                    ++code_curr;
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::numeric_prefix):
+                {
+                    ++code_curr;
+                    validation_module_traits_t::wasm_u32 subopcode{};
+                    if(!parse_wasm_leb128_immediate(code_curr, code_end, subopcode)) [[unlikely]] { return true; }
+                    switch(static_cast<wasm1p1_numeric_code>(subopcode))
+                    {
+                        case wasm1p1_numeric_code::i32_trunc_sat_f32_s:
+                        case wasm1p1_numeric_code::i32_trunc_sat_f32_u:
+                        case wasm1p1_numeric_code::i32_trunc_sat_f64_s:
+                        case wasm1p1_numeric_code::i32_trunc_sat_f64_u:
+                        case wasm1p1_numeric_code::i64_trunc_sat_f32_s:
+                        case wasm1p1_numeric_code::i64_trunc_sat_f32_u:
+                        case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
+                        case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
+                        {
+                            break;
+                        }
+                        default:
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_get):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_set):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_null):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_is_null):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_func):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::simd_prefix):
+                {
+                    return true;
+                }
+                default:
+                {
+                    if(!skip_wasm_unreachable_noncontrol_instruction(code_curr, code_end)) [[unlikely]] { return true; }
+                    break;
+                }
+            }
+        }
+
+        return code_curr != code_end;
+    }
+
     // Validate one local function and optionally append its LLVM IR into the supplied module storage.
     inline constexpr local_func_storage_t compile_all_from_uwvm_local_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                                            validation_module_storage_t const& validation_module,
@@ -1353,6 +1644,24 @@ namespace details
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
         local_func_storage.module_id = options.curr_wasm_id;
+        validate_runtime_local_func_with_standard_wasm1p1_validator(validation_module, local_func_storage, err, options.validator_feature_parameter);
+
+        auto const requires_interpreter_fallback{runtime_local_func_requires_interpreter_fallback(curr_module, local_func_storage)};
+        if(emitted_llvm_jit_ir_storage == nullptr && requires_interpreter_fallback) { return local_func_storage; }
+
+        auto const use_interpreter_fallback{emitted_llvm_jit_ir_storage != nullptr && requires_interpreter_fallback};
+        if(use_interpreter_fallback)
+        {
+            if(!emit_runtime_local_func_llvm_jit_interpreter_fallback_entries(local_func_storage,
+                                                                              *emitted_llvm_jit_ir_storage,
+                                                                              options.verify_llvm_jit_ir,
+                                                                              options.emit_unwind_call_stack_frames)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            return local_func_storage;
+        }
+
         // Validation writes tiered loop reentry metadata back into the returned local_func_storage, so callers can publish
         // OSR entry information together with the compiled function metadata.
         validate_runtime_local_func(validation_module,
@@ -1369,6 +1678,7 @@ namespace details
                                     options.emit_tiered_loop_reentry_entries,
                                     options.emit_call_stack_frames,
                                     options.emit_unwind_call_stack_frames,
+                                    options.validator_feature_parameter,
                                     ::std::addressof(local_func_storage.tiered_loop_reentries));
         return local_func_storage;
     }
@@ -1569,7 +1879,7 @@ namespace details
         for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
         {
             auto const local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
-            validate_runtime_local_func(validation_module, local_func_storage, err);
+            validate_runtime_local_func_with_standard_wasm1p1_validator(validation_module, local_func_storage, err, nullptr);
         }
     }
 }  // namespace details
@@ -1579,14 +1889,15 @@ inline constexpr ::std::size_t default_target_task_groups_per_compile_thread{4uz
 inline constexpr ::std::size_t default_target_task_groups_per_adjusted_compile_thread{4uz};
 inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compile_thread{5uz};
 
-// Validate all code bodies in a parser-owned module and print a formatted diagnostic on the first failure.
-template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-inline constexpr bool
-    validate_all_wasm_code_for_module(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-                                      ::uwvm2::utils::container::u8cstring_view file_name,
-                                      ::uwvm2::utils::container::u8string_view module_name) noexcept
-{
-    details::validation_module_storage_t const& validation_module{module_storage};
+    // Validate all code bodies in a parser-owned module and print a formatted diagnostic on the first failure.
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr bool
+        validate_all_wasm_code_for_module(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+                                          ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& feature_parameter,
+                                          ::uwvm2::utils::container::u8cstring_view file_name,
+                                          ::uwvm2::utils::container::u8string_view module_name) noexcept
+    {
+        details::validation_module_storage_t const& validation_module{module_storage};
 
     auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<details::validation_module_traits_t::import_section_storage_t>(
         validation_module.sections)};
@@ -1608,9 +1919,13 @@ inline constexpr bool
         try
 #endif
         {
-            details::validate_runtime_local_func(validation_module,
-                                                 {.code_begin = code_begin_ptr, .code_end = code_end_ptr, .function_index = import_func_count + local_idx},
-                                                 v_err);
+            ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                  validation_module,
+                                                                          import_func_count + local_idx,
+                                                                          code_begin_ptr,
+                                                                          code_end_ptr,
+                                                                          v_err,
+                                                                          feature_parameter);
         }
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
@@ -1658,8 +1973,18 @@ inline constexpr bool
 #endif
     }
 
-    return true;
-}
+        return true;
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr bool
+        validate_all_wasm_code_for_module(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+                                          ::uwvm2::utils::container::u8cstring_view file_name,
+                                          ::uwvm2::utils::container::u8string_view module_name) noexcept
+    {
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> default_feature_parameter{};
+        return validate_all_wasm_code_for_module(module_storage, default_feature_parameter, file_name, module_name);
+    }
 
 inline constexpr bool validate_all_wasm_code() noexcept
 {
@@ -1714,7 +2039,13 @@ inline constexpr bool validate_all_wasm_code() noexcept
                     {
                         // Binary format version 1 is the WebAssembly 1.0/MVP-compatible format handled by this path.
                         // A future binfmt version must add a separate validation adapter instead of falling through here.
-                        if(!validate_all_wasm_code_for_module(wf->wasm_module_storage.wasm_binfmt_ver1_storage, wf->file_name, module_name)) { return false; }
+                        if(!validate_all_wasm_code_for_module(wf->wasm_module_storage.wasm_binfmt_ver1_storage,
+                                                              wf->wasm_parameter.binfmt1_para,
+                                                              wf->file_name,
+                                                              module_name))
+                        {
+                            return false;
+                        }
                         break;
                     }
                     [[unlikely]] default:
