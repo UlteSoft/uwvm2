@@ -11,12 +11,14 @@ extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __a
 extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("_clock_settime");
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_gettime");
 #else
-#if defined(_REDIR_TIME64)
-#if defined(__DEFINED_clockid_t) && defined(__DEFINED_struct_timespec)
-extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres_time64");
-#else
+#if defined(__USE_TIME64_REDIRECTS) || (defined(__GLIBC__) && defined(__USE_TIME_BITS64) && defined(__TIMESIZE) && __TIMESIZE == 32)
+// glibc time64 redirects use the __clock_getres64 symbol on dual-time ABIs.
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres64");
-#endif
+extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("__clock_settime64");
+extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_gettime64");
+#elif defined(_REDIR_TIME64) && _REDIR_TIME64
+// musl follows the kernel-style name here: clock_getres gets "_time64", not "64".
+extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres_time64");
 extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("__clock_settime64");
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_gettime64");
 #else
@@ -821,14 +823,14 @@ inline iso8601_timestamp to_iso8601_local_impl(::std::int_least64_t seconds, ::s
 				throw_posix_error(static_cast<int>(errn));
 			}
 		}
-#elif defined(_WIN32) && !defined(__BIONIC__) && !defined(__WINE__) && !defined(__CYGWIN__) && \
-		((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) &&                          \
-         !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+#elif defined(_WIN32) && !defined(__BIONIC__) && !defined(__WINE__) && !defined(__CYGWIN__) &&                 \
+	((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) && \
+	 !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		bias = _dstbias;
 #else
 		bias = daylight ? -3600L : 0;
 #endif
-		}
+	}
 	::std::uint_least32_t const ul32_tm_gmtoff{
 		static_cast<::std::uint_least32_t>(static_cast<long unsigned>(tm_gmtoff))};
 	::std::uint_least32_t const ul32_bias{static_cast<::std::uint_least32_t>(static_cast<long unsigned>(bias))};
@@ -855,18 +857,18 @@ inline iso8601_timestamp to_iso8601_local_impl(::std::int_least64_t seconds, ::s
 #endif
 	long unsigned ulong_tm_gmtoff{static_cast<long unsigned>(tm_gmtoff)};
 	long seconds{};
-#if (defined(_MSC_VER) || defined(_UCRT)) && \
-		((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) &&                          \
-         !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+#if (defined(_MSC_VER) || defined(_UCRT)) &&                                                                   \
+	((defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__)) && \
+	 !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+	{
+		auto errn{::fast_io::noexcept_call(_get_dstbias, __builtin_addressof(seconds))};
+		if (errn)
 		{
-			auto errn{::fast_io::noexcept_call(_get_dstbias, __builtin_addressof(seconds))};
-			if (errn)
-			{
-				throw_posix_error(static_cast<int>(errn));
-			}
+			throw_posix_error(static_cast<int>(errn));
 		}
+	}
 #else
-		seconds = _dstbias;
+	seconds = _dstbias;
 #endif
 	auto const ulong_seconds{static_cast<long unsigned>(static_cast<unsigned>(seconds))};
 	ulong_tm_gmtoff += ulong_seconds;
