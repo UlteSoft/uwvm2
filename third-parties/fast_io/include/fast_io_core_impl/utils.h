@@ -142,6 +142,15 @@ concept my_integral =
 	;
 
 template <typename T>
+concept character_integral =
+	::std::same_as<::std::remove_cvref_t<T>, char> || ::std::same_as<::std::remove_cvref_t<T>, wchar_t> ||
+	::std::same_as<::std::remove_cvref_t<T>, char8_t> || ::std::same_as<::std::remove_cvref_t<T>, char16_t> ||
+	::std::same_as<::std::remove_cvref_t<T>, char32_t>;
+
+template <typename T>
+concept non_character_integral = my_integral<T> && !character_integral<T>;
+
+template <typename T>
 concept my_signed_integral = ::std::signed_integral<T>
 #ifdef __SIZEOF_INT128__
 							 || ::std::same_as<::std::remove_cv_t<T>, __int128_t>

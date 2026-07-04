@@ -1070,6 +1070,13 @@ inline constexpr auto dec(scalar_type t) noexcept
 		::fast_io::details::base_mani_flags_cache<10, false, shbase, full>>(t);
 }
 
+template <bool shbase = false, bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
+inline constexpr auto cintegral(scalar_type t) noexcept
+{
+	return dec<shbase, full>(t);
+}
+
 template <bool shbase = false, bool full = false, bool oct_c2y = false, bool uppercase_showbase = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
 inline constexpr auto oct(scalar_type t) noexcept
@@ -2569,7 +2576,7 @@ inline constexpr char_type *print_reserve_method_impl(char_type *iter,
 } // namespace details
 
 template <typename scalar_type>
-	requires(details::my_integral<scalar_type> || ::fast_io::details::my_floating_point<scalar_type> ||
+	requires(details::non_character_integral<scalar_type> || ::fast_io::details::my_floating_point<scalar_type> ||
 			 ::std::same_as<::std::nullptr_t, ::std::remove_cvref_t<scalar_type>>)
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
@@ -2578,7 +2585,7 @@ template <typename scalar_type>
 #endif
 inline constexpr auto print_alias_define(io_alias_t, scalar_type t) noexcept
 {
-	if constexpr (details::my_integral<scalar_type>)
+	if constexpr (details::non_character_integral<scalar_type>)
 	{
 		using int_alias_type = ::fast_io::details::integer_alias_type<scalar_type>;
 		return manipulators::scalar_manip_t<manipulators::integral_default_scalar_flags, int_alias_type>{
@@ -2597,7 +2604,7 @@ inline constexpr auto print_alias_define(io_alias_t, scalar_type t) noexcept
 }
 
 template <::std::integral char_type, typename T>
-	requires(details::my_integral<T> || ::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
+	requires(details::non_character_integral<T> || ::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, T>) noexcept
 {
 	if constexpr (::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
@@ -2611,7 +2618,7 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, T
 }
 
 template <::std::integral char_type, typename T>
-	requires(details::my_integral<T> || ::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
+	requires(details::non_character_integral<T> || ::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]] // always inline to reduce inline depth in GCC and LLVM clang
 #endif
