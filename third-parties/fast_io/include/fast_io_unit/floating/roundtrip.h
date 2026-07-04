@@ -647,7 +647,7 @@ dragonbox_compute_mul_parity_float64(::std::uint_least64_t two_f, ::std::uint_le
 
 template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
 [[nodiscard]] inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
-dragonbox_nearest_shorter_interval(typename iec559_traits<flt>::mantissa_type m2,
+dragonbox_nearest_shorter_interval([[maybe_unused]] typename iec559_traits<flt>::mantissa_type m2,
 								   ::std::int_least32_t e2, bool negative) noexcept
 {
 	using trait = iec559_traits<flt>;
