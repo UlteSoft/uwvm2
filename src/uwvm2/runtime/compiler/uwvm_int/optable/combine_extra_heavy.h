@@ -1421,10 +1421,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     // ----------------------------------------
-    // ChaCha20 (fixed test vector): fuse the whole block function
+    // ChaCha20 reference block: fuse the whole block function
     // ----------------------------------------
 
-    /// @brief Extra-heavy mega-op for the ChaCha20 reference block used by `/tmp/uwvm2test/chacha20.wasm` (tail-call).
+    /// @brief Extra-heavy mega-op for the ChaCha20 reference block (tail-call).
     /// @details
     /// This opfunc replaces the entire Wasm body of the reference ChaCha20 block function (20 rounds; 10 double-rounds),
     /// writing 16 words (state[0..15]) back to linear memory at `out_ptr + {0..60}`.

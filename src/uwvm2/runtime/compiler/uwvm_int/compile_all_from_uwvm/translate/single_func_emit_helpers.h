@@ -6,11 +6,7 @@
 // Keep `-Rclog` useful for runtime decisions without dumping every emitted op.
 constexpr bool runtime_log_emit_opfuncs{false};
 constexpr bool runtime_log_emit_cf{false};
-#ifdef UWVM_TEST
-constexpr bool runtime_log_emit_wasm_ops{true};
-#else
 constexpr bool runtime_log_emit_wasm_ops{false};
-#endif
 constexpr bool runtime_log_emit_stacktop{false};
 constexpr bool runtime_log_emit_conbine{true};
 constexpr bool runtime_log_emit_func_stats{true};
