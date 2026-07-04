@@ -836,39 +836,81 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							return cmake_args
 						end
 
+						local function with_wabt_prepare_lock(action)
+							local scheduler = import("core.base.scheduler")
+							local lock_name = "uwvm2.wabt.prepare"
+							local lock_dir = "build/test/third-parties"
+
+							scheduler.co_lock(lock_name)
+							local lock = nil
+							local action_errors = nil
+							try {
+								function()
+									os.mkdir(lock_dir)
+									lock = io.openlock(path.join(lock_dir, "wabt.prepare.lock"))
+									lock:lock()
+									action()
+								end,
+								catch {
+									function(errors)
+										action_errors = errors
+									end
+								},
+								finally {
+									function()
+										if lock then
+											lock:unlock()
+											lock:close()
+										end
+										scheduler.co_unlock(lock_name)
+									end
+								}
+							}
+
+							if action_errors then
+								raise(action_errors)
+							end
+						end
+
 						if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
-							local wabt_root = "build/test/third-parties/wabt"
-							-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
-							if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
-								print("wabt source not found or incomplete. Attempting to pull...")
+							with_wabt_prepare_lock(function()
+								if has_wabt("build/test/third-parties/wabt") or has_wabt("wabt") then
+									return
+								end
+
+								local wabt_root = "build/test/third-parties/wabt"
+								-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
+								if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
+									print("wabt source not found or incomplete. Attempting to pull...")
+									if not os.isdir(wabt_root) then
+										os.mkdir(wabt_root)
+									end
+									-- Use git clone/pull instead of submodule
+									if not os.isdir(path.join(wabt_root, ".git")) then
+										os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", wabt_root, "--recursive"})
+									else
+										os.vrunv("git", {"-C", wabt_root, "pull"})
+										os.vrunv("git", {"-C", wabt_root, "submodule", "update", "--init", "--recursive"})
+									end
+								end
+
 								if not os.isdir(wabt_root) then
-									os.mkdir(wabt_root)
+									wabt_root = "wabt"
 								end
-								-- Use git clone/pull instead of submodule
-								if not os.isdir(path.join(wabt_root, ".git")) then
-									os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", wabt_root, "--recursive"})
+
+								if os.isdir(wabt_root) then
+									print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
+									local build_dir = path.join(wabt_root, "build")
+									os.tryrm(build_dir)
+									-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
+									-- when fed malformed inputs (important for fuzzing/differential validation).
+									-- Use WABT's internal SHA-256 implementation so Darwin cross sysroots do not need OpenSSL libcrypto.
+									os.vrunv("cmake", make_wabt_cmake_args(wabt_root))
+									os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 								else
-									os.vrunv("git", {"-C", wabt_root, "pull"})
-									os.vrunv("git", {"-C", wabt_root, "submodule", "update", "--init", "--recursive"})
+									raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
 								end
-							end
-
-							if not os.isdir(wabt_root) then
-								wabt_root = "wabt"
-							end
-
-							if os.isdir(wabt_root) then
-								print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
-								local build_dir = path.join(wabt_root, "build")
-								os.tryrm(build_dir)
-								-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
-								-- when fed malformed inputs (important for fuzzing/differential validation).
-								-- Use WABT's internal SHA-256 implementation so Darwin cross sysroots do not need OpenSSL libcrypto.
-								os.vrunv("cmake", make_wabt_cmake_args(wabt_root))
-								os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
-							else
-								raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
-							end
+							end)
 						end
 					end)
 				end
