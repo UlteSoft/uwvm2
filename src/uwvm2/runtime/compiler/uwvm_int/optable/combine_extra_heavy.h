@@ -1295,7 +1295,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 const k{::std::bit_cast<wasm_f32>(k_bits)};
 
         auto const& memory{*memory_p};
-        [[maybe_unused]] auto const lock_guard{details::lock_memory(memory)};
+        details::enter_memory_operation_memory_lock(memory);
 
         if(i_u < end_u)
         {
@@ -1323,6 +1323,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 ptr_u += wasm_u32{16u};
             }
         }
+        details::exit_memory_operation_memory_lock(memory);
 
         conbine_details::store_local(type...[2u], ptr_off, ::std::bit_cast<wasm_i32>(ptr_u));
         conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
@@ -1418,10 +1419,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     // ----------------------------------------
-    // ChaCha20 (fixed test vector): fuse the whole block function
+    // ChaCha20 reference block: fuse the whole block function
     // ----------------------------------------
 
-    /// @brief Extra-heavy mega-op for the ChaCha20 reference block used by `/tmp/uwvm2test/chacha20.wasm` (tail-call).
+    /// @brief Extra-heavy mega-op for the ChaCha20 reference block (tail-call).
     /// @details
     /// This opfunc replaces the entire Wasm body of the reference ChaCha20 block function (20 rounds; 10 double-rounds),
     /// writing 16 words (state[0..15]) back to linear memory at `out_ptr + {0..60}`.
@@ -1645,7 +1646,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // This is equivalent to per-store bounds checks for the contiguous 16-word range [0..60].
         if(memory_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         auto const& mem{*memory_p};
-        [[maybe_unused]] auto const lock_guard{details::lock_memory(mem)};
+        details::enter_memory_operation_memory_lock(mem);
         ::std::uint_least64_t const max_eff{static_cast<::std::uint_least64_t>(out_ptr) + 60u};
         details::memory_offset_t const effective_offset{.offset = max_eff, .offset_65_bit = (max_eff >> 32u) != 0u};
         details::bounds_check_generic(mem, 0uz, 60u, effective_offset, 4uz);
@@ -1673,6 +1674,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         store_word(8u, l8 + 2036477234u);
         store_word(4u, l12 + 857760878u);
         store_word(0u, l15 + 1634760805u);
+        details::exit_memory_operation_memory_lock(mem);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
