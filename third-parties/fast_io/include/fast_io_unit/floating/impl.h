@@ -182,13 +182,15 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 					  sizeof(flt) == sizeof(double)) // this is the case on xxx-windows-msvc
 		{
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(
+													 flags.floating, flags.rounding, flags.nan_show_sign,
+													 flags.nan_show_type>(
 				iter, static_cast<double>(f.reference));
 		}
 		else if constexpr (::fast_io::details::print_floating_decimal_via_float<flt>)
 		{
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(
+													 flags.floating, flags.rounding, flags.nan_show_sign,
+													 flags.nan_show_type>(
 				iter, static_cast<float>(f.reference));
 		}
 		else
@@ -198,8 +200,8 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 						  "currently only support iec559 float32 and float64 decimal output; narrower IEC559 "
 						  "formats are printed through float");
 			return details::print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-													 flags.floating, flags.nan_show_sign, flags.nan_show_type>(iter,
-																											   f.reference);
+													 flags.floating, flags.rounding, flags.nan_show_sign,
+													 flags.nan_show_type>(iter, f.reference);
 		}
 	}
 }

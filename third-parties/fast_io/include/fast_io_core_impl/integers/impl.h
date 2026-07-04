@@ -54,6 +54,20 @@ enum class floating_nan_payload_scan : ::std::uint_fast8_t
 	preserve
 };
 
+enum class floating_rounding : ::std::uint_least8_t
+{
+	nearest_to_even,
+	nearest_to_odd,
+	nearest_toward_plus_infinity,
+	nearest_toward_minus_infinity,
+	nearest_toward_zero,
+	nearest_away_from_zero,
+	toward_plus_infinity,
+	toward_minus_infinity,
+	toward_zero,
+	away_from_zero
+};
+
 enum class lc_time_flag : ::std::uint_least8_t
 {
 	none,
@@ -162,6 +176,7 @@ struct scalar_flags
 	bool nan_show_type{};
 	bool nan_parse_sign{true};
 	floating_nan_payload_scan nan_payload_scan{floating_nan_payload_scan::consume};
+	floating_rounding rounding{};
 };
 
 inline constexpr scalar_flags integral_default_scalar_flags{};
@@ -231,6 +246,79 @@ inline constexpr ::fast_io::manipulators::scalar_flags hexafloat_mani_flags_cach
 template <bool uppercase, bool comma, ::fast_io::manipulators::floating_format fm>
 inline constexpr ::fast_io::manipulators::scalar_flags dcmfloat_mani_flags_cache{
 	.uppercase = uppercase, .uppercase_e = uppercase, .comma = comma, .floating = fm};
+
+inline constexpr ::fast_io::manipulators::scalar_flags
+set_floating_rounding_flag(::fast_io::manipulators::scalar_flags flags,
+						   ::fast_io::manipulators::floating_rounding rounding) noexcept
+{
+	flags.rounding = rounding;
+	return flags;
+}
+
+template <::fast_io::manipulators::scalar_flags flags, ::fast_io::manipulators::floating_rounding rounding>
+inline constexpr ::fast_io::manipulators::scalar_flags floating_rounding_mani_flags_cache{
+	::fast_io::details::set_floating_rounding_flag(flags, rounding)};
+
+template <::fast_io::manipulators::floating_rounding rounding>
+inline constexpr bool floating_rounding_is_nearest{
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_zero ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero};
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool floating_rounding_directed_round_up(bool negative) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool floating_rounding_nearest_tie_round_up(bool negative,
+																		   ::std::uint_least64_t mantissa) noexcept
+{
+	auto const rounded_down{mantissa >> 1u};
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return (rounded_down & 1u) != 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return (rounded_down & 1u) == 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 template <bool uppercase, bool shbase>
 inline constexpr ::fast_io::manipulators::scalar_flags cryptohash_mani_flags_cache{
@@ -527,6 +615,29 @@ struct scalar_manip_precision_t
 	T reference;
 	::std::size_t precision;
 };
+
+template <floating_rounding rounding_policy, scalar_flags flags, typename T>
+inline constexpr auto rounding(scalar_manip_t<flags, T> value) noexcept
+{
+	return scalar_manip_t<::fast_io::details::floating_rounding_mani_flags_cache<flags, rounding_policy>, T>{
+		value.reference};
+}
+
+template <floating_rounding rounding_policy, scalar_flags flags, typename T>
+inline constexpr auto rounding(scalar_manip_precision_t<flags, T> value) noexcept
+{
+	return scalar_manip_precision_t<::fast_io::details::floating_rounding_mani_flags_cache<flags, rounding_policy>, T>{
+		value.reference, value.precision};
+}
+
+template <floating_rounding rounding_policy, typename scalar_type>
+	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
+inline constexpr auto rounding_get(scalar_type &value) noexcept
+{
+	return scalar_manip_t<::fast_io::details::floating_rounding_mani_flags_cache<
+							  ::fast_io::manipulators::floating_point_default_scalar_flags, rounding_policy>,
+						  scalar_type &>{value};
+}
 
 template <scalar_placement flags, typename T>
 struct width_t

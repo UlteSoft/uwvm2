@@ -383,6 +383,92 @@ template <typename T>
 	}
 }
 
+template <::fast_io::manipulators::floating_rounding rounding>
+inline constexpr bool scan_decfloat_nearest_rounding{
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_zero ||
+	rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero};
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool scan_decfloat_directed_round_up(bool negative) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool scan_decfloat_nearest_tie_round_up(bool negative,
+																	   ::std::uint_least64_t mantissa) noexcept
+{
+	auto const rounded_down{mantissa >> 1u};
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return (rounded_down & 1u) != 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return (rounded_down & 1u) == 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr ::std::uint_least64_t
+scan_decfloat_round_mantissa(bool negative, ::std::uint_least64_t mantissa, bool has_tail, bool is_tie) noexcept
+{
+	if constexpr (::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
+	{
+		if ((mantissa & 1u) != 0u)
+		{
+			if (!is_tie || ::fast_io::details::scan_decfloat_nearest_tie_round_up<rounding>(negative, mantissa))
+			{
+				++mantissa;
+			}
+		}
+	}
+	else
+	{
+		if (((mantissa & 1u) != 0u || has_tail) &&
+			::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
+		{
+			++mantissa;
+		}
+	}
+	return mantissa >> 1u;
+}
+
 [[nodiscard]] inline constexpr scan_decfloat_uint128
 scan_decfloat_mul_64x128_high(::std::uint_least64_t value, ::fast_io::details::uint64x2 cache) noexcept
 {
@@ -397,9 +483,11 @@ scan_decfloat_mul_64x128_high(::std::uint_least64_t value, ::fast_io::details::u
 	return {low, high};
 }
 
-template <typename T>
+template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
 [[nodiscard]] inline constexpr bool scan_decfloat_compute_adjusted(::std::int_least64_t exponent,
 																   ::std::uint_least64_t significand,
+																   bool negative,
 																   scan_decfloat_adjusted_mantissa &answer) noexcept
 {
 	using no_cvref_t = ::std::remove_cvref_t<T>;
@@ -445,23 +533,51 @@ template <typename T>
 				answer = {};
 				return true;
 			}
-			mantissa >>= static_cast<unsigned>(-power2 + 1);
-			mantissa += mantissa & 1u;
-			mantissa >>= 1u;
+			auto const subnormal_shift{static_cast<unsigned>(-power2 + 1)};
+			if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+			{
+				mantissa >>= subnormal_shift;
+				mantissa += mantissa & 1u;
+				mantissa >>= 1u;
+			}
+			else
+			{
+				auto const subnormal_tail_mask{(::std::uint_least64_t{1u} << subnormal_shift) - 1u};
+				bool const has_tail{(mantissa & subnormal_tail_mask) != 0u || product.low != 0u};
+				mantissa >>= subnormal_shift;
+				bool const is_tie{!has_tail && (mantissa & 1u) != 0u};
+				mantissa =
+					::fast_io::details::scan_decfloat_round_mantissa<rounding>(negative, mantissa, has_tail, is_tie);
+			}
 			answer.power2 = mantissa < (::std::uint_least64_t{1} << mantissa_explicit_bits) ? 0 : 1;
 			answer.mantissa = mantissa;
 			return true;
 		}
-		if (product.low <= 1 &&
-			::fast_io::details::scan_decfloat_min_round_to_even_power10<no_cvref_t>() <= exponent &&
-			exponent <= ::fast_io::details::scan_decfloat_max_round_to_even_power10<no_cvref_t>() &&
-			(mantissa & 3u) == 1u &&
-			(mantissa << static_cast<unsigned>(shift)) == product.high)
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
 		{
-			mantissa &= ~::std::uint_least64_t{1};
+			if (product.low <= 1 &&
+				::fast_io::details::scan_decfloat_min_round_to_even_power10<no_cvref_t>() <= exponent &&
+				exponent <= ::fast_io::details::scan_decfloat_max_round_to_even_power10<no_cvref_t>() &&
+				(mantissa & 3u) == 1u &&
+				(mantissa << static_cast<unsigned>(shift)) == product.high)
+			{
+				mantissa &= ~::std::uint_least64_t{1};
+			}
+			mantissa += mantissa & 1u;
+			mantissa >>= 1u;
 		}
-		mantissa += mantissa & 1u;
-		mantissa >>= 1u;
+		else
+		{
+			auto const shifted_back{mantissa << static_cast<unsigned>(shift)};
+			bool const is_tie{
+				product.low <= 1 &&
+				::fast_io::details::scan_decfloat_min_round_to_even_power10<no_cvref_t>() <= exponent &&
+				exponent <= ::fast_io::details::scan_decfloat_max_round_to_even_power10<no_cvref_t>() &&
+				(mantissa & 1u) != 0u && shifted_back == product.high};
+			bool const has_tail{shifted_back != product.high || product.low != 0u};
+			mantissa =
+				::fast_io::details::scan_decfloat_round_mantissa<rounding>(negative, mantissa, has_tail, is_tie);
+		}
 		if (mantissa >= (::std::uint_least64_t{2} << mantissa_explicit_bits))
 		{
 			mantissa = ::std::uint_least64_t{1} << mantissa_explicit_bits;
@@ -682,7 +798,8 @@ scan_decfloat_assign_adjusted(T &value, bool negative, ::std::uint_least64_t sig
 	return ::fast_io::parse_code::ok;
 }
 
-template <typename T>
+template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
 [[nodiscard]] inline constexpr ::fast_io::parse_code scan_decfloat_assign(T &value, bool negative,
 																		  scan_decfloat_significand_state const &state,
 																		  ::std::int_least64_t exponent) noexcept
@@ -693,15 +810,19 @@ template <typename T>
 	adjusted_exponent = ::fast_io::details::scan_decfloat_saturating_add(
 		adjusted_exponent,
 		static_cast<::std::int_least64_t>(state.significant_digits - state.stored_digits));
-	if (!state.truncated_nonzero &&
-		::fast_io::details::scan_decfloat_try_clinger(state.significand, adjusted_exponent, negative, value))
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
 	{
-		return ::fast_io::parse_code::ok;
+		if (!state.truncated_nonzero &&
+			::fast_io::details::scan_decfloat_try_clinger(state.significand, adjusted_exponent, negative, value))
+		{
+			return ::fast_io::parse_code::ok;
+		}
 	}
 	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
 	if (!state.truncated_nonzero)
 	{
-		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t>(adjusted_exponent, state.significand, adjusted))
+		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+				adjusted_exponent, state.significand, negative, adjusted))
 		{
 			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
 		}
@@ -709,8 +830,10 @@ template <typename T>
 	else
 	{
 		::fast_io::details::scan_decfloat_adjusted_mantissa adjusted_next;
-		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t>(adjusted_exponent, state.significand, adjusted) &&
-			::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t>(adjusted_exponent, state.significand + 1u, adjusted_next) &&
+		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+				adjusted_exponent, state.significand, negative, adjusted) &&
+			::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+				adjusted_exponent, state.significand + 1u, negative, adjusted_next) &&
 			adjusted.mantissa == adjusted_next.mantissa && adjusted.power2 == adjusted_next.power2)
 		{
 			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
@@ -719,7 +842,8 @@ template <typename T>
 	return ::fast_io::parse_code::partial;
 }
 
-template <typename T>
+template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
 [[nodiscard]] inline constexpr ::fast_io::parse_code
 scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t significand,
 						   ::std::uint_least64_t fractional_digits,
@@ -728,12 +852,16 @@ scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t signif
 	using no_cvref_t = ::std::remove_cvref_t<T>;
 	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
 		exponent, -static_cast<::std::int_least64_t>(fractional_digits))};
-	if (::fast_io::details::scan_decfloat_try_clinger(significand, adjusted_exponent, negative, value))
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
 	{
-		return ::fast_io::parse_code::ok;
+		if (::fast_io::details::scan_decfloat_try_clinger(significand, adjusted_exponent, negative, value))
+		{
+			return ::fast_io::parse_code::ok;
+		}
 	}
 	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
-	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t>(adjusted_exponent, significand, adjusted))
+	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+			adjusted_exponent, significand, negative, adjusted))
 	{
 		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
 	}
@@ -861,8 +989,8 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 			}
 
 			return {first,
-					::fast_io::details::scan_decfloat_assign_short(value, negative, significand, fractional_digits,
-																   exponent),
+					::fast_io::details::scan_decfloat_assign_short<T, flags.rounding>(
+						value, negative, significand, fractional_digits, exponent),
 					true};
 		}
 	}
@@ -963,7 +1091,8 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
 		return {first, ::fast_io::parse_code::ok};
 	}
-	return {first, ::fast_io::details::scan_decfloat_assign(value, negative, significand_state, exponent)};
+	return {first, ::fast_io::details::scan_decfloat_assign<T, flags.rounding>(
+					   value, negative, significand_state, exponent)};
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
