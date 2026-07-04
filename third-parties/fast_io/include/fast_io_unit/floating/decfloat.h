@@ -222,6 +222,14 @@ template <typename T>
 	return false;
 }
 
+inline constexpr bool scan_decfloat_clinger_environment_independent{
+#if defined(FAST_IO_HAS_FLOATING_POINT_ENVIRONMENT)
+	false
+#else
+	true
+#endif
+};
+
 struct scan_decfloat_significand_state
 {
 	::std::uint_least64_t significand{};
@@ -627,6 +635,46 @@ inline constexpr ::std::int_least64_t scan_decfloat_saturating_add(::std::int_le
 	return a + b;
 }
 
+[[nodiscard]] inline constexpr ::std::int_least64_t
+scan_decfloat_adjusted_exponent(scan_decfloat_significand_state const &state,
+								::std::int_least64_t exponent) noexcept
+{
+	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
+		exponent, -static_cast<::std::int_least64_t>(state.fractional_digits))};
+	return ::fast_io::details::scan_decfloat_saturating_add(
+		adjusted_exponent,
+		static_cast<::std::int_least64_t>(state.significant_digits - state.stored_digits));
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool
+scan_decfloat_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down,
+							   ::std::uint_least64_t remainder, ::std::uint_least64_t divisor,
+							   bool tail_nonzero) noexcept
+{
+	if (!remainder && !tail_nonzero)
+	{
+		return false;
+	}
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	{
+		auto const half{divisor >> 1u};
+		if (remainder < half)
+		{
+			return false;
+		}
+		if (half < remainder || tail_nonzero)
+		{
+			return true;
+		}
+		return ::fast_io::details::print_rsv_fp_decimal_tie_round_up<rounding>(negative, rounded_down);
+	}
+	else
+	{
+		return ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative);
+	}
+}
+
 inline constexpr void scan_decfloat_append_digit(scan_decfloat_significand_state &state, char8_t digit,
 												 bool after_decimal) noexcept
 {
@@ -805,12 +853,9 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 																		  ::std::int_least64_t exponent) noexcept
 {
 	using no_cvref_t = ::std::remove_cvref_t<T>;
-	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
-		exponent, -static_cast<::std::int_least64_t>(state.fractional_digits))};
-	adjusted_exponent = ::fast_io::details::scan_decfloat_saturating_add(
-		adjusted_exponent,
-		static_cast<::std::int_least64_t>(state.significant_digits - state.stored_digits));
-	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	auto adjusted_exponent{::fast_io::details::scan_decfloat_adjusted_exponent(state, exponent)};
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even &&
+				  ::fast_io::details::scan_decfloat_clinger_environment_independent)
 	{
 		if (!state.truncated_nonzero &&
 			::fast_io::details::scan_decfloat_try_clinger(state.significand, adjusted_exponent, negative, value))
@@ -845,14 +890,17 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
 [[nodiscard]] inline constexpr ::fast_io::parse_code
-scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t significand,
-						   ::std::uint_least64_t fractional_digits,
-						   ::std::int_least64_t exponent) noexcept
+scan_decfloat_assign_significand(T &value, bool negative, ::std::uint_least64_t significand,
+								 ::std::int_least64_t adjusted_exponent) noexcept
 {
 	using no_cvref_t = ::std::remove_cvref_t<T>;
-	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
-		exponent, -static_cast<::std::int_least64_t>(fractional_digits))};
-	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	if (!significand)
+	{
+		value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
+		return ::fast_io::parse_code::ok;
+	}
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even &&
+				  ::fast_io::details::scan_decfloat_clinger_environment_independent)
 	{
 		if (::fast_io::details::scan_decfloat_try_clinger(significand, adjusted_exponent, negative, value))
 		{
@@ -866,6 +914,195 @@ scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t signif
 		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
 	}
 	return ::fast_io::parse_code::partial;
+}
+
+template <typename T, ::fast_io::manipulators::floating_precision precision_mode,
+		  ::fast_io::manipulators::floating_rounding rounding =
+			  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_precision(T &value, bool negative, scan_decfloat_significand_state const &state,
+							   ::std::int_least64_t exponent, ::std::size_t precision) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+	{
+		switch (::fast_io::details::current_floating_rounding())
+		{
+		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+			return ::fast_io::details::scan_decfloat_assign_precision<
+				T, precision_mode, ::fast_io::manipulators::floating_rounding::toward_plus_infinity>(
+				value, negative, state, exponent, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+			return ::fast_io::details::scan_decfloat_assign_precision<
+				T, precision_mode, ::fast_io::manipulators::floating_rounding::toward_minus_infinity>(
+				value, negative, state, exponent, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_zero:
+			return ::fast_io::details::scan_decfloat_assign_precision<
+				T, precision_mode, ::fast_io::manipulators::floating_rounding::toward_zero>(
+				value, negative, state, exponent, precision);
+		default:
+			return ::fast_io::details::scan_decfloat_assign_precision<
+				T, precision_mode, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+				value, negative, state, exponent, precision);
+		}
+	}
+	else
+	{
+		auto adjusted_exponent{::fast_io::details::scan_decfloat_adjusted_exponent(state, exponent)};
+		auto significand{state.significand};
+		if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::significant)
+		{
+			if (!precision)
+			{
+				precision = 1u;
+			}
+			if (state.significant_digits <= precision || state.stored_digits <= precision)
+			{
+				return ::fast_io::details::scan_decfloat_assign<T, rounding>(value, negative, state, exponent);
+			}
+			auto const cut{static_cast<::std::uint_least32_t>(state.stored_digits - precision)};
+			auto const divisor{::fast_io::details::print_rsv_fp_pow10_0_to_19_table[cut]};
+			auto quotient{significand / divisor};
+			auto const remainder{significand - quotient * divisor};
+			if (::fast_io::details::scan_decfloat_decimal_round_up<rounding>(
+					negative, quotient, remainder, divisor, state.truncated_nonzero))
+			{
+				++quotient;
+			}
+			significand = quotient;
+			adjusted_exponent = ::fast_io::details::scan_decfloat_saturating_add(
+				adjusted_exponent, static_cast<::std::int_least64_t>(cut));
+			if (precision < 20u &&
+				significand == ::fast_io::details::print_rsv_fp_pow10_0_to_19_table[precision])
+			{
+				significand /= 10u;
+				adjusted_exponent = ::fast_io::details::scan_decfloat_saturating_add(adjusted_exponent, 1);
+			}
+		}
+		else
+		{
+			constexpr auto int64_max{(::std::numeric_limits<::std::int_least64_t>::max)()};
+			if (static_cast<::std::uintmax_t>(precision) >
+				static_cast<::std::uintmax_t>(int64_max))
+			{
+				return ::fast_io::details::scan_decfloat_assign<T, rounding>(value, negative, state, exponent);
+			}
+			auto const target_exponent{-static_cast<::std::int_least64_t>(precision)};
+			if (target_exponent <= adjusted_exponent)
+			{
+				return ::fast_io::details::scan_decfloat_assign<T, rounding>(value, negative, state, exponent);
+			}
+			auto const cut64{static_cast<::std::uint_least64_t>(target_exponent - adjusted_exponent)};
+			if (20u <= cut64)
+			{
+				if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+				{
+					significand = 0u;
+				}
+				else
+				{
+					significand = static_cast<::std::uint_least64_t>(
+						::fast_io::details::floating_rounding_directed_round_up<rounding>(negative));
+				}
+			}
+			else
+			{
+				auto const divisor{
+					::fast_io::details::print_rsv_fp_pow10_0_to_19_table[static_cast<::std::size_t>(cut64)]};
+				auto quotient{significand / divisor};
+				auto const remainder{significand - quotient * divisor};
+				if (::fast_io::details::scan_decfloat_decimal_round_up<rounding>(
+						negative, quotient, remainder, divisor, state.truncated_nonzero))
+				{
+					++quotient;
+				}
+				significand = quotient;
+			}
+			adjusted_exponent = target_exponent;
+		}
+		return ::fast_io::details::scan_decfloat_assign_significand<T, rounding>(
+			value, negative, significand, adjusted_exponent);
+	}
+}
+
+template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t significand,
+						   ::std::uint_least64_t fractional_digits,
+						   ::std::int_least64_t exponent) noexcept
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
+		exponent, -static_cast<::std::int_least64_t>(fractional_digits))};
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even &&
+				  ::fast_io::details::scan_decfloat_clinger_environment_independent)
+	{
+		if (::fast_io::details::scan_decfloat_try_clinger(significand, adjusted_exponent, negative, value))
+		{
+			return ::fast_io::parse_code::ok;
+		}
+	}
+	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
+	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+			adjusted_exponent, significand, negative, adjusted))
+	{
+		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+	}
+	return ::fast_io::parse_code::partial;
+}
+
+template <typename T>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_current_environment(T &value, bool negative,
+										 scan_decfloat_significand_state const &state,
+										 ::std::int_least64_t exponent) noexcept
+{
+	switch (::fast_io::details::current_floating_rounding())
+	{
+	case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+		return ::fast_io::details::scan_decfloat_assign<
+			T, ::fast_io::manipulators::floating_rounding::toward_plus_infinity>(
+			value, negative, state, exponent);
+	case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+		return ::fast_io::details::scan_decfloat_assign<
+			T, ::fast_io::manipulators::floating_rounding::toward_minus_infinity>(
+			value, negative, state, exponent);
+	case ::fast_io::manipulators::floating_rounding::toward_zero:
+		return ::fast_io::details::scan_decfloat_assign<
+			T, ::fast_io::manipulators::floating_rounding::toward_zero>(
+			value, negative, state, exponent);
+	default:
+		return ::fast_io::details::scan_decfloat_assign<
+			T, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+			value, negative, state, exponent);
+	}
+}
+
+template <typename T>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_short_current_environment(T &value, bool negative, ::std::uint_least64_t significand,
+											   ::std::uint_least64_t fractional_digits,
+											   ::std::int_least64_t exponent) noexcept
+{
+	switch (::fast_io::details::current_floating_rounding())
+	{
+	case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+		return ::fast_io::details::scan_decfloat_assign_short<
+			T, ::fast_io::manipulators::floating_rounding::toward_plus_infinity>(
+			value, negative, significand, fractional_digits, exponent);
+	case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+		return ::fast_io::details::scan_decfloat_assign_short<
+			T, ::fast_io::manipulators::floating_rounding::toward_minus_infinity>(
+			value, negative, significand, fractional_digits, exponent);
+	case ::fast_io::manipulators::floating_rounding::toward_zero:
+		return ::fast_io::details::scan_decfloat_assign_short<
+			T, ::fast_io::manipulators::floating_rounding::toward_zero>(
+			value, negative, significand, fractional_digits, exponent);
+	default:
+		return ::fast_io::details::scan_decfloat_assign_short<
+			T, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+			value, negative, significand, fractional_digits, exponent);
+	}
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -988,23 +1225,34 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 				return {first, ::fast_io::parse_code::ok, true};
 			}
 
-			return {first,
-					::fast_io::details::scan_decfloat_assign_short<T, flags.rounding>(
-						value, negative, significand, fractional_digits, exponent),
-					true};
+			if constexpr (flags.rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+			{
+				return {first,
+						::fast_io::details::scan_decfloat_assign_short_current_environment(
+							value, negative, significand, fractional_digits, exponent),
+						true};
+			}
+			else
+			{
+				return {first,
+						::fast_io::details::scan_decfloat_assign_short<T, flags.rounding>(
+							value, negative, significand, fractional_digits, exponent),
+						true};
+			}
 		}
 	}
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
-		  scan_decfloat_supported_floating_point T>
+		  scan_decfloat_supported_floating_point T, bool use_precision = false>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
 [[msvc::forceinline]]
 #endif
 inline constexpr ::fast_io::parse_result<char_type const *>
-scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *end, T &value) noexcept
+scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *end, T &value,
+									 ::std::size_t precision = 0) noexcept
 {
 	auto first{begin};
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
@@ -1027,12 +1275,15 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 						 ::fast_io::details::scan_decfloat_decimal_digit(*first, first_digit))};
 	if (numeric_candidate)
 	{
-		auto const short_result{
-			::fast_io::details::scan_decfloat_contiguous_short_define_impl<char_type, flags>(begin, first, end,
-																							 negative, value)};
-		if (short_result.handled)
+		if constexpr (!use_precision)
 		{
-			return {short_result.iter, short_result.code};
+			auto const short_result{
+				::fast_io::details::scan_decfloat_contiguous_short_define_impl<char_type, flags>(begin, first, end,
+																								 negative, value)};
+			if (short_result.handled)
+			{
+				return {short_result.iter, short_result.code};
+			}
 		}
 	}
 
@@ -1091,19 +1342,36 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
 		return {first, ::fast_io::parse_code::ok};
 	}
-	return {first, ::fast_io::details::scan_decfloat_assign<T, flags.rounding>(
-					   value, negative, significand_state, exponent)};
+	if constexpr (use_precision)
+	{
+		return {first, ::fast_io::details::scan_decfloat_assign_precision<T, flags.precision, flags.rounding>(
+						   value, negative, significand_state, exponent, precision)};
+	}
+	else
+	{
+		if constexpr (flags.rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+		{
+			return {first, ::fast_io::details::scan_decfloat_assign_current_environment(
+							   value, negative, significand_state, exponent)};
+		}
+		else
+		{
+			return {first, ::fast_io::details::scan_decfloat_assign<T, flags.rounding>(
+							   value, negative, significand_state, exponent)};
+		}
+	}
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
-		  scan_decfloat_supported_floating_point T>
+		  scan_decfloat_supported_floating_point T, bool use_precision = false>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
 [[msvc::forceinline]]
 #endif
 inline constexpr ::fast_io::parse_result<char_type const *>
-scan_decfloat_contiguous_define(char_type const *begin, char_type const *end, T &value) noexcept
+scan_decfloat_contiguous_define(char_type const *begin, char_type const *end, T &value,
+								::std::size_t precision = 0) noexcept
 {
 	if constexpr (!flags.noskipws)
 	{
@@ -1133,7 +1401,8 @@ scan_decfloat_contiguous_define(char_type const *begin, char_type const *end, T 
 		}
 	}
 
-	return ::fast_io::details::scan_decfloat_contiguous_define_impl<char_type, flags>(begin, end, value);
+	return ::fast_io::details::scan_decfloat_contiguous_define_impl<char_type, flags, T, use_precision>(
+		begin, end, value, precision);
 }
 
 } // namespace details
@@ -1155,6 +1424,18 @@ scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::sca
 					   ::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
 {
 	return ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(begin, end, value.reference);
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_result<char_type const *>
+scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
+					   char_type const *begin, char_type const *end,
+					   ::fast_io::manipulators::scalar_manip_precision_t<flags, T &> value) noexcept
+{
+	return ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
+		begin, end, value.reference, value.precision);
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, details::my_floating_point T>
