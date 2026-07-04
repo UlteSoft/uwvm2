@@ -26,6 +26,26 @@ template <typename T, ::std::size_t table_size>
 inline constexpr auto scan_decfloat_power10_table{
 	::fast_io::details::scan_decfloat_generate_power10_table<T, table_size>()};
 
+template <typename T, ::std::size_t table_size>
+inline constexpr auto scan_decfloat_generate_clinger_max_mantissa_table() noexcept
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+	::fast_io::freestanding::array<::std::uint_least64_t, table_size> table{};
+	::std::uint_least64_t divisor{1u};
+	constexpr ::std::uint_least64_t limit{::std::uint_least64_t{2u} << trait::mbits};
+	for (::std::size_t i{}; i != table_size; ++i)
+	{
+		table.index_unchecked(i) = limit / divisor;
+		divisor *= 5u;
+	}
+	return table;
+}
+
+template <typename T, ::std::size_t table_size>
+inline constexpr auto scan_decfloat_clinger_max_mantissa_table{
+	::fast_io::details::scan_decfloat_generate_clinger_max_mantissa_table<T, table_size>()};
+
 template <typename T>
 concept scan_decfloat_has_iec559_traits = requires {
 	typename ::fast_io::details::iec559_traits<::std::remove_cvref_t<T>>::mantissa_type;
@@ -153,6 +173,19 @@ template <typename T>
 			value = negative ? -result : result;
 			return true;
 		}
+		if (0 <= exponent && exponent <= 10)
+		{
+			auto const &max_table{::fast_io::details::scan_decfloat_clinger_max_mantissa_table<no_cvref_t, 11u>};
+			auto const index{static_cast<::std::size_t>(exponent)};
+			if (significand <= max_table.index_unchecked(index))
+			{
+				auto const &table{::fast_io::details::scan_decfloat_power10_table<no_cvref_t, 11u>};
+				no_cvref_t result{static_cast<no_cvref_t>(significand)};
+				result *= table.index_unchecked(index);
+				value = negative ? -result : result;
+				return true;
+			}
+		}
 	}
 	else if constexpr (::fast_io::details::scan_decfloat_binary64_like<no_cvref_t>)
 	{
@@ -172,6 +205,19 @@ template <typename T>
 			value = negative ? -result : result;
 			return true;
 		}
+		if (0 <= exponent && exponent <= 22)
+		{
+			auto const &max_table{::fast_io::details::scan_decfloat_clinger_max_mantissa_table<no_cvref_t, 23u>};
+			auto const index{static_cast<::std::size_t>(exponent)};
+			if (significand <= max_table.index_unchecked(index))
+			{
+				auto const &table{::fast_io::details::scan_decfloat_power10_table<no_cvref_t, 23u>};
+				no_cvref_t result{static_cast<no_cvref_t>(significand)};
+				result *= table.index_unchecked(index);
+				value = negative ? -result : result;
+				return true;
+			}
+		}
 	}
 	return false;
 }
@@ -187,9 +233,19 @@ struct scan_decfloat_significand_state
 	bool truncated_nonzero{};
 };
 
+template <::std::integral char_type>
+struct scan_decfloat_fast_result
+{
+	char_type const *iter{};
+	::fast_io::parse_code code{};
+	bool handled{};
+};
+
 inline constexpr ::std::uint_least64_t scan_decfloat_significand_digit_limit{19u};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_min_power10{-342};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_max_power10{326};
+inline constexpr ::std::uint_least64_t scan_decfloat_pow10_0_to_8_table[]{
+	1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u};
 
 struct scan_decfloat_adjusted_mantissa
 {
@@ -483,7 +539,72 @@ inline constexpr void scan_decfloat_append_digit(scan_decfloat_significand_state
 	}
 }
 
-template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool
+scan_decfloat_ascii8_is_digits(::std::uint_least64_t val) noexcept
+{
+	return ((((val + 0x4646464646464646u) | (val - 0x3030303030303030u)) &
+			 0x8080808080808080u) == 0);
+}
+
+[[nodiscard]] inline constexpr ::std::uint_least32_t
+scan_decfloat_ascii8_parse(::std::uint_least64_t val) noexcept
+{
+	constexpr ::std::uint_least64_t mask{0x000000FF000000FFu};
+	constexpr ::std::uint_least64_t mul1{0x000F424000000064u};
+	constexpr ::std::uint_least64_t mul2{0x0000271000000001u};
+	val -= 0x3030303030303030u;
+	val = (val * 10u) + (val >> 8u);
+	val = (((val & mask) * mul1) + (((val >> 16u) & mask) * mul2)) >> 32u;
+	return static_cast<::std::uint_least32_t>(val);
+}
+
+inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significand_state &state,
+														bool after_decimal,
+														::std::uint_least32_t digits) noexcept
+{
+	state.has_digit = true;
+	if (after_decimal)
+	{
+		state.fractional_digits += 8u;
+	}
+	if (!state.has_nonzero_digit)
+	{
+		if (digits == 0)
+		{
+			return;
+		}
+		state.has_nonzero_digit = true;
+	}
+	state.significant_digits += 8u;
+	if (state.stored_digits == ::fast_io::details::scan_decfloat_significand_digit_limit)
+	{
+		if (digits != 0)
+		{
+			state.truncated_nonzero = true;
+		}
+		return;
+	}
+	auto const available{::fast_io::details::scan_decfloat_significand_digit_limit - state.stored_digits};
+	if (8u <= available)
+	{
+		state.significand = state.significand * 100000000u + static_cast<::std::uint_least64_t>(digits);
+		state.stored_digits += 8u;
+		return;
+	}
+	auto const divisor{::fast_io::details::scan_decfloat_pow10_0_to_8_table[8u - available]};
+	auto const stored_part{digits / divisor};
+	auto const truncated_part{digits - stored_part * divisor};
+	state.significand =
+		state.significand * ::fast_io::details::scan_decfloat_pow10_0_to_8_table[available] +
+		static_cast<::std::uint_least64_t>(stored_part);
+	state.stored_digits = ::fast_io::details::scan_decfloat_significand_digit_limit;
+	if (truncated_part != 0)
+	{
+		state.truncated_nonzero = true;
+	}
+}
+
+template <typename T, ::std::integral char_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -494,6 +615,45 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 					 scan_decfloat_significand_state &state) noexcept
 {
 	char8_t digit{};
+	if constexpr (sizeof(char_type) == sizeof(char8_t) && !::fast_io::details::is_ebcdic<char_type> &&
+				  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u &&
+				  ::fast_io::details::scan_decfloat_binary64_like<T>)
+	{
+#ifdef __cpp_if_consteval
+		if !consteval
+#else
+		if (!__builtin_is_constant_evaluated())
+#endif
+		{
+			for (; first != last && !state.has_nonzero_digit; ++first)
+			{
+				if (!::fast_io::details::scan_decfloat_decimal_digit(*first, digit))
+				{
+					return first;
+				}
+				::fast_io::details::scan_decfloat_append_digit(state, digit, after_decimal);
+			}
+			if (static_cast<::std::size_t>(last - first) >= 2u * sizeof(::std::uint_least64_t))
+			{
+				for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
+				{
+					::std::uint_least64_t val;
+					::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+					if constexpr (::std::endian::little != ::std::endian::native)
+					{
+						val = ::fast_io::little_endian(val);
+					}
+					if (!::fast_io::details::scan_decfloat_ascii8_is_digits(val))
+					{
+						break;
+					}
+					::fast_io::details::scan_decfloat_append_eight_digits(
+						state, after_decimal, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+					first += sizeof(::std::uint_least64_t);
+				}
+			}
+		}
+	}
 	for (; first != last && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
 	{
 		::fast_io::details::scan_decfloat_append_digit(state, digit, after_decimal);
@@ -559,6 +719,155 @@ template <typename T>
 	return ::fast_io::parse_code::partial;
 }
 
+template <typename T>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t significand,
+						   ::std::uint_least64_t fractional_digits,
+						   ::std::int_least64_t exponent) noexcept
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	auto adjusted_exponent{::fast_io::details::scan_decfloat_saturating_add(
+		exponent, -static_cast<::std::int_least64_t>(fractional_digits))};
+	if (::fast_io::details::scan_decfloat_try_clinger(significand, adjusted_exponent, negative, value))
+	{
+		return ::fast_io::parse_code::ok;
+	}
+	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
+	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t>(adjusted_exponent, significand, adjusted))
+	{
+		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+	}
+	return ::fast_io::parse_code::partial;
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr scan_decfloat_fast_result<char_type>
+scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type const *first,
+										   char_type const *end, bool negative, T &value) noexcept
+{
+	if constexpr (sizeof(char_type) != sizeof(char8_t) || ::fast_io::details::is_ebcdic<char_type>)
+	{
+		return {};
+	}
+	else
+	{
+#ifdef __cpp_if_consteval
+		if consteval
+		{
+			return {};
+		}
+		else
+#else
+		if (__builtin_is_constant_evaluated())
+		{
+			return {};
+		}
+		else
+#endif
+		{
+			::std::uint_least64_t significand{};
+			::std::uint_least64_t digit_count{};
+			::std::uint_least64_t fractional_digits{};
+			char8_t digit{};
+			for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
+			{
+				if (digit_count == ::fast_io::details::scan_decfloat_significand_digit_limit)
+				{
+					return {};
+				}
+				significand = significand * 10u + static_cast<::std::uint_least64_t>(digit);
+				++digit_count;
+			}
+
+			constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
+			if (first != end && *first == dot)
+			{
+				++first;
+				auto const *fraction_begin{first};
+				for (; digit_count + 8u <= ::fast_io::details::scan_decfloat_significand_digit_limit &&
+					   static_cast<::std::size_t>(end - first) >= sizeof(::std::uint_least64_t);)
+				{
+					::std::uint_least64_t val;
+					::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+					if constexpr (::std::endian::little != ::std::endian::native)
+					{
+						val = ::fast_io::little_endian(val);
+					}
+					if (!::fast_io::details::scan_decfloat_ascii8_is_digits(val))
+					{
+						break;
+					}
+					significand = significand * 100000000u +
+								  static_cast<::std::uint_least64_t>(
+									  ::fast_io::details::scan_decfloat_ascii8_parse(val));
+					digit_count += 8u;
+					first += sizeof(::std::uint_least64_t);
+				}
+				for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
+				{
+					if (digit_count == ::fast_io::details::scan_decfloat_significand_digit_limit)
+					{
+						return {};
+					}
+					significand = significand * 10u + static_cast<::std::uint_least64_t>(digit);
+					++digit_count;
+				}
+				fractional_digits = static_cast<::std::uint_least64_t>(first - fraction_begin);
+			}
+
+			if (digit_count == 0)
+			{
+				return {begin, ::fast_io::parse_code::invalid, true};
+			}
+
+			::std::int_least64_t exponent{};
+			constexpr auto lower_e{::fast_io::char_literal_v<u8'e', char_type>};
+			constexpr auto upper_e{::fast_io::char_literal_v<u8'E', char_type>};
+			if constexpr (flags.floating == ::fast_io::manipulators::floating_format::fixed)
+			{
+			}
+			else if (first != end && (*first == lower_e || *first == upper_e))
+			{
+				auto const *exponent_begin{first};
+				auto exponent_result{::fast_io::details::scan_decfloat_exponent(first + 1, end, exponent)};
+				if (exponent_result.code == ::fast_io::parse_code::ok)
+				{
+					first = exponent_result.iter;
+				}
+				else if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
+				{
+					return {exponent_result.iter, exponent_result.code, true};
+				}
+				else
+				{
+					first = exponent_begin;
+				}
+			}
+			else if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
+			{
+				return {first, ::fast_io::parse_code::invalid, true};
+			}
+
+			if (significand == 0)
+			{
+				value = negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
+				return {first, ::fast_io::parse_code::ok, true};
+			}
+
+			return {first,
+					::fast_io::details::scan_decfloat_assign_short(value, negative, significand, fractional_digits,
+																   exponent),
+					true};
+		}
+	}
+}
+
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
 		  scan_decfloat_supported_floating_point T>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
@@ -583,6 +892,22 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		return {begin, ::fast_io::parse_code::invalid};
 	}
 
+	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
+	char8_t first_digit{};
+	bool const numeric_candidate{
+		first != end && (*first == dot ||
+						 ::fast_io::details::scan_decfloat_decimal_digit(*first, first_digit))};
+	if (numeric_candidate)
+	{
+		auto const short_result{
+			::fast_io::details::scan_decfloat_contiguous_short_define_impl<char_type, flags>(begin, first, end,
+																							 negative, value)};
+		if (short_result.handled)
+		{
+			return {short_result.iter, short_result.code};
+		}
+	}
+
 	auto const special_result{
 		::fast_io::details::scan_hexfloat_special_value<flags.nan_parse_sign, flags.nan_payload_scan>(
 			first, end, negative, value)};
@@ -592,13 +917,12 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 	}
 
 	::fast_io::details::scan_decfloat_significand_state significand_state;
-	first = ::fast_io::details::scan_decfloat_digits(first, end, false, significand_state);
+	first = ::fast_io::details::scan_decfloat_digits<T, char_type>(first, end, false, significand_state);
 
-	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
 	if (first != end && *first == dot)
 	{
 		++first;
-		first = ::fast_io::details::scan_decfloat_digits(first, end, true, significand_state);
+		first = ::fast_io::details::scan_decfloat_digits<T, char_type>(first, end, true, significand_state);
 	}
 
 	if (!significand_state.has_digit)
