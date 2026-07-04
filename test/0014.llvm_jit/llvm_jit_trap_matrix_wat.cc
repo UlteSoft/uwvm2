@@ -124,6 +124,12 @@ namespace
         }
     }
 
+    [[nodiscard]] ::std::string env_string(char const* name)
+    {
+        if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
+        return {};
+    }
+
     [[nodiscard]] bool command_succeeds(::std::string const& command)
     {
         return run_system_command(command) == 0;
@@ -261,8 +267,10 @@ namespace
         auto const stem{::std::string{fixture.name} + "." + mode.name + "." + policy};
         auto const output_path{artifact_dir / (stem + ".out")};
         auto const log_path{artifact_dir / (stem + ".log")};
-        auto const command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path) +
-                           " --run " + quote_argument(wasm_path)};
+        auto command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-cache-path disable -Rllvm-call-stack " + policy +
+                     " -Rclog file " + quote_argument(log_path)};
+        if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
+        command += " --run " + quote_argument(wasm_path);
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
         ::std::cout << "[trap-matrix] " << full_command << '\n';
 
@@ -339,7 +347,10 @@ int main(int argc, char** argv)
     auto const strict_env{::std::getenv("UWVM_TRAP_MATRIX_STRICT")};
     bool const strict{strict_env != nullptr && *strict_env != '\0' && ::std::string_view{strict_env} != "0"};
     auto const wat_dir{project_root / "test" / "0014.llvm_jit" / "wat" / "trap_matrix"};
-    auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "trap_matrix"};
+    auto const artifact_dir{[](::std::filesystem::path const& dir) {
+        if(auto const env{::std::getenv("UWVM_TRAP_MATRIX_ARTIFACT_DIR")}; env != nullptr && *env != '\0') { return ::std::filesystem::path{env}; }
+        return dir / "test-artifacts" / "0014.llvm_jit" / "trap_matrix";
+    }(executable_dir)};
 
     bool ok{true};
     ::std::size_t mismatch_count{};
@@ -376,7 +387,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if(mismatch_count == 0uz)
+    if(ok && mismatch_count == 0uz)
     {
         ::std::cout << "[trap-matrix] all trap outputs matched instruction baselines\n";
         return 0;

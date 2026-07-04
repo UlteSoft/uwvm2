@@ -12,7 +12,11 @@ extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexc
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("_clock_gettime");
 #else
 #if defined(_REDIR_TIME64)
+#if defined(__DEFINED_clockid_t) && defined(__DEFINED_struct_timespec)
+extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres_time64");
+#else
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres64");
+#endif
 extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("__clock_settime64");
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_gettime64");
 #else

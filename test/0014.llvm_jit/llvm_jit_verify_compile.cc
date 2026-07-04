@@ -265,7 +265,8 @@ namespace
         auto const log_path{artifact_dir / "default_call_stack_probe.log"};
         if(!write_fixture(wasm_path, select_start_wasm)) [[unlikely]] { return false; }
 
-        auto const command{quote_argument(uwvm_path) + " -Raot -Rclog file " + quote_argument(log_path) + " --run " + quote_argument(wasm_path)};
+        auto const command{quote_argument(uwvm_path) + " -Raot -Rllvm-cache-path disable -Rclog file " + quote_argument(log_path) + " --run " +
+                           quote_argument(wasm_path)};
         ::std::cout << "[llvm_jit] " << command << '\n';
 
         auto const status{run_system_command(command)};
@@ -309,8 +310,8 @@ namespace
                                        auto const output_path{artifact_dir / (::std::string{"inline_"} + label + ".out")};
                                        auto const log_path{artifact_dir / (::std::string{"inline_"} + label + ".log")};
                                        auto const command{quote_argument(uwvm_path) + " " + ::std::string{mode_args} +
-                                                          " -Rllvm-call-stack " + ::std::string{policy} + " -Rclog file " + quote_argument(log_path) +
-                                                          " --run " + quote_argument(wasm_path)};
+                                                          " -Rllvm-cache-path disable -Rllvm-call-stack " + ::std::string{policy} + " -Rclog file " +
+                                                          quote_argument(log_path) + " --run " + quote_argument(wasm_path)};
 
                                        if(!run_trap_command(command, output_path, label.c_str())) [[unlikely]] { return false; }
                                        if(expect_full_inline_chain) { return check_inline_call_stack_trap_output(output_path, label.c_str()); }
@@ -355,28 +356,28 @@ namespace
     [[nodiscard]] bool run_full_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
         auto const command{
-            quote_argument(uwvm_path) + " -Rcm full -Rcc jit --run " + quote_argument(wasm_path)};
+            quote_argument(uwvm_path) + " -Rcm full -Rcc jit -Rllvm-cache-path disable --run " + quote_argument(wasm_path)};
         return run_command(command, "full llvm-jit");
     }
 
     [[nodiscard]] bool run_lazy_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
         auto const command{
-            quote_argument(uwvm_path) + " -Rjit --run " + quote_argument(wasm_path)};
+            quote_argument(uwvm_path) + " -Rjit -Rllvm-cache-path disable --run " + quote_argument(wasm_path)};
         return run_command(command, "lazy llvm-jit");
     }
 
     [[nodiscard]] bool run_lazy_verification_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
         auto const command{
-            quote_argument(uwvm_path) + " -Rcm lazy+verification -Rcc jit --run " + quote_argument(wasm_path)};
+            quote_argument(uwvm_path) + " -Rcm lazy+verification -Rcc jit -Rllvm-cache-path disable --run " + quote_argument(wasm_path)};
         return run_command(command, "lazy+verification llvm-jit");
     }
 
     [[nodiscard]] bool run_aot_shortcut(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
         auto const command{
-            quote_argument(uwvm_path) + " -Raot --run " + quote_argument(wasm_path)};
+            quote_argument(uwvm_path) + " -Raot -Rllvm-cache-path disable --run " + quote_argument(wasm_path)};
         return run_command(command, "runtime-aot shortcut");
     }
 

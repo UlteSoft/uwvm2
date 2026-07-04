@@ -41,7 +41,18 @@
 #  include <Availability.h>
 # endif
 # if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
-#  include <sgidefs.h>
+#  if __has_include(<sgidefs.h>)
+#   include <sgidefs.h>
+#  endif
+#  ifndef _ABIO32
+#   define _ABIO32 1
+#  endif
+#  ifndef _ABIN32
+#   define _ABIN32 2
+#  endif
+#  ifndef _ABI64
+#   define _ABI64 3
+#  endif
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>

@@ -9,7 +9,9 @@ namespace
     using info_t = optable::compiled_defined_call_info;
 
     inline ::std::size_t g_expected_wasm_id{};
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
     inline ::std::size_t g_direct_bridge_calls{};
+#endif
     inline ::std::size_t g_import_bridge_calls{};
 
     [[nodiscard]] inline ::std::uint32_t load_u32(::std::byte const* p) noexcept
@@ -37,7 +39,9 @@ namespace
 
         if(wasm_module_id == SIZE_MAX)
         {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             ++g_direct_bridge_calls;
+#endif
 
             auto const* const info = reinterpret_cast<info_t const*>(call_function);
             if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -167,7 +171,9 @@ namespace
     [[nodiscard]] int run_suite(runtime_module_t const& rt, ::std::size_t wasm_id) noexcept
     {
         g_expected_wasm_id = wasm_id;
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         g_direct_bridge_calls = 0uz;
+#endif
         g_import_bridge_calls = 0uz;
 
         ::uwvm2::validation::error::code_validation_error_impl err{};

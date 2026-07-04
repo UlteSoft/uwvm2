@@ -24,11 +24,37 @@
  ****************************************/
 
 #ifndef UWVM_MODULE
+// std
+# include <cstdlib>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <uwvm2/uwvm/crtmain/impl.h>
+# if !defined(_WIN32) && !defined(__wasi__) && __has_include(<sys/resource.h>)
+#  include <sys/resource.h>
+# endif
+# if defined(__linux__) && __has_include(<sys/prctl.h>)
+#  include <sys/prctl.h>
+# endif
 #endif
+
+namespace
+{
+    inline void disable_core_dumps_for_test() noexcept
+    {
+#if !defined(_WIN32) && !defined(__wasi__)
+        auto const env{::std::getenv("UWVM_TEST_DISABLE_COREDUMP")};
+        if(env == nullptr || *env == '\0' || *env == '0') { return; }
+# if __has_include(<sys/resource.h>)
+        ::rlimit const zero_limit{};
+        static_cast<void>(::setrlimit(RLIMIT_CORE, &zero_limit));
+# endif
+# if defined(__linux__) && defined(PR_SET_DUMPABLE)
+        static_cast<void>(::prctl(PR_SET_DUMPABLE, 0, 0, 0, 0));
+# endif
+#endif
+    }
+}
 
 /// @brief      (crt) main func. The main function is a special function, but there are still meaningless [[gnu::used]].
 /// @details    winnt avoid using int main(argc argv), use int main() directly to avoid wasting time parsing and transcoding ACP.
@@ -43,6 +69,7 @@ UWVM_GNU_USED int main(
 #endif
 )
 {
+    disable_core_dumps_for_test();
 #if !((defined(_WIN32) && !defined(__CYGWIN__)) && !defined(_WIN32_WINDOWS))  // NOT WINNT
     return ::uwvm2::uwvm::uwvm_main_non_winnt(argc, argv);
 #else

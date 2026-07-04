@@ -2933,7 +2933,7 @@ namespace uwvm2::runtime::lib
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             auto const use_llvm_jit_unwind_call_stack{runtime_llvm_jit_unwind_call_stack_requested()};
-            auto const defer_native_jit_frames{use_llvm_jit_unwind_call_stack && n != 0uz && current_trap_kind == trap_kind::call_indirect_type_mismatch
+            auto const defer_native_jit_frames{use_llvm_jit_unwind_call_stack && n > 1uz && current_trap_kind == trap_kind::call_indirect_type_mismatch
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                                                && !tiered_snapshot_active_for_native_order
 # endif

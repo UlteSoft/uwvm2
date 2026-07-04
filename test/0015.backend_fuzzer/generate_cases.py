@@ -1222,6 +1222,8 @@ def main() -> int:
                 "name": case.name,
                 "wasm": str(wasm_path),
                 "expect_trap": case.expect_trap,
+                "requires_runtime_calls": case.requires_runtime_calls,
+                "has_local_imported_i32_add": case.has_local_imported_i32_add,
             }
         )
 

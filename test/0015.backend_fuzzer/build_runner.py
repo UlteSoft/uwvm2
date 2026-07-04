@@ -287,6 +287,7 @@ def main() -> int:
         "-DUWVM_USE_UWVM_INT",
         "-DUWVM_USE_LLVM_JIT",
         "-DUWVM_DISABLE_DEBUG_INT",
+        "-DUWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519",
     ]
     add_matrix_defines(defines, args.combine, args.delay)
     add_memory_model_defines(defines, args.memory_model)
@@ -324,6 +325,8 @@ def main() -> int:
         *llvm_libs,
         *libcxx_libs,
         *llvm_system_libs,
+        "-lssl",
+        "-lcrypto",
         *split_env_words("UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS"),
         *args.extra_ldflag,
     ]
