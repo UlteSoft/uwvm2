@@ -1531,6 +1531,33 @@ fixed_case1_integer_and_point(char_type *iter, typename iec559_traits<flt>::mant
 	return iter;
 }
 
+template <typename flt, bool comma, bool json_float, ::std::integral char_type>
+inline constexpr char_type *
+fixed_case1_integer_and_point_maybe_json(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
+										 ::std::int_least32_t olength,
+										 ::std::int_least32_t real_exp) noexcept
+{
+	auto eposition(real_exp + 1);
+	if (olength == eposition)
+	{
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(iter, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength;
+		if constexpr (json_float)
+		{
+			return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+		}
+	}
+	else
+	{
+		auto tmp{iter};
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(iter + 1u, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength + 1u;
+		my_copy_n(tmp + 1u, static_cast<::std::uint_least32_t>(eposition), tmp);
+		tmp[eposition] = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+	}
+	return iter;
+}
+
 template <typename flt, bool comma, ::std::integral char_type>
 inline constexpr char_type *fixed_case2_all_point(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
 												  ::std::int_least32_t olength, ::std::int_least32_t real_exp) noexcept
@@ -1555,7 +1582,7 @@ inline constexpr char_type *print_rsv_fp_fixed_decision_impl(char_type *iter,
 	}
 	else if (0 <= real_exp && real_exp < olength)
 	{
-		return fixed_case1_integer_and_point<flt, comma>(iter, m10, olength, real_exp);
+		return fixed_case1_integer_and_point_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
 	}
 	else
 	{
@@ -1601,11 +1628,10 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 	{
 		::std::int_least32_t olength{static_cast<::std::int_least32_t>(chars_len<10, true>(m10))};
 		::std::int_least32_t const real_exp{static_cast<::std::int_least32_t>(e10 + olength - 1)};
-		::std::uint_least32_t fixed_length{}, this_case{};
+		::std::uint_least32_t fixed_length{};
 		if (olength <= real_exp)
 		{
 			fixed_length = static_cast<::std::uint_least32_t>(real_exp + 1);
-			this_case = 1;
 		}
 		else if (0 <= real_exp && real_exp < olength)
 		{
@@ -1614,7 +1640,6 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 			{
 				--fixed_length;
 			}
-			this_case = 2;
 		}
 		else
 		{
@@ -1629,19 +1654,17 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 			iter = print_rsv_fp_decimal_common_impl<comma>(iter, m10, static_cast<::std::uint_least32_t>(olength));
 			return print_rsv_fp_e_impl<flt, uppercase_e>(iter, real_exp);
 		}
-		// fixed decision
-		switch (this_case)
+		if (olength <= real_exp)
 		{
-		case 1:
 			return fixed_case0_full_integer_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
-		case 2:
-		{
-			return fixed_case1_integer_and_point<flt, comma>(iter, m10, olength, real_exp);
 		}
-		default:
+		else if (0 <= real_exp)
+		{
+			return fixed_case1_integer_and_point_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
+		}
+		else
 		{
 			return fixed_case2_all_point<flt, comma>(iter, m10, olength, real_exp);
-		}
 		}
 	}
 }

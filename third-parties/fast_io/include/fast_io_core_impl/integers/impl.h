@@ -164,35 +164,114 @@ struct ip_scan_manip_t
 
 struct scalar_flags
 {
+	// Scan and print: integer radix in the closed range [2, 36]. Floating
+	// manipulators keep this at 10 as a dispatch invariant; the actual decimal
+	// versus hexadecimal floating syntax is selected by `floating`.
 	::std::size_t base{10};
+	// Print only: use alphabetic spellings for scalar values that have such a
+	// spelling, such as boolalpha-style bools and nullptr. Numeric scan paths do
+	// not consult this flag.
 	bool alphabet{};
+	// Scan and print: print a base prefix for integer/hex-float output, or
+	// require and consume that prefix during integer/hex-float input. Decimal
+	// integer scan ignores the prefix request because base 10 has no prefix.
 	bool showbase{};
+	// Print only: emit an explicit '+' for non-negative signed numeric output
+	// and for floating special values according to the NaN sign policy. Input
+	// uses `allow_leading_plus` instead, matching from_chars-style defaults.
 	bool showpos{};
+	// Scan only: disable the usual leading whitespace skip. String-like scan
+	// also uses this to switch from token parsing to exact-position parsing.
 	bool noskipws{};
+	// Print only: choose uppercase prefix letters for bases with alphabetic
+	// prefixes, for example 0X/0B instead of 0x/0b. Scan accepts valid prefix
+	// spellings independently of this output preference.
 	bool uppercase_showbase{};
+	// Scan and print: select the modern octal prefix grammar for base 8 where
+	// the manipulator requests a prefix, such as 0o/0O instead of the legacy 0
+	// spelling.
 	bool modern_octal{};
+	// Print only: use uppercase alphabetic digits and uppercase spellings for
+	// affected scalar text, such as A-F, INF/NAN, TRUE/FALSE, and nullptr forms.
+	// Scan is case-tolerant where the grammar allows it.
 	bool uppercase{};
+	// Print only: use an uppercase exponent marker for floating output, such as
+	// E for decimal scientific notation and P for hexadecimal floating output.
+	// Scan accepts both exponent-marker cases where applicable.
 	bool uppercase_e{};
 #if 0
+	// Print only: reserved exponent-sign policy. If enabled, it would control
+	// whether positive floating exponents are printed with an explicit '+'.
 	bool showpos_e{true};
 #endif
+	// Print only: request the comma variant of scalar formatting. For floating
+	// and timestamp-like output this changes the fractional separator, and for
+	// percentage-style output it selects the comma-aware spelling.
 	bool comma{};
+	// Scan and print, with manipulator-specific meaning: integer print uses it
+	// for full-width/zero-filled forms such as addresses; integer scan reuses
+	// the same storage bit as the skip-leading-zero policy.
 	bool full{};
+	// Print only: JSON-friendly decimal floating spelling. For general/default
+	// and fixed decimal output, integer-valued finite results keep a fractional
+	// marker such as 0.0 or 10.0; scientific output is not forced this way.
 	bool json_float{};
+	// Print only: alignment metadata for scalar width formatting. Numeric scan
+	// does not use placement; width wrappers consume this kind of policy while
+	// composing formatted output.
 	scalar_placement placement{scalar_placement::none};
+	// Scan and print: select the floating grammar/format family. Print uses it
+	// to choose fixed, general, scientific, shortest decimal, or hexfloat
+	// output; scan uses it to constrain decimal fixed/scientific forms or to
+	// select hexadecimal floating parsing.
 	floating_format floating{};
+	// Print only: locale time-format selector for timestamp manipulators, such
+	// as d_t_fmt, d_fmt, t_fmt, and the era-aware variants. It is not part of
+	// numeric scan.
 	lc_time_flag time_flag{};
 #if 0
+	// Scan only: reserved locale-aware parse selector. It is currently disabled
+	// and should not be assumed by active scan code.
 	bool localeparse{};
 #endif
+	// Scan only: string-like input mode that stops at a line boundary instead
+	// of using the ordinary whitespace-delimited token behavior.
 	bool line{};
+	// Print only: select percentage or sex-ratio scalar output. Ordinary
+	// integer/floating scan does not interpret trailing percent notation through
+	// this flag.
 	percentage_flag percentage{};
+	// Print only: when printing NaNs, preserve and print the NaN sign if the
+	// representation carries one. Infinity sign output is governed by the
+	// ordinary sign path, not by this NaN-specific switch.
 	bool nan_show_sign{true};
+	// Print only: append the implementation-specific NaN kind/type suffix, for
+	// example forms such as signaling or indeterminate NaNs, when that
+	// information is representable by the floating backend.
 	bool nan_show_type{};
+	// Scan only: when parsing NaN special values, decide whether a consumed
+	// leading '-' is reflected into the resulting NaN sign bit. Infinity uses
+	// the normal parsed sign regardless of this NaN-specific policy.
 	bool nan_parse_sign{true};
+	// Scan only: policy for a NaN parenthesized payload/type suffix. `none`
+	// rejects or stops before payload handling, `consume` accepts and discards
+	// the suffix, and `preserve` maps recognized suffix information into the
+	// produced NaN where the target format supports it.
 	floating_nan_payload_scan nan_payload_scan{floating_nan_payload_scan::consume};
+	// Scan and print for floating values: rounding policy used by precision
+	// output and by decimal-to-binary input. The current-environment variant is
+	// only meaningful when floating environment support is enabled.
 	floating_rounding rounding{};
+	// Scan and print for precision-bearing floating manipulators: significant
+	// precision means total significant digits; fractional precision means
+	// digits after the radix point. Hexfloat precision supports significant
+	// hexadecimal digits only.
 	floating_precision precision{};
+	// Scan only: accept an optional leading '+' before integer, decimal-float,
+	// or hex-float input. The default is false to match std::from_chars and
+	// fast_float default behavior; exponent signs such as e+1 or p+1 are
+	// controlled by the floating grammar and remain separate.
+	bool allow_leading_plus{};
 };
 
 inline constexpr scalar_flags integral_default_scalar_flags{};
@@ -305,6 +384,17 @@ template <::fast_io::manipulators::scalar_flags flags, bool json_float>
 inline constexpr ::fast_io::manipulators::scalar_flags json_float_mani_flags_cache{
 	::fast_io::details::set_json_float_flag(flags, json_float)};
 
+inline constexpr ::fast_io::manipulators::scalar_flags
+set_allow_leading_plus_flag(::fast_io::manipulators::scalar_flags flags, bool allow_leading_plus) noexcept
+{
+	flags.allow_leading_plus = allow_leading_plus;
+	return flags;
+}
+
+template <::fast_io::manipulators::scalar_flags flags, bool allow_leading_plus>
+inline constexpr ::fast_io::manipulators::scalar_flags allow_leading_plus_mani_flags_cache{
+	::fast_io::details::set_allow_leading_plus_flag(flags, allow_leading_plus)};
+
 template <::fast_io::manipulators::floating_rounding rounding>
 inline constexpr bool floating_rounding_is_nearest{
 	rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even ||
@@ -399,9 +489,15 @@ template <bool uppercase, bool shbase>
 inline constexpr ::fast_io::manipulators::scalar_flags cryptohash_mani_flags_cache{
 	.base = 16, .showbase = shbase, .uppercase_showbase = uppercase, .uppercase = uppercase};
 
-template <::std::size_t bs, bool noskipws, bool shbase, bool skipzero, bool oct_c2y>
+template <::std::size_t bs, bool noskipws, bool shbase, bool skipzero, bool oct_c2y,
+		  bool allow_leading_plus = false>
 inline constexpr ::fast_io::manipulators::scalar_flags base_scan_mani_flags_cache{
-	.base = bs, .showbase = shbase, .noskipws = noskipws, .modern_octal = oct_c2y, .full = skipzero};
+	.base = bs,
+	.showbase = shbase,
+	.noskipws = noskipws,
+	.modern_octal = oct_c2y,
+	.full = skipzero,
+	.allow_leading_plus = allow_leading_plus};
 
 template <bool shport>
 inline constexpr ::fast_io::manipulators::ip_flags base_ip_prefix_flags_cache{.showport = shport};
@@ -720,12 +816,14 @@ inline constexpr auto json_float(scalar_manip_precision_t<flags, T> value) noexc
 		value.reference, value.precision};
 }
 
-template <floating_rounding rounding_policy, typename scalar_type>
+template <floating_rounding rounding_policy, bool allow_leading_plus = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto rounding_get(scalar_type &value) noexcept
 {
-	return scalar_manip_t<::fast_io::details::floating_rounding_mani_flags_cache<
-							  ::fast_io::manipulators::floating_point_default_scalar_flags, rounding_policy>,
+	return scalar_manip_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+							  ::fast_io::details::floating_rounding_mani_flags_cache<
+								  ::fast_io::manipulators::floating_point_default_scalar_flags, rounding_policy>,
+							  allow_leading_plus>,
 						  scalar_type &>{value};
 }
 
@@ -1386,69 +1484,90 @@ inline constexpr auto comma_scientific(scalar_type t, ::std::size_t n) noexcept
 	return comma_scientific<uppercase, precision_mode, rounding_policy>(t, n);
 }
 
-template <floating_rounding rounding_policy = floating_rounding::nearest_to_even, typename scalar_type>
+template <floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto decimal_get(scalar_type &value) noexcept
 {
-	return scalar_manip_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-							  ::fast_io::manipulators::floating_point_default_scalar_flags,
-							  floating_precision::significant, rounding_policy>,
+	return scalar_manip_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+							  ::fast_io::details::floating_precision_rounding_mani_flags_cache<
+								  ::fast_io::manipulators::floating_point_default_scalar_flags,
+								  floating_precision::significant, rounding_policy>,
+							  allow_leading_plus>,
 						  scalar_type &>{value};
 }
 
 template <floating_precision precision_mode = floating_precision::significant,
 		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
 		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto decimal_get(scalar_type &value, ::std::size_t n) noexcept
 {
-	return scalar_manip_precision_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-										::fast_io::manipulators::floating_point_default_scalar_flags,
-										precision_mode, rounding_policy>,
+	return scalar_manip_precision_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+										::fast_io::details::floating_precision_rounding_mani_flags_cache<
+											::fast_io::manipulators::floating_point_default_scalar_flags,
+											precision_mode, rounding_policy>,
+										allow_leading_plus>,
 									scalar_type &>{value, n};
 }
 
-template <floating_rounding rounding_policy = floating_rounding::nearest_to_even, typename scalar_type>
+template <floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto fixed_get(scalar_type &value) noexcept
 {
-	return scalar_manip_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-							  ::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::fixed>,
-							  floating_precision::fractional, rounding_policy>,
+	return scalar_manip_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+							  ::fast_io::details::floating_precision_rounding_mani_flags_cache<
+								  ::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::fixed>,
+								  floating_precision::fractional, rounding_policy>,
+							  allow_leading_plus>,
 						  scalar_type &>{value};
 }
 
 template <floating_precision precision_mode = floating_precision::fractional,
 		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
 		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto fixed_get(scalar_type &value, ::std::size_t n) noexcept
 {
-	return scalar_manip_precision_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-										::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::fixed>,
-										precision_mode, rounding_policy>,
+	return scalar_manip_precision_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+										::fast_io::details::floating_precision_rounding_mani_flags_cache<
+											::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::fixed>,
+											precision_mode, rounding_policy>,
+										allow_leading_plus>,
 									scalar_type &>{value, n};
 }
 
-template <floating_rounding rounding_policy = floating_rounding::nearest_to_even, typename scalar_type>
+template <floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto scientific_get(scalar_type &value) noexcept
 {
-	return scalar_manip_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-							  ::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::scientific>,
-							  floating_precision::fractional, rounding_policy>,
+	return scalar_manip_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+							  ::fast_io::details::floating_precision_rounding_mani_flags_cache<
+								  ::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::scientific>,
+								  floating_precision::fractional, rounding_policy>,
+							  allow_leading_plus>,
 						  scalar_type &>{value};
 }
 
 template <floating_precision precision_mode = floating_precision::fractional,
 		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool allow_leading_plus = false,
 		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<::std::remove_cvref_t<scalar_type>>)
 inline constexpr auto scientific_get(scalar_type &value, ::std::size_t n) noexcept
 {
-	return scalar_manip_precision_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
-										::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::scientific>,
-										precision_mode, rounding_policy>,
+	return scalar_manip_precision_t<::fast_io::details::allow_leading_plus_mani_flags_cache<
+										::fast_io::details::floating_precision_rounding_mani_flags_cache<
+											::fast_io::details::dcmfloat_mani_flags_cache<false, false, manipulators::floating_format::scientific>,
+											precision_mode, rounding_policy>,
+										allow_leading_plus>,
 									scalar_type &>{value, n};
 }
 

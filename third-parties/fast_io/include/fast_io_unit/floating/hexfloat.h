@@ -600,10 +600,17 @@ scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type co
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
 	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
 	bool negative{};
-	if (first != end && (*first == minus || *first == plus))
+	if (first != end && *first == minus)
 	{
-		negative = *first == minus;
+		negative = true;
 		++first;
+	}
+	else if constexpr (flags.allow_leading_plus)
+	{
+		if (first != end && *first == plus)
+		{
+			++first;
+		}
 	}
 
 	auto const special_result{
@@ -691,10 +698,17 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
 	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
 	bool negative{};
-	if (first != end && (*first == minus || *first == plus))
+	if (first != end && *first == minus)
 	{
-		negative = *first == minus;
+		negative = true;
 		++first;
+	}
+	else if constexpr (flags.allow_leading_plus)
+	{
+		if (first != end && *first == plus)
+		{
+			++first;
+		}
 	}
 
 	auto const special_result{
@@ -823,6 +837,205 @@ inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f
 	return with_sign_prt_rsv_exponent_hex_impl<trait::e2hexdigits>(iter, e2);
 }
 
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *print_rsvhexfloat_digit_impl(char_type *iter, ::std::uint_least32_t digit) noexcept
+{
+	if (digit < 10u)
+	{
+		*iter = ::fast_io::char_literal_add<char_type>(digit);
+	}
+	else
+	{
+		*iter = static_cast<char_type>(
+			char_literal_v<(uppercase ? u8'A' : u8'a'), char_type> + static_cast<char_type>(digit - 10u));
+	}
+	++iter;
+	return iter;
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool print_rsvhexfloat_round_up(bool negative, ::std::uint_least32_t rounded_down,
+															   ::std::uint_least32_t next_digit,
+															   bool tail_nonzero) noexcept
+{
+	if (!next_digit && !tail_nonzero)
+	{
+		return false;
+	}
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	{
+		if (next_digit < 8u)
+		{
+			return false;
+		}
+		if (8u < next_digit || tail_nonzero)
+		{
+			return true;
+		}
+		return ::fast_io::details::floating_rounding_nearest_tie_round_up<rounding>(
+			negative, static_cast<::std::uint_least64_t>(rounded_down) << 1u);
+	}
+	else
+	{
+		return ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative);
+	}
+}
+
+template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e, bool comma,
+		  ::fast_io::manipulators::floating_rounding rounding =
+			  ::fast_io::manipulators::floating_rounding::nearest_to_even,
+		  bool nan_show_sign = true, bool nan_show_type = false, typename flt, ::std::integral char_type>
+inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *iter, flt f,
+																	::std::size_t precision) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+	{
+		switch (::fast_io::details::current_floating_rounding())
+		{
+		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+			return print_rsvhexfloat_precision_define_impl<
+				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
+				::fast_io::manipulators::floating_rounding::toward_plus_infinity, nan_show_sign, nan_show_type>(
+				iter, f, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+			return print_rsvhexfloat_precision_define_impl<
+				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
+				::fast_io::manipulators::floating_rounding::toward_minus_infinity, nan_show_sign, nan_show_type>(
+				iter, f, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_zero:
+			return print_rsvhexfloat_precision_define_impl<
+				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
+				::fast_io::manipulators::floating_rounding::toward_zero, nan_show_sign, nan_show_type>(
+				iter, f, precision);
+		default:
+			return print_rsvhexfloat_precision_define_impl<
+				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
+				::fast_io::manipulators::floating_rounding::nearest_to_even, nan_show_sign, nan_show_type>(
+				iter, f, precision);
+		}
+	}
+	else
+	{
+		using trait = iec559_traits<flt>;
+		using mantissa_type = typename trait::mantissa_type;
+		constexpr ::std::size_t mbits{trait::mbits};
+		constexpr ::std::size_t ebits{trait::ebits};
+		constexpr ::std::uint_least32_t bias{(static_cast<::std::uint_least32_t>(1 << ebits) >> 1) - 1};
+		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+		auto [mantissa, exponent, sign] = get_punned_result(f);
+		constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
+		constexpr ::std::int_least32_t minus_bias{-static_cast<::std::int_least32_t>(bias)};
+		constexpr ::std::uint_least32_t makeup_bits{((mbits / 4u + 1u) * 4u - mbits) % 4u};
+		constexpr ::std::size_t fractional_hex_digits{(mbits + makeup_bits) >> 2u};
+		constexpr ::std::size_t total_hex_digits{fractional_hex_digits + 1u};
+		if (exponent == exponent_mask_u32)
+		{
+			return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
+		}
+		if (!precision)
+		{
+			precision = 1u;
+		}
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+		if constexpr (showbase)
+		{
+			iter = print_reserve_show_base_impl<16, showbase_uppercase, false>(iter);
+		}
+		if (!mantissa && !exponent)
+		{
+			iter = print_rsvhexfloat_digit_impl<uppercase>(iter, 0u);
+			if (1u < precision)
+			{
+				*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+				++iter;
+				iter = ::fast_io::details::my_fill_n(iter, precision - 1u, char_literal_v<u8'0', char_type>);
+			}
+			*iter = char_literal_v < uppercase_e ? u8'P' : u8'p', char_type > ;
+			++iter;
+			return with_sign_prt_rsv_exponent_hex_impl<trait::e2hexdigits>(iter, 0);
+		}
+		::std::int_least32_t e2{static_cast<::std::int_least32_t>(exponent) + minus_bias};
+		if (exponent == 0)
+		{
+			++e2;
+		}
+		auto aligned_mantissa{static_cast<mantissa_type>(mantissa << makeup_bits)};
+		auto hex_digit_at = [aligned_mantissa, exponent](::std::size_t index) constexpr noexcept -> ::std::uint_least32_t {
+			if (!index)
+			{
+				return exponent ? 1u : 0u;
+			}
+			if (fractional_hex_digits < index)
+			{
+				return 0u;
+			}
+			auto const shift{static_cast<::std::uint_least32_t>((fractional_hex_digits - index) << 2u)};
+			return static_cast<::std::uint_least32_t>(
+				(aligned_mantissa >> shift) & static_cast<mantissa_type>(0xFu));
+		};
+		char8_t digits[total_hex_digits + 1u]{};
+		auto const retained_digits{precision < total_hex_digits ? precision : total_hex_digits};
+		for (::std::size_t index{}; index != retained_digits; ++index)
+		{
+			digits[index] = static_cast<char8_t>(hex_digit_at(index));
+		}
+		if (precision < total_hex_digits)
+		{
+			auto const next_digit{hex_digit_at(precision)};
+			bool tail_nonzero{};
+			for (auto index{precision + 1u}; index != total_hex_digits; ++index)
+			{
+				if (hex_digit_at(index))
+				{
+					tail_nonzero = true;
+					break;
+				}
+			}
+			if (::fast_io::details::print_rsvhexfloat_round_up<rounding>(
+					sign, digits[precision - 1u], next_digit, tail_nonzero))
+			{
+				for (auto index{precision}; index; --index)
+				{
+					auto &digit{digits[index - 1u]};
+					if (digit != 0xFu)
+					{
+						++digit;
+						break;
+					}
+					digit = 0u;
+				}
+				if (exponent != 0 && digits[0] == 2u)
+				{
+					digits[0] = 1u;
+					for (::std::size_t index{1u}; index != retained_digits; ++index)
+					{
+						digits[index] = 0u;
+					}
+					++e2;
+				}
+			}
+		}
+		iter = print_rsvhexfloat_digit_impl<uppercase>(iter, digits[0]);
+		if (1u < precision)
+		{
+			*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+			++iter;
+			for (::std::size_t index{1u}; index != retained_digits; ++index)
+			{
+				iter = print_rsvhexfloat_digit_impl<uppercase>(iter, digits[index]);
+			}
+			if (retained_digits < precision)
+			{
+				iter = ::fast_io::details::my_fill_n(iter, precision - retained_digits,
+													 char_literal_v<u8'0', char_type>);
+			}
+		}
+		*iter = char_literal_v < uppercase_e ? u8'P' : u8'p', char_type > ;
+		++iter;
+		return with_sign_prt_rsv_exponent_hex_impl<trait::e2hexdigits>(iter, e2);
+	}
+}
+
 template <bool showbase, typename mantissa_type>
 inline constexpr ::std::size_t print_rsvhexfloat_size_cache{
 	print_integer_reserved_size_cache<16, showbase, true, false, mantissa_type> + 6 +
@@ -833,20 +1046,24 @@ inline constexpr ::std::size_t print_rsvhexfloat_size_cache{
 namespace manipulators
 {
 
-template <bool noskipws = false, bool prefix = false, ::fast_io::details::my_floating_point scalar_type>
+template <bool noskipws = false, bool prefix = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_floating_point scalar_type>
 inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase = prefix,
 																	  .noskipws = noskipws,
-																	  .floating = ::fast_io::manipulators::floating_format::hexfloat},
+																	  .floating = ::fast_io::manipulators::floating_format::hexfloat,
+																	  .allow_leading_plus = allow_leading_plus},
 								scalar_type &>
 	hexfloat_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, ::fast_io::details::my_floating_point scalar_type>
+template <bool noskipws = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_floating_point scalar_type>
 inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase = true,
 																	  .noskipws = noskipws,
-																	  .floating = ::fast_io::manipulators::floating_format::hexfloat},
+																	  .floating = ::fast_io::manipulators::floating_format::hexfloat,
+																	  .allow_leading_plus = allow_leading_plus},
 								scalar_type &>
 	hexfloat0x_get(scalar_type &t) noexcept
 {

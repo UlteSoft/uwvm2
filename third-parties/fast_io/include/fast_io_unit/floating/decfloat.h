@@ -991,7 +991,8 @@ scan_decfloat_assign_precision(T &value, bool negative, scan_decfloat_significan
 			{
 				return ::fast_io::details::scan_decfloat_assign<T, rounding>(value, negative, state, exponent);
 			}
-			auto const cut64{static_cast<::std::uint_least64_t>(target_exponent - adjusted_exponent)};
+			auto const cut64{static_cast<::std::uint_least64_t>(target_exponent) -
+							 static_cast<::std::uint_least64_t>(adjusted_exponent)};
 			if (20u <= cut64)
 			{
 				if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
@@ -1263,9 +1264,12 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		negative = true;
 		++first;
 	}
-	else if (first != end && *first == plus)
+	else if constexpr (flags.allow_leading_plus)
 	{
-		return {begin, ::fast_io::parse_code::invalid};
+		if (first != end && *first == plus)
+		{
+			++first;
+		}
 	}
 
 	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};

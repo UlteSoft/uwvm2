@@ -102,24 +102,33 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_t<fla
 	}
 	else
 	{
+		constexpr ::std::size_t decimal_extra{
+			((flags.floating == manipulators::floating_format::general) ? 3u : 0u) +
+			((flags.json_float && flags.floating != manipulators::floating_format::scientific) ? 2u : 0u)};
 		if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double> &&
 					  sizeof(flt) == sizeof(double)) // this is the case on xxx-windows-msvc
 		{
-			return details::print_rsv_fp_size_with_special_cache<details::print_rsv_cache<double, flags.floating>,
-																 flags.nan_show_type>;
+			return ::fast_io::details::intrinsics::add_or_overflow_die(
+				details::print_rsv_fp_size_with_special_cache<details::print_rsv_cache<double, flags.floating>,
+															  flags.nan_show_type>,
+				decimal_extra);
 		}
 		else if constexpr (::fast_io::details::print_floating_decimal_via_float<flt>)
 		{
-			return details::print_rsv_fp_size_with_special_cache<details::print_rsv_cache<float, flags.floating>,
-																 flags.nan_show_type>;
+			return ::fast_io::details::intrinsics::add_or_overflow_die(
+				details::print_rsv_fp_size_with_special_cache<details::print_rsv_cache<float, flags.floating>,
+															  flags.nan_show_type>,
+				decimal_extra);
 		}
 		else
 		{
 			static_assert(::fast_io::details::print_floating_decimal_direct_supported<flt>,
 						  "currently only support iec559 float32 and float64 decimal output; narrower IEC559 "
 						  "formats are printed through float");
-			return details::print_rsv_fp_size_with_special_cache<
-				details::print_rsv_cache<::std::remove_cvref_t<flt>, flags.floating>, flags.nan_show_type>;
+			return ::fast_io::details::intrinsics::add_or_overflow_die(
+				details::print_rsv_fp_size_with_special_cache<
+					details::print_rsv_cache<::std::remove_cvref_t<flt>, flags.floating>, flags.nan_show_type>,
+				decimal_extra);
 		}
 	}
 }
@@ -332,6 +341,104 @@ inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, ma
 	}
 }
 #endif
+
+template <::std::integral char_type, manipulators::scalar_flags flags, details::my_floating_point flt>
+	requires(flags.base == 10 && flags.floating == manipulators::floating_format::hexfloat)
+inline constexpr ::std::size_t
+print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_precision_t<flags, flt>>,
+				   manipulators::scalar_manip_precision_t<flags, flt> f) noexcept
+{
+	static_assert(flags.precision == manipulators::floating_precision::significant,
+				  "fast_io hexfloat precision supports only total/significant hexadecimal digit precision");
+	using trait = ::fast_io::details::iec559_traits<flt>;
+	::std::size_t base_size{};
+	if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<flt>, __float128>
+#endif
+	)
+	{
+#ifdef __SIZEOF_FLOAT80__
+		if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double> && sizeof(flt) == sizeof(__float80) &&
+					  sizeof(flt) > sizeof(double))
+		{
+			base_size = details::print_rsv_fp_size_with_special_cache<
+				details::print_rsvhexfloat_size_cache<
+					flags.showbase, typename details::iec559_traits<__float80>::mantissa_type>,
+				flags.nan_show_type>;
+		}
+		else
+#endif
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+			if constexpr (sizeof(flt) > sizeof(double))
+		{
+			base_size = details::print_rsv_fp_size_with_special_cache<
+				details::print_rsvhexfloat_size_cache<flags.showbase, __uint128_t>, flags.nan_show_type>;
+		}
+		else
+#endif
+			base_size = details::print_rsv_fp_size_with_special_cache<
+				details::print_rsvhexfloat_size_cache<flags.showbase,
+													  typename details::iec559_traits<double>::mantissa_type>,
+				flags.nan_show_type>;
+	}
+	else
+	{
+		base_size = details::print_rsv_fp_size_with_special_cache<
+			details::print_rsvhexfloat_size_cache<flags.showbase, typename trait::mantissa_type>,
+			flags.nan_show_type>;
+	}
+	return ::fast_io::details::intrinsics::add_or_overflow_die(
+		::fast_io::details::intrinsics::add_or_overflow_die(base_size, f.precision), 8u);
+}
+
+template <::std::integral char_type, manipulators::scalar_flags flags, details::my_floating_point flt>
+	requires(flags.base == 10 && flags.floating == manipulators::floating_format::hexfloat)
+inline constexpr char_type *print_reserve_define(
+	io_reserve_type_t<char_type, manipulators::scalar_manip_precision_t<flags, flt>>,
+	char_type *iter, manipulators::scalar_manip_precision_t<flags, flt> f) noexcept
+{
+	static_assert(flags.precision == manipulators::floating_precision::significant,
+				  "fast_io hexfloat precision supports only total/significant hexadecimal digit precision");
+	if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double>
+#if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
+				  || ::std::same_as<::std::remove_cvref_t<flt>, __float128>
+#endif
+	)
+	{
+#ifdef __SIZEOF_FLOAT80__
+		if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double> && sizeof(flt) == sizeof(__float80) &&
+					  sizeof(flt) > sizeof(double))
+		{
+			return details::print_rsvhexfloat_precision_define_impl<
+				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
+				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				iter, static_cast<__float80>(f.reference), f.precision);
+		}
+		else
+#endif
+#if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
+			if constexpr (sizeof(flt) > sizeof(double))
+		{
+			return details::print_rsvhexfloat_precision_define_impl<
+				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
+				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				iter, static_cast<__float128>(f.reference), f.precision);
+		}
+		else
+#endif
+			return details::print_rsvhexfloat_precision_define_impl<
+				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
+				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				iter, static_cast<double>(f.reference), f.precision);
+	}
+	else
+	{
+		return details::print_rsvhexfloat_precision_define_impl<
+			flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
+			flags.rounding, flags.nan_show_sign, flags.nan_show_type>(iter, f.reference, f.precision);
+	}
+}
 
 template <::std::integral char_type, manipulators::scalar_flags flags, details::my_floating_point flt>
 	requires(flags.base == 10 && flags.floating != manipulators::floating_format::hexfloat)

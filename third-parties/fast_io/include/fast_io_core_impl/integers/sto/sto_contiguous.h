@@ -1120,7 +1120,8 @@ inline constexpr parse_result<char_type const *> scan_shbase_impl(char_type cons
 template <::std::integral char_type>
 inline constexpr char_type const *skip_hexdigits(char_type const *first, char_type const *last) noexcept;
 
-template <char8_t base, bool shbase = false, bool skipzero = false, bool oct_c2y = false, ::std::integral char_type, my_integral T>
+template <char8_t base, bool shbase = false, bool skipzero = false, bool oct_c2y = false,
+		  bool allow_leading_plus = false, ::std::integral char_type, my_integral T>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1141,6 +1142,17 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 		if ((sign = (minus_sign == *first)))
 		{
 			++first;
+		}
+		else if constexpr (allow_leading_plus)
+		{
+			if (*first == char_literal_v<u8'+', char_type>)
+			{
+				++first;
+			}
+		}
+		if (first == last) [[unlikely]]
+		{
+			return {first, parse_code::invalid};
 		}
 		if constexpr (shbase && base != 10)
 		{
@@ -1164,35 +1176,36 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 		}
 	}
 	constexpr auto zero{char_literal_v<u8'0', char_type>};
-	if (first != last)
+	if (first == last) [[unlikely]]
 	{
-		auto first_ch{*first};
-		if (!char_is_digit<base, char_type>(static_cast<unsigned_char_type>(first_ch))) [[unlikely]]
+		return {first, parse_code::invalid};
+	}
+	auto first_ch{*first};
+	if (!char_is_digit<base, char_type>(static_cast<unsigned_char_type>(first_ch))) [[unlikely]]
+	{
+		return {first, parse_code::invalid};
+	}
+	else if (first_ch == zero)
+	{
+		if constexpr (skipzero)
 		{
-			return {first, parse_code::invalid};
+			++first;
+			first = ::fast_io::details::find_none_zero_simd_impl(first, last);
+			if (first == last) [[likely]]
+			{
+				t = 0;
+				return {first, parse_code::ok};
+			}
 		}
-		else if (first_ch == zero)
+		else
 		{
-			if constexpr (skipzero)
+			++first;
+			if ((first == last) || (!char_is_digit<base, char_type>(static_cast<unsigned_char_type>(*first)))) [[likely]]
 			{
-				++first;
-				first = ::fast_io::details::find_none_zero_simd_impl(first, last);
-				if (first == last) [[likely]]
-				{
-					t = 0;
-					return {first, parse_code::ok};
-				}
+				t = {};
+				return {first, parse_code::ok};
 			}
-			else
-			{
-				++first;
-				if ((first == last) || (!char_is_digit<base, char_type>(static_cast<unsigned_char_type>(*first)))) [[likely]]
-				{
-					t = {};
-					return {first, parse_code::ok};
-				}
-				return {first, parse_code::invalid};
-			}
+			return {first, parse_code::invalid};
 		}
 	}
 	using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
@@ -1274,8 +1287,9 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 	return {it, parse_code::ok};
 }
 
-template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y, ::std::integral char_type,
-		  details::my_integral T>
+template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y,
+		  bool allow_leading_plus = false,
+		  ::std::integral char_type, details::my_integral T>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1294,6 +1308,17 @@ inline constexpr parse_result<char_type const *> scan_int_contiguous_define_impl
 	}
 	if constexpr (my_unsigned_integral<T>)
 	{
+		if constexpr (allow_leading_plus)
+		{
+			if (*first == char_literal_v<u8'+', char_type>)
+			{
+				++first;
+				if (first == last) [[unlikely]]
+				{
+					return {first, parse_code::invalid};
+				}
+			}
+		}
 		if constexpr (shbase && base != 10)
 		{
 			if constexpr (base == 8 && !oct_c2y)
@@ -1316,7 +1341,7 @@ inline constexpr parse_result<char_type const *> scan_int_contiguous_define_impl
 		}
 	}
 	return scan_int_contiguous_none_space_part_define_impl<base, ((shbase && base != 10) && my_signed_integral<T>),
-														   skipzero, oct_c2y>(first, last, t);
+														   skipzero, oct_c2y, allow_leading_plus>(first, last, t);
 }
 } // namespace details
 
@@ -1640,7 +1665,9 @@ inline constexpr parse_result<char_type const *> sc_int_ctx_skip_digits_phase(ch
 	return {first, (first == last) ? parse_code::partial : parse_code::invalid};
 }
 
-template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y, typename State,
+template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y,
+		  bool allow_leading_plus = false,
+		  typename State,
 		  ::std::integral char_type, my_integral T>
 inline constexpr parse_result<char_type const *> scan_context_define_parse_impl(State &st, char_type const *first,
 																				char_type const *last, T &t) noexcept
@@ -1651,7 +1678,7 @@ inline constexpr parse_result<char_type const *> scan_context_define_parse_impl(
 	{
 		[[assume(phase != scan_integral_context_phase::space)]];
 	}
-	if constexpr (my_unsigned_integral<T>)
+	if constexpr (my_unsigned_integral<T> && !allow_leading_plus)
 	{
 		[[assume(phase != scan_integral_context_phase::sign)]];
 	}
@@ -1685,9 +1712,9 @@ inline constexpr parse_result<char_type const *> scan_context_define_parse_impl(
 	}
 	case scan_integral_context_phase::sign:
 	{
-		if constexpr (my_signed_integral<T>)
+		if constexpr (my_signed_integral<T> || allow_leading_plus)
 		{
-			auto phase_ret = sc_int_ctx_sign_phase<true, false>(st, first, last);
+			auto phase_ret = sc_int_ctx_sign_phase<my_signed_integral<T>, allow_leading_plus>(st, first, last);
 			if (phase_ret.code != ongoing_parse_code) [[unlikely]]
 			{
 				return phase_ret;
@@ -1827,81 +1854,100 @@ inline constexpr ch_get_t<T &> ch_get(T &reference) noexcept
 }
 
 template <::std::size_t bs, bool noskipws = false, bool skipzero = false, bool prefix = false, bool oct_c2y = false,
-		  ::fast_io::details::my_integral scalar_type>
+		  bool allow_leading_plus = false, ::fast_io::details::my_integral scalar_type>
 	requires(2 <= bs && bs <= 36)
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<bs, noskipws, (bs == 10 ? false : prefix), skipzero, oct_c2y>,
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									bs, noskipws, (bs == 10 ? false : prefix), skipzero, oct_c2y,
+									allow_leading_plus>,
 								scalar_type &>
 base_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, bool prefix = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<2, noskipws, prefix, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool prefix = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									2, noskipws, prefix, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 bin_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<2, noskipws, true, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									2, noskipws, true, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 bin0b_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, bool prefix = false, bool oct_c2y = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<8, noskipws, prefix, skipzero, oct_c2y>,
+template <bool noskipws = false, bool skipzero = false, bool prefix = false, bool oct_c2y = false,
+		  bool allow_leading_plus = false, ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									8, noskipws, prefix, skipzero, oct_c2y, allow_leading_plus>,
 								scalar_type &>
 oct_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<8, noskipws, true, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									8, noskipws, true, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 oct0_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<8, noskipws, true, skipzero, true>,
+template <bool noskipws = false, bool skipzero = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									8, noskipws, true, skipzero, true, allow_leading_plus>,
 								scalar_type &>
 oct0o_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<10, noskipws, false, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									10, noskipws, false, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 dec_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, bool prefix = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<16, noskipws, prefix, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool prefix = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									16, noskipws, prefix, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 hex_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, bool skipzero = false, ::fast_io::details::my_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<16, noskipws, true, skipzero, false>,
+template <bool noskipws = false, bool skipzero = false, bool allow_leading_plus = false,
+		  ::fast_io::details::my_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									16, noskipws, true, skipzero, false, allow_leading_plus>,
 								scalar_type &>
 hex0x_get(scalar_type &t) noexcept
 {
 	return {t};
 }
 
-template <bool noskipws = false, ::fast_io::details::my_unsigned_integral scalar_type>
-inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<16, noskipws, true, true, false>,
+template <bool noskipws = false, bool allow_leading_plus = false, ::fast_io::details::my_unsigned_integral scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::base_scan_mani_flags_cache<
+									16, noskipws, true, true, false, allow_leading_plus>,
 								scalar_type &>
 addrvw_get(scalar_type &t) noexcept
 {
@@ -1931,7 +1977,8 @@ scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::sca
 					   char_type const *begin, char_type const *end,
 					   ::fast_io::manipulators::scalar_manip_t<flags, T &> t) noexcept
 {
-	return details::scan_int_contiguous_define_impl<flags.base, flags.noskipws, flags.showbase, flags.full, flags.modern_octal>(
+	return details::scan_int_contiguous_define_impl<flags.base, flags.noskipws, flags.showbase, flags.full,
+													flags.modern_octal, flags.allow_leading_plus>(
 		begin, end, t.reference);
 }
 
@@ -1941,7 +1988,8 @@ scan_context_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar
 					char_type const *begin, char_type const *end,
 					::fast_io::manipulators::scalar_manip_t<flags, T &> t) noexcept
 {
-	return details::scan_context_define_parse_impl<flags.base, flags.noskipws, flags.showbase, flags.full, flags.modern_octal>(
+	return details::scan_context_define_parse_impl<flags.base, flags.noskipws, flags.showbase, flags.full,
+												   flags.modern_octal, flags.allow_leading_plus>(
 		state, begin, end, t.reference);
 }
 
