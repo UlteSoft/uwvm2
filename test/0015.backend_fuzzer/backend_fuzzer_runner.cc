@@ -376,6 +376,9 @@ namespace
         rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = false;
         rtmode::runtime_tiered_disable_llvm_full_jit = false;
 #endif
+#if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
+        rtmode::global_runtime_llvm_jit_cache_path_mode = rtmode::runtime_llvm_jit_cache_path_mode_t::disabled;
+#endif
     }
 
     void configure_mode(::std::string_view mode)

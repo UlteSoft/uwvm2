@@ -40,7 +40,7 @@ constexpr bool runtime_log_emit_opfuncs{false};
 constexpr bool runtime_log_emit_cf{false};
 constexpr bool runtime_log_emit_wasm_ops{false};
 constexpr bool runtime_log_emit_stacktop{false};
-[[maybe_unused]] constexpr bool runtime_log_emit_conbine{false};
+[[maybe_unused]] constexpr bool runtime_log_emit_conbine{true};
 constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t

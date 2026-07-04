@@ -171,8 +171,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string lazy_local_function_wasm_code_hash(runtime_module_storage_t const& curr_module,
-                                                                                                          ::std::size_t local_function_index) noexcept
+    inline constexpr void append_lazy_llvm_jit_cache_shape_key(::uwvm2::utils::container::u8string& key, compile_option const& opt) noexcept
+    {
+        auto const bool_key_value{[](bool value) constexpr noexcept -> ::fast_io::u8string_view { return value ? u8"1" : u8"0"; }};
+
+        // These flags alter emitted IR, generated symbol sets, or synchronization on lazy target-table loads.
+        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+            key, u8"route-wasm-calls-through-runtime-bridge", bool_key_value(opt.route_wasm_calls_through_runtime_bridge));
+        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+            key, u8"lazy-defined-targets-are-atomic", bool_key_value(opt.lazy_defined_targets_are_atomic));
+        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+            key, u8"emit-tiered-loop-reentry-entries", bool_key_value(opt.emit_tiered_loop_reentry_entries));
+        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+            key, u8"emit-call-stack-frames", bool_key_value(opt.emit_call_stack_frames));
+        ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+            key, u8"emit-unwind-call-stack-frames", bool_key_value(opt.emit_unwind_call_stack_frames));
+    }
+
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+        lazy_local_function_wasm_code_hash(runtime_module_storage_t const& curr_module, ::std::size_t local_function_index) noexcept
     {
         if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]]
         {
@@ -983,6 +1000,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                                   u8"validation-mode",
                                                                                   lazy_validation_mode_name(options.validation_mode));
                 append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
+                append_lazy_llvm_jit_cache_shape_key(llvm_jit_cache_codegen_policy, options.compile_options);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
@@ -1172,6 +1190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                                   u8"validation-mode",
                                                                                   lazy_validation_mode_name(options.validation_mode));
                 append_llvm_jit_native_target_codegen_policy(llvm_jit_cache_codegen_policy, target_config);
+                append_lazy_llvm_jit_cache_shape_key(llvm_jit_cache_codegen_policy, options.compile_options);
             }
             auto llvm_jit_cache_context{::uwvm2::runtime::llvm_jit_cache::default_cache_context(
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
@@ -1560,7 +1579,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
 
                 // MCJIT materialization consumes the IR module and resolves all function symbols before publication.
-                if(!materialize_lazy_local_function_group(curr_module, storage, options, claimed_group, llvm_ir_storage)) [[unlikely]]
+                lazy_compile_options materialize_options{options};
+                materialize_options.compile_options = emit_options;
+                if(!materialize_lazy_local_function_group(curr_module, storage, materialize_options, claimed_group, llvm_ir_storage)) [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
@@ -1621,7 +1642,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                                     ::std::addressof(llvm_ir_storage));
             llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
 
-            if(!materialize_lazy_local_function(curr_module, storage, options, local_function_index, llvm_ir_storage)) [[unlikely]]
+            lazy_compile_options materialize_options{options};
+            materialize_options.compile_options = emit_options;
+            if(!materialize_lazy_local_function(curr_module, storage, materialize_options, local_function_index, llvm_ir_storage)) [[unlikely]]
             {
                 ::fast_io::fast_terminate();
             }

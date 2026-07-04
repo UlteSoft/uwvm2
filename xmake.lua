@@ -789,7 +789,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							end
 
 							local sysroot_para = get_config("sysroot")
-							if sysroot_para ~= "detect" and sysroot_para then
+							if sysroot_para ~= "detect" and sysroot_para ~= "none" and sysroot_para ~= "no" and sysroot_para then
 								local sysroot_flag = "--sysroot=" .. sysroot_para
 								append_common_compile_flag(sysroot_flag)
 								append_unique(linkerflags, linkerflags_seen, sysroot_flag)

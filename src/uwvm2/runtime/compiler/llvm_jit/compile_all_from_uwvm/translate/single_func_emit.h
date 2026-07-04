@@ -351,14 +351,23 @@ template <typename FunctionPtr>
 #endif
 }
 
-template <auto Function>
-[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_runtime_bridge_function_symbol_name() noexcept
+template <auto Function, typename FunctionSignature = decltype(Function)>
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_runtime_bridge_function_symbol_name(::uwvm2::utils::container::u8string_view discriminator = {}) noexcept
 {
     char const* pretty{__PRETTY_FUNCTION__};
     ::std::size_t pretty_size{};
     while(pretty[pretty_size] != '\0') { ++pretty_size; }
 
-    auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(pretty), pretty_size)};
+    ::uwvm2::utils::container::u8string hash_input{};
+    hash_input.append(reinterpret_cast<char8_t const*>(pretty), pretty_size);
+    if(!discriminator.empty())
+    {
+        hash_input.push_back(u8'#');
+        hash_input.append(discriminator.data(), discriminator.size());
+    }
+
+    auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(hash_input.data()), hash_input.size())};
     return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_bridge_", ::fast_io::mnp::hex<false, true>(hash));
 }
 
@@ -2322,6 +2331,37 @@ static_assert(sizeof(::std::uint_least32_t) == sizeof(runtime_wasm_u32));
 static_assert(sizeof(::std::uint_least64_t) == sizeof(runtime_wasm_u64));
 static_assert(sizeof(runtime_wasm_u32) == sizeof(runtime_wasm_f32));
 static_assert(sizeof(runtime_wasm_u64) == sizeof(runtime_wasm_f64));
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+    get_llvm_jit_bridge_value_type_name(runtime_operand_stack_value_type value_type) noexcept
+{
+    switch(value_type)
+    {
+        case runtime_operand_stack_value_type::i32: return ::uwvm2::utils::container::u8string_view{u8"i32"};
+        case runtime_operand_stack_value_type::i64: return ::uwvm2::utils::container::u8string_view{u8"i64"};
+        case runtime_operand_stack_value_type::f32: return ::uwvm2::utils::container::u8string_view{u8"f32"};
+        case runtime_operand_stack_value_type::f64: return ::uwvm2::utils::container::u8string_view{u8"f64"};
+        [[unlikely]] default: return ::uwvm2::utils::container::u8string_view{u8"unknown"};
+    }
+}
+
+[[nodiscard]] inline ::uwvm2::utils::container::u8string make_llvm_jit_memory_bridge_symbol_discriminator(
+    ::uwvm2::utils::container::u8string_view bridge_kind,
+    runtime_operand_stack_value_type value_type,
+    ::std::size_t access_bytes,
+    bool signed_access = false) noexcept
+{
+    ::uwvm2::utils::container::u8string out{};
+    ::uwvm2::utils::container::u8string_ref_uwvm out_ref{::std::addressof(out)};
+    ::fast_io::io::print(out_ref,
+                         bridge_kind,
+                         u8":",
+                         get_llvm_jit_bridge_value_type_name(value_type),
+                         u8":",
+                         access_bytes,
+                         signed_access ? ::uwvm2::utils::container::u8string_view{u8":s"} : ::uwvm2::utils::container::u8string_view{u8":u"});
+    return out;
+}
 
 // Result of resolving a table element for call_indirect.  This separates "table slot is empty" from "slot is present but
 // cannot be converted to a same-module direct call".
@@ -6461,11 +6501,13 @@ template <typename CreateValue>
         }};
 
     auto const emit_runtime_bridge_call{[&]<auto bridge_function>(::llvm::FunctionType* bridge_function_type,
-                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
+                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments,
+                                                                  ::uwvm2::utils::container::u8string_view discriminator = {}) constexpr noexcept
+                                                                  -> ::llvm::CallInst*
                                         {
                                             return emit_runtime_bridge_call_with_discriminator.template operator()<bridge_function>(bridge_function_type,
                                                                                                                                     arguments,
-                                                                                                                                    {});
+                                                                                                                                    discriminator);
                                         }};
 
     // Select one of four scalar bridge functions based on the Wasm value type.  This keeps bridge signatures exact for
@@ -6869,11 +6911,13 @@ template <typename CreateValue>
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
                                  ::std::size_t load_bytes,
-                                 bool signed_load) constexpr noexcept -> ::llvm::CallInst*
+                                 bool signed_load,
+                                 runtime_operand_stack_value_type scalar_value_type) constexpr noexcept -> ::llvm::CallInst*
         {
-            auto bridge_discriminator{
-                ::uwvm2::utils::container::u8concat_uwvm(u8"local-imported-memory-load:", load_bytes, u8":", signed_load ? 1u : 0u)
-            };
+            auto discriminator_storage{
+                make_llvm_jit_memory_bridge_symbol_discriminator(u8"local-imported-memory-load", scalar_value_type, load_bytes, signed_load)};
+            auto discriminator{
+                ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
                 switch(load_bytes)
@@ -6881,37 +6925,32 @@ template <typename CreateValue>
                     case 1uz:
                         if(signed_load)
                         {
-                            return emit_runtime_bridge_call_with_discriminator
-                                .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, true>>(
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, true>>(
                                 bridge_function_type,
                                 bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                                discriminator);
                         }
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         if(signed_load)
                         {
-                            return emit_runtime_bridge_call_with_discriminator
-                                .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, true>>(
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, true>>(
                                 bridge_function_type,
                                 bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                                discriminator);
                         }
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 4uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 4uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6923,51 +6962,44 @@ template <typename CreateValue>
                     case 1uz:
                         if(signed_load)
                         {
-                            return emit_runtime_bridge_call_with_discriminator
-                                .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, true>>(
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, true>>(
                                 bridge_function_type,
                                 bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                                discriminator);
                         }
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         if(signed_load)
                         {
-                            return emit_runtime_bridge_call_with_discriminator
-                                .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, true>>(
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, true>>(
                                 bridge_function_type,
                                 bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                                discriminator);
                         }
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
                         if(signed_load)
                         {
-                            return emit_runtime_bridge_call_with_discriminator
-                                .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, true>>(
+                            return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, true>>(
                                 bridge_function_type,
                                 bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                                discriminator);
                         }
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 8uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 8uz, false>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 8uz, false>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6975,20 +7007,18 @@ template <typename CreateValue>
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f32>)
             {
                 if(load_bytes != 4uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call_with_discriminator
-                    .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f32, 4uz, false>>(
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f32, 4uz, false>>(
                     bridge_function_type,
                     bridge_arguments,
-                    ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                    discriminator);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(load_bytes != 8uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call_with_discriminator
-                    .template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f64, 8uz, false>>(
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f64, 8uz, false>>(
                     bridge_function_type,
                     bridge_arguments,
-                    ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                    discriminator);
             }
             else
             {
@@ -7000,31 +7030,31 @@ template <typename CreateValue>
     auto const emit_local_imported_memory_store_bridge_call_for_scalar{
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
-                                 ::std::size_t store_bytes) constexpr noexcept -> ::llvm::CallInst*
+                                 ::std::size_t store_bytes,
+                                 runtime_operand_stack_value_type scalar_value_type) constexpr noexcept -> ::llvm::CallInst*
         {
-            auto bridge_discriminator{::uwvm2::utils::container::u8concat_uwvm(u8"local-imported-memory-store:", store_bytes)};
+            auto discriminator_storage{make_llvm_jit_memory_bridge_symbol_discriminator(u8"local-imported-memory-store", scalar_value_type, store_bytes)};
+            auto discriminator{
+                ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
                 switch(store_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 1uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 1uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 2uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 2uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 4uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 4uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -7034,29 +7064,25 @@ template <typename CreateValue>
                 switch(store_bytes)
                 {
                     case 1uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 1uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 1uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 2uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 2uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 4uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 4uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     case 8uz:
-                        return emit_runtime_bridge_call_with_discriminator
-                            .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 8uz>>(
-                                bridge_function_type,
-                                bridge_arguments,
-                                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                        return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 8uz>>(
+                            bridge_function_type,
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -7064,20 +7090,16 @@ template <typename CreateValue>
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f32>)
             {
                 if(store_bytes != 4uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call_with_discriminator
-                    .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f32, 4uz>>(
-                        bridge_function_type,
-                        bridge_arguments,
-                        ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f32, 4uz>>(bridge_function_type,
+                                                                                                                                        bridge_arguments,
+                                                                                                                                        discriminator);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(store_bytes != 8uz) [[unlikely]] { return nullptr; }
-                return emit_runtime_bridge_call_with_discriminator
-                    .template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f64, 8uz>>(
-                        bridge_function_type,
-                        bridge_arguments,
-                        ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f64, 8uz>>(bridge_function_type,
+                                                                                                                                        bridge_arguments,
+                                                                                                                                        discriminator);
             }
             else
             {
@@ -7119,22 +7141,26 @@ template <typename CreateValue>
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_i32>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::i64:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_i64>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::f32:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_f32>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::f64:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_f64>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 [[unlikely]] default:
                 {
                     return nullptr;
@@ -7176,19 +7202,23 @@ template <typename CreateValue>
                 case runtime_operand_stack_value_type::i32:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_i32>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::i64:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_i64>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::f32:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_f32>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::f64:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_f64>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 [[unlikely]] default:
                 {
                     return nullptr;
@@ -7221,9 +7251,8 @@ template <typename CreateValue>
     auto const emit_native_memory_load_bridge_call{
         [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
                                   ::llvm::Type* llvm_result_type,
-                                  ::std::size_t load_bytes,
-                                  bool signed_load,
-                                  ::llvm::Value* address_value) constexpr noexcept -> ::llvm::CallInst*
+                                  ::llvm::Value* address_value,
+                                  ::uwvm2::utils::container::u8string_view discriminator) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -7234,22 +7263,19 @@ template <typename CreateValue>
                                           false)};
             auto memory_address{emit_native_memory_object_address()};
             if(memory_address == nullptr) [[unlikely]] { return nullptr; }
-            auto bridge_discriminator{
-                ::uwvm2::utils::container::u8concat_uwvm(u8"native-memory-load:", load_bytes, u8":", signed_load ? 1u : 0u)
-            };
-            return emit_runtime_bridge_call_with_discriminator.template operator()<bridge_function>(
+            return emit_runtime_bridge_call.template operator()<bridge_function>(
                 bridge_function_type,
                 {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value},
-                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                discriminator);
         }};
 
     // Emit a native-memory store bridge call for fallback paths.
     auto const emit_native_memory_store_bridge_call{
         [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
                                   ::llvm::Type* llvm_value_type,
-                                  ::std::size_t store_bytes,
                                   ::llvm::Value* address_value,
-                                  ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
+                                  ::llvm::Value* value,
+                                  ::uwvm2::utils::container::u8string_view discriminator) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_value_type == nullptr || address_value == nullptr || value == nullptr) [[unlikely]]
             {
@@ -7263,11 +7289,10 @@ template <typename CreateValue>
                                           false)};
             auto memory_address{emit_native_memory_object_address()};
             if(memory_address == nullptr) [[unlikely]] { return nullptr; }
-            auto bridge_discriminator{::uwvm2::utils::container::u8concat_uwvm(u8"native-memory-store:", store_bytes)};
-            return emit_runtime_bridge_call_with_discriminator.template operator()<bridge_function>(
+            return emit_runtime_bridge_call.template operator()<bridge_function>(
                 bridge_function_type,
                 {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value, value},
-                ::uwvm2::utils::container::u8string_view{bridge_discriminator.data(), bridge_discriminator.size()});
+                discriminator);
         }};
 
     // Emit a native-memory memory.size bridge call when direct length loads are unavailable.
@@ -7295,11 +7320,14 @@ template <typename CreateValue>
         {
             if(memory0_access_info.memory_p != nullptr)
             {
+                auto discriminator_storage{
+                    make_llvm_jit_memory_bridge_symbol_discriminator(u8"native-memory-load", result_type, load_bytes, signed_load)};
+                auto discriminator{
+                    ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
                 return emit_native_memory_load_bridge_call.template operator()<native_bridge_function>(static_offset,
-                                                                                                       llvm_result_type,
-                                                                                                       load_bytes,
-                                                                                                       signed_load,
-                                                                                                       address_value);
+                                                                                                      llvm_result_type,
+                                                                                                      address_value,
+                                                                                                      discriminator);
             }
             return emit_local_imported_memory_load_bridge_call(static_offset, result_type, llvm_result_type, load_bytes, signed_load, address_value);
         }};
@@ -7316,11 +7344,14 @@ template <typename CreateValue>
         {
             if(memory0_access_info.memory_p != nullptr)
             {
+                auto discriminator_storage{make_llvm_jit_memory_bridge_symbol_discriminator(u8"native-memory-store", value_type, store_bytes)};
+                auto discriminator{
+                    ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
                 return emit_native_memory_store_bridge_call.template operator()<native_bridge_function>(static_offset,
-                                                                                                        llvm_value_type,
-                                                                                                        store_bytes,
-                                                                                                        address_value,
-                                                                                                        value);
+                                                                                                       llvm_value_type,
+                                                                                                       address_value,
+                                                                                                       value,
+                                                                                                       discriminator);
             }
             return emit_local_imported_memory_store_bridge_call(static_offset, value_type, llvm_value_type, store_bytes, address_value, value);
         }};
@@ -7396,26 +7427,24 @@ template <typename CreateValue>
             {
                 if(load_bytes != 4uz) [[unlikely]] { return nullptr; }
 
-                auto load_inst{
-                    ir_builder.CreateLoad(::llvm::Type::getFloatTy(llvm_context),
-                                          ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getFloatTy(llvm_context))),
-                                          get_llvm_string_ref(u8"memory.load"))};
+                auto load_inst{ir_builder.CreateLoad(llvm_i32_type,
+                                                     ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)),
+                                                     get_llvm_string_ref(u8"memory.load"))};
                 load_inst->setAlignment(memory_alignment);
                 load_inst->setVolatile(true);
-                return load_inst;
+                return ir_builder.CreateBitCast(load_inst, ::llvm::Type::getFloatTy(llvm_context));
             }
 
             if(result_type == runtime_operand_stack_value_type::f64)
             {
                 if(load_bytes != 8uz) [[unlikely]] { return nullptr; }
 
-                auto load_inst{
-                    ir_builder.CreateLoad(::llvm::Type::getDoubleTy(llvm_context),
-                                          ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getDoubleTy(llvm_context))),
-                                          get_llvm_string_ref(u8"memory.load"))};
+                auto load_inst{ir_builder.CreateLoad(llvm_i64_type,
+                                                     ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)),
+                                                     get_llvm_string_ref(u8"memory.load"))};
                 load_inst->setAlignment(memory_alignment);
                 load_inst->setVolatile(true);
-                return load_inst;
+                return ir_builder.CreateBitCast(load_inst, ::llvm::Type::getDoubleTy(llvm_context));
             }
 
             return nullptr;
@@ -7514,9 +7543,10 @@ template <typename CreateValue>
                 if(store_bytes != 4uz) [[unlikely]] { return nullptr; }
 
                 auto store_inst{
-                    ir_builder.CreateStore(value,
-                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getFloatTy(llvm_context))))};
+                    ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i32_type),
+                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)))};
                 store_inst->setAlignment(memory_alignment);
+                store_inst->setVolatile(true);
                 return store_inst;
             }
 
@@ -7524,10 +7554,10 @@ template <typename CreateValue>
             {
                 if(store_bytes != 8uz) [[unlikely]] { return nullptr; }
 
-                auto store_inst{ir_builder.CreateStore(
-                    value,
-                    ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getDoubleTy(llvm_context))))};
+                auto store_inst{ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i64_type),
+                                                       ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)))};
                 store_inst->setAlignment(memory_alignment);
+                store_inst->setVolatile(true);
                 return store_inst;
             }
 

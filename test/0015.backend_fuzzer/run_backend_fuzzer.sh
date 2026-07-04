@@ -390,8 +390,16 @@ for item in manifest:
         raise SystemExit(1)
 
     oracle_log = log_dir / f"{idx:04d}.wabt.log"
-    oracle_rc = run_logged([wasm_interp, *wabt_flags, "--run-all-exports", str(wasm)], oracle_log)
-    oracle = classify_wabt(oracle_rc, oracle_log)
+    if item.get("has_local_imported_i32_add", False):
+        # WABT has no host implementation for uwvm's synthetic local-imported module.
+        oracle_log.write_text(
+            "skipped WABT execution: case uses backend-local-import.add_i32\n",
+            encoding="utf-8",
+        )
+        oracle = "trap" if item.get("expect_trap", False) else "ok"
+    else:
+        oracle_rc = run_logged([wasm_interp, *wabt_flags, "--run-all-exports", str(wasm)], oracle_log)
+        oracle = classify_wabt(oracle_rc, oracle_log)
 
     for mode in modes:
         mode_log = log_dir / f"{idx:04d}.{mode}.log"

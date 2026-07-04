@@ -29,6 +29,7 @@
 # include <cstring>
 # include <limits>
 # include <memory>
+# include <string>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>
@@ -142,6 +143,13 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         }
 
         inline constexpr ~runtime_llvm_jit_section_memory_manager() override { deregisterEHFrames(); }
+
+        [[nodiscard]] inline ::llvm::JITSymbol findSymbol(::std::string const& name) override
+        {
+            auto const address{this->getSymbolAddress(name)};
+            if(address == 0u) { return nullptr; }
+            return ::llvm::JITSymbol{address, ::llvm::JITSymbolFlags::Exported};
+        }
 
         inline constexpr ::std::uint8_t*
             allocateCodeSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name) noexcept override

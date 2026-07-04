@@ -13,7 +13,7 @@ function darwin_target(opt)
 	end
 
     local sysroot_para = get_config("sysroot")
-    if sysroot_para ~= "detect" and sysroot_para then
+    if sysroot_para ~= "detect" and sysroot_para ~= "none" and sysroot_para ~= "no" and sysroot_para then
         local sysroot_cvt = "--sysroot=" .. sysroot_para
         add_cxflags(sysroot_cvt, {force = true})
         add_ldflags(sysroot_cvt, {force = true})
