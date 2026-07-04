@@ -594,11 +594,6 @@ template <char8_t base, my_unsigned_integral T, ::std::size_t n>
 inline constexpr ::fast_io::freestanding::array<T, n> pow_table_n{::fast_io::details::generate_pow_table<base, T, n>()};
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline parse_result<char_type const *>
 runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
 {
@@ -984,11 +979,6 @@ runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *fi
 }
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr parse_result<char_type const *>
 compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
 {
@@ -1031,11 +1021,6 @@ compile_time_scan_int_contiguous_none_simd_space_part_define_impl(char_type cons
 }
 
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr parse_result<char_type const *>
 scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &res) noexcept
 {
@@ -1122,11 +1107,6 @@ inline constexpr char_type const *skip_hexdigits(char_type const *first, char_ty
 
 template <char8_t base, bool shbase = false, bool skipzero = false, bool oct_c2y = false,
 		  bool allow_leading_plus = false, ::std::integral char_type, my_integral T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr parse_result<char_type const *>
 scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_type const *last, T &t) noexcept
 {
@@ -1290,11 +1270,6 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 template <char8_t base, bool noskipws, bool shbase, bool skipzero, bool oct_c2y,
 		  bool allow_leading_plus = false,
 		  ::std::integral char_type, details::my_integral T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr parse_result<char_type const *> scan_int_contiguous_define_impl(char_type const *first,
 																				 char_type const *last, T &t) noexcept
 {
@@ -1602,6 +1577,11 @@ inline constexpr parse_result<char_type const *> sc_int_ctx_zero_phase(scan_inte
 }
 
 template <char8_t base, bool oct_c2y, ::std::integral char_type, typename State, my_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr parse_result<char_type const *> sc_int_ctx_digit_phase(State &st, char_type const *first,
 																		char_type const *last, T &t) noexcept
 {
