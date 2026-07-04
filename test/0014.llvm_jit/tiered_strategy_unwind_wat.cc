@@ -120,6 +120,12 @@ namespace
         }
     }
 
+    [[nodiscard]] ::std::string env_string(char const* name)
+    {
+        if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
+        return {};
+    }
+
     [[nodiscard]] ::std::filesystem::path find_wat2wasm(::std::filesystem::path const& project_root)
     {
         if(auto const env{::std::getenv("WAT2WASM")}; env != nullptr && *env != '\0')
@@ -230,8 +236,24 @@ namespace
         auto const stem{::std::string{test_case.name} + "." + policy};
         auto const output_path{artifact_dir / (stem + ".out")};
         auto const log_path{artifact_dir / (stem + ".log")};
-        auto const command{quote_argument(uwvm_path) + " " + test_case.args + " -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path) +
-                           " --run " + quote_argument(wasm_path)};
+        auto command{quote_argument(uwvm_path) + " " + test_case.args + " -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path)};
+        if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty())
+        {
+            auto const case_args{::std::string_view{test_case.args}};
+            auto const case_has_high_level_policy{case_args.find("-Rllvm-policy") != ::std::string_view::npos ||
+                                                  case_args.find("--runtime-llvm-jit-policy") != ::std::string_view::npos};
+            auto const extra_has_policy{extra_args.find("-Rllvm-policy") != ::std::string::npos ||
+                                        extra_args.find("--runtime-llvm-jit-policy") != ::std::string::npos ||
+                                        extra_args.find("-Rllvm-lazy-policy") != ::std::string::npos ||
+                                        extra_args.find("--runtime-llvm-jit-lazy-policy") != ::std::string::npos ||
+                                        extra_args.find("-Rllvm-full-policy") != ::std::string::npos ||
+                                        extra_args.find("--runtime-llvm-jit-full-policy") != ::std::string::npos};
+            if(!(case_has_high_level_policy && extra_has_policy))
+            {
+                command += " " + extra_args;
+            }
+        }
+        command += " --run " + quote_argument(wasm_path);
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
         ::std::cout << "[tiered-strategy] " << full_command << '\n';
 
@@ -622,7 +644,10 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "tiered_strategy_wat"};
+    auto const artifact_dir{[](::std::filesystem::path const& dir) {
+        if(auto const env{::std::getenv("UWVM_TIERED_STRATEGY_ARTIFACT_DIR")}; env != nullptr && *env != '\0') { return ::std::filesystem::path{env}; }
+        return dir / "test-artifacts" / "0014.llvm_jit" / "tiered_strategy_wat";
+    }(executable_dir)};
 
     bool ok{true};
     for(auto const& test_case: make_cases())

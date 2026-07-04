@@ -25,6 +25,16 @@ if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
   echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
 fi
 
+UWVM_XMAKE_MODE="${UWVM_XMAKE_MODE:-debug}"
+case "${UWVM_XMAKE_MODE}" in
+  debug|release|releasedbg|minsizerel) ;;
+  *)
+    echo "ERR: UWVM_XMAKE_MODE must be debug, release, releasedbg, or minsizerel; got: ${UWVM_XMAKE_MODE}" >&2
+    exit 2
+    ;;
+esac
+echo "INFO: xmake mode = ${UWVM_XMAKE_MODE}"
+
 xmake_build() {
   if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
     xmake b -v -j "${UWVM_XMAKE_JOBS}" "$@"
@@ -51,7 +61,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 COMMON_F_FLAGS=(
-  -m debug
+  -m "${UWVM_XMAKE_MODE}"
   --use-llvm-compiler=y
   --ccache=n
   --cxflags=-Wno-error

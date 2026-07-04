@@ -457,8 +457,10 @@ namespace
                                         char const* policy)
     {
         auto const output_path{artifact_dir / (::std::string{stem} + "." + mode.name + "." + policy + ".out")};
-        auto const command{(run_prefix.empty() ? ::std::string{} : ::std::string{run_prefix} + " ") + quote_argument(uwvm_path) + " " + mode.args +
-                           " -Rllvm-cache-path disable -Rllvm-call-stack " + policy + " --run " + quote_argument(wasm_path)};
+        auto command{(run_prefix.empty() ? ::std::string{} : ::std::string{run_prefix} + " ") + quote_argument(uwvm_path) + " " + mode.args +
+                     " -Rllvm-cache-path disable -Rllvm-call-stack " + policy};
+        if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
+        command += " --run " + quote_argument(wasm_path);
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
         ::std::cout << "[llvm-jit-unwind-stack] " << full_command << '\n';
 

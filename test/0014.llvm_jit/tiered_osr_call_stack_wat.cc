@@ -112,6 +112,12 @@ namespace
         }
     }
 
+    [[nodiscard]] ::std::string env_string(char const* name)
+    {
+        if(auto const env{::std::getenv(name)}; env != nullptr && *env != '\0') { return env; }
+        return {};
+    }
+
     [[nodiscard]] int run_system_command(::std::string const& command)
     {
 #ifdef _WIN32
@@ -336,8 +342,10 @@ namespace
         auto const stem{::std::string{fixture.label} + "." + mode.name + "." + policy};
         auto const output_path{artifact_dir / (stem + ".out")};
         auto const log_path{artifact_dir / (stem + ".log")};
-        auto const command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path) +
-                           " --run " + quote_argument(wasm_path)};
+        auto command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-cache-path disable -Rllvm-call-stack " + policy +
+                     " -Rclog file " + quote_argument(log_path)};
+        if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
+        command += " --run " + quote_argument(wasm_path);
 
         if(!run_trap_command(command, output_path, stem.c_str())) { return {.output_path = output_path, .log_path = log_path}; }
         auto result{read_trap_result(output_path, log_path, fixture.label, mode.name, policy)};
@@ -406,7 +414,10 @@ int main(int argc, char** argv)
     }
 
     auto const wat_dir{project_root / "test" / "0014.llvm_jit" / "wat"};
-    auto const artifact_dir{executable_dir / "test-artifacts" / "0014.llvm_jit" / "tiered_osr_wat"};
+    auto const artifact_dir{[](::std::filesystem::path const& dir) {
+        if(auto const env{::std::getenv("UWVM_TIERED_OSR_ARTIFACT_DIR")}; env != nullptr && *env != '\0') { return ::std::filesystem::path{env}; }
+        return dir / "test-artifacts" / "0014.llvm_jit" / "tiered_osr_wat";
+    }(executable_dir)};
 
     for(auto const& fixture: fixtures)
     {

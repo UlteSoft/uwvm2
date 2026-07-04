@@ -51,7 +51,18 @@
 #  include <sys/stat.h>
 # endif
 # if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
-#  include <sgidefs.h>
+#  if __has_include(<sgidefs.h>)
+#   include <sgidefs.h>
+#  endif
+#  ifndef _ABIO32
+#   define _ABIO32 1
+#  endif
+#  ifndef _ABIN32
+#   define _ABIN32 2
+#  endif
+#  ifndef _ABI64
+#   define _ABI64 3
+#  endif
 # endif
 // import
 # include <fast_io.h>
@@ -132,4 +143,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
-

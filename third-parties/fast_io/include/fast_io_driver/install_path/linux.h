@@ -1,9 +1,8 @@
 ﻿#pragma once
 
-#if defined(__linux__)
-#include <linux/limits.h>
-#else
 #include <limits.h>
+#if defined(__linux__) && !defined(PATH_MAX)
+#include <linux/limits.h>
 #endif
 
 namespace fast_io::details
