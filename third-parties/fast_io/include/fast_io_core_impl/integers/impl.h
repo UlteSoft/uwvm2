@@ -268,9 +268,9 @@ struct scalar_flags
 	// hexadecimal digits only.
 	floating_precision precision{};
 	// Scan only: accept an optional leading '+' before integer, decimal-float,
-	// or hex-float input. The default is false to match std::from_chars and
-	// fast_float default behavior; exponent signs such as e+1 or p+1 are
-	// controlled by the floating grammar and remain separate.
+	// or hex-float input. The default is false to match from_chars-style
+	// behavior; exponent signs such as e+1 or p+1 are controlled by the
+	// floating grammar and remain separate.
 	bool allow_leading_plus{};
 };
 

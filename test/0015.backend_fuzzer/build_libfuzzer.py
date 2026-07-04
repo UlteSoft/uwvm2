@@ -90,7 +90,6 @@ def main() -> int:
 
     include_dirs = [
         root / "src",
-        root / "third-parties" / "fast_float" / "include",
         root / "third-parties" / "fast_io" / "include",
         root / "third-parties" / "bizwen" / "include",
         root / "third-parties" / "boost_unordered" / "include",

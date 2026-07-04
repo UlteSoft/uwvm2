@@ -401,9 +401,6 @@ target("uwvm")
 	local is_debug_mode = is_mode("debug")  -- public all modules in debug mode
 	local enable_cxx_module = get_config("use-cxx-module")
 
-	-- third-parties/fast_float
-	add_includedirs("third-parties/fast_float/include")
-
 	-- third-parties/fast_io
 	add_includedirs("third-parties/fast_io/include")
 
@@ -476,9 +473,6 @@ target("uwvm_runtime")
 	-- Interpreter/runtime execution unit: disable observable floating-point side effects
 	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
 	add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
-
-	-- third-parties/fast_float
-	add_includedirs("third-parties/fast_float/include")
 
 	-- third-parties/fast_io
 	add_includedirs("third-parties/fast_io/include")
@@ -585,9 +579,6 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_default(false)
 
 		local enable_cxx_module = get_config("use-cxx-module")
-
-		-- third-parties/fast_float
-		add_includedirs("third-parties/fast_float/include")
 
 		-- third-parties/fast_io
 		add_includedirs("third-parties/fast_io/include")
@@ -1014,9 +1005,6 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 
 			local enable_cxx_module = get_config("use-cxx-module")
 
-			-- third-parties/fast_float
-			add_includedirs("third-parties/fast_float/include")
-
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")
 
@@ -1106,9 +1094,6 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			set_default(false)
 
 			local enable_cxx_module = get_config("use-cxx-module")
-
-			-- third-parties/fast_float
-			add_includedirs("third-parties/fast_float/include")
 
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")

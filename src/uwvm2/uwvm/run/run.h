@@ -44,7 +44,6 @@
 #ifndef UWVM_MODULE
 // std
 # include <bit>
-# include <charconv>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -495,9 +494,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     /**
      * @brief   Parse a floating-point literal from a half-open UTF-8 range.
-     * @details The normal decimal scanner uses fast_io when fast_float is enabled and falls back to
-     *          `std::from_chars` otherwise.  fast_io hexfloat scanning is still available without fast_float, so the
-     *          hexfloat path is always attempted.  In every case, partial consumption is rejected.
+     * @details Decimal and hexfloat forms are scanned by fast_io.  In every case, partial consumption is rejected.
      */
     template <typename T>
     [[nodiscard]] inline constexpr bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
@@ -505,15 +502,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         if(first == last) { return false; }
 
         // Scan ordinary floating-point syntax.
-# if defined(FAST_IO_NOT_USE_FAST_FLOAT)
-        auto const char_first{reinterpret_cast<char const*>(first)};
-        auto const char_last{reinterpret_cast<char const*>(last)};
-        auto const [next, err]{::std::from_chars(char_first, char_last, out, ::std::chars_format::general)};
-        if(err == ::std::errc{} && next == char_last) { return true; }
-# else
         auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
         if(err == ::fast_io::parse_code::ok && next == last) { return true; }
-# endif
 
         // Scan binary floating-point syntax, which must use the 0x-prefixed hexfloat form.
         auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat0x_get<true>(out))};
