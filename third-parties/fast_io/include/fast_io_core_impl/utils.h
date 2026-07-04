@@ -161,6 +161,9 @@ concept my_floating_point = ::std::floating_point<T>
 #ifdef __SIZEOF_FLOAT128__
 							|| ::std::same_as<::std::remove_cv_t<T>, __float128>
 #endif
+#if defined(__clang__) && defined(__aarch64__) && !defined(__STDCPP_BFLOAT16_T__)
+							|| ::std::same_as<::std::remove_cv_t<T>, __bf16>
+#endif
 #ifdef __STDCPP_BFLOAT16_T__
 							|| ::std::same_as<::std::remove_cv_t<T>, decltype(0.0bf16)>
 #endif
@@ -463,7 +466,6 @@ inline constexpr T compile_pow5{::fast_io::details::compile_pow_n<T, 5, pow>};
 
 template <my_integral T, ::std::size_t pow>
 inline constexpr T compile_pow2{::fast_io::details::compile_pow_n<T, 2, pow>};
-
 
 
 inline constexpr bool is_wasi_environment{

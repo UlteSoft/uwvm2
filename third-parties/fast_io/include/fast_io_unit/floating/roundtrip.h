@@ -74,6 +74,68 @@ inline constexpr uint64x2 float64_mod5_tb[]{
 
 inline constexpr auto compute_pow10_float64{pow10_float64_tb + 292};
 
+inline constexpr uint64x2 pow10_float64_scan_low_tb[]{
+	{0xEEF453D6923BD65A, 0x113FAA2906A13B40}, // 1e-342
+	{0x9558B4661B6565F8, 0x4AC7CA59A424C508}, // 1e-341
+	{0xBAAEE17FA23EBF76, 0x5D79BCF00D2DF64A}, // 1e-340
+	{0xE95A99DF8ACE6F53, 0xF4D82C2C107973DD}, // 1e-339
+	{0x91D8A02BB6C10594, 0x79071B9B8A4BE86A}, // 1e-338
+	{0xB64EC836A47146F9, 0x9748E2826CDEE285}, // 1e-337
+	{0xE3E27A444D8D98B7, 0xFD1B1B2308169B26}, // 1e-336
+	{0x8E6D8C6AB0787F72, 0xFE30F0F5E50E20F8}, // 1e-335
+	{0xB208EF855C969F4F, 0xBDBD2D335E51A936}, // 1e-334
+	{0xDE8B2B66B3BC4723, 0xAD2C788035E61383}, // 1e-333
+	{0x8B16FB203055AC76, 0x4C3BCB5021AFCC32}, // 1e-332
+	{0xADDCB9E83C6B1793, 0xDF4ABE242A1BBF3E}, // 1e-331
+	{0xD953E8624B85DD78, 0xD71D6DAD34A2AF0E}, // 1e-330
+	{0x87D4713D6F33AA6B, 0x8672648C40E5AD69}, // 1e-329
+	{0xA9C98D8CCB009506, 0x680EFDAF511F18C3}, // 1e-328
+	{0xD43BF0EFFDC0BA48, 0x0212BD1B2566DEF3}, // 1e-327
+	{0x84A57695FE98746D, 0x014BB630F7604B58}, // 1e-326
+	{0xA5CED43B7E3E9188, 0x419EA3BD35385E2E}, // 1e-325
+	{0xCF42894A5DCE35EA, 0x52064CAC828675BA}, // 1e-324
+	{0x818995CE7AA0E1B2, 0x7343EFEBD1940994}, // 1e-323
+	{0xA1EBFB4219491A1F, 0x1014EBE6C5F90BF9}, // 1e-322
+	{0xCA66FA129F9B60A6, 0xD41A26E077774EF7}, // 1e-321
+	{0xFD00B897478238D0, 0x8920B098955522B5}, // 1e-320
+	{0x9E20735E8CB16382, 0x55B46E5F5D5535B1}, // 1e-319
+	{0xC5A890362FDDBC62, 0xEB2189F734AA831E}, // 1e-318
+	{0xF712B443BBD52B7B, 0xA5E9EC7501D523E5}, // 1e-317
+	{0x9A6BB0AA55653B2D, 0x47B233C92125366F}, // 1e-316
+	{0xC1069CD4EABE89F8, 0x999EC0BB696E840B}, // 1e-315
+	{0xF148440A256E2C76, 0xC00670EA43CA250E}, // 1e-314
+	{0x96CD2A865764DBCA, 0x380406926A5E5729}, // 1e-313
+	{0xBC807527ED3E12BC, 0xC605083704F5ECF3}, // 1e-312
+	{0xEBA09271E88D976B, 0xF7864A44C633682F}, // 1e-311
+	{0x93445B8731587EA3, 0x7AB3EE6AFBE0211E}, // 1e-310
+	{0xB8157268FDAE9E4C, 0x5960EA05BAD82965}, // 1e-309
+	{0xE61ACF033D1A45DF, 0x6FB92487298E33BE}, // 1e-308
+	{0x8FD0C16206306BAB, 0xA5D3B6D479F8E057}, // 1e-307
+	{0xB3C4F1BA87BC8696, 0x8F48A4899877186D}, // 1e-306
+	{0xE0B62E2929ABA83C, 0x331ACDABFE94DE88}, // 1e-305
+	{0x8C71DCD9BA0B4925, 0x9FF0C08B7F1D0B15}, // 1e-304
+	{0xAF8E5410288E1B6F, 0x07ECF0AE5EE44DDA}, // 1e-303
+	{0xDB71E91432B1A24A, 0xC9E82CD9F69D6151}, // 1e-302
+	{0x892731AC9FAF056E, 0xBE311C083A225CD3}, // 1e-301
+	{0xAB70FE17C79AC6CA, 0x6DBD630A48AAF407}, // 1e-300
+	{0xD64D3D9DB981787D, 0x092CBBCCDAD5B109}, // 1e-299
+	{0x85F0468293F0EB4E, 0x25BBF56008C58EA6}, // 1e-298
+	{0xA76C582338ED2621, 0xAF2AF2B80AF6F24F}, // 1e-297
+	{0xD1476E2C07286FAA, 0x1AF5AF660DB4AEE2}, // 1e-296
+	{0x82CCA4DB847945CA, 0x50D98D9FC890ED4E}, // 1e-295
+	{0xA37FCE126597973C, 0xE50FF107BAB528A1}, // 1e-294
+	{0xCC5FC196FEFD7D0C, 0x1E53ED49A96272C9}  // 1e-293
+};
+
+[[nodiscard]] inline constexpr uint64x2 compute_pow10_float64_scan(::std::int_least32_t exponent) noexcept
+{
+	if (exponent < -292)
+	{
+		return pow10_float64_scan_low_tb[static_cast<::std::size_t>(exponent + 342)];
+	}
+	return compute_pow10_float64[exponent];
+}
+
 template <typename mantissa_type>
 struct m10_result
 {
@@ -407,6 +469,188 @@ dragonbox_main(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32
 	}
 }
 
+struct dragonbox_decimal_adjusted_mantissa
+{
+	::std::uint_least64_t mantissa{};
+	::std::int_least32_t power2{};
+};
+
+struct dragonbox_decimal_uint128
+{
+	::std::uint_least64_t low{};
+	::std::uint_least64_t high{};
+};
+
+[[nodiscard]] inline constexpr ::std::int_least32_t
+dragonbox_decimal_binary_power(::std::int_least32_t exponent) noexcept
+{
+	return static_cast<::std::int_least32_t>((((152170 + 65536) * exponent) >> 16) + 63);
+}
+
+[[nodiscard]] inline constexpr dragonbox_decimal_uint128
+dragonbox_decimal_mul_64x128_high(::std::uint_least64_t value, ::fast_io::details::uint64x2 cache) noexcept
+{
+	::std::uint_least64_t high{};
+	auto low{::fast_io::intrinsics::umul(value, cache.hi, high)};
+	auto const middle{::fast_io::intrinsics::umulh(value, cache.lo)};
+	low += middle;
+	if (low < middle)
+	{
+		++high;
+	}
+	return {low, high};
+}
+
+template <typename flt>
+[[nodiscard]] inline constexpr bool
+dragonbox_decimal_compute_adjusted(::std::int_least64_t exponent, ::std::uint_least64_t significand,
+								   dragonbox_decimal_adjusted_mantissa &answer) noexcept
+{
+	using trait = ::fast_io::details::iec559_traits<flt>;
+	if constexpr (sizeof(flt) != sizeof(::std::uint_least32_t) && sizeof(flt) != sizeof(::std::uint_least64_t))
+	{
+		return false;
+	}
+	else
+	{
+		constexpr auto mantissa_explicit_bits{static_cast<::std::int_least32_t>(trait::mbits)};
+		constexpr auto minimum_exponent{
+			-static_cast<::std::int_least32_t>((static_cast<::std::uint_least32_t>(1u) << (trait::ebits - 1u)) - 1u)};
+		constexpr auto infinite_power{
+			static_cast<::std::int_least32_t>((static_cast<::std::uint_least32_t>(1u) << trait::ebits) - 1u)};
+		constexpr auto smallest_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? -65 : -342};
+		constexpr auto largest_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? 38 : 308};
+		constexpr auto min_round_to_even_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? -17 : -4};
+		constexpr auto max_round_to_even_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? 10 : 23};
+		if (significand == 0 || exponent < smallest_power10)
+		{
+			answer = {};
+			return true;
+		}
+		if (exponent > largest_power10)
+		{
+			answer = {.mantissa = 0, .power2 = infinite_power};
+			return true;
+		}
+		if (exponent < -342 || exponent > 326)
+		{
+			return false;
+		}
+		auto const exponent32{static_cast<::std::int_least32_t>(exponent)};
+		auto const leading_zeroes{static_cast<::std::int_least32_t>(::std::countl_zero(significand))};
+		significand <<= static_cast<unsigned>(leading_zeroes);
+		auto const cache{::fast_io::details::compute_pow10_float64_scan(exponent32)};
+		auto const product{::fast_io::details::dragonbox_decimal_mul_64x128_high(significand, cache)};
+		auto const upperbit{static_cast<::std::int_least32_t>(product.high >> 63u)};
+		auto const shift{upperbit + 64 - mantissa_explicit_bits - 3};
+		auto mantissa{product.high >> static_cast<unsigned>(shift)};
+		auto power2{static_cast<::std::int_least32_t>(
+			::fast_io::details::dragonbox_decimal_binary_power(exponent32) + upperbit - leading_zeroes - minimum_exponent)};
+		if (power2 <= 0)
+		{
+			if (-power2 + 1 >= 64)
+			{
+				answer = {};
+				return true;
+			}
+			mantissa >>= static_cast<unsigned>(-power2 + 1);
+			mantissa += mantissa & 1u;
+			mantissa >>= 1u;
+			answer.power2 = mantissa < (::std::uint_least64_t{1} << mantissa_explicit_bits) ? 0 : 1;
+			answer.mantissa = mantissa;
+			return true;
+		}
+		if (product.low <= 1 && min_round_to_even_power10 <= exponent && exponent <= max_round_to_even_power10 &&
+			(mantissa & 3u) == 1u &&
+			(mantissa << static_cast<unsigned>(shift)) == product.high)
+		{
+			mantissa &= ~::std::uint_least64_t{1};
+		}
+		mantissa += mantissa & 1u;
+		mantissa >>= 1u;
+		if (mantissa >= (::std::uint_least64_t{2} << mantissa_explicit_bits))
+		{
+			mantissa = ::std::uint_least64_t{1} << mantissa_explicit_bits;
+			++power2;
+		}
+		mantissa &= ~(::std::uint_least64_t{1} << mantissa_explicit_bits);
+		if (power2 >= infinite_power)
+		{
+			answer = {.mantissa = 0, .power2 = infinite_power};
+			return true;
+		}
+		answer = {.mantissa = mantissa, .power2 = power2};
+		return true;
+	}
+}
+
+template <typename flt>
+[[nodiscard]] inline constexpr bool dragonbox_decimal_roundtrips_to(
+	typename iec559_traits<flt>::mantissa_type decimal_mantissa, ::std::int_least32_t decimal_exponent,
+	typename iec559_traits<flt>::mantissa_type binary_mantissa, ::std::int_least32_t binary_exponent) noexcept
+{
+	dragonbox_decimal_adjusted_mantissa adjusted;
+	if (!::fast_io::details::dragonbox_decimal_compute_adjusted<flt>(decimal_exponent, decimal_mantissa, adjusted))
+	{
+		return false;
+	}
+	return adjusted.mantissa == binary_mantissa && adjusted.power2 == binary_exponent;
+}
+
+template <typename flt>
+inline constexpr void dragonbox_correct_shortest_roundtrip(typename iec559_traits<flt>::mantissa_type &m10,
+														   ::std::int_least32_t &e10,
+														   typename iec559_traits<flt>::mantissa_type m2,
+														   ::std::int_least32_t e2) noexcept
+{
+	if constexpr (sizeof(flt) == sizeof(::std::uint_least32_t) || sizeof(flt) == sizeof(::std::uint_least64_t))
+	{
+		if (::fast_io::details::dragonbox_decimal_roundtrips_to<flt>(m10, e10, m2, e2))
+		{
+			return;
+		}
+		auto const next{static_cast<typename iec559_traits<flt>::mantissa_type>(m10 + 1u)};
+		if (::fast_io::details::dragonbox_decimal_roundtrips_to<flt>(next, e10, m2, e2))
+		{
+			m10 = next;
+			return;
+		}
+		if (m10)
+		{
+			auto const previous{static_cast<typename iec559_traits<flt>::mantissa_type>(m10 - 1u)};
+			if (::fast_io::details::dragonbox_decimal_roundtrips_to<flt>(previous, e10, m2, e2))
+			{
+				m10 = previous;
+				return;
+			}
+		}
+		auto extended_base{m10};
+		typename iec559_traits<flt>::mantissa_type add_limit{1u};
+		auto extended_exponent{e10};
+		for (::std::uint_least32_t extension{}; extension != 3u; ++extension)
+		{
+			auto const next_base{static_cast<typename iec559_traits<flt>::mantissa_type>(extended_base * 10u)};
+			if (next_base / 10u != extended_base)
+			{
+				break;
+			}
+			extended_base = next_base;
+			add_limit = static_cast<typename iec559_traits<flt>::mantissa_type>(add_limit * 10u);
+			--extended_exponent;
+			for (typename iec559_traits<flt>::mantissa_type add{}; add != add_limit; ++add)
+			{
+				auto const extended{static_cast<typename iec559_traits<flt>::mantissa_type>(extended_base + add)};
+				if (::fast_io::details::dragonbox_decimal_roundtrips_to<flt>(extended, extended_exponent, m2, e2))
+				{
+					m10 = extended;
+					e10 = extended_exponent;
+					return;
+				}
+			}
+		}
+	}
+}
+
 template <typename flt>
 #if __has_cpp_attribute(__gnu__::__pure__)
 [[__gnu__::__pure__]]
@@ -418,6 +662,7 @@ inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
 dragonbox_impl(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2) noexcept
 {
 	auto [m10, e10] = dragonbox_main<flt>(m2, e2);
+	::fast_io::details::dragonbox_correct_shortest_roundtrip<flt>(m10, e10, m2, e2);
 	// m10 should not ==0
 	auto [v, n] = ::fast_io::bitops::rtz_iec559(m10);
 	e10 += static_cast<::std::int_least32_t>(static_cast<::std::uint_least32_t>(n));

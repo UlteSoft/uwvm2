@@ -58,12 +58,26 @@ template <::std::integral char_type>
 {
 	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
 	auto uch{static_cast<unsigned_char_type>(ch)};
-	if (::fast_io::details::char_digit_to_literal<10, char_type>(uch))
+	if constexpr (sizeof(char_type) == sizeof(char8_t) && !::fast_io::details::is_ebcdic<char_type>)
 	{
-		return false;
+		constexpr auto zero{static_cast<unsigned_char_type>(::fast_io::char_literal_v<u8'0', char_type>)};
+		auto const value{static_cast<unsigned_char_type>(uch - zero)};
+		if (value < 10u)
+		{
+			digit = static_cast<char8_t>(value);
+			return true;
+		}
 	}
-	digit = static_cast<char8_t>(uch);
-	return true;
+	else
+	{
+		if (::fast_io::details::char_digit_to_literal<10, char_type>(uch))
+		{
+			return false;
+		}
+		digit = static_cast<char8_t>(uch);
+		return true;
+	}
+	return false;
 }
 
 template <char8_t lower, char8_t upper, ::std::integral char_type>
@@ -141,7 +155,7 @@ scan_hexfloat_special_value(char_type const *first, char_type const *end, bool n
 		{
 			iter += 5;
 		}
-		value = ::fast_io::details::fp_make_infinity<T>(negative);
+		::fast_io::details::fp_assign_infinity(value, negative);
 		return {iter, ::fast_io::parse_code::ok, true};
 	}
 	if (::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(*first))
@@ -183,15 +197,15 @@ scan_hexfloat_special_value(char_type const *first, char_type const *end, bool n
 		}
 		if (indeterminate)
 		{
-			value = ::fast_io::details::fp_make_nan<T, false, true>(true);
+			::fast_io::details::fp_assign_nan<T, false, true>(value, true);
 		}
 		else if (signaling)
 		{
-			value = ::fast_io::details::fp_make_nan<T, true, false>(nan_parse_sign && negative);
+			::fast_io::details::fp_assign_nan<T, true, false>(value, nan_parse_sign && negative);
 		}
 		else
 		{
-			value = ::fast_io::details::fp_make_nan<T, false, false>(nan_parse_sign && negative);
+			::fast_io::details::fp_assign_nan<T, false, false>(value, nan_parse_sign && negative);
 		}
 		return {iter, ::fast_io::parse_code::ok, true};
 	}

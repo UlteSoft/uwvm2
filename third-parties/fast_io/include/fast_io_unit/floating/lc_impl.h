@@ -68,18 +68,18 @@ inline constexpr ::std::size_t lc_print_reserve_float_size_impl(basic_lc_all<cha
 		{
 			return lc_print_rsv_iec559_size<char_type, double, flags.floating, flags.nan_show_type>(all);
 		}
-		static_assert((::std::same_as<::std::remove_cvref_t<flt>, double> ||
-					   ::std::same_as<::std::remove_cvref_t<flt>, float>
-#ifdef __STDCPP_FLOAT32_T__
-					   || ::std::same_as<::std::remove_cvref_t<flt>, _Float32>
-#endif
-#ifdef __STDCPP_FLOAT64_T__
-					   || ::std::same_as<::std::remove_cvref_t<flt>, _Float64>
-#endif
-					   ),
-					  "currently only support iec559 float32 and float64, sorry");
-		return lc_print_rsv_iec559_size<char_type, ::std::remove_cvref_t<flt>, flags.floating, flags.nan_show_type>(
-			all);
+		else if constexpr (::fast_io::details::print_floating_decimal_via_float<flt>)
+		{
+			return lc_print_rsv_iec559_size<char_type, float, flags.floating, flags.nan_show_type>(all);
+		}
+		else
+		{
+			static_assert(::fast_io::details::print_floating_decimal_direct_supported<flt>,
+						  "currently only support iec559 float32 and float64 decimal output; narrower IEC559 "
+						  "formats are printed through float");
+			return lc_print_rsv_iec559_size<char_type, ::std::remove_cvref_t<flt>, flags.floating, flags.nan_show_type>(
+				all);
+		}
 	}
 }
 
@@ -113,6 +113,17 @@ inline constexpr char_type *print_reserve_define(basic_lc_all<char_type> const *
 #endif
 		)
 		{
+#ifdef __SIZEOF_FLOAT80__
+			if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double> && sizeof(flt) == sizeof(__float80) &&
+						  sizeof(flt) > sizeof(double))
+			{
+				return ::fast_io::details::lc_print_rsvhexfloat_define_impl<
+					flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
+					flags.nan_show_sign, flags.nan_show_type>(
+					iter, static_cast<__float80>(f.reference), decimal_point.base, decimal_point.len);
+			}
+			else
+#endif
 #if (defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)) && defined(__SIZEOF_INT128__)
 			if constexpr (sizeof(flt) > sizeof(double))
 			{
@@ -146,19 +157,19 @@ inline constexpr char_type *print_reserve_define(basic_lc_all<char_type> const *
 																   flags.nan_show_type>(
 				all, iter, static_cast<double>(f.reference));
 		}
+		else if constexpr (::fast_io::details::print_floating_decimal_via_float<flt>)
+		{
+			return ::fast_io::details::lc_print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e,
+																   flags.floating, flags.nan_show_sign,
+																   flags.nan_show_type>(
+				all, iter, static_cast<float>(f.reference));
+		}
 		else
 		{
 			// this is the case for every other platform, including xxx-windows-gnu
-			static_assert((::std::same_as<::std::remove_cvref_t<flt>, double> ||
-						   ::std::same_as<::std::remove_cvref_t<flt>, float>
-#ifdef __STDCPP_FLOAT32_T__
-						   || ::std::same_as<::std::remove_cvref_t<flt>, _Float32>
-#endif
-#ifdef __STDCPP_FLOAT64_T__
-						   || ::std::same_as<::std::remove_cvref_t<flt>, _Float64>
-#endif
-						   ),
-						  "currently only support iec559 float32 and float64, sorry");
+			static_assert(::fast_io::details::print_floating_decimal_direct_supported<flt>,
+						  "currently only support iec559 float32 and float64 decimal output; narrower IEC559 "
+						  "formats are printed through float");
 			return ::fast_io::details::lc_print_rsvflt_define_impl<flags.showpos, flags.uppercase, flags.uppercase_e,
 																   flags.floating, flags.nan_show_sign,
 																   flags.nan_show_type>(all, iter, f.reference);
