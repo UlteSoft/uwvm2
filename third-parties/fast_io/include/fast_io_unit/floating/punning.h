@@ -499,10 +499,69 @@ inline constexpr bool fp_nan_is_signaling(mantissa_type mantissa) noexcept
 	return mantissa != 0 && (mantissa & fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()) == 0;
 }
 
+#ifdef __SIZEOF_FLOAT80__
+template <typename flt>
+inline constexpr bool fp_floating_point_is_float80{
+	::std::same_as<::std::remove_cv_t<flt>, __float80> ||
+	(::std::same_as<::std::remove_cv_t<flt>, long double> &&
+	 sizeof(long double) == sizeof(__float80) && ::std::numeric_limits<long double>::digits == 64 &&
+	 ::std::numeric_limits<long double>::max_exponent == 16384)};
+
+template <typename flt>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void fp_assign_float80_bits(flt &value, ::std::uint_least64_t mantissa,
+											 ::std::uint_least32_t exponent, bool sign) noexcept
+	requires(::fast_io::details::fp_floating_point_is_float80<flt>)
+{
+	static_assert(sizeof(flt) >= sizeof(::std::uint_least64_t) + sizeof(::std::uint_least16_t));
+	static_assert(::std::endian::native == ::std::endian::little,
+				  "fast_io float80 bit assignment currently supports only little-endian x87 storage");
+	struct storage_type
+	{
+		unsigned char bytes[sizeof(flt)];
+	};
+	static_assert(sizeof(storage_type) == sizeof(flt));
+	storage_type storage{};
+	auto const exponent_bits{
+		static_cast<::std::uint_least16_t>((sign ? 0x8000u : 0u) | (exponent & 0x7fffu))};
+	for (::std::size_t index{}; index != sizeof(::std::uint_least64_t); ++index)
+	{
+		storage.bytes[index] = static_cast<unsigned char>(mantissa >> (index * 8u));
+	}
+	storage.bytes[8] = static_cast<unsigned char>(exponent_bits);
+	storage.bytes[9] = static_cast<unsigned char>(exponent_bits >> 8u);
+	if (__builtin_is_constant_evaluated())
+	{
+		value = ::fast_io::bit_cast<flt>(storage);
+	}
+	else
+	{
+#if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
+		__builtin_memcpy
+#else
+		::std::memcpy
+#endif
+			(__builtin_addressof(value), __builtin_addressof(storage), sizeof(flt));
+	}
+}
+#else
+template <typename flt>
+inline constexpr bool fp_floating_point_is_float80{};
+
+template <typename flt>
+inline constexpr void fp_assign_float80_bits(flt &, ::std::uint_least64_t, ::std::uint_least32_t, bool) noexcept = delete;
+#endif
+
 template <typename flt>
 inline constexpr void fp_assign_bits(flt &value, typename iec559_traits<flt>::mantissa_type bits) noexcept
 {
 	using mantissa_type = typename iec559_traits<flt>::mantissa_type;
+	static_assert(!::fast_io::details::fp_floating_point_is_float80<flt>,
+				  "use fp_assign_float80_bits for IEC 60559 extended precision");
 	static_assert(sizeof(flt) == sizeof(mantissa_type));
 	if (__builtin_is_constant_evaluated())
 	{
@@ -526,13 +585,21 @@ inline constexpr void fp_assign_infinity(flt &value, bool sign) noexcept
 	using mantissa_type = typename trait::mantissa_type;
 	constexpr ::std::size_t mbits{trait::mbits};
 	constexpr ::std::size_t ebits{trait::ebits};
-	constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
-	mantissa_type bits{static_cast<mantissa_type>(exponent_mask << mbits)};
-	if (sign)
+	if constexpr (::fast_io::details::fp_floating_point_is_float80<flt>)
 	{
-		bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		::fast_io::details::fp_assign_float80_bits(value, ::std::uint_least64_t{1} << mbits,
+												   (static_cast<::std::uint_least32_t>(1u) << ebits) - 1u, sign);
 	}
-	::fast_io::details::fp_assign_bits(value, bits);
+	else
+	{
+		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+		mantissa_type bits{static_cast<mantissa_type>(exponent_mask << mbits)};
+		if (sign)
+		{
+			bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		}
+		::fast_io::details::fp_assign_bits(value, bits);
+	}
 }
 
 template <typename flt, bool signaling = false, bool indeterminate = false>
@@ -544,13 +611,25 @@ inline constexpr void fp_assign_nan(flt &value, bool sign) noexcept
 	constexpr ::std::size_t ebits{trait::ebits};
 	constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
 	constexpr mantissa_type quiet_bit{fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()};
-	mantissa_type mantissa{signaling ? static_cast<mantissa_type>(1) : quiet_bit};
-	mantissa_type bits{static_cast<mantissa_type>((exponent_mask << mbits) | mantissa)};
-	if (sign || indeterminate)
+	if constexpr (::fast_io::details::fp_floating_point_is_float80<flt>)
 	{
-		bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		constexpr auto explicit_integer_bit{::std::uint_least64_t{1} << mbits};
+		::std::uint_least64_t mantissa{explicit_integer_bit |
+									   (signaling ? ::std::uint_least64_t{1}
+												  : static_cast<::std::uint_least64_t>(quiet_bit))};
+		::fast_io::details::fp_assign_float80_bits(value, mantissa, static_cast<::std::uint_least32_t>(exponent_mask),
+												   sign || indeterminate);
 	}
-	::fast_io::details::fp_assign_bits(value, bits);
+	else
+	{
+		mantissa_type mantissa{signaling ? static_cast<mantissa_type>(1) : quiet_bit};
+		mantissa_type bits{static_cast<mantissa_type>((exponent_mask << mbits) | mantissa)};
+		if (sign || indeterminate)
+		{
+			bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		}
+		::fast_io::details::fp_assign_bits(value, bits);
+	}
 }
 
 template <typename flt>

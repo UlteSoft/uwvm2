@@ -212,26 +212,47 @@ scan_hexfloat_special_value(char_type const *first, char_type const *end, bool n
 	return {};
 }
 
+template <typename storage_type_t>
 struct scan_hexfloat_significand_state
 {
+	using storage_type = storage_type_t;
 	bool has_digit{};
 	bool has_nonzero_digit{};
-	::std::uint_least64_t stored{};
+	storage_type stored{};
 	::std::size_t stored_hex_digits{};
 	::std::int_least64_t significant_hex_digits{};
 	::std::int_least64_t fractional_hex_digits{};
 	bool truncated_nonzero{};
 };
 
-template <::std::size_t stored_hex_digits_limit>
+template <::std::size_t precision_bits>
+struct scan_hexfloat_storage_type
+{
+	inline static constexpr ::std::size_t stored_hex_digits_limit{(precision_bits + 7u) / 4u};
+#ifdef __SIZEOF_INT128__
+	using type = ::std::conditional_t<
+		(stored_hex_digits_limit * 4u <= ::std::numeric_limits<::std::uint_least64_t>::digits),
+		::std::uint_least64_t, __uint128_t>;
+#else
+	static_assert(stored_hex_digits_limit * 4u <= ::std::numeric_limits<::std::uint_least64_t>::digits,
+				  "fast_io hexfloat scan needs 128-bit integer support for this floating-point type");
+	using type = ::std::uint_least64_t;
+#endif
+};
+
+template <::std::size_t precision_bits>
+using scan_hexfloat_storage_t = typename ::fast_io::details::scan_hexfloat_storage_type<precision_bits>::type;
+
+template <::std::size_t stored_hex_digits_limit, typename state_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
 [[msvc::forceinline]]
 #endif
-inline constexpr void scan_hexfloat_append_digit(scan_hexfloat_significand_state &state, bool after_decimal,
+inline constexpr void scan_hexfloat_append_digit(state_type &state, bool after_decimal,
 												 char8_t digit) noexcept
 {
+	using storage_type = typename state_type::storage_type;
 	state.has_digit = true;
 	if (after_decimal)
 	{
@@ -248,7 +269,7 @@ inline constexpr void scan_hexfloat_append_digit(scan_hexfloat_significand_state
 	++state.significant_hex_digits;
 	if (state.stored_hex_digits != stored_hex_digits_limit)
 	{
-		state.stored = (state.stored << 4u) | digit;
+		state.stored = static_cast<storage_type>((state.stored << 4u) | static_cast<storage_type>(digit));
 		++state.stored_hex_digits;
 	}
 	else if (digit != 0u)
@@ -305,16 +326,17 @@ inline constexpr void scan_hexfloat_ascii8_pack(::std::uint_least64_t val, ::std
 	return true;
 }
 
-template <::std::size_t stored_hex_digits_limit>
+template <::std::size_t stored_hex_digits_limit, typename state_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
 [[msvc::forceinline]]
 #endif
-inline constexpr void scan_hexfloat_append_ascii8(scan_hexfloat_significand_state &state, bool after_decimal,
+inline constexpr void scan_hexfloat_append_ascii8(state_type &state, bool after_decimal,
 												  ::std::uint_least64_t nibbles,
 												  ::std::uint_least64_t packed) noexcept
 {
+	using storage_type = typename state_type::storage_type;
 	state.has_digit = true;
 	if (after_decimal)
 	{
@@ -343,13 +365,17 @@ inline constexpr void scan_hexfloat_append_ascii8(scan_hexfloat_significand_stat
 	auto available{stored_hex_digits_limit - state.stored_hex_digits};
 	if (significant_digits <= available)
 	{
-		state.stored = (state.stored << static_cast<unsigned>(significant_digits * 4u)) | packed;
+		state.stored = static_cast<storage_type>(
+			(state.stored << static_cast<unsigned>(significant_digits * 4u)) |
+			static_cast<storage_type>(packed));
 		state.stored_hex_digits += static_cast<::std::size_t>(significant_digits);
 		return;
 	}
 	auto const truncated_digits{significant_digits - available};
 	auto const truncated_bits{static_cast<unsigned>(truncated_digits * 4u)};
-	state.stored = (state.stored << static_cast<unsigned>(available * 4u)) | (packed >> truncated_bits);
+	state.stored = static_cast<storage_type>(
+		(state.stored << static_cast<unsigned>(available * 4u)) |
+		static_cast<storage_type>(packed >> truncated_bits));
 	state.stored_hex_digits = stored_hex_digits_limit;
 	if ((packed & ((::std::uint_least64_t{1} << truncated_bits) - 1u)) != 0)
 	{
@@ -357,7 +383,7 @@ inline constexpr void scan_hexfloat_append_ascii8(scan_hexfloat_significand_stat
 	}
 }
 
-template <::std::size_t stored_hex_digits_limit, ::std::integral char_type>
+template <::std::size_t stored_hex_digits_limit, ::std::integral char_type, typename state_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -365,7 +391,7 @@ template <::std::size_t stored_hex_digits_limit, ::std::integral char_type>
 #endif
 inline constexpr char_type const *scan_hexfloat_significand_run(char_type const *first, char_type const *last,
 																bool after_decimal,
-																scan_hexfloat_significand_state &state) noexcept
+																state_type &state) noexcept
 {
 #ifdef __cpp_if_consteval
 	if !consteval
@@ -456,16 +482,74 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 	return {first, ::fast_io::parse_code::ok};
 }
 
-[[nodiscard]] inline constexpr ::std::uint_least64_t scan_hexfloat_round_shift(::std::uint_least64_t stored,
-																			   ::std::int_least64_t remaining_bits,
-																			   bool truncated_nonzero,
-																			   ::std::int_least64_t shift) noexcept
+template <::fast_io::details::my_unsigned_integral storage_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr ::std::int_least64_t scan_hexfloat_bit_width(storage_type stored) noexcept
 {
-	auto const stored_bits{static_cast<::std::int_least64_t>(::std::bit_width(stored))};
+	if constexpr (sizeof(storage_type) <= sizeof(::std::uint_least64_t))
+	{
+		return static_cast<::std::int_least64_t>(
+			::std::bit_width(static_cast<::std::uint_least64_t>(stored)));
+	}
+#ifdef __SIZEOF_INT128__
+	else
+	{
+		auto const high{static_cast<::std::uint_least64_t>(stored >> 64u)};
+		if (high != 0)
+		{
+			return static_cast<::std::int_least64_t>(64u + ::std::bit_width(high));
+		}
+		return static_cast<::std::int_least64_t>(
+			::std::bit_width(static_cast<::std::uint_least64_t>(stored)));
+	}
+#endif
+}
+
+template <::fast_io::details::my_unsigned_integral storage_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr storage_type scan_hexfloat_low_mask(::std::int_least64_t bits) noexcept
+{
+	constexpr auto storage_bits{static_cast<::std::int_least64_t>(sizeof(storage_type) *
+																 ::std::numeric_limits<unsigned char>::digits)};
+	if (bits <= 0)
+	{
+		return {};
+	}
+	if (bits >= storage_bits)
+	{
+		return static_cast<storage_type>(~storage_type{});
+	}
+	return static_cast<storage_type>((storage_type{1} << static_cast<unsigned>(bits)) - storage_type{1});
+}
+
+template <::fast_io::details::my_unsigned_integral storage_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+[[nodiscard]] inline constexpr storage_type scan_hexfloat_round_shift(storage_type stored,
+																	  ::std::int_least64_t remaining_bits,
+																	  bool truncated_nonzero,
+																	  ::std::int_least64_t shift) noexcept
+{
+	constexpr auto storage_bits{static_cast<::std::int_least64_t>(sizeof(storage_type) *
+																 ::std::numeric_limits<unsigned char>::digits)};
+	auto const stored_bits{::fast_io::details::scan_hexfloat_bit_width(stored)};
 	if (shift <= 0)
 	{
 		auto const left_shift{remaining_bits - shift};
-		return left_shift >= 64 ? 0u : stored << static_cast<unsigned>(left_shift);
+		return left_shift >= storage_bits
+				   ? storage_type{}
+				   : static_cast<storage_type>(stored << static_cast<unsigned>(left_shift));
 	}
 
 	auto const shift_in_stored{shift - remaining_bits};
@@ -478,13 +562,13 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 		return 0u;
 	}
 
-	::std::uint_least64_t quotient{};
+	storage_type quotient{};
 	bool half{};
 	bool below_half{truncated_nonzero};
 	if (shift_in_stored == stored_bits)
 	{
 		half = true;
-		auto const below_mask{(::std::uint_least64_t{1} << static_cast<unsigned>(stored_bits - 1)) - 1u};
+		auto const below_mask{::fast_io::details::scan_hexfloat_low_mask<storage_type>(stored_bits - 1)};
 		below_half = below_half || (stored & below_mask) != 0u;
 	}
 	else
@@ -493,7 +577,7 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 		half = ((stored >> static_cast<unsigned>(shift_in_stored - 1)) & 1u) != 0u;
 		if (shift_in_stored > 1)
 		{
-			auto const below_mask{(::std::uint_least64_t{1} << static_cast<unsigned>(shift_in_stored - 1)) - 1u};
+			auto const below_mask{::fast_io::details::scan_hexfloat_low_mask<storage_type>(shift_in_stored - 1)};
 			below_half = below_half || (stored & below_mask) != 0u;
 		}
 	}
@@ -504,9 +588,14 @@ scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int
 	return quotient;
 }
 
-template <typename T>
+template <typename T, ::fast_io::details::my_unsigned_integral storage_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value, bool negative,
-																		::std::uint_least64_t stored,
+																		storage_type stored,
 																		::std::size_t stored_hex_digits,
 																		::std::int_least64_t significant_hex_digits,
 																		bool truncated_nonzero,
@@ -517,14 +606,15 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 	constexpr ::std::size_t mbits{trait::mbits};
 	constexpr ::std::size_t ebits{trait::ebits};
 	constexpr ::std::size_t precision_bits{mbits + 1u};
-	static_assert(precision_bits <= 60u);
+	static_assert(precision_bits <= sizeof(storage_type) * ::std::numeric_limits<unsigned char>::digits);
+	static_assert(sizeof(mantissa_type) <= sizeof(storage_type));
 	constexpr auto bias{static_cast<::std::int_least64_t>((static_cast<::std::uint_least32_t>(1u) << ebits) >> 1u) - 1};
 	constexpr auto min_exponent{1 - bias};
 	constexpr auto max_exponent{bias};
 	constexpr auto int64_max{(::std::numeric_limits<::std::int_least64_t>::max)()};
 	constexpr auto int64_min{(::std::numeric_limits<::std::int_least64_t>::min)()};
 
-	auto const stored_bits{static_cast<::std::int_least64_t>(::std::bit_width(stored))};
+	auto const stored_bits{::fast_io::details::scan_hexfloat_bit_width(stored)};
 	auto const remaining_bits{(significant_hex_digits - static_cast<::std::int_least64_t>(stored_hex_digits)) * 4};
 	auto const total_bits{stored_bits + remaining_bits};
 	auto const exponent_offset{total_bits - 1};
@@ -537,50 +627,98 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 		return ::fast_io::parse_code::overflow;
 	}
 
-	mantissa_type result_bits{};
-	if (negative)
+	if constexpr (::fast_io::details::fp_floating_point_is_float80<T>)
 	{
-		result_bits = static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
-	}
-
-	if (exponent2 >= min_exponent)
-	{
-		auto significand{::fast_io::details::scan_hexfloat_round_shift(
-			stored, remaining_bits, truncated_nonzero, total_bits - static_cast<::std::int_least64_t>(precision_bits))};
-		if (significand == (::std::uint_least64_t{1} << precision_bits))
+		if (exponent2 >= min_exponent)
 		{
-			significand >>= 1u;
-			if (exponent2 == max_exponent)
+			auto significand{::fast_io::details::scan_hexfloat_round_shift(
+				stored, remaining_bits, truncated_nonzero,
+				total_bits - static_cast<::std::int_least64_t>(precision_bits))};
+			auto exponent_field{static_cast<::std::uint_least32_t>(exponent2 + bias)};
+			if (significand == static_cast<storage_type>(storage_type{1} << precision_bits))
 			{
-				return ::fast_io::parse_code::overflow;
+				significand >>= 1u;
+				if (exponent2 == max_exponent)
+				{
+					return ::fast_io::parse_code::overflow;
+				}
+				++exponent_field;
 			}
-			result_bits |= static_cast<mantissa_type>((exponent2 + 1 + bias) << mbits);
+			::fast_io::details::fp_assign_float80_bits(value, static_cast<::std::uint_least64_t>(significand),
+													   exponent_field, negative);
+			return ::fast_io::parse_code::ok;
+		}
+
+		auto const subnormal_shift{(min_exponent - static_cast<::std::int_least64_t>(mbits)) - binary_exponent};
+		auto const fraction{
+			::fast_io::details::scan_hexfloat_round_shift(stored, remaining_bits, truncated_nonzero, subnormal_shift)};
+		if (fraction == 0u)
+		{
+			return ::fast_io::parse_code::overflow;
+		}
+		if (fraction >= static_cast<storage_type>(storage_type{1} << mbits))
+		{
+			::fast_io::details::fp_assign_float80_bits(value, ::std::uint_least64_t{1} << mbits, 1u, negative);
 		}
 		else
 		{
-			result_bits |= static_cast<mantissa_type>((exponent2 + bias) << mbits);
+			::fast_io::details::fp_assign_float80_bits(value, static_cast<::std::uint_least64_t>(fraction), 0u,
+													   negative);
 		}
-		result_bits |= static_cast<mantissa_type>(significand - (::std::uint_least64_t{1} << mbits));
-		value = ::fast_io::bit_cast<T>(result_bits);
 		return ::fast_io::parse_code::ok;
-	}
-
-	auto const subnormal_shift{(min_exponent - static_cast<::std::int_least64_t>(mbits)) - binary_exponent};
-	auto const fraction{::fast_io::details::scan_hexfloat_round_shift(stored, remaining_bits, truncated_nonzero, subnormal_shift)};
-	if (fraction == 0u)
-	{
-		return ::fast_io::parse_code::overflow;
-	}
-	if (fraction >= (::std::uint_least64_t{1} << mbits))
-	{
-		result_bits |= static_cast<mantissa_type>(mantissa_type{1} << mbits);
 	}
 	else
 	{
-		result_bits |= static_cast<mantissa_type>(fraction);
+		mantissa_type result_bits{};
+		if (negative)
+		{
+			result_bits = static_cast<mantissa_type>(mantissa_type{1} << (mbits + ebits));
+		}
+
+		if (exponent2 >= min_exponent)
+		{
+			auto significand{::fast_io::details::scan_hexfloat_round_shift(
+				stored, remaining_bits, truncated_nonzero,
+				total_bits - static_cast<::std::int_least64_t>(precision_bits))};
+			if (significand == static_cast<storage_type>(storage_type{1} << precision_bits))
+			{
+				significand >>= 1u;
+				if (exponent2 == max_exponent)
+				{
+					return ::fast_io::parse_code::overflow;
+				}
+				result_bits |= static_cast<mantissa_type>(
+					static_cast<mantissa_type>(static_cast<::std::uint_least64_t>(exponent2 + 1 + bias)) << mbits);
+			}
+			else
+			{
+				result_bits |= static_cast<mantissa_type>(
+					static_cast<mantissa_type>(static_cast<::std::uint_least64_t>(exponent2 + bias)) << mbits);
+			}
+			result_bits |=
+				static_cast<mantissa_type>(significand - static_cast<storage_type>(storage_type{1} << mbits));
+			::fast_io::details::fp_assign_bits(value, result_bits);
+			return ::fast_io::parse_code::ok;
+		}
+
+		auto const subnormal_shift{(min_exponent - static_cast<::std::int_least64_t>(mbits)) - binary_exponent};
+		auto const fraction{
+			::fast_io::details::scan_hexfloat_round_shift(stored, remaining_bits, truncated_nonzero, subnormal_shift)};
+		if (fraction == 0u)
+		{
+			return ::fast_io::parse_code::overflow;
+		}
+		if (fraction >= static_cast<storage_type>(storage_type{1} << mbits))
+		{
+			result_bits |= static_cast<mantissa_type>(mantissa_type{1} << mbits);
+		}
+		else
+		{
+			result_bits |= static_cast<mantissa_type>(fraction);
+		}
+		::fast_io::details::fp_assign_bits(value, result_bits);
+		return ::fast_io::parse_code::ok;
 	}
-	value = ::fast_io::bit_cast<T>(result_bits);
-	return ::fast_io::parse_code::ok;
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -596,6 +734,8 @@ scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type co
 	using trait = ::fast_io::details::iec559_traits<T>;
 	constexpr ::std::size_t precision_bits{trait::mbits + 1u};
 	constexpr ::std::size_t stored_hex_digits_limit{(precision_bits + 7u) / 4u};
+	using storage_type = ::fast_io::details::scan_hexfloat_storage_t<precision_bits>;
+	static_assert(stored_hex_digits_limit * 4u <= sizeof(storage_type) * ::std::numeric_limits<unsigned char>::digits);
 	auto first{begin};
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
 	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
@@ -633,7 +773,7 @@ scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type co
 		first += 2;
 	}
 
-	::fast_io::details::scan_hexfloat_significand_state significand_state;
+	::fast_io::details::scan_hexfloat_significand_state<storage_type> significand_state;
 	first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, false,
 																					   significand_state);
 
@@ -694,6 +834,8 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 	using trait = ::fast_io::details::iec559_traits<T>;
 	constexpr ::std::size_t precision_bits{trait::mbits + 1u};
 	constexpr ::std::size_t stored_hex_digits_limit{(precision_bits + 7u) / 4u};
+	using storage_type = ::fast_io::details::scan_hexfloat_storage_t<precision_bits>;
+	static_assert(stored_hex_digits_limit * 4u <= sizeof(storage_type) * ::std::numeric_limits<unsigned char>::digits);
 	auto first{begin};
 	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
 	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
@@ -731,7 +873,7 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		first += 2;
 	}
 
-	::fast_io::details::scan_hexfloat_significand_state significand_state;
+	::fast_io::details::scan_hexfloat_significand_state<storage_type> significand_state;
 	first = ::fast_io::details::scan_hexfloat_significand_run<stored_hex_digits_limit>(first, end, false,
 																					   significand_state);
 
