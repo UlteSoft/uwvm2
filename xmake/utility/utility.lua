@@ -508,8 +508,8 @@ function get_sysroot_option()
     -- Check for a given sysroot or auto-detect sysroot.
     sysroot = get_config("sysroot")
     local detect = sysroot == "detect"
-    -- The specified sysroot if sysroot is not “no” or “detect”.
-    sysroot = (sysroot ~= "no" and not detect) and sysroot or nil
+    -- The specified sysroot if sysroot is not “none”/“no” or “detect”.
+    sysroot = (sysroot ~= "none" and sysroot ~= "no" and not detect) and sysroot or nil
     -- If the clang toolchain is used and sysroot is not specified, then autoprobe is attempted.
     detect = detect and common.is_clang()
     cache_info["sysroot_set_by_user"] = sysroot and true or false

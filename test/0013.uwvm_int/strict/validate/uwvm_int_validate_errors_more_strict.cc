@@ -630,7 +630,7 @@ namespace
         func_type ty{{}, {}};
         func_body fb{};
         op(fb.code, wasm_op::memory_size);
-        append_u8(fb.code, 0x80u);  // truncated leb (will be truncated at runtime)
+        append_u8(fb.code, 0x00u);  // reserved memidx; code_end is truncated before this byte at runtime
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
 
@@ -648,7 +648,7 @@ namespace
         func_type ty{{}, {}};
         func_body fb{};
         op(fb.code, wasm_op::memory_grow);
-        append_u8(fb.code, 0x80u);  // truncated leb (will be truncated at runtime)
+        append_u8(fb.code, 0x00u);  // reserved memidx; code_end is truncated before this byte at runtime
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
 
@@ -1296,11 +1296,11 @@ namespace
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memory_size_index_module(),
                                                            u8"uwvm2test_validate_invalid_memory_size_idx",
                                                            errc::invalid_memory_index,
-                                                           2uz) == 0);
+                                                           1uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memory_grow_index_module(),
                                                            u8"uwvm2test_validate_invalid_memory_grow_idx",
                                                            errc::invalid_memory_index,
-                                                           2uz) == 0);
+                                                           1uz) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_illegal_memory_size_index_module(), u8"uwvm2test_validate_illegal_memory_size_idx", errc::illegal_memory_index) == 0);
         UWVM2TEST_REQUIRE(
