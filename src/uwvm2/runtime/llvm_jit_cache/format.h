@@ -169,7 +169,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                 ::std::byte{'J'},
                                                 ::std::byte{'C'},
                                                 ::std::byte{0x01u}};
-    inline constexpr ::std::uint_least32_t cache_format_version{3u};
+    inline constexpr ::std::uint_least32_t cache_format_version{4u};
     inline constexpr ::std::size_t cache_fixed_header_size{64uz};
     inline constexpr ::std::size_t cache_sha256_digest_size{32uz};
     inline constexpr ::std::size_t cache_ed25519_signature_size{64uz};
