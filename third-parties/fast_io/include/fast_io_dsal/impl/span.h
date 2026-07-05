@@ -8,7 +8,7 @@ class span
 {
 public:
 	using element_type = T;
-	using value_type = std::remove_cv_t<element_type>;
+	using value_type = ::std::remove_cv_t<element_type>;
 	using size_type = ::std::size_t;
 	using difference_type = ::std::ptrdiff_t;
 	using pointer = element_type *;
@@ -31,20 +31,21 @@ public:
 #endif
 	pointer ptr{};
 	size_type n{};
-	inline constexpr span() noexcept = default;
+	inline constexpr explicit span() noexcept = default;
 	template <::std::contiguous_iterator Iter>
 		requires ::std::same_as<value_type, ::std::iter_value_t<Iter>>
-	inline constexpr span(Iter first, size_type count) noexcept(noexcept(::std::to_address(first)))
+	inline constexpr explicit span(Iter first, size_type count) noexcept(noexcept(::std::to_address(first)))
 		: ptr{::std::to_address(first)}, n{count}
 	{}
 	template <::std::contiguous_iterator Iter, ::std::sentinel_for<Iter> S>
 		requires ::std::same_as<value_type, ::std::iter_value_t<Iter>>
-	inline constexpr span(Iter first, S snt) noexcept(noexcept(::std::to_address(first)))
+	inline constexpr explicit span(Iter first, S snt) noexcept(noexcept(::std::to_address(first)))
 		: ptr{::std::to_address(first)}, n{static_cast<size_type>(snt - first)}
 	{}
 	template <::std::ranges::contiguous_range R>
-		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>> && !::std::same_as<::std::remove_cvref_t<R>, ::fast_io::containers::span<element_type>>)
-	inline constexpr span(R &&range) noexcept(noexcept(::std::ranges::data(range)) && noexcept(::std::ranges::size(range)))
+		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>> &&
+				 !::std::is_rvalue_reference_v<R &&>)
+	inline constexpr explicit span(::fast_io::freestanding::from_range_t, R &&range) noexcept(noexcept(::std::ranges::data(range)) && noexcept(::std::ranges::size(range)))
 		: ptr{::std::ranges::data(range)}, n{::std::ranges::size(range)}
 	{}
 
@@ -335,7 +336,7 @@ inline constexpr ::fast_io::containers::span<::std::byte> as_writable_bytes(::fa
 }
 
 template <::std::ranges::contiguous_range R>
-span(R &&r) -> span<::std::remove_reference_t<::std::ranges::range_reference_t<R>>>;
+span(::fast_io::freestanding::from_range_t, R &&r) -> span<::std::remove_reference_t<::std::ranges::range_reference_t<R>>>;
 
 template <typename T>
 	requires ::std::equality_comparable<T>

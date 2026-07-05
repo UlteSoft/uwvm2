@@ -58,7 +58,7 @@ struct aes
 {
 	inline static constexpr ::std::size_t block_size = 16;
 	inline static constexpr ::std::size_t key_size = keysize;
-	inline static constexpr ::std::size_t key_schedule_size = keysize == 16 ? 10 : (keysize == 24 ? 12 : 15);
+	inline static constexpr ::std::size_t key_schedule_size = keysize == 16 ? 11 : (keysize == 24 ? 13 : 15);
 	__m128i key_schedule[key_schedule_size];
 	inline explicit aes(::std::span<::std::byte const, key_size> key_span) noexcept
 	{
@@ -135,9 +135,49 @@ struct aes
 			key_schedule[13] = aes_256_key_exp_2(key_schedule[11], key_schedule[12]);
 			key_schedule[14] = aes_256_key_exp(key_schedule[12], key_schedule[13], 0x40);
 		}
+		if constexpr (decrypt)
+		{
+			// Prepare decryption key schedule: reverse order and apply InvMixColumns
+			for (::std::size_t i{}, j{key_schedule_size - 1}; i < j; ++i, --j)
+			{
+				__m128i tmp = key_schedule[i];
+				key_schedule[i] = key_schedule[j];
+				key_schedule[j] = tmp;
+			}
+			for (::std::size_t i{1}; i < key_schedule_size - 1; ++i)
+			{
+				key_schedule[i] = _mm_aesimc_si128(key_schedule[i]);
+			}
+		}
 	}
 	inline void operator()(::std::byte const *from, ::std::size_t blocks, ::std::byte *to) noexcept
-	{}
+	{
+		constexpr ::std::size_t rounds = key_schedule_size - 1;
+		for (::std::size_t i{}; i != blocks; ++i)
+		{
+			__m128i block = _mm_loadu_si128(reinterpret_cast<__m128i const *>(from));
+			block = _mm_xor_si128(block, key_schedule[0]);
+			if constexpr (!decrypt)
+			{
+				for (::std::size_t j{1}; j != rounds; ++j)
+				{
+					block = _mm_aesenc_si128(block, key_schedule[j]);
+				}
+				block = _mm_aesenclast_si128(block, key_schedule[rounds]);
+			}
+			else
+			{
+				for (::std::size_t j{1}; j != rounds; ++j)
+				{
+					block = _mm_aesdec_si128(block, key_schedule[j]);
+				}
+				block = _mm_aesdeclast_si128(block, key_schedule[rounds]);
+			}
+			_mm_storeu_si128(reinterpret_cast<__m128i *>(to), block);
+			from += block_size;
+			to += block_size;
+		}
+	}
 };
 
 } // namespace fast_io

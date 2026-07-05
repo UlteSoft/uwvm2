@@ -59,6 +59,10 @@ namespace uwvm2::utils::allocator::fast_io_strict
 #if __has_cpp_attribute(__gnu__::__malloc__)
         [[__gnu__::__malloc__]]
 #endif
+        static inline constexpr void* allocate_conditional_zero(::std::size_t n, bool zero) noexcept
+        { return details::nt_rtlallocate_heap_common_impl(n, zero ? 0x00000008u : 0u); }
+
+#if 0
         static inline constexpr void* allocate(::std::size_t n) noexcept
         { return details::nt_rtlallocate_heap_common_impl(n, 0u); }
 #if __has_cpp_attribute(__gnu__::__malloc__)
@@ -71,6 +75,10 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
         inline static constexpr void* reallocate_zero(void* addr, ::std::size_t n) noexcept
         { return details::nt_rtlreallocate_heap_common_impl(addr, n, 0x00000008u); }
+#endif
+
+        inline static constexpr void* reallocate_conditional_zero(void* addr, ::std::size_t n, bool zero) noexcept
+        { return details::nt_rtlreallocate_heap_common_impl(addr, n, zero ? 0x00000008u : 0u); }
 
         inline static constexpr void deallocate(void* addr) noexcept
         {

@@ -21,6 +21,16 @@ concept has_allocate_aligned_zero_impl = requires(::std::size_t n) {
 };
 
 template <typename alloc>
+concept has_allocate_conditional_zero_impl = requires(::std::size_t n, bool zero) {
+	{ alloc::allocate_conditional_zero(n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_allocate_aligned_conditional_zero_impl = requires(::std::size_t n, bool zero) {
+	{ alloc::allocate_aligned_conditional_zero(n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
 concept has_reallocate_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate(p, n) } -> ::std::same_as<void *>;
 };
@@ -41,6 +51,16 @@ concept has_reallocate_aligned_zero_impl = requires(void *p, ::std::size_t n) {
 };
 
 template <typename alloc>
+concept has_reallocate_conditional_zero_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_conditional_zero(p, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_reallocate_aligned_conditional_zero_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_aligned_conditional_zero(p, n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
 concept has_reallocate_n_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate_n(p, n, n) } -> ::std::same_as<void *>;
 };
@@ -58,6 +78,16 @@ concept has_reallocate_zero_n_impl = requires(void *p, ::std::size_t n) {
 template <typename alloc>
 concept has_reallocate_aligned_zero_n_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate_aligned_zero_n(p, n, n, n) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_reallocate_n_conditional_zero_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_n_conditional_zero(p, n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_reallocate_aligned_n_conditional_zero_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_aligned_n_conditional_zero(p, n, n, n, zero) } -> ::std::same_as<void *>;
 };
 
 template <typename alloc>
@@ -101,6 +131,16 @@ concept has_allocate_aligned_zero_at_least_impl = requires(::std::size_t n) {
 };
 
 template <typename alloc>
+concept has_allocate_conditional_zero_at_least_impl = requires(::std::size_t n, bool zero) {
+	{ alloc::allocate_conditional_zero_at_least(n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_allocate_aligned_conditional_zero_at_least_impl = requires(::std::size_t n, bool zero) {
+	{ alloc::allocate_aligned_conditional_zero_at_least(n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
 concept has_reallocate_at_least_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate_at_least(p, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
@@ -121,6 +161,16 @@ concept has_reallocate_aligned_zero_at_least_impl = requires(void *p, ::std::siz
 };
 
 template <typename alloc>
+concept has_reallocate_conditional_zero_at_least_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_conditional_zero_at_least(p, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_reallocate_aligned_conditional_zero_at_least_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_aligned_conditional_zero_at_least(p, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
 concept has_reallocate_n_at_least_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate_n_at_least(p, n, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
@@ -138,6 +188,16 @@ concept has_reallocate_zero_n_at_least_impl = requires(void *p, ::std::size_t n)
 template <typename alloc>
 concept has_reallocate_aligned_zero_n_at_least_impl = requires(void *p, ::std::size_t n) {
 	{ alloc::reallocate_aligned_zero_n_at_least(p, n, n, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_reallocate_n_conditional_zero_at_least_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_n_conditional_zero_at_least(p, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_reallocate_aligned_n_conditional_zero_at_least_impl = requires(void *p, ::std::size_t n, bool zero) {
+	{ alloc::reallocate_aligned_n_conditional_zero_at_least(p, n, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
 
 template <typename alloc>
@@ -167,6 +227,16 @@ concept has_handle_allocate_aligned_zero_impl = requires(typename alloc::handle_
 };
 
 template <typename alloc>
+concept has_handle_allocate_conditional_zero_impl = requires(typename alloc::handle_type handle, ::std::size_t n, bool zero) {
+	{ alloc::handle_allocate_conditional_zero(handle, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_handle_allocate_aligned_conditional_zero_impl = requires(typename alloc::handle_type handle, ::std::size_t n, bool zero) {
+	{ alloc::handle_allocate_aligned_conditional_zero(handle, n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
 concept has_handle_reallocate_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate(handle, p, n) } -> ::std::same_as<void *>;
 };
@@ -187,6 +257,16 @@ concept has_handle_reallocate_aligned_zero_impl = requires(typename alloc::handl
 };
 
 template <typename alloc>
+concept has_handle_reallocate_conditional_zero_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_conditional_zero(handle, p, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_aligned_conditional_zero_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_aligned_conditional_zero(handle, p, n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
 concept has_handle_reallocate_n_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate_n(handle, p, n, n) } -> ::std::same_as<void *>;
 };
@@ -204,6 +284,16 @@ concept has_handle_reallocate_zero_n_impl = requires(typename alloc::handle_type
 template <typename alloc>
 concept has_handle_reallocate_aligned_zero_n_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate_aligned_zero_n(handle, p, n, n, n) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_n_conditional_zero_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_n_conditional_zero(handle, p, n, n, zero) } -> ::std::same_as<void *>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_aligned_n_conditional_zero_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_aligned_n_conditional_zero(handle, p, n, n, n, zero) } -> ::std::same_as<void *>;
 };
 
 
@@ -228,6 +318,16 @@ concept has_handle_allocate_aligned_zero_at_least_impl = requires(typename alloc
 };
 
 template <typename alloc>
+concept has_handle_allocate_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, ::std::size_t n, bool zero) {
+	{ alloc::handle_allocate_conditional_zero_at_least(handle, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_handle_allocate_aligned_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, ::std::size_t n, bool zero) {
+	{ alloc::handle_allocate_aligned_conditional_zero_at_least(handle, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
 concept has_handle_reallocate_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate_at_least(handle, p, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
@@ -248,6 +348,16 @@ concept has_handle_reallocate_aligned_zero_at_least_impl = requires(typename all
 };
 
 template <typename alloc>
+concept has_handle_reallocate_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_conditional_zero_at_least(handle, p, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_aligned_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_aligned_conditional_zero_at_least(handle, p, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
 concept has_handle_reallocate_n_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate_n_at_least(handle, p, n, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
@@ -265,6 +375,16 @@ concept has_handle_reallocate_zero_n_at_least_impl = requires(typename alloc::ha
 template <typename alloc>
 concept has_handle_reallocate_aligned_zero_n_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n) {
 	{ alloc::handle_reallocate_aligned_zero_n_at_least(handle, p, n, n, n) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_n_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_n_conditional_zero_at_least(handle, p, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
+};
+
+template <typename alloc>
+concept has_handle_reallocate_aligned_n_conditional_zero_at_least_impl = requires(typename alloc::handle_type handle, void *p, ::std::size_t n, bool zero) {
+	{ alloc::handle_reallocate_aligned_n_conditional_zero_at_least(handle, p, n, n, n, zero) } -> ::std::same_as<::fast_io::allocation_least_result>;
 };
 
 

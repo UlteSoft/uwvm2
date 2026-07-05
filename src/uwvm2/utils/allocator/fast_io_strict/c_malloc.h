@@ -34,6 +34,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             void* p = ::std::calloc(1, n);
             return p;
         }
+
 #if (__has_include(<malloc.h>) || __has_include(<malloc_np.h>)) && !defined(__MSDOS__) && !defined(__LLVM_LIBC__)
         inline static constexpr ::fast_io::allocation_least_result allocate_at_least(::std::size_t n) noexcept
         {
@@ -44,9 +45,15 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
         inline static constexpr ::fast_io::allocation_least_result allocate_zero_at_least(::std::size_t n) noexcept
         {
+            ::std::size_t const requested{n == 0 ? 1 : n};
             auto p{allocate_zero(n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
-            return {p, ::fast_io::details::c_malloc_usable_size_impl(p)};
+            auto const count{::fast_io::details::c_malloc_usable_size_impl(p)};
+            if(requested < count)
+            {
+                ::fast_io::freestanding::bytes_clear_n(reinterpret_cast<::std::byte*>(p) + requested, count - requested);
+            }
+            return {p, count};
         }
 
         inline static constexpr ::fast_io::allocation_least_result reallocate_at_least(void* oldp, ::std::size_t n) noexcept

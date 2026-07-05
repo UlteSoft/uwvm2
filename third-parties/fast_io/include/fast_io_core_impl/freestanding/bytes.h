@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace fast_io::details
 {
@@ -83,13 +83,10 @@ inline constexpr ::std::byte *bytes_copy_n(::std::byte const *first, ::std::size
 	}
 	else
 	{
-		if (n)
-#if __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if (n) [[likely]]
 		{
 #if FAST_IO_HAS_BUILTIN(__builtin_memmove)
-            __builtin_memmove(dest, first, n);
+			__builtin_memmove(dest, first, n);
 #else
 			::std::memmove(dest, first, n);
 #endif
@@ -115,13 +112,10 @@ inline constexpr ::std::byte *nonoverlapped_bytes_copy_n(::std::byte const *firs
 	}
 	else
 	{
-		if (n)
-#if __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if (n) [[likely]]
 		{
 #if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
-            __builtin_memcpy(dest, first, n);
+			__builtin_memcpy(dest, first, n);
 #else
 			::std::memcpy(dest, first, n);
 #endif
@@ -155,7 +149,7 @@ inline constexpr ::std::byte const *type_punning_from_bytes(::std::byte const *_
 #endif
 		{
 #if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
-            __builtin_memcpy(__builtin_addressof(t), first, n);
+			__builtin_memcpy(__builtin_addressof(t), first, n);
 #else
 			::std::memcpy(__builtin_addressof(t), first, n);
 #endif
@@ -180,7 +174,7 @@ inline constexpr ::std::byte *type_punning_to_bytes_n(T const &__restrict first,
 #endif
 		{
 #if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
-            __builtin_memcpy(dest, __builtin_addressof(first), n);
+			__builtin_memcpy(dest, __builtin_addressof(first), n);
 #else
 			::std::memcpy(dest, __builtin_addressof(first), n);
 #endif
@@ -208,7 +202,7 @@ inline constexpr ::std::byte *bytes_clear_n(::std::byte *data, ::std::size_t siz
 	else
 	{
 #if FAST_IO_HAS_BUILTIN(__builtin_memset)
-        __builtin_memset(data, 0, size);
+		__builtin_memset(data, 0, size);
 #else
 		::std::memset(data, 0, size);
 #endif
@@ -233,7 +227,7 @@ inline constexpr ::std::byte *bytes_fill_n(::std::byte *data, ::std::size_t size
 	else
 	{
 #if FAST_IO_HAS_BUILTIN(__builtin_memset)
-         __builtin_memset(data, static_cast<char unsigned>(val), size);
+		__builtin_memset(data, static_cast<char unsigned>(val), size);
 #else
 		::std::memset(data, static_cast<char unsigned>(val), size);
 #endif

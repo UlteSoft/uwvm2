@@ -120,7 +120,7 @@ CRT heap debugging does not exist on mingw-w64
 
 inline void wincrt_fp_allocate_buffer_impl(FILE *__restrict fpp) noexcept
 {
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	if (fp->_bufsiz < 4)
 	{
 		fp->_bufsiz = wincrt_internal_buffer_size;
@@ -145,7 +145,7 @@ inline void wincrt_fp_write_cold_malloc_case_impl(FILE *__restrict fpp, char con
 		return;
 	}
 
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 
 	::std::size_t allocated_buffer_size{wincrt_internal_buffer_size};
 
@@ -173,7 +173,7 @@ inline void wincrt_fp_write_cold_malloc_case_impl(FILE *__restrict fpp, char con
 inline void wincrt_fp_write_cold_normal_case_impl(FILE *__restrict fpp, char const *__restrict first,
 												  ::std::size_t diff)
 {
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	fp->_flag |= crt_dirty_value;
 
 	if (::std::size_t const remain{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(fp->_cnt))}; diff < remain)
@@ -210,7 +210,7 @@ inline void wincrt_fp_write_cold_normal_case_impl(FILE *__restrict fpp, char con
 inline void wincrt_fp_write_cold_impl(FILE *__restrict fp, char const *first, char const *last)
 {
 	::std::size_t diff{static_cast<::std::size_t>(last - first)};
-	crt_iobuf *fpp{reinterpret_cast<crt_iobuf *>(fp)};
+	::fast_io::details::crt_iobuf *fpp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fp)};
 	if (fpp->_base == nullptr)
 	{
 		if (auto const fd{fpp->_file}; fd == ::fast_io::posix_stderr_number)
@@ -237,7 +237,7 @@ template <::std::integral char_type>
 #endif
 inline void wincrt_fp_overflow_impl(FILE *__restrict fpp, char_type ch)
 {
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	if (fp->_base == nullptr)
 	{
 		wincrt_fp_allocate_buffer_impl(fpp);
@@ -259,7 +259,7 @@ inline void wincrt_fp_overflow_impl(FILE *__restrict fpp, char_type ch)
 #endif
 inline void wincrt_fp_flush_stdout_impl()
 {
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(::fast_io::win32::wincrt_acrt_iob_func(1))};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(::fast_io::win32::wincrt_acrt_iob_func(1))};
 	if (fp->_ptr == fp->_base) [[unlikely]]
 	{
 		return;
@@ -278,7 +278,7 @@ inline char *wincrt_fp_read_cold_impl(FILE *__restrict fpp, char *first, ::std::
 	{
 		wincrt_fp_flush_stdout_impl();
 	}
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	::std::size_t cnt{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(fp->_cnt))};
 	non_overlapped_copy_n(fp->_ptr, cnt, first);
 	first += cnt;
@@ -332,7 +332,7 @@ inline bool wincrt_fp_underflow_impl(FILE *__restrict fpp)
 	{
 		wincrt_fp_flush_stdout_impl();
 	}
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	if (fp->_base == nullptr)
 	{
 		wincrt_fp_allocate_buffer_impl(fpp);
@@ -362,7 +362,7 @@ template <typename T, ::std::size_t num>
 inline T *wincrt_get_buffer_ptr_impl(FILE *__restrict fpp) noexcept
 {
 	static_assert(num < 4);
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	if constexpr (num == 0)
 	{
 		return reinterpret_cast<T *>(fp->_base);
@@ -383,7 +383,7 @@ inline void wincrt_set_buffer_curr_ptr_impl(FILE *__restrict fpp,
 #endif
 											void *ptr) noexcept
 {
-	crt_iobuf *fp{reinterpret_cast<crt_iobuf *>(fpp)};
+	::fast_io::details::crt_iobuf *fp{reinterpret_cast<::fast_io::details::crt_iobuf *>(fpp)};
 	fp->_cnt -= static_cast<::std::int_least32_t>(
 		static_cast<::std::uint_least32_t>(static_cast<::std::size_t>(reinterpret_cast<char *>(ptr) - fp->_ptr)));
 	fp->_ptr = reinterpret_cast<char *>(ptr);
@@ -395,12 +395,12 @@ WINE has not correctly implemented this yet. I am submitting patches.
 inline void ucrt_lock_file(FILE *__restrict fp) noexcept
 {
 	char *fp2{reinterpret_cast<char *>(fp)};
-	::fast_io::win32::EnterCriticalSection(fp2 + sizeof(crt_iobuf));
+	::fast_io::win32::EnterCriticalSection(fp2 + sizeof(::fast_io::details::crt_iobuf));
 }
 inline void ucrt_unlock_file(FILE *__restrict fp) noexcept
 {
 	char *fp2{reinterpret_cast<char *>(fp)};
-	::fast_io::win32::LeaveCriticalSection(fp2 + sizeof(crt_iobuf));
+	::fast_io::win32::LeaveCriticalSection(fp2 + sizeof(::fast_io::details::crt_iobuf));
 }
 #endif
 } // namespace details
@@ -487,7 +487,7 @@ template <::std::integral char_type>
 inline ::std::byte *read_some_bytes_underflow_define(::fast_io::basic_c_io_observer_unlocked<char_type> ciob,
 													 ::std::byte *first, ::std::byte *last)
 {
-	return reinterpret_cast<::std::byte *>(::fast_io::details::wincrt_fp_read_cold_impl(ciob.fp, 
+	return reinterpret_cast<::std::byte *>(::fast_io::details::wincrt_fp_read_cold_impl(ciob.fp,
 																						reinterpret_cast<char *>(first),
 																						reinterpret_cast<char *>(last)));
 }

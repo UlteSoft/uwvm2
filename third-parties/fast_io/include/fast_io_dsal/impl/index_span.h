@@ -46,13 +46,14 @@ public:
 		: ptr{::std::to_address(first)}
 	{}
 	template <::std::ranges::contiguous_range R>
-		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>>)
-	inline explicit constexpr index_span(::fast_io::containers::index_unchecked_t, R &&range) noexcept(noexcept(::std::ranges::data(range)))
+		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>> &&
+				 !::std::is_rvalue_reference_v<R &&>)
+	inline explicit constexpr index_span(::fast_io::containers::index_unchecked_t, ::fast_io::freestanding::from_range_t, R &&range) noexcept(noexcept(::std::ranges::data(range)))
 		: ptr{::std::ranges::data(range)}
 	{}
 	template <::std::ranges::contiguous_range R>
-		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>> && !::std::same_as<::std::remove_cvref_t<R>, ::fast_io::containers::index_span<element_type, N>>)
-	inline constexpr index_span(R &&range) noexcept(noexcept(::std::ranges::data(range)) && noexcept(::std::ranges::size(range)))
+		requires(::std::same_as<value_type, ::std::ranges::range_value_t<R>> && !::std::is_rvalue_reference_v<R &&>)
+	inline constexpr index_span(::fast_io::freestanding::from_range_t, R &&range) noexcept(noexcept(::std::ranges::data(range)) && noexcept(::std::ranges::size(range)))
 		: ptr{::std::ranges::data(range)}
 	{
 		if (::std::ranges::size(range) < N) [[unlikely]]

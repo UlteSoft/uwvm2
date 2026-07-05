@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 /*
 Create python's PyBytesObject by using fast_io's api
@@ -96,10 +96,7 @@ inline basic_io_scatter_t<char> pybytes_asstringandsize_impl(PyObject *self) noe
 {
 	char *s{};
 	Py_ssize_t len{};
-	if (self != nullptr)
-#if __has_cpp_attribute(likely)
-		[[likely]]
-#endif
+	if (self != nullptr) [[likely]]
 	{
 		if (::fast_io::noexcept_call(pybytes_asstringandsize_model_impl, self, __builtin_addressof(s),
 									 __builtin_addressof(len)) < 0)
