@@ -705,9 +705,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz128)
             auto const bits{v128_to_vec<v128_i64x2>(v)};
             return !__builtin_ia32_ptestz128(bits, bits);
-#  elif (defined(__aarch64__) || defined(_M_ARM64)) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)
+#  elif defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                 \
+      UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)
             return __builtin_neon_vmaxvq_u32(v128_to_vec<v128_u32x4>(v)) != 0u;
-#  elif (defined(__aarch64__) || defined(_M_ARM64)) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)
+#  elif !defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&           \
+      UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)
             return __builtin_aarch64_reduc_umax_scal_v4si_uu(v128_to_vec<v128_u32x4>(v)) != 0u;
 #  else
             // LoongArch LSX __builtin_lsx_bnz_v is semantically valid here, but Clang lowers it to a conditional branch.
@@ -730,9 +732,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return !__builtin_wasm_all_true_i8x16(::std::bit_cast<v128_i8x16>(~bytes));
 #  elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16)
             return __builtin_wasm_bitmask_i8x16(::std::bit_cast<v128_i8x16>(mask)) != 0;
-#  elif (defined(__aarch64__) || defined(_M_ARM64)) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)
+#  elif defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                 \
+      UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)
             return __builtin_neon_vmaxvq_u32(::std::bit_cast<v128_u32x4>(mask)) != 0u;
-#  elif (defined(__aarch64__) || defined(_M_ARM64)) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)
+#  elif !defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&           \
+      UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)
             return __builtin_aarch64_reduc_umax_scal_v4si_uu(::std::bit_cast<v128_u32x4>(mask)) != 0u;
 #  else
             // LoongArch LSX __builtin_lsx_bnz_v is a good fit for direct error branches in the parser, not for this value-returning helper.
@@ -1059,21 +1063,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_roundeven(FloatT x) noexcept
         {
-# if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
-            return __builtin_elementwise_roundeven(x);
-# else
-            if(::std::isnan(x) || ::std::isinf(x) || x == FloatT{}) { return x; }
+            if constexpr(::std::same_as<FloatT, wasm_f32>)
+            {
+                auto const bits{::std::bit_cast<u32>(x)};
+                auto const sign{bits & u32{0x80000000u}};
+                auto const exp{(bits >> 23u) & u32{0xffu}};
+                if(exp == u32{0xffu}) { return x; }
+                if(exp < u32{126u}) { return ::std::bit_cast<wasm_f32>(sign); }
+                if(exp == u32{126u})
+                {
+                    if((bits & u32{0x007fffffu}) == 0u) { return ::std::bit_cast<wasm_f32>(sign); }
+                    return ::std::bit_cast<wasm_f32>(sign | u32{0x3f800000u});
+                }
+                if(exp >= u32{150u}) { return x; }
 
-            auto const t{::std::trunc(x)};
-            auto const frac_abs{::std::fabs(x - t)};
-            if(frac_abs < static_cast<FloatT>(0.5)) { return t; }
+                auto const shift{u32{150u} - exp};
+                auto const half{u32{1u} << (shift - 1u)};
+                auto const increment{half << 1u};
+                auto const frac_mask{increment - 1u};
+                auto const frac{bits & frac_mask};
+                auto out{bits & ~frac_mask};
+                if(frac > half || (frac == half && (out & increment) != 0u)) { out += increment; }
+                return ::std::bit_cast<wasm_f32>(out);
+            }
+            else if constexpr(::std::same_as<FloatT, wasm_f64>)
+            {
+                auto const bits{::std::bit_cast<u64>(x)};
+                auto const sign{bits & u64{0x8000000000000000ull}};
+                auto const exp{(bits >> 52u) & u64{0x7ffu}};
+                if(exp == u64{0x7ffu}) { return x; }
+                if(exp < u64{1022u}) { return ::std::bit_cast<wasm_f64>(sign); }
+                if(exp == u64{1022u})
+                {
+                    if((bits & u64{0x000fffffffffffffull}) == 0u) { return ::std::bit_cast<wasm_f64>(sign); }
+                    return ::std::bit_cast<wasm_f64>(sign | u64{0x3ff0000000000000ull});
+                }
+                if(exp >= u64{1075u}) { return x; }
 
-            auto const step{::std::copysign(FloatT{1}, x)};
-            if(frac_abs > static_cast<FloatT>(0.5)) { return static_cast<FloatT>(t + step); }
-
-            auto const half_t{static_cast<FloatT>(t * static_cast<FloatT>(0.5))};
-            return ::std::trunc(half_t) == half_t ? t : static_cast<FloatT>(t + step);
-# endif
+                auto const shift{u64{1075u} - exp};
+                auto const half{u64{1u} << (shift - 1u)};
+                auto const increment{half << 1u};
+                auto const frac_mask{increment - 1u};
+                auto const frac{bits & frac_mask};
+                auto out{bits & ~frac_mask};
+                if(frac > half || (frac == half && (out & increment) != 0u)) { out += increment; }
+                return ::std::bit_cast<wasm_f64>(out);
+            }
+            else
+            {
+                static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>, "unsupported wasm_roundeven type");
+            }
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr lane_array<wasm_f64, 2uz> load_f64x2_lanes(wasm_v128 v) noexcept
@@ -1090,6 +1129,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             for(::std::size_t i{}; i != 2uz; ++i) { bits.lane[i] = ::std::bit_cast<u64>(lanes.lane[i]); }
             return store_uint_lanes<u64, 2uz>(bits);
         }
+
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+#  if (defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundps)) ||                                                                                     \
+      (defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                  \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)) ||                                                                                                           \
+      (!defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&            \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv4sf)) ||                                                                                                   \
+      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_s))
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 vec_roundeven_f32x4_v128(wasm_v128 v) noexcept
+        {
+#   if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundps)
+            return vec_to_v128(__builtin_ia32_roundps(v128_to_vec<v128_f32x4>(v), 8));
+#   elif defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)
+            return vec_to_v128(::std::bit_cast<v128_f32x4>(__builtin_neon_vrndnq_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_f32x4>(v)), 41)));
+#   elif !defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&          \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv4sf)
+            return vec_to_v128(__builtin_aarch64_roundevenv4sf(v128_to_vec<v128_f32x4>(v)));
+#   elif defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_s)
+            return vec_to_v128(::std::bit_cast<v128_f32x4>(__builtin_lsx_vfrintrne_s(v128_to_vec<v128_f32x4>(v))));
+#   endif
+        }
+#  endif
+
+#  if (defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundpd)) ||                                                                                     \
+      (defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                  \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)) ||                                                                                                           \
+      (!defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&            \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv2df)) ||                                                                                                   \
+      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_d))
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 vec_roundeven_f64x2_v128(wasm_v128 v) noexcept
+        {
+#   if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundpd)
+            return vec_to_v128(__builtin_ia32_roundpd(v128_to_vec<v128_f64x2>(v), 8));
+#   elif defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)
+            return vec_to_v128(::std::bit_cast<v128_f64x2>(__builtin_neon_vrndnq_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_f64x2>(v)), 42)));
+#   elif !defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&          \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv2df)
+            return vec_to_v128(__builtin_aarch64_roundevenv2df(v128_to_vec<v128_f64x2>(v)));
+#   elif defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_d)
+            return vec_to_v128(::std::bit_cast<v128_f64x2>(__builtin_lsx_vfrintrne_d(v128_to_vec<v128_f64x2>(v))));
+#   endif
+        }
+#  endif
+# endif
 
         template <typename U>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr U abs_signed_bits(U v) noexcept
@@ -1252,7 +1337,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof(shuffle_controls) == 32uz);
 
         template <typename LaneT>
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr shuffle_controls make_shuffle_controls(LaneT const(&lanes_imm)[16]) noexcept
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr shuffle_controls make_shuffle_controls(LaneT const (&lanes_imm)[16]) noexcept
         {
             shuffle_controls out{};  // init
             for(::std::size_t i{}; i != 16uz; ++i)
@@ -1998,8 +2083,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if UWVM_HAS_BUILTIN(__builtin_elementwise_trunc)
                 else if constexpr(Op == simd_code::f32x4_trunc) { return vec_to_v128(__builtin_elementwise_trunc(v128_to_vec<v128_f32x4>(v))); }
 #  endif
-#  if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
-                else if constexpr(Op == simd_code::f32x4_nearest) { return vec_to_v128(__builtin_elementwise_roundeven(v128_to_vec<v128_f32x4>(v))); }
+#  if (defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundps)) ||                                                                                     \
+      (defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                  \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)) ||                                                                                                           \
+      (!defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&            \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv4sf)) ||                                                                                                   \
+      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_s))
+                else if constexpr(Op == simd_code::f32x4_nearest) { return vec_roundeven_f32x4_v128(v); }
 #  endif
 # endif
                 lane_array<wasm_f32, 4uz> out{};  // init
@@ -2070,8 +2160,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if UWVM_HAS_BUILTIN(__builtin_elementwise_trunc)
                 else if constexpr(Op == simd_code::f64x2_trunc) { return vec_to_v128(__builtin_elementwise_trunc(v128_to_vec<v128_f64x2>(v))); }
 #  endif
-#  if UWVM_HAS_BUILTIN(__builtin_elementwise_roundeven)
-                else if constexpr(Op == simd_code::f64x2_nearest) { return vec_to_v128(__builtin_elementwise_roundeven(v128_to_vec<v128_f64x2>(v))); }
+#  if (defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_roundpd)) ||                                                                                     \
+      (defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                  \
+       UWVM_HAS_BUILTIN(__builtin_neon_vrndnq_v)) ||                                                                                                           \
+      (!defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&            \
+       UWVM_HAS_BUILTIN(__builtin_aarch64_roundevenv2df)) ||                                                                                                   \
+      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vfrintrne_d))
+                else if constexpr(Op == simd_code::f64x2_nearest) { return vec_roundeven_f64x2_v128(v); }
 #  endif
 # endif
                 lane_array<wasm_f64, 2uz> out{};  // init
@@ -2942,14 +3037,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // LSX vmskltz.b packs the byte sign bits into the low halfword, matching Wasm lane order on little-endian targets.
                 auto const mask{__builtin_lsx_vmskltz_b(v128_to_vec<v128_i8x16>(v))};
                 return ::std::bit_cast<wasm_i32>(static_cast<u32>(__builtin_lsx_vpickve2gr_hu(::std::bit_cast<v128_u16x8>(mask), 0)));
-# elif (defined(__aarch64__) || defined(_M_ARM64)) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vaddv_u8) &&                                      \
-     UWVM_HAS_BUILTIN(__builtin_shufflevector) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
-                // Clang ACLE does not expose an SSE-style fixed v128 movemask for SVE2; NEON gives a compact branchless 128-bit path here.
+# elif defined(__clang__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&                                  \
+     UWVM_HAS_BUILTIN(__builtin_neon_vaddv_u8) && UWVM_HAS_BUILTIN(__builtin_shufflevector) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) &&             \
+     defined(__LITTLE_ENDIAN__)
                 constexpr v128_u8x16 weights{1u, 2u, 4u, 8u, 16u, 32u, 64u, 128u, 1u, 2u, 4u, 8u, 16u, 32u, 64u, 128u};
-                auto const weighted{static_cast<v128_u8x16>((v128_to_vec<v128_u8x16>(v) >> 7u) * weights)};
+                auto const sign_bytes{::std::bit_cast<v128_u8x16>(v128_to_vec<v128_i8x16>(v) >> 7u)};
+                auto const weighted{sign_bytes & weights};
                 auto const low{__builtin_shufflevector(weighted, weighted, 0, 1, 2, 3, 4, 5, 6, 7)};
                 auto const high{__builtin_shufflevector(weighted, weighted, 8, 9, 10, 11, 12, 13, 14, 15)};
                 return ::std::bit_cast<wasm_i32>(static_cast<u32>(__builtin_neon_vaddv_u8(low)) | (static_cast<u32>(__builtin_neon_vaddv_u8(high)) << 8u));
+# elif !defined(__clang__) && defined(__GNUC__) && (defined(__aarch64__) || defined(_M_ARM64)) && (defined(__ARM_NEON) || defined(__ARM_NEON__)) &&            \
+     UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_plus_scal_v8qi_uu) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                                               \
+     UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+                constexpr v128_u8x16 weights{1u, 2u, 4u, 8u, 16u, 32u, 64u, 128u, 1u, 2u, 4u, 8u, 16u, 32u, 64u, 128u};
+                auto const sign_bytes{::std::bit_cast<v128_u8x16>(v128_to_vec<v128_i8x16>(v) >> 7u)};
+                auto const weighted{sign_bytes & weights};
+                auto const low{__builtin_shufflevector(weighted, weighted, 0, 1, 2, 3, 4, 5, 6, 7)};
+                auto const high{__builtin_shufflevector(weighted, weighted, 8, 9, 10, 11, 12, 13, 14, 15)};
+                return ::std::bit_cast<wasm_i32>(static_cast<u32>(__builtin_aarch64_reduc_plus_scal_v8qi_uu(low)) |
+                                                 (static_cast<u32>(__builtin_aarch64_reduc_plus_scal_v8qi_uu(high)) << 8u));
 # else
 #  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
                 auto const lanes{static_cast<v128_u8x16>(v128_to_vec<v128_u8x16>(v) >> 7u)};
@@ -3047,27 +3153,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t simd_memory_access_size() noexcept
         {
             if constexpr(Op == simd_code::v128_load || Op == simd_code::v128_store) { return 16uz; }
-            else if constexpr(Op == simd_code::v128_load8x8_s || Op == simd_code::v128_load8x8_u ||
-                              Op == simd_code::v128_load16x4_s || Op == simd_code::v128_load16x4_u ||
-                              Op == simd_code::v128_load32x2_s || Op == simd_code::v128_load32x2_u ||
-                              Op == simd_code::v128_load64_splat || Op == simd_code::v128_load64_zero ||
-                              Op == simd_code::v128_load64_lane || Op == simd_code::v128_store64_lane)
+            else if constexpr(Op == simd_code::v128_load8x8_s || Op == simd_code::v128_load8x8_u || Op == simd_code::v128_load16x4_s ||
+                              Op == simd_code::v128_load16x4_u || Op == simd_code::v128_load32x2_s || Op == simd_code::v128_load32x2_u ||
+                              Op == simd_code::v128_load64_splat || Op == simd_code::v128_load64_zero || Op == simd_code::v128_load64_lane ||
+                              Op == simd_code::v128_store64_lane)
             {
                 return 8uz;
             }
-            else if constexpr(Op == simd_code::v128_load32_splat || Op == simd_code::v128_load32_zero ||
-                              Op == simd_code::v128_load32_lane || Op == simd_code::v128_store32_lane)
+            else if constexpr(Op == simd_code::v128_load32_splat || Op == simd_code::v128_load32_zero || Op == simd_code::v128_load32_lane ||
+                              Op == simd_code::v128_store32_lane)
             {
                 return 4uz;
             }
-            else if constexpr(Op == simd_code::v128_load16_splat || Op == simd_code::v128_load16_lane || Op == simd_code::v128_store16_lane)
-            {
-                return 2uz;
-            }
-            else if constexpr(Op == simd_code::v128_load8_splat || Op == simd_code::v128_load8_lane || Op == simd_code::v128_store8_lane)
-            {
-                return 1uz;
-            }
+            else if constexpr(Op == simd_code::v128_load16_splat || Op == simd_code::v128_load16_lane || Op == simd_code::v128_store16_lane) { return 2uz; }
+            else if constexpr(Op == simd_code::v128_load8_splat || Op == simd_code::v128_load8_lane || Op == simd_code::v128_store8_lane) { return 1uz; }
             else
             {
                 static_assert(Op != Op, "unhandled SIMD memory opcode");
