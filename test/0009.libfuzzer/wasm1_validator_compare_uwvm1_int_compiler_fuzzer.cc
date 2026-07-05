@@ -28,7 +28,7 @@
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/features/binfmt.h>
 # include <uwvm2/validation/error/error.h>
-# include <uwvm2/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1p1/impl.h>
 
 # include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
 
@@ -61,8 +61,8 @@ namespace
 
 extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t size)
 {
-    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
     using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
+    using feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
 
     try
     {
@@ -75,24 +75,41 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         auto const* begin = reinterpret_cast<::std::byte const*>(mod.data());
         auto const* end = begin + mod.size();
 
-        // Phase 1: parser check (must pass before running validators).
-        ::uwvm2::parser::wasm::base::error_impl parse_err{};
-        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> module_storage{};
+        // Phase 1: parser check using the same feature tuple/parameters as the runtime compiler path.
+        feature_parameter_t runtime_feature_parameter{};
+        ::uwvm2::parser::wasm::base::error_impl rt_parse_err{};
+        ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t rt_parsed_module_storage{};
         try
         {
-            module_storage = ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Feature>(begin, end, parse_err, {});
+            rt_parsed_module_storage =
+                ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin, end, rt_parse_err, runtime_feature_parameter);
         }
         catch(::fast_io::error const&)
         {
             return 0;
         }
 
-        auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-            ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(module_storage.sections)};
+        constexpr auto get_importsec_from_features_tuple{
+            []<::uwvm2::parser::wasm::concepts::wasm_feature... Fs>(auto const& section,
+                                                                     ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                -> decltype(auto)
+            {
+                return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(section);
+            }};
+        constexpr auto get_codesec_from_features_tuple{
+            []<::uwvm2::parser::wasm::concepts::wasm_feature... Fs>(auto const& section,
+                                                                     ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                -> decltype(auto)
+            {
+                return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>>(section);
+            }};
+
+        auto const& importsec{get_importsec_from_features_tuple(rt_parsed_module_storage.sections, ::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features)};
         auto const import_func_count{importsec.importdesc.index_unchecked(0u).size()};
 
-        auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-            ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Feature>>(module_storage.sections)};
+        auto const& codesec{get_codesec_from_features_tuple(rt_parsed_module_storage.sections, ::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features)};
 
         // Temporary limitation: the compiler-side validator needs type section pointers for call_indirect.
         // Skip inputs that might contain call_indirect (0x11) anywhere in function bodies.
@@ -107,7 +124,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
             }
         }
 
-        // Phase 2 (standard validation): find the first code-validation error (or ok).
+        // Phase 2 (standard validation): find the first runtime-spec code-validation error (or ok).
         code_validation_error_code std_code{code_validation_error_code::ok};
         for(::std::size_t local_idx{}; local_idx < codesec.codes.size(); ++local_idx)
         {
@@ -118,12 +135,13 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
             ::uwvm2::validation::error::code_validation_error_impl v_err{};
             try
             {
-                ::uwvm2::validation::standard::wasm1::validate_code<Feature>(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                             module_storage,
-                                                                             import_func_count + local_idx,
-                                                                             code_begin_ptr,
-                                                                             code_end_ptr,
-                                                                             v_err);
+                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                      rt_parsed_module_storage,
+                                                                      import_func_count + local_idx,
+                                                                      code_begin_ptr,
+                                                                      code_end_ptr,
+                                                                      v_err,
+                                                                      runtime_feature_parameter);
             }
             catch(::fast_io::error const&)
             {
@@ -132,15 +150,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
             }
         }
 
-        // Phase 3 (runtime init for compiler path): parser -> init -> compile (captures compiler-side code-validation error).
-        ::uwvm2::parser::wasm::base::error_impl rt_parse_err{};
-        ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t rt_parsed_module_storage{};
-        rt_parsed_module_storage =
-            ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin,
-                                                              end,
-                                                              rt_parse_err,
-                                                              ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
-
+        // Phase 3 (runtime init for compiler path): init -> compile (captures compiler-side code-validation error).
         // Resource guards for fuzzing: a valid wasm can still request enormous initial table/memory sizes.
         // Building the runtime record would then attempt huge allocations and OOM the fuzzer process.
         {
@@ -193,6 +203,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         ::uwvm2::uwvm::wasm::storage::execute_wasm.file_name = u8"fuzz.wasm";
         ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name = u8"fuzz";
         ::uwvm2::uwvm::wasm::storage::execute_wasm.binfmt_ver = 1u;
+        ::uwvm2::uwvm::wasm::storage::execute_wasm.wasm_parameter.binfmt1_para = runtime_feature_parameter;
         ::uwvm2::uwvm::wasm::storage::execute_wasm.wasm_module_storage.wasm_binfmt_ver1_storage = ::std::move(rt_parsed_module_storage);
 
         if(::uwvm2::uwvm::wasm::loader::construct_all_module_and_check_duplicate_module() != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok)
@@ -221,7 +232,11 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         ::uwvm2::validation::error::code_validation_error_impl compiler_err{};
         ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option op{};
         (void)::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t{}>(it->second, op, compiler_err);
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t{}>(
+            it->second,
+            op,
+            compiler_err,
+            &runtime_feature_parameter);
 
         if(std_code != compiler_err.err_code) [[unlikely]] { fuzz_trap(); }
 
