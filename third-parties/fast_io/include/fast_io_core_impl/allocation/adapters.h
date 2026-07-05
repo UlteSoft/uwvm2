@@ -825,14 +825,14 @@ public:
 					}
 					else
 					{
-						ptr = allocator_type::allocate_aligned_at_least(alignment, n).ptr;
+						ptr = allocator_type::allocate_aligned_zero_at_least(alignment, n).ptr;
 					}
 				}
 				else
 				{
 					if constexpr (::fast_io::details::has_allocate_aligned_impl<alloc>)
 					{
-						ptr = allocator_type::allocate_aligned_zero(alignment, n);
+						ptr = allocator_type::allocate_aligned(alignment, n);
 					}
 					else
 					{

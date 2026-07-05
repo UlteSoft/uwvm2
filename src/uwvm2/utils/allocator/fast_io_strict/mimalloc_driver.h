@@ -47,7 +47,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-        inline static constexpr void* allocate_zero_aligned(::std::size_t n, ::std::size_t alignment) noexcept
+        inline static constexpr void* allocate_aligned_zero(::std::size_t alignment, ::std::size_t n) noexcept
         {
             if(n == 0) [[unlikely]] { n = 1; }
             void* p = ::fast_io::mimalloc::mi_calloc_aligned(1, n, alignment);
