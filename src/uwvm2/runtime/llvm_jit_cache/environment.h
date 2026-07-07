@@ -482,6 +482,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::append_cache_key_value(out, u8"runtime-jit", u8"none");
 #endif
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        // Keep cached native objects separated when runtime bridge symbol naming or bridge-call ABI details change.
+        details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"semantic-discriminator-and-type-v1");
+#endif
         return out;
     }
 

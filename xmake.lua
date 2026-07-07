@@ -253,7 +253,7 @@ function def_build(opt)
 
 					local function is_git_repo()
 						if not git_available() then return false end
-						local result = os.iorun("git rev-parse --is-inside-work-tree")
+						local result = os.iorun("git -C \"" .. os.projectdir() .. "\" rev-parse --is-inside-work-tree")
 						return result and result:trim() == "true"
 					end
 
@@ -263,7 +263,7 @@ function def_build(opt)
 
 					-- General Git commands execute functions and return results or nil
 					local function git_command(cmd)
-						local result = os.iorun(cmd)
+						local result = os.iorun("git -C \"" .. os.projectdir() .. "\" " .. cmd:gsub("^git%s+", ""))
 						if result and not result:find("fatal:") then
 							return result:trim()
 						end
