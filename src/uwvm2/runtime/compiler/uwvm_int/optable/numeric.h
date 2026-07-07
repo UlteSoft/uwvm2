@@ -36,7 +36,7 @@
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
-# if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
+# if defined(UWVM_ENABLE_UWVM_INT_FENV_DEBUG_CHECK) && __has_include(<cfenv>)
 #  include <cfenv>
 # endif
 // import
@@ -371,7 +371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         UWVM_ALWAYS_INLINE inline constexpr bool fp_rounding_is_tonearest() noexcept
         {
-# if __has_include(<cfenv>) && defined(FE_TONEAREST)
+# if defined(UWVM_ENABLE_UWVM_INT_FENV_DEBUG_CHECK) && __has_include(<cfenv>) && defined(FE_TONEAREST)
             return ::std::fegetround() == FE_TONEAREST;
 # else
             return true;

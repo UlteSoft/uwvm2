@@ -311,6 +311,34 @@ auto const emit_imm_to{[&]<typename T>(bytecode_vec_t& dst, T const& v) constexp
 
 auto const emit_imm{[&]<typename T>(T const& v) constexpr UWVM_THROWS { emit_imm_to(bytecode, v); }};
 
+auto const read_wasm_le_u32{[](::std::byte const* p) constexpr noexcept -> ::std::uint32_t
+                            {
+                                ::std::uint32_t value{};
+                                ::std::memcpy(::std::addressof(value), p, sizeof(value));
+                                return ::fast_io::little_endian(value);
+                            }};
+
+auto const read_wasm_le_u64{[](::std::byte const* p) constexpr noexcept -> ::std::uint64_t
+                            {
+                                ::std::uint64_t value{};
+                                ::std::memcpy(::std::addressof(value), p, sizeof(value));
+                                return ::fast_io::little_endian(value);
+                            }};
+
+auto const read_wasm_f32_const{[&](::std::byte const* p) constexpr noexcept -> ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
+                               {
+                                   using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+                                   static_assert(sizeof(wasm_f32) == sizeof(::std::uint32_t));
+                                   return ::std::bit_cast<wasm_f32>(read_wasm_le_u32(p));
+                               }};
+
+auto const read_wasm_f64_const{[&](::std::byte const* p) constexpr noexcept -> ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64
+                               {
+                                   using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+                                   static_assert(sizeof(wasm_f64) == sizeof(::std::uint64_t));
+                                   return ::std::bit_cast<wasm_f64>(read_wasm_le_u64(p));
+                               }};
+
 labels.clear();
 ptr_fixups.clear();
 

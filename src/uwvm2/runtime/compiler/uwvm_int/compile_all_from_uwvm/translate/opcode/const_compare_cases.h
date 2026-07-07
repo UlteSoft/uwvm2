@@ -306,8 +306,7 @@ case wasm1_code::f32_const:
     // [ safe      ] unsafe (could be the section_end)
     //           ^^ code_curr
 
-    wasm_f32 imm;
-    ::std::memcpy(::std::addressof(imm), code_curr, sizeof(imm));
+    wasm_f32 const imm{read_wasm_f32_const(code_curr)};
 
     code_curr += sizeof(imm);
 
@@ -412,8 +411,7 @@ case wasm1_code::f64_const:
     // [     safe  ] unsafe (could be the section_end)
     //           ^^ code_curr
 
-    wasm_f64 imm;
-    ::std::memcpy(::std::addressof(imm), code_curr, sizeof(imm));
+    wasm_f64 const imm{read_wasm_f64_const(code_curr)};
 
     code_curr += sizeof(imm);
 
