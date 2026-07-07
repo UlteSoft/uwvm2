@@ -3565,14 +3565,77 @@ inline constexpr void print_semantic_emit_width_direct(outputstmtype optstm, T &
 	{
 		required = ::fast_io::details::intrinsics::add_or_overflow_die(required, static_cast<::std::size_t>(1u));
 	}
-	if (required <= static_cast<::std::size_t>(256u))
+	constexpr ::std::size_t small_width_buffer_size{
+		(::fast_io::details::decay::print_stack_buffer_max_size<char_type>() < static_cast<::std::size_t>(256u))
+			? ::fast_io::details::decay::print_stack_buffer_max_size<char_type>()
+			: static_cast<::std::size_t>(256u)};
+	if constexpr (small_width_buffer_size != 0u)
 	{
-		::fast_io::basic_dynamic_output_buffer<char_type> buffer;
-		auto buffer_ref{::fast_io::operations::output_stream_ref(buffer)};
-		::fast_io::operations::decay::print_semantic_emit_width_direct<line, char_type>(
-			buffer_ref, reference, width, fillch, placement_code, len);
-		::fast_io::operations::decay::write_all_decay(optstm, buffer.begin_ptr, buffer.curr_ptr);
-		return;
+		if (required <= small_width_buffer_size)
+		{
+			char_type buffer[small_width_buffer_size];
+			char_type *iter{buffer};
+			if (width <= len || placement_code == 0u)
+			{
+				iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, reference);
+			}
+			else
+			{
+				::std::size_t const padding{width - len};
+				if (placement_code == 1u)
+				{
+					iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, reference);
+					iter = ::fast_io::details::my_fill_n(iter, padding, fillch);
+				}
+				else if (placement_code == 2u)
+				{
+					::std::size_t const left_padding{padding >> 1u};
+					::std::size_t const right_padding{padding - left_padding};
+					iter = ::fast_io::details::my_fill_n(iter, left_padding, fillch);
+					iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, reference);
+					iter = ::fast_io::details::my_fill_n(iter, right_padding, fillch);
+				}
+				else if (placement_code == 4u)
+				{
+					::std::size_t const internal_len{
+						::fast_io::operations::decay::print_semantic_internal_shift_arg<char_type>(reference)};
+					if (internal_len == 0)
+					{
+						iter = ::fast_io::details::my_fill_n(iter, padding, fillch);
+						iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter,
+																										 reference);
+					}
+					else
+					{
+						char_type *const first{iter};
+						char_type *const last{
+							::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, reference)};
+						if (len < internal_len)
+						{
+							iter = last;
+						}
+						else
+						{
+							char_type *const shift_pos{first + internal_len};
+							::fast_io::details::my_copy(shift_pos, last, shift_pos + padding);
+							::fast_io::details::my_fill_n(shift_pos, padding, fillch);
+							iter = first + width;
+						}
+					}
+				}
+				else
+				{
+					iter = ::fast_io::details::my_fill_n(iter, padding, fillch);
+					iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, reference);
+				}
+			}
+			if constexpr (line)
+			{
+				*iter++ = ::fast_io::char_literal_v<u8'\n', char_type>;
+			}
+			::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+			return;
+		}
 	}
 	if (width <= len || placement_code == 0u)
 	{
