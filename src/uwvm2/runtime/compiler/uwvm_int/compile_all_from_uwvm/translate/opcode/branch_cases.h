@@ -415,9 +415,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
-                                                              wasm_u64 bits{};  // init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += sizeof(bits);
+                                                              auto const bits{read_wasm_le_u64(p)};
+                                                              p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -578,9 +577,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
-                                                              wasm_u64 bits{};  // init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += sizeof(bits);
+                                                              auto const bits{read_wasm_le_u64(p)};
+                                                              p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -711,9 +709,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f32_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                              wasm_u32 bits;  // no init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += 4;
+                                                              auto const bits{read_wasm_le_u32(p)};
+                                                              p += sizeof(::std::uint32_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -2403,9 +2400,8 @@ case wasm1_code::br_if:
                                                       {
                                                           if(!consume_op(wasm1_code::f32_const, p)) { return false; }
                                                           if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                          wasm_u32 bits;  // no init
-                                                          ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                          p += 4;
+                                                          auto const bits{read_wasm_le_u32(p)};
+                                                          p += sizeof(::std::uint32_t);
                                                           return bits == expected_bits;
                                                       }};
 

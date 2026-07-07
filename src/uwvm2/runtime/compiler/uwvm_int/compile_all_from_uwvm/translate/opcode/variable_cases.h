@@ -206,8 +206,11 @@ case wasm1_code::local_get:
                 if(op != const_op) { return false; }
                 ++scan;
 
-                FpT mul{};  // init
-                ::std::memcpy(::std::addressof(mul), scan, sizeof(mul));
+                FpT const mul{[&](::std::byte const* p) constexpr noexcept
+                              {
+                                  if constexpr(::std::same_as<FpT, wasm_f32>) { return read_wasm_f32_const(p); }
+                                  else { return read_wasm_f64_const(p); }
+                              }(scan)};
                 scan += sizeof(mul);
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
@@ -218,8 +221,11 @@ case wasm1_code::local_get:
                 if(op != const_op) { return false; }
                 ++scan;
 
-                FpT add{};  // init
-                ::std::memcpy(::std::addressof(add), scan, sizeof(add));
+                FpT const add{[&](::std::byte const* p) constexpr noexcept
+                              {
+                                  if constexpr(::std::same_as<FpT, wasm_f32>) { return read_wasm_f32_const(p); }
+                                  else { return read_wasm_f64_const(p); }
+                              }(scan)};
                 scan += sizeof(add);
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
@@ -314,7 +320,7 @@ case wasm1_code::local_get:
                                              {
                                                  if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                  if(static_cast<::std::size_t>(endp - scan) < 8uz) [[unlikely]] { return false; }
-                                                 ::std::memcpy(::std::addressof(out), scan, sizeof(out));
+                                                 out = read_wasm_f64_const(scan);
                                                  scan += sizeof(out);
                                                  return true;
                                              }};
@@ -589,8 +595,7 @@ case wasm1_code::local_get:
                         if(curr_local_type == curr_operand_stack_value_type::f32 && op0 == wasm1_code::f32_const &&
                            static_cast<::std::size_t>(code_end - code_curr) >= (1uz + sizeof(wasm_f32) + 3uz))
                         {
-                            wasm_f32 imm{};  // init
-                            ::std::memcpy(::std::addressof(imm), code_curr + 1uz, sizeof(imm));
+                            wasm_f32 const imm{read_wasm_f32_const(code_curr + 1uz)};
 
                             wasm1_code op1{};  // init
                             ::std::memcpy(::std::addressof(op1), code_curr + 1uz + sizeof(wasm_f32), sizeof(op1));
@@ -622,8 +627,7 @@ case wasm1_code::local_get:
                         else if(curr_local_type == curr_operand_stack_value_type::f64 && op0 == wasm1_code::f64_const &&
                                 static_cast<::std::size_t>(code_end - code_curr) >= (1uz + sizeof(wasm_f64) + 3uz))
                         {
-                            wasm_f64 imm{};  // init
-                            ::std::memcpy(::std::addressof(imm), code_curr + 1uz, sizeof(imm));
+                            wasm_f64 const imm{read_wasm_f64_const(code_curr + 1uz)};
 
                             wasm1_code op1{};  // init
                             ::std::memcpy(::std::addressof(op1), code_curr + 1uz + sizeof(wasm_f64), sizeof(op1));

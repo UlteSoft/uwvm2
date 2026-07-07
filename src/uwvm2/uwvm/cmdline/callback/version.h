@@ -1070,7 +1070,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             using size_type = ::std::size_t;
             constexpr size_type npos{static_cast<size_type>(-1)};
             constexpr bool is_tail_call{
-# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(__s390x__) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
                 true
 # else
                 false
@@ -1190,10 +1190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
 #elif defined(__s390x__)
             abi_name = u8"s390x Linux ABI";
-            i32_begin = i64_begin = 3uz;
-            i32_end = i64_end = 6uz;
-            f32_begin = f64_begin = 6uz;
-            f32_end = f64_end = 8uz;
+            abi_note = u8"Stack-top cache: Off (indirect musttail is not stack-stable for long interpreter loops).";
 #elif defined(__s390__) || defined(__SYSC_ZARCH__)
             abi_name = u8"s390 / z/Architecture (31-bit)";
             abi_note = u8"Stack-top cache: Off (i64/f64 passing is ABI-sensitive).";
