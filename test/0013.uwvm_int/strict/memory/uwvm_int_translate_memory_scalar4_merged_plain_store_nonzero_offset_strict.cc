@@ -177,6 +177,7 @@ namespace
         UWVM2TEST_REQUIRE(search_curr_i32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc0, optable::translate::get_uwvmint_i32_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc0, optable::translate::get_uwvmint_i32_store_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
@@ -186,27 +187,34 @@ namespace
         UWVM2TEST_REQUIRE(!search_curr_i32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc0, optable::translate::get_uwvmint_i32_store_imm_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         UWVM2TEST_REQUIRE(search_curr_i32_i64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32_i64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_store_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         UWVM2TEST_REQUIRE(search_curr_i32_f32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc2, optable::translate::get_uwvmint_f32_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32_f32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc2, optable::translate::get_uwvmint_f32_store_local_plus_imm_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         UWVM2TEST_REQUIRE(search_curr_i32_f64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc3, optable::translate::get_uwvmint_f64_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32_f64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc3, optable::translate::get_uwvmint_f64_store_local_plus_imm_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         return 0;
     }

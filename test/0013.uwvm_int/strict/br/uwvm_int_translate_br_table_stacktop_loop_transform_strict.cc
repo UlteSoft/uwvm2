@@ -107,7 +107,7 @@ namespace
             }
         }
 
-        // Mode B: tailcall + stacktop caching (i32 ring). Cover br_table's loop-target transform thunk path.
+        // Mode B: tailcall + stacktop caching. Cover br_table's loop re-entry stacktop transform path.
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -168,10 +168,19 @@ namespace
             constexpr auto f45 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<opt>(c45, tuple);
             constexpr auto f46 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<opt>(c46, tuple);
 
+            constexpr auto n35 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<opt>(c35, tuple);
+            constexpr auto n36 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<opt>(c36, tuple);
+            constexpr auto n45 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<opt>(c45, tuple);
+            constexpr auto n46 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<opt>(c46, tuple);
+
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, f35) ||
                               bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, f36) ||
                               bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, f45) ||
-                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, f46));
+                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, f46) ||
+                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, n35) ||
+                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, n36) ||
+                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, n45) ||
+                              bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, n46));
 #endif
 
             using Runner = interpreter_runner<opt>;

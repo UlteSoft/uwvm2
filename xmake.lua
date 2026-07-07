@@ -554,7 +554,8 @@ for _, file in ipairs(os.files("test/**.cc")) do
 	if not ((is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) or
 		(is_0013_uwvm_int_lazy and not is_int_backend) or
 		(is_0014_llvm_jit and not get_config("enable-test-llvm-jit")) or
-		is_0015_backend_fuzzer) then
+		is_0015_backend_fuzzer or
+		(is_libfuzzer and not test_libfuzzer)) then
 		local name = path.basename(file)
 		target(name)
 		local group = path.directory(file):gsub("\\\\", "/")

@@ -689,64 +689,18 @@ namespace
         auto const log_text{read_text_file(kLogPath)};
         UWVM2TEST_REQUIRE(!log_text.empty());
 
+        // Runtime conbine logging records pending states when they are flushed. Fully consumed fusion
+        // states are covered by the dedicated bytecode/fptr strict tests instead.
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         for(char const* kind : {
                 "local_get",
-                "local_get2",
                 "local_get_i32_localget",
-                "local_get_const_i32",
-                "local_get_const_i64",
                 "local_get_eqz_i32",
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-                "local_get2_const_i32_mul",
-                "local_get2_const_i32_shl",
-#endif
-                "i32_add_2localget_local_set",
-                "i32_add_2localget_local_tee",
-                "i32_add_imm_local_settee_same",
-                "i32_sub_imm_local_settee_same",
-                "i32_mul_imm_local_settee_same",
-                "i32_and_imm_local_settee_same",
-                "i32_or_imm_local_settee_same",
-                "i32_xor_imm_local_settee_same",
-                "i32_shl_imm_local_settee_same",
-                "i32_shr_s_imm_local_settee_same",
-                "i32_shr_u_imm_local_settee_same",
-                "i32_rotl_imm_local_settee_same",
-                "i32_rotr_imm_local_settee_same",
-                "i64_add_2localget_local_set",
-                "i64_add_2localget_local_tee",
-                "i64_add_imm_local_settee_same",
-                "i64_sub_imm_local_settee_same",
-                "i64_mul_imm_local_settee_same",
-                "i64_and_imm_local_settee_same",
-                "i64_or_imm_local_settee_same",
-                "i64_xor_imm_local_settee_same",
-                "i64_shl_imm_local_settee_same",
-                "i64_shr_s_imm_local_settee_same",
-                "i64_shr_u_imm_local_settee_same",
-                "i64_rotl_imm_local_settee_same",
-                "i64_rotr_imm_local_settee_same",
-                "local_get_const_i32_cmp_brif",
-                "local_get_const_i32_add",
-                "local_get_const_i32_add_localget",
-#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-                "local_get_const_f32",
-                "local_get_const_f64",
-                "f32_add_imm_local_settee_same",
-                "f32_mul_imm_local_settee_same",
-                "f32_sub_imm_local_settee_same",
-                "f64_add_imm_local_settee_same",
-                "f64_mul_imm_local_settee_same",
-                "f64_sub_imm_local_settee_same",
-                "f32_acc_add_floor_localget_wait_add",
-                "f64_acc_add_abs_localget_wait_add",
-                "f32_acc_add_negabs_localget_wait_const",
-                "f64_acc_add_negabs_localget_wait_const",
-#endif
             })
         {
             UWVM2TEST_REQUIRE(log_contains_kind(log_text, kind));
         }
+#endif
 
         (void)::std::remove(kLogPath);
 

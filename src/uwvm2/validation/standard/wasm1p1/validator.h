@@ -2440,7 +2440,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     break;
                 }
-                case opcode_byte(wasm1p1_code::table_get):
+                case static_cast<wasm_byte>(wasm1p1_code::table_get):
                 {
                     // table.get tableidx ...
                     // [safe   ] unsafe (could be the section_end)
@@ -2476,7 +2476,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     break;
                 }
-                case opcode_byte(wasm1p1_code::table_set):
+                case static_cast<wasm_byte>(wasm1p1_code::table_set):
                 {
                     // table.set tableidx ...
                     // [safe   ] unsafe (could be the section_end)
@@ -2632,7 +2632,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                         break;
                     }
-                case opcode_byte(wasm1p1_code::select_t):
+                case static_cast<wasm_byte>(wasm1p1_code::select_t):
                 {
                     // select_t result_types ...
                     // [  safe ] unsafe (could be the section_end)
@@ -4286,7 +4286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"f64.reinterpret_i64", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::f64);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::i32_extend8_s):
+                case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
                 {
                     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                     {
@@ -4299,7 +4299,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"i32.extend8_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::i32_extend16_s):
+                case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
                 {
                     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                     {
@@ -4312,7 +4312,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"i32.extend16_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::i64_extend8_s):
+                case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
                 {
                     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                     {
@@ -4325,7 +4325,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"i64.extend8_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::i64_extend16_s):
+                case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
                 {
                     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                     {
@@ -4338,7 +4338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"i64.extend16_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::i64_extend32_s):
+                case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
                 {
                     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                     {
@@ -4351,7 +4351,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     validate_numeric_unary(u8"i64.extend32_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                     break;
                 }
-                case opcode_byte(wasm1p1_code::ref_null):
+                case static_cast<wasm_byte>(wasm1p1_code::ref_null):
                 {
                     // ref.null reftype ...
                     // [  safe ] unsafe (could be the section_end)
@@ -4389,7 +4389,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     operand_stack.push_back({vt});
                     break;
                 }
-                case opcode_byte(wasm1p1_code::ref_is_null):
+                case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
                 {
                     // ref.is_null ...
                     // [  safe   ] unsafe (could be the section_end)
@@ -4426,7 +4426,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     operand_stack.push_back({curr_operand_stack_value_type::i32});
                     break;
                 }
-                case opcode_byte(wasm1p1_code::ref_func):
+                case static_cast<wasm_byte>(wasm1p1_code::ref_func):
                 {
                     // ref.func funcidx ...
                     // [  safe ] unsafe (could be the section_end)
@@ -4454,7 +4454,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     operand_stack.push_back({static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)});
                     break;
                 }
-                case opcode_byte(wasm1p1_code::numeric_prefix):
+                case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                 {
                     // numeric_prefix subopcode ...
                     // [safe] unsafe (could be the section_end)
@@ -4904,7 +4904,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     break;
                 }
-                case opcode_byte(wasm1p1_code::simd_prefix):
+                case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
                 {
                     // simd_prefix subopcode ...
                     // [safe] unsafe (could be the section_end)

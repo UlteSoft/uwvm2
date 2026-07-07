@@ -188,6 +188,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             key, u8"emit-unwind-call-stack-frames", bool_key_value(opt.emit_unwind_call_stack_frames));
     }
 
+    [[nodiscard]] inline constexpr ::uwvm2::runtime::llvm_jit_cache::cache_policy lazy_llvm_jit_object_cache_policy() noexcept
+    {
+        auto policy{::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+#if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+        // These MCJIT targets cannot reliably use external data-symbol relocations for runtime storage, so the lazy emitter
+        // materializes host object pointers as absolute constants. RISC-V64 also uses direct bridge-function pointers. Those
+        // constants are process-local and must not be reused from the cross-process object cache.
+        policy.enable = false;
+#endif
+        return policy;
+    }
+
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
         lazy_local_function_wasm_code_hash(runtime_module_storage_t const& curr_module, ::std::size_t local_function_index) noexcept
     {
@@ -1008,7 +1020,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 *target_machine)};
             llvm_jit_cache_context.cache_key_is_complete = true;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
-                                                                                          ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+                                                                                          lazy_llvm_jit_object_cache_policy()};
 
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
@@ -1198,7 +1210,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 *target_machine)};
             llvm_jit_cache_context.cache_key_is_complete = true;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
-                                                                                          ::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+                                                                                          lazy_llvm_jit_object_cache_policy()};
 
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
@@ -1463,7 +1475,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             {
                 collect_lazy_unwind_direct_call_group(curr_module, storage, entry_local_function_index, candidate_group);
             }
-            else if(::uwvm2::runtime::llvm_jit_cache::default_cache_policy().enable)
+            else if(lazy_llvm_jit_object_cache_policy().enable)
             {
                 // Opportunistic lazy groups depend on scheduler timing and existing cache warmth.  Cache-enabled lazy JIT
                 // uses one stable demanded function per cache object; cache-disabled mode keeps group warmup below.

@@ -318,14 +318,8 @@ namespace
             optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::mul>(curr, tuple);
         constexpr auto exp_mul_local_tee_same =
             optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::mul>(curr, tuple);
-        constexpr auto exp_rotr_local_set_same =
-            optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
-        constexpr auto exp_rotr_local_tee_same =
-            optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
         constexpr auto exp_xor_local_tee_same =
             optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::xor_>(curr, tuple);
-        constexpr auto exp_rotl_local_tee_same =
-            optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotl>(curr, tuple);
         constexpr auto exp_shl_local_set_same =
             optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::shl>(curr, tuple);
         constexpr auto exp_shr_u_local_tee_same =
@@ -340,17 +334,27 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_mul_local_set_same));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_rotr_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_sub_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_xor_local_tee_same));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_rotl_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_shl_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(10).op.operands, exp_shr_u_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(11).op.operands, exp_and_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(12).op.operands, exp_or_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(13).op.operands, exp_shr_s_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(14).op.operands, exp_mul_local_tee_same));
+
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        constexpr auto exp_rotr_local_set_same =
+            optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
+        constexpr auto exp_rotr_local_tee_same =
+            optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
+        constexpr auto exp_rotl_local_tee_same =
+            optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotl>(curr, tuple);
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_rotr_local_tee_same));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_rotl_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(15).op.operands, exp_rotr_local_set_same));
+# endif
 
 # if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
         constexpr auto exp_add_2localget_local_set =

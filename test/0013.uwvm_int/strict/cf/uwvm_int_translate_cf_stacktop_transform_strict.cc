@@ -13,7 +13,7 @@ namespace
         auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
 
         // f0: (param i32) (result i32) -> 123 (for param!=0)
-        // Contains an unreachable-at-runtime `br 0` that should be emitted as `br_stacktop_transform_to_begin`
+        // Contains an unreachable-at-runtime `br 0` that exercises loop re-entry stacktop transform emission
         // when stacktop caching (merged rings) is enabled and the cache is non-empty at the branch point.
         {
             func_type ty{{k_val_i32}, {k_val_i32}};
@@ -93,7 +93,13 @@ namespace
         constexpr auto f45 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
         constexpr auto f46 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
 
-        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46);
+        constexpr auto n35 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c35, tuple);
+        constexpr auto n36 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c36, tuple);
+        constexpr auto n45 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
+        constexpr auto n46 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
+
+        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46) ||
+               bytecode_contains_fptr(bc, n35) || bytecode_contains_fptr(bc, n36) || bytecode_contains_fptr(bc, n45) || bytecode_contains_fptr(bc, n46);
 #endif
     }
 

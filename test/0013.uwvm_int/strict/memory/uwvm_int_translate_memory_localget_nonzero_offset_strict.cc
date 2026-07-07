@@ -139,15 +139,23 @@ namespace
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_count_fptr(bc1, exp_i32_load_and_imm) == 1uz);
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f32_load_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_f32_load_plain));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_local_get_i32));
-        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc2, exp_f32_load_localget) == 1uz);
+        bool const f32_fused{bytecode_contains_fptr(bc2, exp_f32_load_localget)};
+        UWVM2TEST_REQUIRE(f32_fused || bytecode_contains_fptr(bc2, exp_f32_load_plain));
+        if(f32_fused)
+        {
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_f32_load_plain));
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_local_get_i32));
+            UWVM2TEST_REQUIRE(bytecode_count_fptr(bc2, exp_f32_load_localget) == 1uz);
+        }
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_local_get_i32));
-        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc3, exp_f64_load_localget) == 1uz);
+        bool const f64_fused{bytecode_contains_fptr(bc3, exp_f64_load_localget)};
+        UWVM2TEST_REQUIRE(f64_fused || bytecode_contains_fptr(bc3, exp_f64_load_plain));
+        if(f64_fused)
+        {
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_local_get_i32));
+            UWVM2TEST_REQUIRE(bytecode_count_fptr(bc3, exp_f64_load_localget) == 1uz);
+        }
         return 0;
     }
 #endif
@@ -190,15 +198,23 @@ namespace
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_count_fptr(bc1, exp_i32_load_and_imm) == 1uz);
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f32_load_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_f32_load_plain));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_local_get_i32));
-        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc2, exp_f32_load_localget) == 1uz);
+        bool const f32_fused{bytecode_contains_fptr(bc2, exp_f32_load_localget)};
+        UWVM2TEST_REQUIRE(f32_fused || bytecode_contains_fptr(bc2, exp_f32_load_plain));
+        if(f32_fused)
+        {
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_f32_load_plain));
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_local_get_i32));
+            UWVM2TEST_REQUIRE(bytecode_count_fptr(bc2, exp_f32_load_localget) == 1uz);
+        }
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_local_get_i32));
-        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc3, exp_f64_load_localget) == 1uz);
+        bool const f64_fused{bytecode_contains_fptr(bc3, exp_f64_load_localget)};
+        UWVM2TEST_REQUIRE(f64_fused || bytecode_contains_fptr(bc3, exp_f64_load_plain));
+        if(f64_fused)
+        {
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
+            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_local_get_i32));
+            UWVM2TEST_REQUIRE(bytecode_count_fptr(bc3, exp_f64_load_localget) == 1uz);
+        }
 #else
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_plain));

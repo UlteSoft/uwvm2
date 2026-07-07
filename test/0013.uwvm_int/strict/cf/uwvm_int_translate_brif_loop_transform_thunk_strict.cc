@@ -16,8 +16,7 @@ namespace
         // f0: (param i32 n) -> (result i32)
         //
         // Keep a cached f32 value on the operand stack across a loop, and use `br_if 0` as a back-edge.
-        // With stacktop caching enabled, this triggers the `br_if` direct-jump fast path and the special
-        // "loop-entry stacktop transform thunk" emission:
+        // With stacktop caching enabled, this triggers the `br_if` loop re-entry stacktop transform path:
         //   target_frame.type == loop && stacktop_cache_count != 0
         //
         // Always returns 42.
@@ -117,7 +116,13 @@ namespace
         constexpr auto f45 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
         constexpr auto f46 = optable::translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
 
-        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46);
+        constexpr auto n35 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c35, tuple);
+        constexpr auto n36 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c36, tuple);
+        constexpr auto n45 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c45, tuple);
+        constexpr auto n46 = optable::translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(c46, tuple);
+
+        return bytecode_contains_fptr(bc, f35) || bytecode_contains_fptr(bc, f36) || bytecode_contains_fptr(bc, f45) || bytecode_contains_fptr(bc, f46) ||
+               bytecode_contains_fptr(bc, n35) || bytecode_contains_fptr(bc, n36) || bytecode_contains_fptr(bc, n45) || bytecode_contains_fptr(bc, n46);
 #endif
     }
 
@@ -162,7 +167,7 @@ namespace
             UWVM2TEST_REQUIRE(run_brif_loop_transform_thunk_suite<opt>(rt) == 0);
         }
 
-        // tailcall + stacktop caching (int/float merged rings): assert loop-entry transform thunk exists.
+        // tailcall + stacktop caching (int/float merged rings): assert loop-entry transform exists.
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -203,4 +208,3 @@ int main()
 {
     return test_translate_brif_loop_transform_thunk();
 }
-

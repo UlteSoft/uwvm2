@@ -401,22 +401,24 @@ namespace
         }
     };
 
-    [[nodiscard]] constexpr ::std::size_t abi_bytes(wasm_value_type t) noexcept
+    template <typename ValueType>
+    [[nodiscard]] constexpr ::std::size_t abi_bytes(ValueType t) noexcept
     {
-        switch(t)
+        switch(static_cast<::std::uint_least8_t>(t))
         {
-            case wasm_value_type::i32:
-            case wasm_value_type::f32:
+            case static_cast<::std::uint_least8_t>(wasm_value_type::i32):
+            case static_cast<::std::uint_least8_t>(wasm_value_type::f32):
                 return 4uz;
-            case wasm_value_type::i64:
-            case wasm_value_type::f64:
+            case static_cast<::std::uint_least8_t>(wasm_value_type::i64):
+            case static_cast<::std::uint_least8_t>(wasm_value_type::f64):
                 return 8uz;
             default:
                 return 0uz;
         }
     }
 
-    [[nodiscard]] inline ::std::size_t abi_total_bytes(wasm_value_type const* begin, wasm_value_type const* end) noexcept
+    template <typename ValueType>
+    [[nodiscard]] inline ::std::size_t abi_total_bytes(ValueType const* begin, ValueType const* end) noexcept
     {
         ::std::size_t total{};
         for(auto it = begin; it != end; ++it)

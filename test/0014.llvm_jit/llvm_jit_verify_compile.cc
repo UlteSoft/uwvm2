@@ -52,6 +52,83 @@ namespace
     inline constexpr ::std::string_view wasm1p1_scalar_runtime_args{
         "--runtime-llvm-jit-cache-path disable --wasm-feature-enable-sign-extension --wasm-feature-enable-nontrapping-float-to-int"};
 
+    inline constexpr ::std::string_view wasm1p1_all_runtime_args{
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-1p1"};
+
+    // WebAssembly 1.1 scalar edge fixture.  This covers every sign-extension
+    // opcode and every saturating float-to-int opcode at clamp/NaN boundaries.
+    inline constexpr ::std::array<unsigned char, 247uz> wasm1p1_scalar_edges_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u,
+        0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u, 0x0au, 0xd6u, 0x01u, 0x01u, 0xd3u, 0x01u,
+        0x00u, 0x41u, 0xffu, 0x01u, 0xc0u, 0x41u, 0x7fu, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu,
+        0x41u, 0x80u, 0x80u, 0x02u, 0xc1u, 0x41u, 0x80u, 0x80u, 0x7eu, 0x47u, 0x04u, 0x40u,
+        0x00u, 0x0bu, 0x42u, 0xffu, 0x01u, 0xc2u, 0x42u, 0x7fu, 0x52u, 0x04u, 0x40u, 0x00u,
+        0x0bu, 0x42u, 0x80u, 0x80u, 0x02u, 0xc3u, 0x42u, 0x80u, 0x80u, 0x7eu, 0x52u, 0x04u,
+        0x40u, 0x00u, 0x0bu, 0x42u, 0x80u, 0x80u, 0x80u, 0x80u, 0x08u, 0xc4u, 0x42u, 0x80u,
+        0x80u, 0x80u, 0x80u, 0x78u, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u,
+        0xc0u, 0x7fu, 0xfcu, 0x00u, 0x41u, 0x00u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x43u,
+        0x00u, 0x00u, 0x80u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u, 0x47u, 0x04u, 0x40u, 0x00u,
+        0x0bu, 0x44u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0xe0u, 0x41u, 0xfcu, 0x02u,
+        0x41u, 0xffu, 0xffu, 0xffu, 0xffu, 0x07u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x44u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0xf0u, 0x41u, 0xfcu, 0x03u, 0x41u, 0x7fu,
+        0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0x7fu, 0xfcu, 0x04u,
+        0x42u, 0x00u, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0x80u, 0xbfu,
+        0xfcu, 0x05u, 0x42u, 0x00u, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x44u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0xe0u, 0x43u, 0xfcu, 0x06u, 0x42u, 0xffu, 0xffu, 0xffu,
+        0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0x00u, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu,
+        0x44u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0xf0u, 0x43u, 0xfcu, 0x07u, 0x42u,
+        0x7fu, 0x52u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
+    // WebAssembly 1.1 bulk-memory fixture for memory.init, data.drop,
+    // memory.copy, and memory.fill.
+    inline constexpr ::std::array<unsigned char, 118uz> wasm1p1_bulk_memory_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x03u, 0x01u, 0x00u, 0x01u, 0x07u,
+        0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u, 0x0cu,
+        0x01u, 0x01u, 0x0au, 0x43u, 0x01u, 0x41u, 0x00u, 0x41u, 0x00u, 0x41u, 0x00u, 0x41u,
+        0x10u, 0xfcu, 0x0bu, 0x00u, 0x41u, 0x04u, 0x41u, 0x01u, 0x41u, 0x04u, 0xfcu, 0x08u,
+        0x00u, 0x00u, 0x41u, 0x08u, 0x41u, 0x04u, 0x41u, 0x04u, 0xfcu, 0x0au, 0x00u, 0x00u,
+        0xfcu, 0x09u, 0x00u, 0x41u, 0x04u, 0x2du, 0x00u, 0x00u, 0x41u, 0x05u, 0x2du, 0x00u,
+        0x00u, 0x6au, 0x41u, 0x08u, 0x2du, 0x00u, 0x00u, 0x6au, 0x41u, 0x0bu, 0x2du, 0x00u,
+        0x00u, 0x6au, 0x41u, 0xf8u, 0x00u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu, 0x0bu,
+        0x09u, 0x01u, 0x01u, 0x06u, 0x0au, 0x14u, 0x1eu, 0x28u, 0x32u, 0x3cu};
+
+    // WebAssembly 1.1 table/reference fixture covering ref.null,
+    // ref.is_null, ref.func, table.get/set, table.init/drop/copy/grow/size/fill.
+    inline constexpr ::std::array<unsigned char, 181uz> wasm1p1_table_ref_bulk_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x04u, 0x03u, 0x00u, 0x00u, 0x00u, 0x04u, 0x04u, 0x01u, 0x70u,
+        0x00u, 0x08u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u,
+        0x00u, 0x02u, 0x09u, 0x06u, 0x01u, 0x01u, 0x00u, 0x02u, 0x00u, 0x01u, 0x0au, 0x84u,
+        0x01u, 0x03u, 0x02u, 0x00u, 0x0bu, 0x02u, 0x00u, 0x0bu, 0x7cu, 0x01u, 0x01u, 0x7fu,
+        0xfcu, 0x10u, 0x00u, 0x41u, 0x08u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0xd0u, 0x70u,
+        0xd1u, 0x21u, 0x00u, 0xd2u, 0x00u, 0xd1u, 0x20u, 0x00u, 0x6au, 0x21u, 0x00u, 0x41u,
+        0x00u, 0xd0u, 0x70u, 0x41u, 0x02u, 0xfcu, 0x11u, 0x00u, 0x41u, 0x02u, 0x41u, 0x00u,
+        0x41u, 0x02u, 0xfcu, 0x0cu, 0x00u, 0x00u, 0xfcu, 0x0du, 0x00u, 0x41u, 0x04u, 0x41u,
+        0x02u, 0x41u, 0x02u, 0xfcu, 0x0eu, 0x00u, 0x00u, 0xd2u, 0x00u, 0x41u, 0x01u, 0xfcu,
+        0x0fu, 0x00u, 0x41u, 0x08u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0xfcu, 0x10u, 0x00u,
+        0x41u, 0x09u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x41u, 0x00u, 0x25u, 0x00u, 0xd1u,
+        0x20u, 0x00u, 0x6au, 0x21u, 0x00u, 0x41u, 0x04u, 0x25u, 0x00u, 0xd1u, 0x20u, 0x00u,
+        0x6au, 0x21u, 0x00u, 0x41u, 0x08u, 0xd0u, 0x70u, 0x26u, 0x00u, 0x41u, 0x08u, 0x25u,
+        0x00u, 0xd1u, 0x20u, 0x00u, 0x6au, 0x41u, 0x03u, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu,
+        0x0bu};
+
+    // WebAssembly 1.1 SIMD fixture covering v128 memory ops, constants,
+    // splat, lane extraction, arithmetic, equality, and all_true.
+    inline constexpr ::std::array<unsigned char, 132uz> wasm1p1_simd_basic_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x03u, 0x01u, 0x00u, 0x01u, 0x07u,
+        0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u, 0x0au,
+        0x5fu, 0x01u, 0x5du, 0x01u, 0x01u, 0x7fu, 0x41u, 0x00u, 0xfdu, 0x0cu, 0x01u, 0x00u,
+        0x00u, 0x00u, 0x02u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x04u, 0x00u,
+        0x00u, 0x00u, 0xfdu, 0x0bu, 0x02u, 0x00u, 0x41u, 0x00u, 0xfdu, 0x00u, 0x02u, 0x00u,
+        0x41u, 0x05u, 0xfdu, 0x11u, 0xfdu, 0xaeu, 0x01u, 0xfdu, 0x1bu, 0x02u, 0x21u, 0x00u,
+        0xfdu, 0x0cu, 0x06u, 0x00u, 0x00u, 0x00u, 0x07u, 0x00u, 0x00u, 0x00u, 0x08u, 0x00u,
+        0x00u, 0x00u, 0x09u, 0x00u, 0x00u, 0x00u, 0x41u, 0x00u, 0xfdu, 0x00u, 0x02u, 0x00u,
+        0x41u, 0x05u, 0xfdu, 0x11u, 0xfdu, 0xaeu, 0x01u, 0xfdu, 0x37u, 0xfdu, 0xa3u, 0x01u,
+        0x20u, 0x00u, 0x41u, 0x08u, 0x46u, 0x71u, 0x45u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
     // WebAssembly 1.1 multi-value fixture.  The helper returns two i32s and
     // `_start` consumes them.  This intentionally exercises the LLVM raw-entry
     // interpreter fallback path because the current typed LLVM ABI is scalar.
@@ -450,6 +527,18 @@ namespace
         return run_command(command, "lazy+verification llvm-jit");
     }
 
+    [[nodiscard]] bool run_tiered_mode(::std::filesystem::path const& uwvm_path,
+                                       ::std::filesystem::path const& wasm_path,
+                                       ::std::string_view tiered_args,
+                                       ::std::string_view extra_args = {})
+    {
+        auto command{quote_argument(uwvm_path) + " " + ::std::string{tiered_args}};
+        append_default_llvm_cache_disable_arg(command, extra_args);
+        append_extra_args(command, extra_args);
+        command += " --run " + quote_argument(wasm_path);
+        return run_command(command, "tiered llvm-jit");
+    }
+
     [[nodiscard]] bool run_aot_shortcut(::std::filesystem::path const& uwvm_path,
                                         ::std::filesystem::path const& wasm_path,
                                         ::std::string_view extra_args = {})
@@ -461,6 +550,12 @@ namespace
         return run_command(command, "runtime-aot shortcut");
     }
 
+    [[nodiscard]] ::std::filesystem::path llvm_jit_fixture_path(::std::filesystem::path const& executable_dir,
+                                                                 ::std::string_view file_name)
+    {
+        return executable_dir / "test-artifacts" / "0014.llvm_jit" / ::std::string{file_name};
+    }
+
     template <::std::size_t N>
     [[nodiscard]] bool run_fixture(::std::filesystem::path const& uwvm_path,
                                    ::std::filesystem::path const& executable_dir,
@@ -469,7 +564,7 @@ namespace
                                    ::std::string_view extra_args = {},
                                    bool expect_without_extra_args_to_fail = false)
     {
-        auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / ::std::string{file_name}};
+        auto const wasm_path{llvm_jit_fixture_path(executable_dir, file_name)};
         if(!write_fixture(wasm_path, wasm_bytes)) [[unlikely]] { return false; }
 
         auto const label{::std::string{file_name}};
@@ -482,9 +577,34 @@ namespace
         return true;
     }
 
+    [[nodiscard]] bool run_wasm1p1_tiered_matrix(::std::filesystem::path const& uwvm_path,
+                                                 ::std::filesystem::path const& wasm_path,
+                                                 ::std::string_view extra_args)
+    {
+        for(::std::string_view tiered_args: {::std::string_view{"-Rtiered"},
+                                            ::std::string_view{"-Rtiered -Rtiered-disable-t0"},
+                                            ::std::string_view{"-Rtiered -Rtiered-disable-t2"},
+                                            ::std::string_view{"-Rtiered -Rtiered-disable-t0 -Rtiered-disable-t2"}})
+        {
+            if(!run_tiered_mode(uwvm_path, wasm_path, tiered_args, extra_args)) [[unlikely]] { return false; }
+        }
+
+        for(::std::string_view policy: {::std::string_view{"debug"},
+                                        ::std::string_view{"default"},
+                                        ::std::string_view{"fast-compile"},
+                                        ::std::string_view{"balanced"},
+                                        ::std::string_view{"max"}})
+        {
+            auto policy_args{::std::string{extra_args} + " --runtime-llvm-jit-policy " + ::std::string{policy}};
+            if(!run_tiered_mode(uwvm_path, wasm_path, "-Rtiered", policy_args)) [[unlikely]] { return false; }
+        }
+
+        return true;
+    }
+
     [[nodiscard]] bool run_wasm1p1_policy_matrix(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& executable_dir)
     {
-        auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / "wasm1p1_scalar_start.wasm"};
+        auto const wasm_path{llvm_jit_fixture_path(executable_dir, "wasm1p1_scalar_start.wasm")};
 
         for(::std::string_view policy: {::std::string_view{"debug"},
                                         ::std::string_view{"pb-o1"},
@@ -501,7 +621,7 @@ namespace
             if(!run_lazy_mode(uwvm_path, wasm_path, extra_args)) [[unlikely]] { return false; }
         }
 
-        return true;
+        return run_wasm1p1_tiered_matrix(uwvm_path, wasm_path, wasm1p1_scalar_runtime_args);
     }
 
 }  // namespace
@@ -536,6 +656,42 @@ int main(int argc, char** argv)
     }
     if(!run_fixture(uwvm_path,
                     executable_dir,
+                    "wasm1p1_scalar_edges_start.wasm",
+                    wasm1p1_scalar_edges_start_wasm,
+                    wasm1p1_scalar_runtime_args,
+                    true)) [[unlikely]]
+    {
+        return 1;
+    }
+    if(!run_fixture(uwvm_path,
+                    executable_dir,
+                    "wasm1p1_bulk_memory_start.wasm",
+                    wasm1p1_bulk_memory_start_wasm,
+                    wasm1p1_all_runtime_args,
+                    true)) [[unlikely]]
+    {
+        return 1;
+    }
+    if(!run_fixture(uwvm_path,
+                    executable_dir,
+                    "wasm1p1_table_ref_bulk_start.wasm",
+                    wasm1p1_table_ref_bulk_start_wasm,
+                    wasm1p1_all_runtime_args,
+                    true)) [[unlikely]]
+    {
+        return 1;
+    }
+    if(!run_fixture(uwvm_path,
+                    executable_dir,
+                    "wasm1p1_simd_basic_start.wasm",
+                    wasm1p1_simd_basic_start_wasm,
+                    wasm1p1_all_runtime_args,
+                    true)) [[unlikely]]
+    {
+        return 1;
+    }
+    if(!run_fixture(uwvm_path,
+                    executable_dir,
                     "wasm1p1_multivalue_start.wasm",
                     wasm1p1_multivalue_start_wasm,
                     wasm1p1_multivalue_runtime_args,
@@ -544,6 +700,18 @@ int main(int argc, char** argv)
         return 1;
     }
     if(!run_wasm1p1_policy_matrix(uwvm_path, executable_dir)) [[unlikely]] { return 1; }
+    for(auto const file_name: {::std::string_view{"wasm1p1_scalar_edges_start.wasm"},
+                               ::std::string_view{"wasm1p1_bulk_memory_start.wasm"},
+                               ::std::string_view{"wasm1p1_table_ref_bulk_start.wasm"},
+                               ::std::string_view{"wasm1p1_simd_basic_start.wasm"}})
+    {
+        if(!run_wasm1p1_tiered_matrix(uwvm_path,
+                                      llvm_jit_fixture_path(executable_dir, file_name),
+                                      wasm1p1_all_runtime_args)) [[unlikely]]
+        {
+            return 1;
+        }
+    }
     if(!run_inline_unwind_trap_fixture(uwvm_path, executable_dir)) [[unlikely]] { return 1; }
 
     return 0;

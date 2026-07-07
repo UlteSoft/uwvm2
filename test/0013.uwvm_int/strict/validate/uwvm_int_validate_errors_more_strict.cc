@@ -199,7 +199,7 @@ namespace
         func_type ty{{}, {}};
         func_body fb{};
         op(fb.code, wasm_op::block);
-        append_u8(fb.code, 0x00u);  // illegal blocktype
+        append_u8(fb.code, 0x7au);  // illegal negative blocktype (-6)
         op(fb.code, wasm_op::end);
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
@@ -338,7 +338,7 @@ namespace
         // if <illegal blocktype byte> ... end
         // Triggers translate.h `if` blocktype switch default => illegal_block_type.
         op(fb.code, wasm_op::if_);
-        append_u8(fb.code, 0x00u);  // illegal blocktype byte
+        append_u8(fb.code, 0x7au);  // illegal negative blocktype (-6)
         op(fb.code, wasm_op::end);  // end if
         op(fb.code, wasm_op::end);  // end func
         (void)mb.add_func(::std::move(ty), ::std::move(fb));

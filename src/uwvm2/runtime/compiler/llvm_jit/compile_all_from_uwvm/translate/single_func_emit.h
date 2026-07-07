@@ -257,6 +257,58 @@ template <typename FunctionPtr>
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
 }
 
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+// Materialize a full process-local address without routing through a JIT data-section constant pool.  RuntimeDyld's
+// RISC-V64 handling can truncate absolute references to the emitted object's own data section.  Build the value from
+// byte-sized immediates seeded by a volatile stack zero so LLVM cannot fold it back into an inttoptr constant.
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_riscv64_immediate_pointer_value(::llvm::IRBuilder<>& ir_builder,
+                                                                                       ::std::uintptr_t host_address,
+                                                                                       ::llvm::Type* pointer_type) noexcept
+{
+    if(host_address == 0u || pointer_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto& llvm_context{ir_builder.getContext()};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
+    if(current_function == nullptr || current_function->empty()) [[unlikely]] { return nullptr; }
+
+    auto& entry_block{current_function->getEntryBlock()};
+    ::llvm::IRBuilder<> entry_builder{&entry_block, entry_block.getFirstInsertionPt()};
+    auto zero_slot{entry_builder.CreateAlloca(llvm_intptr_type, nullptr, get_llvm_string_ref(u8"uwvm.riscv64.host.addr.zero"))};
+    zero_slot->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+
+    auto zero_store{ir_builder.CreateStore(::llvm::ConstantInt::get(llvm_intptr_type, 0u), zero_slot)};
+    zero_store->setVolatile(true);
+    zero_store->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+
+    auto address_load{ir_builder.CreateLoad(llvm_intptr_type, zero_slot, get_llvm_string_ref(u8"uwvm.riscv64.host.addr"))};
+    address_load->setVolatile(true);
+    address_load->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    ::llvm::Value* address_value{address_load};
+
+    for(unsigned shift{static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u - 8u)};; shift -= 8u)
+    {
+        if(shift != static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u - 8u))
+        {
+            address_value = ir_builder.CreateShl(address_value, ::llvm::ConstantInt::get(llvm_intptr_type, 8u), get_llvm_string_ref(u8"uwvm.riscv64.host.addr.shl"));
+        }
+
+        auto const chunk{static_cast<::std::uint_least8_t>((host_address >> shift) & 0xffu)};
+        if(chunk != 0u)
+        {
+            address_value = ir_builder.CreateOr(address_value,
+                                                ::llvm::ConstantInt::get(llvm_intptr_type, chunk),
+                                                get_llvm_string_ref(u8"uwvm.riscv64.host.addr.or"));
+        }
+
+        if(shift == 0u) { break; }
+    }
+
+    return ir_builder.CreateIntToPtr(address_value, pointer_type, get_llvm_string_ref(u8"uwvm.host.ptr"));
+}
+#endif
+
 #if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
 // Put host addresses in the JIT module's own data section on targets where MCJIT cannot reliably materialize arbitrary
 // process addresses directly. COFF/Win64 may truncate far host-image addresses.
@@ -319,7 +371,9 @@ template <typename FunctionPtr>
 [[nodiscard]] inline constexpr ::llvm::Value*
     get_llvm_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
-#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    return get_llvm_riscv64_immediate_pointer_value(ir_builder, host_address, pointer_type);
+#elif UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
     return get_llvm_jit_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     static_cast<void>(ir_builder);
@@ -410,6 +464,13 @@ template <auto Function>
     auto const function_address{get_llvm_runtime_bridge_function_address(Function)};
     if(function_address == 0u) [[unlikely]] { return nullptr; }
 
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // RISC-V64 RuntimeDyld cannot reliably relocate far process-local bridge functions through an external symbol call.
+    // Materialize the bridge address directly; callers that use object caching must disable it for this target.
+    static_cast<void>(llvm_module);
+    static_cast<void>(discriminator);
+    return get_llvm_host_pointer_value(ir_builder, function_address, get_llvm_pointer_type(function_type));
+#else
     auto symbol_name{get_llvm_runtime_bridge_function_symbol_name<Function>(function_type, discriminator)};
     auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
 
@@ -420,6 +481,7 @@ template <auto Function>
         return existing;
     }
     return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
+#endif
 }
 
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
@@ -432,13 +494,17 @@ template <auto Function>
     auto pointer_type{get_llvm_pointer_type(object_type)};
     if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
-#if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+#if defined(__i386__) || defined(_M_IX86)
     // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds.
-    // ELF riscv64 RuntimeDyld handles absolute HI20/LO12 data-symbol relocations as 32-bit addresses and lacks LO12_S.
     // These host objects are process-stable tables/storage, so materialize their full pointer values as constants.
     static_cast<void>(ir_builder);
     static_cast<void>(symbol_name);
     return get_llvm_host_pointer_constant(host_address, pointer_type);
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // ELF RISC-V64 RuntimeDyld handles some absolute HI20/LO12 references as 32-bit addresses and lacks LO12_S.
+    // Avoid both external data symbols and JIT data-section constants by materializing the full pointer in code.
+    static_cast<void>(symbol_name);
+    return get_llvm_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     auto current_block{ir_builder.GetInsertBlock()};
     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
@@ -872,6 +938,12 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"x29"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // RISC-V64 does not expose native JIT unwind support, and MCJIT has been observed to fault before the trap helper
+    // when lowering llvm.frameaddress in generated trap blocks.  Pass zero and let the runtime use the instruction
+    // call-stack path that is advertised for this target.
+    static_cast<void>(ir_builder);
+    return ::llvm::ConstantInt::get(llvm_intptr_type, 0u);
 #else
     auto const frame_address_ptr{ir_builder.CreateIntrinsic(::llvm::Intrinsic::frameaddress,
                                                             ir_builder.getPtrTy(),

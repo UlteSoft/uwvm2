@@ -1,8 +1,10 @@
 #include "../uwvm_int_translate_strict_common.h"
+#include "../../wasm1p1/uwvm_int_wasm1p1_full_common.h"
 
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
+    namespace full = ::uwvm2test::uwvm_int_wasm1p1_full;
     using errc = ::uwvm2::validation::error::code_validation_error_code;
 
     constexpr ::std::uint32_t k_large_block_type_index{260u};
@@ -392,6 +394,223 @@ namespace
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_common_wasm1p1_error_suite_for_opt() noexcept
+    {
+        auto all_features = make_wasm1p1_feature_parameter();
+
+        auto ref_disabled_features = all_features;
+        auto sign_disabled_features = all_features;
+        auto bulk_disabled_features = all_features;
+        auto nontrapping_disabled_features = all_features;
+        auto simd_disabled_features = all_features;
+
+        using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
+        auto& ref_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(ref_disabled_features);
+        auto& sign_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(sign_disabled_features);
+        auto& bulk_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(bulk_disabled_features);
+        auto& nontrapping_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(nontrapping_disabled_features);
+        auto& simd_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(simd_disabled_features);
+
+        ref_para.enable_reference_types = false;
+        sign_para.enable_sign_extension = false;
+        bulk_para.enable_bulk_memory = false;
+        nontrapping_para.enable_nontrapping_float_to_int = false;
+        simd_para.enable_simd = false;
+
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_ref_feature_module(),
+                                                                  u8"uwvm2test_strict_full_ref_feature",
+                                                                  all_features,
+                                                                  ref_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_ref_feature_masks_ref_type_module(),
+                                                                  u8"uwvm2test_strict_full_ref_feature_masks_type",
+                                                                  all_features,
+                                                                  ref_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_ref_null_type_module(),
+                                                    u8"uwvm2test_strict_full_ref_null_type",
+                                                    all_features,
+                                                    errc::wasm1p1_invalid_reference_type) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_ref_is_null_i32_module(),
+                                                    u8"uwvm2test_strict_full_ref_is_null_i32",
+                                                    all_features,
+                                                    errc::wasm1p1_invalid_reference_type) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_ref_func_undeclared_module(),
+                                                    u8"uwvm2test_strict_full_ref_func_undeclared",
+                                                    all_features,
+                                                    errc::wasm1p1_undeclared_ref_func) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_sign_extension_type_module(),
+                                                                  u8"uwvm2test_strict_full_sign_feature",
+                                                                  all_features,
+                                                                  sign_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_sign_extension_type_module(),
+                                                    u8"uwvm2test_strict_full_sign_type",
+                                                    all_features,
+                                                    errc::numeric_operand_type_mismatch) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_select_t_count_module(),
+                                                    u8"uwvm2test_strict_full_select_count",
+                                                    all_features,
+                                                    errc::invalid_const_immediate) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_select_t_cond_type_module(),
+                                                    u8"uwvm2test_strict_full_select_cond",
+                                                    all_features,
+                                                    errc::select_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_select_t_result_type_mismatch_module(),
+                                                    u8"uwvm2test_strict_full_select_type",
+                                                    all_features,
+                                                    errc::select_type_mismatch) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_numeric_prefix_module(),
+                                                    u8"uwvm2test_strict_full_numeric_prefix",
+                                                    all_features,
+                                                    errc::illegal_opbase) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_nontrapping_feature_module(),
+                                                                  u8"uwvm2test_strict_full_nontrapping_feature",
+                                                                  all_features,
+                                                                  nontrapping_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_bulk_feature_module(),
+                                                                  u8"uwvm2test_strict_full_bulk_feature",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_bulk_feature_masks_data_index_module(),
+                                                                  u8"uwvm2test_strict_full_bulk_feature_masks_data",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_memory_init_data_index_module(),
+                                                    u8"uwvm2test_strict_full_memory_init_data",
+                                                    all_features,
+                                                    errc::illegal_data_index) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_memory_copy_memidx_module(),
+                                                    u8"uwvm2test_strict_full_memory_copy_memidx",
+                                                    all_features,
+                                                    errc::illegal_memory_index) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_memory_fill_type_module(),
+                                                    u8"uwvm2test_strict_full_memory_fill_type",
+                                                    all_features,
+                                                    errc::numeric_operand_type_mismatch) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_table_get_index_module(),
+                                                    u8"uwvm2test_strict_full_table_get_index",
+                                                    all_features,
+                                                    errc::illegal_table_index) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_table_set_value_type_module(),
+                                                    u8"uwvm2test_strict_full_table_set_type",
+                                                    all_features,
+                                                    errc::br_value_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_table_fill_len_type_module(),
+                                                    u8"uwvm2test_strict_full_table_fill_len",
+                                                    all_features,
+                                                    errc::numeric_operand_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_table_fill_feature_masks_type_module(),
+                                                                  u8"uwvm2test_strict_full_table_fill_feature_masks_type",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_table_grow_value_type_module(),
+                                                    u8"uwvm2test_strict_full_table_grow_value",
+                                                    all_features,
+                                                    errc::br_value_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_table_init_elem_index_module(),
+                                                    u8"uwvm2test_strict_full_table_init_elem",
+                                                    all_features,
+                                                    errc::illegal_element_index) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_simd_feature_module(),
+                                                                  u8"uwvm2test_strict_full_simd_feature",
+                                                                  all_features,
+                                                                  simd_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_simd_feature_masks_lane_module(),
+                                                                  u8"uwvm2test_strict_full_simd_feature_masks_lane",
+                                                                  all_features,
+                                                                  simd_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_simd_prefix_module(),
+                                                    u8"uwvm2test_strict_full_simd_prefix",
+                                                    all_features,
+                                                    errc::illegal_opbase) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_simd_lane_module(),
+                                                    u8"uwvm2test_strict_full_simd_lane",
+                                                    all_features,
+                                                    errc::invalid_const_immediate) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_simd_align_module(),
+                                                    u8"uwvm2test_strict_full_simd_align",
+                                                    all_features,
+                                                    errc::illegal_memarg_alignment) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_simd_no_memory_module(),
+                                                    u8"uwvm2test_strict_full_simd_no_memory",
+                                                    all_features,
+                                                    errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_polymorphic_simd_lane_module(),
+                                                                  u8"uwvm2test_strict_full_poly_simd_feature_masks_lane",
+                                                                  all_features,
+                                                                  simd_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_polymorphic_simd_lane_module(),
+                                                    u8"uwvm2test_strict_full_poly_simd_lane",
+                                                    all_features,
+                                                    errc::invalid_const_immediate) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_polymorphic_simd_no_memory_module(),
+                                                    u8"uwvm2test_strict_full_poly_simd_no_memory",
+                                                    all_features,
+                                                    errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_polymorphic_ref_func_undeclared_module(),
+                                                                  u8"uwvm2test_strict_full_poly_ref_func_feature",
+                                                                  all_features,
+                                                                  ref_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_polymorphic_ref_func_undeclared_module(),
+                                                    u8"uwvm2test_strict_full_poly_ref_func_undeclared",
+                                                    all_features,
+                                                    errc::wasm1p1_undeclared_ref_func) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_polymorphic_memory_init_data_index_module(),
+                                                                  u8"uwvm2test_strict_full_poly_memory_init_feature",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_polymorphic_memory_init_data_index_module(),
+                                                    u8"uwvm2test_strict_full_poly_memory_init_data",
+                                                    all_features,
+                                                    errc::illegal_data_index) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_polymorphic_table_init_elem_index_module(),
+                                                                  u8"uwvm2test_strict_full_poly_table_init_feature",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_invalid_polymorphic_table_init_elem_index_module(),
+                                                    u8"uwvm2test_strict_full_poly_table_init_elem",
+                                                    all_features,
+                                                    errc::illegal_element_index) == 0);
+
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_valid_polymorphic_wasm1p1_combo_module(),
+                                                                  u8"uwvm2test_strict_full_polymorphic_ref_feature",
+                                                                  all_features,
+                                                                  ref_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_valid_polymorphic_wasm1p1_combo_module(),
+                                                                  u8"uwvm2test_strict_full_polymorphic_simd_feature",
+                                                                  all_features,
+                                                                  simd_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_valid_polymorphic_wasm1p1_combo_module(),
+                                                                  u8"uwvm2test_strict_full_polymorphic_bulk_feature",
+                                                                  all_features,
+                                                                  bulk_disabled_features,
+                                                                  errc::wasm1p1_feature_required) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_error<Opt>(full::build_valid_polymorphic_wasm1p1_combo_module(),
+                                                    u8"uwvm2test_strict_full_polymorphic_combo",
+                                                    all_features,
+                                                    errc::ok) == 0);
+        return 0;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
     [[nodiscard]] int run_alignment_suite_for_opt() noexcept
     {
         auto select_features = make_alignment_feature_parameter(false, false, true);
@@ -417,6 +636,7 @@ namespace
                                                     u8"uwvm2test_wasm1p1_typeidx_loop_label_mismatch",
                                                     typeidx_features,
                                                     errc::br_value_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(run_common_wasm1p1_error_suite_for_opt<Opt>() == 0);
         return 0;
     }
 

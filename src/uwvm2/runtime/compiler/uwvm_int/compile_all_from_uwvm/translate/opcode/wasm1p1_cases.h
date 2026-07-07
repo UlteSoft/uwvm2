@@ -1,7 +1,7 @@
     // WebAssembly 1.1 instruction support for the UWVM interpreter translator.
     // Feature switches are consumed here, during translation, so runtime opfuncs stay branch-free.
 
-case opcode_byte(wasm1p1_code::table_get):
+case static_cast<wasm_byte>(wasm1p1_code::table_get):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -29,7 +29,7 @@ case opcode_byte(wasm1p1_code::table_get):
     break;
 }
 
-case opcode_byte(wasm1p1_code::table_set):
+case static_cast<wasm_byte>(wasm1p1_code::table_set):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -81,7 +81,7 @@ case opcode_byte(wasm1p1_code::table_set):
     break;
 }
 
-case opcode_byte(wasm1p1_code::select_t):
+case static_cast<wasm_byte>(wasm1p1_code::select_t):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -228,7 +228,7 @@ case opcode_byte(wasm1p1_code::select_t):
     break;
 }
 
-case opcode_byte(wasm1p1_code::i32_extend8_s):
+case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
 {
     auto const op_begin{code_curr};
     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
@@ -244,7 +244,7 @@ case opcode_byte(wasm1p1_code::i32_extend8_s):
     break;
 }
 
-case opcode_byte(wasm1p1_code::i32_extend16_s):
+case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
 {
     auto const op_begin{code_curr};
     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
@@ -260,7 +260,7 @@ case opcode_byte(wasm1p1_code::i32_extend16_s):
     break;
 }
 
-case opcode_byte(wasm1p1_code::i64_extend8_s):
+case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
 {
     auto const op_begin{code_curr};
     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
@@ -276,7 +276,7 @@ case opcode_byte(wasm1p1_code::i64_extend8_s):
     break;
 }
 
-case opcode_byte(wasm1p1_code::i64_extend16_s):
+case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
 {
     auto const op_begin{code_curr};
     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
@@ -292,7 +292,7 @@ case opcode_byte(wasm1p1_code::i64_extend16_s):
     break;
 }
 
-case opcode_byte(wasm1p1_code::i64_extend32_s):
+case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
 {
     auto const op_begin{code_curr};
     if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
@@ -308,7 +308,7 @@ case opcode_byte(wasm1p1_code::i64_extend32_s):
     break;
 }
 
-case opcode_byte(wasm1p1_code::ref_null):
+case static_cast<wasm_byte>(wasm1p1_code::ref_null):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -350,7 +350,7 @@ case opcode_byte(wasm1p1_code::ref_null):
     break;
 }
 
-case opcode_byte(wasm1p1_code::ref_is_null):
+case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -392,7 +392,7 @@ case opcode_byte(wasm1p1_code::ref_is_null):
     break;
 }
 
-case opcode_byte(wasm1p1_code::ref_func):
+case static_cast<wasm_byte>(wasm1p1_code::ref_func):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -418,7 +418,7 @@ case opcode_byte(wasm1p1_code::ref_func):
     break;
 }
 
-case opcode_byte(wasm1p1_code::simd_prefix):
+case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
 {
     auto const op_begin{code_curr};
     ++code_curr;
@@ -2211,7 +2211,7 @@ case opcode_byte(wasm1p1_code::simd_prefix):
     break;
 }
 
-case opcode_byte(wasm1p1_code::numeric_prefix):
+case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
 {
     auto const op_begin{code_curr};
     ++code_curr;

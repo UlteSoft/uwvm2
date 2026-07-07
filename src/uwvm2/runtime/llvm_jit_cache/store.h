@@ -302,10 +302,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             inline constexpr cache_dir_cursor() noexcept = default;
             cache_dir_cursor(cache_dir_cursor const&) = delete;
             cache_dir_cursor& operator= (cache_dir_cursor const&) = delete;
-            inline constexpr cache_dir_cursor(cache_dir_cursor&&) noexcept = default;
-            inline constexpr cache_dir_cursor& operator= (cache_dir_cursor&&) noexcept = default;
+            inline cache_dir_cursor(cache_dir_cursor&&) noexcept = default;
+            inline cache_dir_cursor& operator= (cache_dir_cursor&&) noexcept = default;
 
-            inline constexpr cache_dir_cursor(::fast_io::dir_file&& directory, ::std::size_t next_pos, ::uwvm2::utils::container::u8string&& display) noexcept :
+            inline cache_dir_cursor(::fast_io::dir_file&& directory, ::std::size_t next_pos, ::uwvm2::utils::container::u8string&& display) noexcept :
                 dir{::std::move(directory)}, next{next_pos}, display_path{::std::move(display)}
             {
             }

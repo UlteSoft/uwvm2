@@ -830,7 +830,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     auto const op_byte{static_cast<unsigned>(curr_opbase)};
                     switch(static_cast<wasm_byte>(op_byte))
                     {
-                        case opcode_byte(wasm1p1_code::select_t):
+                        case static_cast<wasm_byte>(wasm1p1_code::select_t):
                         {
                             auto const result_type_count{
                                 read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_const_immediate, err)};
@@ -847,8 +847,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                     err);
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::table_get):
-                        case opcode_byte(wasm1p1_code::table_set):
+                        case static_cast<wasm_byte>(wasm1p1_code::table_get):
+                        case static_cast<wasm_byte>(wasm1p1_code::table_set):
                         {
                             if(!wasm1p1_para.enable_reference_types) [[unlikely]]
                             {
@@ -861,11 +861,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::i32_extend8_s):
-                        case opcode_byte(wasm1p1_code::i32_extend16_s):
-                        case opcode_byte(wasm1p1_code::i64_extend8_s):
-                        case opcode_byte(wasm1p1_code::i64_extend16_s):
-                        case opcode_byte(wasm1p1_code::i64_extend32_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
                         {
                             if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
                             {
@@ -877,7 +877,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             }
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::ref_null):
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_null):
                         {
                             if(!wasm1p1_para.enable_reference_types) [[unlikely]]
                             {
@@ -905,7 +905,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 err);
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::ref_is_null):
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
                         {
                             if(!wasm1p1_para.enable_reference_types) [[unlikely]]
                             {
@@ -917,7 +917,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             }
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::ref_func):
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_func):
                         {
                             if(!wasm1p1_para.enable_reference_types) [[unlikely]]
                             {
@@ -934,7 +934,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    err);
                             return;
                         }
-                        case opcode_byte(wasm1p1_code::numeric_prefix):
+                        case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                         {
                             auto const subopcode{
                                 read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_opbase, err)};
@@ -1099,7 +1099,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                             }
                         }
-                        case opcode_byte(wasm1p1_code::simd_prefix):
+                        case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
                         {
                             if(!wasm1p1_para.enable_simd) [[unlikely]]
                             {

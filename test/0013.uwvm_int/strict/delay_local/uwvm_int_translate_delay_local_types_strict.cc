@@ -314,7 +314,7 @@ namespace
                                  cm.local_funcs.index_unchecked(3).op.operands,
                                  [&](auto const& curr_variant) constexpr noexcept
                                  { return optable::translate::get_uwvmint_f32_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
-# else
+# elif defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
             ok_f32 = ok_f32 || bytecode_contains_f32_variant<Opt>(
                                  cm.local_funcs.index_unchecked(3).op.operands,
                                  [&](auto const& curr_variant) constexpr noexcept
@@ -339,7 +339,7 @@ namespace
                                  cm.local_funcs.index_unchecked(4).op.operands,
                                  [&](auto const& curr_variant) constexpr noexcept
                                  { return optable::translate::get_uwvmint_f64_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
-# else
+# elif defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
             ok_f64 = ok_f64 || bytecode_contains_f64_variant<Opt>(
                                  cm.local_funcs.index_unchecked(4).op.operands,
                                  [&](auto const& curr_variant) constexpr noexcept

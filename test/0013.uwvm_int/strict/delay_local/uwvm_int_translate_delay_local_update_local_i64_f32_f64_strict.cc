@@ -353,12 +353,14 @@ namespace
             auto const exp_i64_add_2localget_local_tee{
                 [&](auto const& curr_variant) constexpr noexcept
                 { return optable::translate::get_uwvmint_i64_add_2localget_local_tee_common_fptr_from_tuple<Opt>(curr_variant, tuple); }};
+#  if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
             auto const exp_f32_add_2localget_local_set{
                 [&](auto const& curr_variant) constexpr noexcept
                 { return optable::translate::get_uwvmint_f32_add_2localget_local_set_common_fptr_from_tuple<Opt>(curr_variant, tuple); }};
             auto const exp_f64_add_2localget_local_set{
                 [&](auto const& curr_variant) constexpr noexcept
                 { return optable::translate::get_uwvmint_f64_add_2localget_local_set_common_fptr_from_tuple<Opt>(curr_variant, tuple); }};
+#  endif
 # endif
 
             bool ok_i64_add_set{};
@@ -372,12 +374,16 @@ namespace
             UWVM2TEST_REQUIRE(ok_i64_add_tee);
 
             bool ok_f32_add_set{};
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) || defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
             ok_f32_add_set = ok_f32_add_set || contains_f32_variant(cm.local_funcs.index_unchecked(2).op.operands, exp_f32_add_2localget_local_set);
+# endif
             ok_f32_add_set = ok_f32_add_set || contains_f32_variant(cm.local_funcs.index_unchecked(2).op.operands, exp_f32_add_set);
             UWVM2TEST_REQUIRE(ok_f32_add_set);
             UWVM2TEST_REQUIRE(contains_f32_variant(cm.local_funcs.index_unchecked(4).op.operands, exp_f32_mul_set));
             bool ok_f64_add_set{};
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) || defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
             ok_f64_add_set = ok_f64_add_set || contains_f64_variant(cm.local_funcs.index_unchecked(5).op.operands, exp_f64_add_2localget_local_set);
+# endif
             ok_f64_add_set = ok_f64_add_set || contains_f64_variant(cm.local_funcs.index_unchecked(5).op.operands, exp_f64_add_set);
             UWVM2TEST_REQUIRE(ok_f64_add_set);
             UWVM2TEST_REQUIRE(contains_f64_variant(cm.local_funcs.index_unchecked(7).op.operands, exp_f64_mul_set));

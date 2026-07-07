@@ -47,7 +47,7 @@ MODES = (
 )
 
 
-POLICIES = ("instruction", "unwind", "auto")
+DEFAULT_POLICIES = ("instruction", "auto")
 
 
 def strip_ansi(s: str) -> str:
@@ -179,6 +179,14 @@ def run_cmd(args, cwd: Path):
     return subprocess.run(args, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
+def detect_call_stack_policies(uwvm: Path, cwd: Path):
+    result = run_cmd([str(uwvm), "--help", "runtime"], cwd)
+    help_text = strip_ansi(result.stdout)
+    if re.search(r"runtime-llvm-jit-call-stack[\s\S]{0,300}\[auto\|instruction\|none\|unwind", help_text):
+        return ("instruction", "unwind", "auto")
+    return DEFAULT_POLICIES
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, type=Path)
@@ -197,8 +205,10 @@ def main() -> int:
     base = ns.work_dir if ns.work_dir is not None else Path("/tmp")
     work = base / f"uwvm_unwind_fuzz_{os.getpid()}"
     work.mkdir(parents=True, exist_ok=True)
+    policies = detect_call_stack_policies(ns.uwvm, ns.root)
     print(f"[fuzz] work={work}")
     print(f"[fuzz] seed={ns.seed} cases={ns.cases}")
+    print(f"[fuzz] call-stack-policies={','.join(policies)}")
 
     failures = []
     total_runs = 0
@@ -220,7 +230,7 @@ def main() -> int:
             baseline = None
             baseline_out = None
             baseline_stdout = None
-            for policy in POLICIES:
+            for policy in policies:
                 args = [str(ns.uwvm), *mode_args, "-Rllvm-call-stack", policy, "--run", str(wasm_path)]
                 r = run_cmd(args, ns.root)
                 total_runs += 1

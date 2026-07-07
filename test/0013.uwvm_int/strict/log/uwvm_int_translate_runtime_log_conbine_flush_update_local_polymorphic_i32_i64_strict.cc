@@ -210,8 +210,15 @@ namespace
         auto const log_text{read_text_file(kLogPath)};
         UWVM2TEST_REQUIRE(!log_text.empty());
 
-        UWVM2TEST_REQUIRE(log_contains_kind(log_text, "local_get_const_i32"));
-        UWVM2TEST_REQUIRE(log_contains_kind(log_text, "local_get_const_i64"));
+        // Integer local.get does not seed combine state after `unreachable`; the regression target is that the
+        // following constants/rotates are flushed without collapsing into same-local update forms.
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+        UWVM2TEST_REQUIRE(log_contains_kind(log_text, "const_i32"));
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        UWVM2TEST_REQUIRE(log_contains_kind(log_text, "rot_xor_add_after_rotl"));
+        UWVM2TEST_REQUIRE(log_contains_kind(log_text, "rot_xor_add_i64_after_rotl"));
+# endif
+#endif
 
         for(char const* kind : {
                 "i32_add_imm_local_settee_same",

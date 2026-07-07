@@ -3442,7 +3442,7 @@ namespace uwvm2::runtime::lib
             // lazily materialized functions are indistinguishable from eagerly translated ones.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || defined(__s390x__) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -3515,11 +3515,8 @@ namespace uwvm2::runtime::lib
 #   endif
 #  endif
 # elif defined(__s390x__)
-            // s390x has enough call argument slots for a small integer/fp stack-top cache after the fixed interpreter arguments.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+            // Keep this in sync with get_curr_target_tranopt(): s390x uses byref opfunc dispatch because indirect musttail
+            // is not stack-stable in long interpreter loops on the tested SystemZ Linux target.
 # elif defined(__wasm__)
             // WebAssembly hosts do not benefit from this native-register cache model.
 # endif
@@ -7409,12 +7406,8 @@ namespace uwvm2::runtime::lib
 #   endif
 #  endif
 # elif defined(__s390x__)
-            // s390x: Linux ABI (r2-r6 integer args, f0/f2/... fp args). Keep v128 caching off by default:
-            // 16-byte vectors can be passed indirectly by pointer.
-            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
-            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
-            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
-            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+            // s390x: SystemZ accepts Clang musttail syntax, but indirect opfunc dispatch in long loops has been observed to
+            // grow the target call stack under QEMU/Linux.  Use the byref dispatcher so tiered T0 remains stack-stable.
 # elif defined(__s390__) || defined(__SYSC_ZARCH__)
             // s390 (31-bit) / z/Architecture (non-s390x toolchains): i64/f64 passing is ABI-sensitive (often reg pairs).
             // Leave stack-top caching disabled by default.
@@ -10691,7 +10684,12 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
             llvm_jit_cache_context.cache_key_is_complete = true;
-            auto const llvm_jit_cache_policy{::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+            auto llvm_jit_cache_policy{::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
+# if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+            // Full-module objects on these MCJIT targets can contain process-local runtime storage or bridge addresses.
+            // Reusing such an object across processes would turn those constants into stale pointers.
+            llvm_jit_cache_policy.enable = false;
+# endif
 
             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> parallel_object_outputs{};
             ::std::size_t parallel_object_defined_function_count{};
