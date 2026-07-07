@@ -46,7 +46,12 @@
 #pragma push_macro("UWVM_RUNTIME_LLVM_JIT")
 #undef UWVM_RUNTIME_LLVM_JIT
 #ifndef UWVM_DISABLE_JIT
-# if defined(UWVM_USE_DEFAULT_JIT)
+# if (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)) && \
+     !(defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64))
+// LLVM MCJIT/RuntimeDyld for 32-bit PowerPC aborts even on a minimal generated function with current LLVM.
+# elif defined(__sparc__) || defined(__sparc)
+// LLVM MCJIT/RuntimeDyld for SPARC ELF aborts even on a minimal generated function with current LLVM.
+# elif defined(UWVM_USE_DEFAULT_JIT)
 #  define UWVM_RUNTIME_LLVM_JIT
 # elif defined(UWVM_USE_LLVM_JIT)
 #  define UWVM_RUNTIME_LLVM_JIT
