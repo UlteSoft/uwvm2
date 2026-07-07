@@ -119,6 +119,14 @@ output_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mute
 }
 
 template <typename T, typename Mutex>
+	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>
+inline constexpr basic_general_io_lockable_ref<T, Mutex>
+output_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
+{
+	return m;
+}
+
+template <typename T, typename Mutex>
 	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>
 inline constexpr basic_general_io_lockable_ref<T, Mutex>
 input_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex> &m) noexcept
@@ -127,10 +135,25 @@ input_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex
 }
 
 template <typename T, typename Mutex>
+	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>
+inline constexpr basic_general_io_lockable_ref<T, Mutex>
+input_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
+{
+	return m;
+}
+
+template <typename T, typename Mutex>
 	requires ::fast_io::operations::defines::has_io_stream_ref_define<T>
 inline constexpr basic_general_io_lockable_ref<T, Mutex> io_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex> &m) noexcept
 {
 	return {__builtin_addressof(m)};
+}
+
+template <typename T, typename Mutex>
+	requires ::fast_io::operations::defines::has_io_stream_ref_define<T>
+inline constexpr basic_general_io_lockable_ref<T, Mutex> io_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
+{
+	return m;
 }
 
 template <typename Mutex, typename Allocator>
