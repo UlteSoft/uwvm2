@@ -1839,6 +1839,125 @@ inline constexpr void print_controls_buffer_impl(outputstmtype optstm, T t, Args
 	}
 }
 
+template <typename T>
+inline constexpr bool print_semantic_pack_parameter_v = false;
+
+template <typename T>
+inline constexpr bool print_semantic_pack_parameter_v<::fast_io::parameter<T>> =
+	::fast_io::details::print_pack<::std::remove_cvref_t<T>>;
+
+template <typename T>
+concept print_semantic_pack_node =
+	::fast_io::details::print_pack<T> ||
+	::fast_io::details::decay::print_semantic_pack_parameter_v<::std::remove_cvref_t<T>>;
+
+template <typename T>
+inline constexpr decltype(auto) print_semantic_pack_ref(T &&t) noexcept
+{
+	if constexpr (::fast_io::details::print_pack<T>)
+	{
+		return ::std::forward<T>(t);
+	}
+	else
+	{
+		return ::fast_io::details::decay::print_semantic_pack_ref(::std::forward<T>(t).reference);
+	}
+}
+
+template <typename T, typename continuation, ::std::size_t... I>
+inline constexpr decltype(auto) print_semantic_pack_apply_impl(T &&t, continuation &&cont,
+															   ::std::index_sequence<I...>)
+{
+	auto &&pack_ref{::fast_io::details::decay::print_semantic_pack_ref(::std::forward<T>(t))};
+	return cont(::fast_io::containers::get<I>(::std::forward<decltype(pack_ref)>(pack_ref).storage)...);
+}
+
+template <typename T, typename continuation>
+inline constexpr decltype(auto) print_semantic_pack_apply(T &&t, continuation &&cont)
+{
+	using pack_type =
+		::std::remove_cvref_t<decltype(::fast_io::details::decay::print_semantic_pack_ref(::std::forward<T>(t)))>;
+	return ::fast_io::details::decay::print_semantic_pack_apply_impl(
+		::std::forward<T>(t), ::std::forward<continuation>(cont), ::std::make_index_sequence<pack_type::size>{});
+}
+
+template <bool already_forwarded, ::std::integral char_type, typename continuation>
+inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont)
+{
+	return cont();
+}
+
+template <bool already_forwarded, ::std::integral char_type, typename continuation, typename T, typename... Args>
+inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont, T &&t, Args &&...args)
+{
+	if constexpr (::fast_io::details::decay::print_semantic_pack_node<T>)
+	{
+		return ::fast_io::details::decay::print_semantic_pack_apply(
+			::std::forward<T>(t), [&]<typename... PackArgs>(PackArgs &&...pack_args) -> decltype(auto) {
+				return ::fast_io::details::decay::print_semantic_pack_expand<false, char_type>(
+					[&]<typename... ExpandedPackArgs>(ExpandedPackArgs &&...expanded_pack_args) -> decltype(auto) {
+						return ::fast_io::details::decay::print_semantic_pack_expand<already_forwarded, char_type>(
+							[&]<typename... TailArgs>(TailArgs &&...tail_args) -> decltype(auto) {
+								return cont(::std::forward<ExpandedPackArgs>(expanded_pack_args)...,
+											::std::forward<TailArgs>(tail_args)...);
+							},
+							::std::forward<Args>(args)...);
+					},
+					::std::forward<PackArgs>(pack_args)...);
+			});
+	}
+	else if constexpr (already_forwarded)
+	{
+		return ::fast_io::details::decay::print_semantic_pack_expand<already_forwarded, char_type>(
+			[&]<typename... TailArgs>(TailArgs &&...tail_args) -> decltype(auto) {
+				return cont(::std::forward<T>(t), ::std::forward<TailArgs>(tail_args)...);
+			},
+			::std::forward<Args>(args)...);
+	}
+	else
+	{
+		auto forwarded{::fast_io::io_print_forward<char_type>(::fast_io::io_print_alias(::std::forward<T>(t)))};
+		return ::fast_io::details::decay::print_semantic_pack_expand<already_forwarded, char_type>(
+			[&]<typename... TailArgs>(TailArgs &&...tail_args) -> decltype(auto) {
+				return cont(forwarded, ::std::forward<TailArgs>(tail_args)...);
+			},
+			::std::forward<Args>(args)...);
+	}
+}
+
+template <::std::integral char_type, typename T>
+struct print_freestanding_decay_param_okay_single;
+
+template <::std::integral char_type, typename T>
+struct print_semantic_pack_params_okay : ::std::false_type
+{};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_pack_params_okay<char_type, ::fast_io::parameter<T>>
+	: print_semantic_pack_params_okay<char_type, ::std::remove_cvref_t<T>>
+{};
+
+template <::std::integral char_type, typename... Args>
+struct print_semantic_pack_params_okay<char_type, ::fast_io::manipulators::pack_t<Args...>>
+	: ::std::bool_constant<
+		  (print_freestanding_decay_param_okay_single<
+			   char_type,
+			   decltype(::fast_io::io_print_forward<char_type>(
+				   ::fast_io::io_print_alias(::std::declval<Args>())))>::value &&
+		   ...)>
+{};
+
+template <::std::integral char_type, typename T>
+struct print_freestanding_decay_param_okay_single
+	: ::std::bool_constant<
+		  ::fast_io::printable<char_type, T> || ::fast_io::reserve_printable<char_type, T> ||
+		  ::fast_io::dynamic_reserve_printable<char_type, T> || ::fast_io::scatter_printable<char_type, T> ||
+		  ::fast_io::reserve_scatters_printable<char_type, T> || ::fast_io::context_printable<char_type, T> ||
+		  ::fast_io::transcode_imaginary_printable<char_type, T> ||
+		  ::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t> ||
+		  print_semantic_pack_params_okay<char_type, ::std::remove_cvref_t<T>>::value>
+{};
+
 } // namespace details::decay
 
 namespace operations
@@ -1848,7 +1967,7 @@ namespace decay
 {
 
 template <bool line, typename outputstmtype, typename... Args>
-inline constexpr decltype(auto) print_freestanding_decay(outputstmtype optstm, Args... args)
+inline constexpr decltype(auto) print_freestanding_decay_no_pack(outputstmtype optstm, Args... args)
 {
 	if constexpr (::fast_io::operations::decay::defines::has_status_print_define<outputstmtype>)
 	{
@@ -1870,7 +1989,7 @@ inline constexpr decltype(auto) print_freestanding_decay(outputstmtype optstm, A
 	{
 		::fast_io::operations::decay::stream_ref_decay_lock_guard lg{
 			::fast_io::operations::decay::output_stream_mutex_ref_decay(optstm)};
-		return ::fast_io::operations::decay::print_freestanding_decay<line>(
+		return ::fast_io::operations::decay::print_freestanding_decay_no_pack<line>(
 			::fast_io::operations::decay::output_stream_unlocked_ref_decay(optstm), args...);
 	}
 	else if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<outputstmtype>)
@@ -1880,6 +1999,25 @@ inline constexpr decltype(auto) print_freestanding_decay(outputstmtype optstm, A
 	else
 	{
 		return ::fast_io::details::decay::print_controls_impl<line>(optstm, args...);
+	}
+}
+
+template <bool line, typename outputstmtype, typename... Args>
+inline constexpr decltype(auto) print_freestanding_decay(outputstmtype optstm, Args... args)
+{
+	if constexpr ((::fast_io::details::decay::print_semantic_pack_node<Args> || ...))
+	{
+		using char_type = typename outputstmtype::output_char_type;
+		return ::fast_io::details::decay::print_semantic_pack_expand<true, char_type>(
+			[optstm]<typename... FlatArgs>(FlatArgs &&...flat_args) constexpr -> decltype(auto) {
+				return ::fast_io::operations::decay::print_freestanding_decay_no_pack<line>(
+					optstm, ::std::forward<FlatArgs>(flat_args)...);
+			},
+			args...);
+	}
+	else
+	{
+		return ::fast_io::operations::decay::print_freestanding_decay_no_pack<line>(optstm, args...);
 	}
 }
 
@@ -1903,11 +2041,7 @@ namespace decay::defines
 template <typename char_type, typename... Args>
 concept print_freestanding_params_okay =
 	::std::integral<char_type> &&
-	((::fast_io::printable<char_type, Args> || ::fast_io::reserve_printable<char_type, Args> ||
-	  ::fast_io::dynamic_reserve_printable<char_type, Args> || ::fast_io::scatter_printable<char_type, Args> ||
-	  ::fast_io::reserve_scatters_printable<char_type, Args> || ::fast_io::context_printable<char_type, Args> ||
-	  ::fast_io::transcode_imaginary_printable<char_type, Args> || ::std::same_as<::std::remove_cvref_t<Args>, ::fast_io::io_null_t>) &&
-	 ...);
+	(::fast_io::details::decay::print_freestanding_decay_param_okay_single<char_type, Args>::value && ...);
 
 template <typename output, typename... Args>
 concept print_freestanding_okay =
