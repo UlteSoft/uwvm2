@@ -6,6 +6,28 @@ namespace fast_io::details
 template <typename flt>
 struct iec559_traits;
 
+inline constexpr ::std::uint_least32_t iec559_exponent_bits_from_max_exponent(
+	::std::uint_least32_t max_exponent) noexcept
+{
+	auto bias{max_exponent - 1u};
+	::std::uint_least32_t bits{};
+	for (; bias; bias >>= 1u)
+	{
+		++bits;
+	}
+	return bits + 1u;
+}
+
+inline constexpr ::std::uint_least32_t iec559_decimal_digits(::std::uint_least32_t value) noexcept
+{
+	::std::uint_least32_t digits{1u};
+	for (; 10u <= value; value /= 10u)
+	{
+		++digits;
+	}
+	return digits;
+}
+
 #if defined(__SIZEOF_FLOAT16__) || defined(__FLOAT16__)
 template <>
 struct iec559_traits<__float16>
@@ -17,7 +39,22 @@ struct iec559_traits<__float16>
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
-	inline static constexpr ::std::uint_least32_t e10max{7};
+	inline static constexpr ::std::uint_least32_t e10max{4};
+};
+#endif
+
+#ifdef __SIZEOF_FLOAT80__
+template <>
+struct iec559_traits<__float80>
+{
+	using mantissa_type = ::std::uint_least64_t;
+	inline static constexpr ::std::size_t mbits{63};
+	inline static constexpr ::std::size_t ebits{15};
+	inline static constexpr ::std::uint_least32_t m10digits{21};
+	inline static constexpr ::std::uint_least32_t m2hexdigits{16};
+	inline static constexpr ::std::uint_least32_t e10digits{4};
+	inline static constexpr ::std::uint_least32_t e2hexdigits{5};
+	inline static constexpr ::std::uint_least32_t e10max{4932};
 };
 #endif
 
@@ -45,6 +82,33 @@ struct iec559_traits<double>
 	inline static constexpr ::std::uint_least32_t e10digits{3};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{4};
 	inline static constexpr ::std::uint_least32_t e10max{308};
+};
+
+template <>
+struct iec559_traits<long double>
+{
+#if defined(__SIZEOF_INT128__)
+	using mantissa_type = ::std::conditional_t<(64 < ::std::numeric_limits<long double>::digits), __uint128_t,
+											   ::std::uint_least64_t>;
+#else
+	using mantissa_type = ::std::uint_least64_t;
+#endif
+	inline static constexpr ::std::size_t mbits{static_cast<::std::size_t>(
+		::std::numeric_limits<long double>::digits - 1)};
+	inline static constexpr ::std::size_t ebits{::fast_io::details::iec559_exponent_bits_from_max_exponent(
+		static_cast<::std::uint_least32_t>(::std::numeric_limits<long double>::max_exponent))};
+	inline static constexpr ::std::uint_least32_t m10digits{
+		::std::numeric_limits<long double>::digits == 113 ? 37u
+														  : static_cast<::std::uint_least32_t>(
+																::std::numeric_limits<long double>::max_digits10)};
+	inline static constexpr ::std::uint_least32_t m2hexdigits{
+		static_cast<::std::uint_least32_t>((mbits + 3u) / 4u)};
+	inline static constexpr ::std::uint_least32_t e10digits{::fast_io::details::iec559_decimal_digits(
+		static_cast<::std::uint_least32_t>(::std::numeric_limits<long double>::max_exponent10))};
+	inline static constexpr ::std::uint_least32_t e2hexdigits{::fast_io::details::iec559_decimal_digits(
+		static_cast<::std::uint_least32_t>(::std::numeric_limits<long double>::max_exponent))};
+	inline static constexpr ::std::uint_least32_t e10max{
+		static_cast<::std::uint_least32_t>(::std::numeric_limits<long double>::max_exponent10)};
 };
 
 #if defined(__SIZEOF_INT128__)
@@ -77,7 +141,7 @@ struct iec559_traits<_Float16>
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
-	inline static constexpr ::std::uint_least32_t e10max{7};
+	inline static constexpr ::std::uint_least32_t e10max{4};
 };
 #endif
 
@@ -126,11 +190,23 @@ struct iec559_traits<_Float128>
 };
 #endif
 
+#if defined(__clang__) && defined(__aarch64__) && !defined(__STDCPP_BFLOAT16_T__)
+template <>
+struct iec559_traits<__bf16>
+{
+	using mantissa_type = ::std::uint_least16_t;
+	inline static constexpr ::std::size_t mbits{7};
+	inline static constexpr ::std::size_t ebits{8};
+	inline static constexpr ::std::uint_least32_t m10digits{4};
+	inline static constexpr ::std::uint_least32_t m2hexdigits{2};
+	inline static constexpr ::std::uint_least32_t e10digits{2};
+	inline static constexpr ::std::uint_least32_t e2hexdigits{3};
+	inline static constexpr ::std::uint_least32_t e10max{38};
+};
+#endif
+
 #ifdef __STDCPP_BFLOAT16_T__
 
-/*
-To do: change the value
-*/
 template <>
 struct iec559_traits<decltype(0.0bf16)>
 {
@@ -140,8 +216,8 @@ struct iec559_traits<decltype(0.0bf16)>
 	inline static constexpr ::std::uint_least32_t m10digits{4};
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
-	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
-	inline static constexpr ::std::uint_least32_t e10max{7};
+	inline static constexpr ::std::uint_least32_t e2hexdigits{3};
+	inline static constexpr ::std::uint_least32_t e10max{38};
 };
 #endif
 
@@ -196,107 +272,420 @@ struct iec559_rep
 	::std::int_least32_t e;
 };
 
+template <bool nan_show_type>
+inline constexpr ::std::size_t print_rsv_fp_special_size_cache{nan_show_type ? 10u : 4u};
+
+template <::std::size_t normal_size, bool nan_show_type>
+inline constexpr ::std::size_t print_rsv_fp_size_with_special_cache{
+	normal_size < print_rsv_fp_special_size_cache<nan_show_type> ? print_rsv_fp_special_size_cache<nan_show_type>
+																 : normal_size};
+
+template <bool showpos, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_sign_impl(char_type *iter, bool sign) noexcept;
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_inf_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"INF", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"INF", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"INF", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"inf", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"inf", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"inf", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"NAN", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"NAN", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"NAN", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"nan", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"nan", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"nan", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_ind_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(IND)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(IND)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(IND)", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(ind)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(ind)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(ind)", iter);
+		}
+	}
+}
+
+template <bool uppercase, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_snan_literal_impl(char_type *iter) noexcept
+{
+	if constexpr (uppercase)
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(SNAN)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(SNAN)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(SNAN)", iter);
+		}
+	}
+	else
+	{
+		if constexpr (::std::same_as<char_type, char>)
+		{
+			return copy_string_literal("(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, wchar_t>)
+		{
+			return copy_string_literal(L"(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char16_t>)
+		{
+			return copy_string_literal(u"(snan)", iter);
+		}
+		else if constexpr (::std::same_as<char_type, char32_t>)
+		{
+			return copy_string_literal(U"(snan)", iter);
+		}
+		else
+		{
+			return copy_string_literal(u8"(snan)", iter);
+		}
+	}
+}
+
+template <typename mantissa_type, ::std::size_t mbits>
+inline constexpr mantissa_type fp_quiet_nan_mantissa_mask() noexcept
+{
+	return static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits - 1u));
+}
+
+template <typename mantissa_type, ::std::size_t mbits>
+inline constexpr bool fp_nan_is_signaling(mantissa_type mantissa) noexcept
+{
+	return mantissa != 0 && (mantissa & fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()) == 0;
+}
+
+#ifdef __SIZEOF_FLOAT80__
+template <typename flt>
+inline constexpr bool fp_floating_point_is_float80{
+	::std::same_as<::std::remove_cv_t<flt>, __float80> ||
+	(::std::same_as<::std::remove_cv_t<flt>, long double> &&
+	 sizeof(long double) == sizeof(__float80) && ::std::numeric_limits<long double>::digits == 64 &&
+	 ::std::numeric_limits<long double>::max_exponent == 16384)};
+
+template <typename flt>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void fp_assign_float80_bits(flt &value, ::std::uint_least64_t mantissa,
+											 ::std::uint_least32_t exponent, bool sign) noexcept
+	requires(::fast_io::details::fp_floating_point_is_float80<flt>)
+{
+	static_assert(sizeof(flt) >= sizeof(::std::uint_least64_t) + sizeof(::std::uint_least16_t));
+	static_assert(::std::endian::native == ::std::endian::little,
+				  "fast_io float80 bit assignment currently supports only little-endian x87 storage");
+	struct storage_type
+	{
+		unsigned char bytes[sizeof(flt)];
+	};
+	static_assert(sizeof(storage_type) == sizeof(flt));
+	storage_type storage{};
+	auto const exponent_bits{
+		static_cast<::std::uint_least16_t>((sign ? 0x8000u : 0u) | (exponent & 0x7fffu))};
+	for (::std::size_t index{}; index != sizeof(::std::uint_least64_t); ++index)
+	{
+		storage.bytes[index] = static_cast<unsigned char>(mantissa >> (index * 8u));
+	}
+	storage.bytes[8] = static_cast<unsigned char>(exponent_bits);
+	storage.bytes[9] = static_cast<unsigned char>(exponent_bits >> 8u);
+	if (__builtin_is_constant_evaluated())
+	{
+		value = ::fast_io::bit_cast<flt>(storage);
+	}
+	else
+	{
+#if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
+		__builtin_memcpy
+#else
+		::std::memcpy
+#endif
+			(__builtin_addressof(value), __builtin_addressof(storage), sizeof(flt));
+	}
+}
+#else
+template <typename flt>
+inline constexpr bool fp_floating_point_is_float80{};
+
+template <typename flt>
+inline constexpr void fp_assign_float80_bits(flt &, ::std::uint_least64_t, ::std::uint_least32_t, bool) noexcept = delete;
+#endif
+
+template <typename flt>
+inline constexpr void fp_assign_bits(flt &value, typename iec559_traits<flt>::mantissa_type bits) noexcept
+{
+	using mantissa_type = typename iec559_traits<flt>::mantissa_type;
+	static_assert(!::fast_io::details::fp_floating_point_is_float80<flt>,
+				  "use fp_assign_float80_bits for IEC 60559 extended precision");
+	static_assert(sizeof(flt) == sizeof(mantissa_type));
+	if (__builtin_is_constant_evaluated())
+	{
+		value = ::fast_io::bit_cast<flt>(bits);
+	}
+	else
+	{
+#if FAST_IO_HAS_BUILTIN(__builtin_memcpy)
+		__builtin_memcpy
+#else
+		::std::memcpy
+#endif
+			(__builtin_addressof(value), __builtin_addressof(bits), sizeof(flt));
+	}
+}
+
+template <typename flt>
+inline constexpr void fp_assign_infinity(flt &value, bool sign) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	if constexpr (::fast_io::details::fp_floating_point_is_float80<flt>)
+	{
+		::fast_io::details::fp_assign_float80_bits(value, ::std::uint_least64_t{1} << mbits,
+												   (static_cast<::std::uint_least32_t>(1u) << ebits) - 1u, sign);
+	}
+	else
+	{
+		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+		mantissa_type bits{static_cast<mantissa_type>(exponent_mask << mbits)};
+		if (sign)
+		{
+			bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		}
+		::fast_io::details::fp_assign_bits(value, bits);
+	}
+}
+
+template <typename flt, bool signaling = false, bool indeterminate = false>
+inline constexpr void fp_assign_nan(flt &value, bool sign) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+	constexpr mantissa_type quiet_bit{fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()};
+	if constexpr (::fast_io::details::fp_floating_point_is_float80<flt>)
+	{
+		constexpr auto explicit_integer_bit{::std::uint_least64_t{1} << mbits};
+		::std::uint_least64_t mantissa{explicit_integer_bit |
+									   (signaling ? ::std::uint_least64_t{1}
+												  : static_cast<::std::uint_least64_t>(quiet_bit))};
+		::fast_io::details::fp_assign_float80_bits(value, mantissa, static_cast<::std::uint_least32_t>(exponent_mask),
+												   sign || indeterminate);
+	}
+	else
+	{
+		mantissa_type mantissa{signaling ? static_cast<mantissa_type>(1) : quiet_bit};
+		mantissa_type bits{static_cast<mantissa_type>((exponent_mask << mbits) | mantissa)};
+		if (sign || indeterminate)
+		{
+			bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1) << (mbits + ebits));
+		}
+		::fast_io::details::fp_assign_bits(value, bits);
+	}
+}
+
+template <typename flt>
+inline constexpr flt fp_make_infinity(bool sign) noexcept
+{
+	flt value;
+	::fast_io::details::fp_assign_infinity(value, sign);
+	return value;
+}
+
+template <typename flt, bool signaling = false, bool indeterminate = false>
+inline constexpr flt fp_make_nan(bool sign) noexcept
+{
+	flt value;
+	::fast_io::details::fp_assign_nan<flt, signaling, indeterminate>(value, sign);
+	return value;
+}
+
 template <bool uppercase, ::std::integral char_type>
 inline constexpr char_type *prsv_fp_nan_impl(char_type *iter, bool isnan) noexcept
 {
 	if (isnan)
 	{
-		if constexpr (uppercase)
-		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"NAN", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"NAN", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"NAN", iter);
-			}
-		}
-		else
-		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"nan", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"nan", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"nan", iter);
-			}
-		}
+		return prsv_fp_nan_literal_impl<uppercase>(iter);
 	}
-	else
+	return prsv_fp_inf_literal_impl<uppercase>(iter);
+}
+
+template <bool showpos, bool uppercase, bool nan_show_sign, bool nan_show_type, ::std::size_t mbits,
+		  typename mantissa_type, ::std::integral char_type>
+inline constexpr char_type *prsv_fp_nan_impl(char_type *iter, mantissa_type mantissa, bool sign) noexcept
+{
+	if (mantissa == 0)
 	{
-		if constexpr (uppercase)
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+		return prsv_fp_inf_literal_impl<uppercase>(iter);
+	}
+
+	if constexpr (nan_show_sign)
+	{
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+	}
+	iter = prsv_fp_nan_literal_impl<uppercase>(iter);
+	if constexpr (nan_show_type)
+	{
+		constexpr mantissa_type quiet_bit{fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()};
+		if (sign && mantissa == quiet_bit)
 		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"INF", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"INF", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"INF", iter);
-			}
+			return prsv_fp_nan_ind_literal_impl<uppercase>(iter);
 		}
-		else
+		if (fp_nan_is_signaling<mantissa_type, mbits>(mantissa))
 		{
-			if constexpr (::std::same_as<char_type, char>)
-			{
-				return copy_string_literal("inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, wchar_t>)
-			{
-				return copy_string_literal(L"inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char16_t>)
-			{
-				return copy_string_literal(u"inf", iter);
-			}
-			else if constexpr (::std::same_as<char_type, char32_t>)
-			{
-				return copy_string_literal(U"inf", iter);
-			}
-			else
-			{
-				return copy_string_literal(u8"inf", iter);
-			}
+			return prsv_fp_nan_snan_literal_impl<uppercase>(iter);
 		}
 	}
+	return iter;
 }
 
 template <bool uppercase, ::std::integral char_type>
@@ -572,6 +961,31 @@ struct
 	::std::uint_least16_t exponent;
 };
 
+#ifdef __SIZEOF_FLOAT80__
+template <::std::size_t padding_size>
+struct
+#if __has_cpp_attribute(__gnu__::__packed__)
+	[[__gnu__::__packed__]]
+#endif
+	float80_storage
+{
+	::std::uint_least64_t mantissa;
+	::std::uint_least16_t exponent;
+	unsigned char padding[padding_size];
+};
+
+template <>
+struct
+#if __has_cpp_attribute(__gnu__::__packed__)
+	[[__gnu__::__packed__]]
+#endif
+	float80_storage<0>
+{
+	::std::uint_least64_t mantissa;
+	::std::uint_least16_t exponent;
+};
+#endif
+
 template <typename flt>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
@@ -597,9 +1011,37 @@ inline constexpr punning_result<flt> get_punned_result(flt f) noexcept
 		bit_cast<mantissa_type>(f)
 #endif
 		;
-	return {unwrap & mantissa_mask, static_cast<::std::uint_least32_t>((unwrap >> mbits) & exponent_mask),
+	return {static_cast<mantissa_type>(unwrap & mantissa_mask),
+			static_cast<::std::uint_least32_t>((unwrap >> mbits) & exponent_mask),
 			static_cast<bool>((unwrap >> total_bits) & 1u)};
 }
+
+#if defined(__SIZEOF_FLOAT80__) && (!defined(__BYTE_ORDER__) || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+template <>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr punning_result<__float80> get_punned_result<__float80>(__float80 f) noexcept
+{
+	static_assert(sizeof(__float80) >= sizeof(::std::uint_least64_t) + sizeof(::std::uint_least16_t));
+	using storage_type = float80_storage<sizeof(__float80) - sizeof(::std::uint_least64_t) - sizeof(::std::uint_least16_t)>;
+	auto unwrap =
+#if FAST_IO_HAS_BUILTIN(__builtin_bit_cast)
+		__builtin_bit_cast(storage_type, f)
+#elif defined(_MSC_VER) && __cpp_lib_bit_cast >= 201806L
+		__builtin_bit_cast(storage_type, f)
+#else
+		bit_cast<storage_type>(f)
+#endif
+		;
+	constexpr ::std::uint_least64_t explicit_integer_bit{::std::uint_least64_t{1} << 63u};
+	return {unwrap.mantissa & static_cast<::std::uint_least64_t>(explicit_integer_bit - 1u),
+			static_cast<::std::uint_least32_t>(unwrap.exponent & 0x7fffu),
+			static_cast<bool>((unwrap.exponent >> 15u) & 1u)};
+}
+#endif
 
 template <bool showpos, ::std::integral char_type>
 inline constexpr char_type *print_rsv_fp_sign_impl(char_type *iter, bool sign) noexcept

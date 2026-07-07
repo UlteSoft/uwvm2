@@ -327,7 +327,7 @@ public:
 	[[__gnu__::__returns_nonnull__]]
 #endif
 	static inline void *
-	allocate_zero_aligned(::std::size_t n, ::std::size_t alignment) noexcept
+	allocate_aligned_zero(::std::size_t alignment, ::std::size_t n) noexcept
 	{
 		if (n == 0) [[unlikely]]
 		{

@@ -8,8 +8,8 @@ Credit: Jk jeon
 namespace fast_io::details
 {
 
-template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e, typename flt,
-		  ::std::integral char_type>
+template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e,
+		  bool nan_show_sign = true, bool nan_show_type = false, typename flt, ::std::integral char_type>
 inline constexpr char_type *lc_print_rsvhexfloat_define_impl(char_type *iter, flt f,
 															 char_type const *decimal_point_base,
 															 ::std::size_t decimal_point_len) noexcept
@@ -24,11 +24,11 @@ inline constexpr char_type *lc_print_rsvhexfloat_define_impl(char_type *iter, fl
 	constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 	constexpr ::std::int_least32_t minus_bias{-static_cast<::std::int_least32_t>(bias)};
 	constexpr ::std::uint_least32_t makeup_bits{((mbits / 4 + 1) * 4 - mbits) % 4}; // Thanks jk-jeon for the formula
-	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if (exponent == exponent_mask_u32)
 	{
-		return prsv_fp_nan_impl<uppercase>(iter, mantissa);
+		return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
 	}
+	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if constexpr (showbase)
 	{
 		iter = print_reserve_show_base_impl<16, showbase_uppercase, false>(iter);

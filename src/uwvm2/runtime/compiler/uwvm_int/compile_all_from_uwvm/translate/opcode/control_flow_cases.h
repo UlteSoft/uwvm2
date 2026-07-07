@@ -64,66 +64,7 @@ case wasm1_code::block:
     // [safe] unsafe (could be the section_end)
     //        ^^ op_begin
 
-    if(code_curr == code_end) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_code = code_validation_error_code::missing_block_type;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
-    }
-
-    // block blocktype ...
-    // [     safe    ] unsafe (could be the section_end)
-    //       ^^ op_begin
-
-    wasm_byte blocktype_byte;
-    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
-
-    ++code_curr;
-
-    // block blocktype ...
-    // [     safe    ] unsafe (could be the section_end)
-    //                 ^^ op_begin
-
-    block_result_type block_result{};
-    switch(blocktype_byte)
-    {
-        case 0x40u:
-        {
-            block_result = {};
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i32):
-        {
-            block_result.begin = i32_result_arr;
-            block_result.end = i32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i64):
-        {
-            block_result.begin = i64_result_arr;
-            block_result.end = i64_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f32):
-        {
-            block_result.begin = f32_result_arr;
-            block_result.end = f32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f64):
-        {
-            block_result.begin = f64_result_arr;
-            block_result.end = f64_result_arr + 1u;
-            break;
-        }
-        [[unlikely]] default:
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.u8 = blocktype_byte;
-            err.err_code = code_validation_error_code::illegal_block_type;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-    }
+    auto const signature{parse_block_type(op_begin, u8"block")};
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     // Large functions may enter tiered execution while looping. Emitting the poll at an outer
@@ -155,7 +96,7 @@ case wasm1_code::block:
                                             .func_index = function_index,
                                             .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
                                             .result_bytes = result_bytes,
-                                            .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                            .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_bytes,
                                             .countdown = 8192u,
                                             .reset_countdown = 8192u,
                                             .request_countdown = request_countdown};
@@ -168,18 +109,7 @@ case wasm1_code::block:
     }
 #endif
 
-    control_flow_stack.push_back({.result = block_result,
-                                  .operand_stack_base = operand_stack.size(),
-                                  .type = block_type::block,
-                                  .polymorphic_base = is_polymorphic,
-                                  .then_polymorphic_end = false,
-                                  .start_label_id = SIZE_MAX,
-                                  .end_label_id = new_label(false),
-                                  .else_label_id = SIZE_MAX});
-
-    // Stack-polymorphism is scoped to the current control frame only.
-    // Entering a nested frame starts it in reachable mode for validation.
-    is_polymorphic = false;
+    enter_control_frame(op_begin, u8"block", block_type::block, signature, SIZE_MAX, new_label(false), SIZE_MAX);
 
     break;
 }
@@ -203,75 +133,9 @@ case wasm1_code::loop:
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
 
-    if(code_curr == code_end) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_code = code_validation_error_code::missing_block_type;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
-    }
-
-    // loop blocktype ...
-    // [    safe    ] unsafe (could be the section_end)
-    //      ^^ code_curr
-
-    wasm_byte blocktype_byte;
-    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
-
-    ++code_curr;
-
-    // loop blocktype ...
-    // [    safe    ] unsafe (could be the section_end)
-    //                ^^ code_curr
-
-    block_result_type block_result{};
-    switch(blocktype_byte)
-    {
-        case 0x40u:
-        {
-            block_result = {};
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i32):
-        {
-            block_result.begin = i32_result_arr;
-            block_result.end = i32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i64):
-        {
-            block_result.begin = i64_result_arr;
-            block_result.end = i64_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f32):
-        {
-            block_result.begin = f32_result_arr;
-            block_result.end = f32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f64):
-        {
-            block_result.begin = f64_result_arr;
-            block_result.end = f64_result_arr + 1u;
-            break;
-        }
-        [[unlikely]] default:
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.u8 = blocktype_byte;
-            err.err_code = code_validation_error_code::illegal_block_type;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-    }
-
-    control_flow_stack.push_back(
-        {.result = block_result,
-         .operand_stack_base = operand_stack.size(),
-         .type = block_type::loop,
-         .polymorphic_base = is_polymorphic,
-         .then_polymorphic_end = false,
-         .start_label_id =
-             [&]() constexpr UWVM_THROWS
+    auto const signature{parse_block_type(op_begin, u8"loop")};
+    auto const loop_start_label_id{
+        [&]() constexpr UWVM_THROWS
          {
              auto const loop_start{new_label(false)};
              if constexpr(stacktop_enabled)
@@ -361,7 +225,7 @@ case wasm1_code::loop:
                                                      .func_index = function_index,
                                                      .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
                                                      .result_bytes = result_bytes,
-                                                     .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                                     .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_bytes,
                                                      .countdown = poll_policy.initial_countdown,
                                                      .reset_countdown = poll_policy.reset_countdown,
                                                      .request_countdown = poll_policy.request_countdown};
@@ -375,14 +239,9 @@ case wasm1_code::loop:
              }
 #endif
              return loop_start;
-         }(),
-         .end_label_id = new_label(false),
-         .else_label_id = SIZE_MAX,
-         .wasm_code_curr_at_start_label = code_curr});
+         }()};
 
-    // Stack-polymorphism is scoped to the current control frame only.
-    // Entering a nested frame starts it in reachable mode for validation.
-    is_polymorphic = false;
+    enter_control_frame(op_begin, u8"loop", block_type::loop, signature, loop_start_label_id, new_label(false), SIZE_MAX, code_curr);
 
     break;
 }
@@ -406,70 +265,18 @@ case wasm1_code::if_:
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
 
-    if(code_curr == code_end) [[unlikely]]
+    auto const signature{parse_block_type(op_begin, u8"if")};
+
+    auto const if_param_count{static_cast<::std::size_t>(signature.start.end - signature.start.begin)};
+    constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const if_required_overflows{if_param_count == max_operand_stack_requirement};
+    auto const if_required_stack_size{if_required_overflows ? max_operand_stack_requirement : (if_param_count + 1uz)};
+    if(!is_polymorphic && (if_required_overflows || concrete_operand_count() < if_required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_code = code_validation_error_code::missing_block_type;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
+        report_operand_stack_underflow(op_begin, u8"if", if_required_stack_size);
     }
 
-    // if blocktype ...
-    // [   safe   ] unsafe (could be the section_end)
-    //    ^^ code_curr
-
-    wasm_byte blocktype_byte;
-    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
-
-    ++code_curr;
-
-    // if blocktype ...
-    // [   safe   ] unsafe (could be the section_end)
-    //              ^^ code_curr
-
-    block_result_type block_result{};
-    switch(blocktype_byte)
-    {
-        case 0x40u:
-        {
-            block_result = {};
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i32):
-        {
-            block_result.begin = i32_result_arr;
-            block_result.end = i32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::i64):
-        {
-            block_result.begin = i64_result_arr;
-            block_result.end = i64_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f32):
-        {
-            block_result.begin = f32_result_arr;
-            block_result.end = f32_result_arr + 1u;
-            break;
-        }
-        case static_cast<wasm_byte>(wasm_value_type_u::f64):
-        {
-            block_result.begin = f64_result_arr;
-            block_result.end = f64_result_arr + 1u;
-            break;
-        }
-        [[unlikely]] default:
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.u8 = blocktype_byte;
-            err.err_code = code_validation_error_code::illegal_block_type;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-    }
-
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"if", 1uz); }
-
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(auto const cond{try_pop_concrete_operand()}; !operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
@@ -607,22 +414,16 @@ case wasm1_code::if_:
         }
     }
 
-    control_flow_stack.push_back({.result = block_result,
-                                  .operand_stack_base = operand_stack.size(),
-                                  .type = block_type::if_,
-                                  .polymorphic_base = is_polymorphic,
-                                  .then_polymorphic_end = false,
-                                  .stacktop_currpos_at_else_entry = else_entry_curr_stacktop,
-                                  .stacktop_memory_count_at_else_entry = else_entry_memory_count,
-                                  .stacktop_cache_count_at_else_entry = else_entry_cache_count,
-                                  .stacktop_cache_i32_count_at_else_entry = else_entry_cache_i32_count,
-                                  .stacktop_cache_i64_count_at_else_entry = else_entry_cache_i64_count,
-                                  .stacktop_cache_f32_count_at_else_entry = else_entry_cache_f32_count,
-                                  .stacktop_cache_f64_count_at_else_entry = else_entry_cache_f64_count,
-                                  .codegen_operand_stack_at_else_entry = else_entry_codegen_operand_stack,
-                                  .start_label_id = SIZE_MAX,
-                                  .end_label_id = end_label_id,
-                                  .else_label_id = else_dest_label_id});
+    enter_control_frame(op_begin, u8"if", block_type::if_, signature, SIZE_MAX, end_label_id, else_dest_label_id);
+    auto& if_frame_for_else_entry{control_flow_stack.back_unchecked()};
+    if_frame_for_else_entry.stacktop_currpos_at_else_entry = else_entry_curr_stacktop;
+    if_frame_for_else_entry.stacktop_memory_count_at_else_entry = else_entry_memory_count;
+    if_frame_for_else_entry.stacktop_cache_count_at_else_entry = else_entry_cache_count;
+    if_frame_for_else_entry.stacktop_cache_i32_count_at_else_entry = else_entry_cache_i32_count;
+    if_frame_for_else_entry.stacktop_cache_i64_count_at_else_entry = else_entry_cache_i64_count;
+    if_frame_for_else_entry.stacktop_cache_f32_count_at_else_entry = else_entry_cache_f32_count;
+    if_frame_for_else_entry.stacktop_cache_f64_count_at_else_entry = else_entry_cache_f64_count;
+    if_frame_for_else_entry.codegen_operand_stack_at_else_entry = else_entry_codegen_operand_stack;
 
     // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
     // surrounding frame is polymorphic.
@@ -695,14 +496,14 @@ case wasm1_code::else_:
         for(::std::size_t i{}; i != expected_count; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
                 err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
                 err.err_selectable.if_then_result_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.if_then_result_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.if_then_result_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::if_then_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -746,6 +547,7 @@ case wasm1_code::else_:
     set_label_offset(if_frame.else_label_id, bytecode.size());
 
     operand_stack_truncate_to(if_frame.operand_stack_base);
+    for(auto curr{if_frame.start.begin}; curr != if_frame.start.end; ++curr) { operand_stack_push(*curr); }
     // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
     is_polymorphic = false;
     if constexpr(stacktop_enabled)
@@ -880,15 +682,15 @@ case wasm1_code::end:
         for(::std::size_t i{}; i != expected_count; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.end_result_mismatch.block_kind = block_kind;
                 err.err_selectable.end_result_mismatch.expected_count = expected_count;
                 err.err_selectable.end_result_mismatch.actual_count = actual_count;
                 err.err_selectable.end_result_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.end_result_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.end_result_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::end_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }

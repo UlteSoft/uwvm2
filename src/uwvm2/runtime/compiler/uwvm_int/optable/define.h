@@ -368,7 +368,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64> ||
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
-        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> || ::std::same_as<Type, wasm_stack_top_i32_with_f32_u> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> ||
+        ::std::same_as<Type, ::uwvm2::object::global::wasm_funcref_t> || ::std::same_as<Type, ::uwvm2::object::global::wasm_externref_t> ||
+        ::std::same_as<Type, wasm_stack_top_i32_with_f32_u> ||
         ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>;
 
     /// @details Functions called when unreachable do not require the `noreturn` keyword, as some embedded plugin systems cannot utilize this option.
@@ -1148,7 +1150,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                    ::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64> ||
                    ::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
                    ::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
-                   ::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>;
+                   ::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> ||
+                   ::std::same_as<ValType, ::uwvm2::object::global::wasm_funcref_t> ||
+                   ::std::same_as<ValType, ::uwvm2::object::global::wasm_externref_t>;
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_interpreter_stacktop_state_t State, typename ValType>

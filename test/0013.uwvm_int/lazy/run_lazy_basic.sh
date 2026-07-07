@@ -72,6 +72,7 @@ if [[ "$#" -gt 0 ]]; then
 else
   TARGETS=(
     uwvm_int_lazy_split
+    uwvm_int_lazy_wasm1p1_alignment
     uwvm_int_lazy_scheduler
     uwvm_int_lazy_runtime
   )

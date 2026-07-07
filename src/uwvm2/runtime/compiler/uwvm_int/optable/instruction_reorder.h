@@ -206,6 +206,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == int_expr_binop::rotr) { return numeric_details::eval_int_binop<numeric_details::int_binop::rotr, IntT, UIntT>(lhs, rhs); }
             else
             {
+                static_assert(Op != Op, "unhandled integer expression binary opcode");
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #  endif

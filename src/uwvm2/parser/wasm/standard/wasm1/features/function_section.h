@@ -6360,6 +6360,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                         // write 16 * 2 byte
 
+# if defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_vext2xv_hu_bu)
+                        auto const needwrite_u16x16{::std::bit_cast<u16x16simd>(__builtin_lasx_vext2xv_hu_bu(simd_vector_str))};
+# else
                         auto const needwrite_u16x16{::std::bit_cast<u16x16simd>(__builtin_shufflevector(simd_vector_str,
                                                                                                         u8x32simd{},
                                                                                                         0,   // 0
@@ -6395,6 +6398,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                                                                         15,  // 30
                                                                                                         32   // 31
                                                                                                         ))};
+# endif
 
                         //  [... curr ... (15) ... curr_next ... (15) ...]
                         //  [                 safe                       ] unsafe (could be the section_end)
@@ -6929,6 +6933,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                         // write 16 * 2 byte
 
+# if defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_vext2xv_hu_bu)
+                        auto const needwrite_u16x16{::std::bit_cast<u16x16simd>(__builtin_lasx_vext2xv_hu_bu(third_fourth_round_simd_u8x32))};
+# else
                         auto const needwrite_u16x16{::std::bit_cast<u16x16simd>(__builtin_shufflevector(third_fourth_round_simd_u8x32,
                                                                                                         u8x32simd{},
                                                                                                         0,   // 0
@@ -6964,6 +6971,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                                                                         15,  // 30
                                                                                                         32   // 31
                                                                                                         ))};
+# endif
 
                         //  [... curr ... (15) ... curr_next ... (15) ...]
                         //  [                 safe                       ] unsafe (could be the section_end)
@@ -7011,6 +7019,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 // write data
                 auto functionsec_funcs_storage_typeidx_u16_vector_imp_curr_ptr_tmp{functionsec.funcs.storage.typeidx_u16_vector.imp.curr_ptr};
 
+# if defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_vext2xv_hu_bu)
+                u16x16simd const u16x16v0{::std::bit_cast<u16x16simd>(__builtin_lasx_vext2xv_hu_bu(simd_vector_str))};
+# else
                 u16x16simd const u16x16v0{::std::bit_cast<u16x16simd>(__builtin_shufflevector(simd_vector_str,
                                                                                               u8x32simd{},
                                                                                               0,   // 0
@@ -7046,11 +7057,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                                                               15,  // 30
                                                                                               32   // 31
                                                                                               ))};
+# endif
 
                 ::std::memcpy(functionsec_funcs_storage_typeidx_u16_vector_imp_curr_ptr_tmp, ::std::addressof(u16x16v0), sizeof(u16x16simd));
 
                 functionsec_funcs_storage_typeidx_u16_vector_imp_curr_ptr_tmp += 16uz;
 
+# if defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_vext2xv_hu_bu)
+                auto const simd_vector_str_high{__builtin_shufflevector(simd_vector_str,
+                                                                        simd_vector_str,
+                                                                        16,  // 0
+                                                                        17,  // 1
+                                                                        18,  // 2
+                                                                        19,  // 3
+                                                                        20,  // 4
+                                                                        21,  // 5
+                                                                        22,  // 6
+                                                                        23,  // 7
+                                                                        24,  // 8
+                                                                        25,  // 9
+                                                                        26,  // 10
+                                                                        27,  // 11
+                                                                        28,  // 12
+                                                                        29,  // 13
+                                                                        30,  // 14
+                                                                        31,  // 15
+                                                                        -1,  // 16
+                                                                        -1,  // 17
+                                                                        -1,  // 18
+                                                                        -1,  // 19
+                                                                        -1,  // 20
+                                                                        -1,  // 21
+                                                                        -1,  // 22
+                                                                        -1,  // 23
+                                                                        -1,  // 24
+                                                                        -1,  // 25
+                                                                        -1,  // 26
+                                                                        -1,  // 27
+                                                                        -1,  // 28
+                                                                        -1,  // 29
+                                                                        -1,  // 30
+                                                                        -1   // 31
+                                                                        )};
+                u16x16simd const u16x16v1{::std::bit_cast<u16x16simd>(__builtin_lasx_vext2xv_hu_bu(simd_vector_str_high))};
+# else
                 u16x16simd const u16x16v1{::std::bit_cast<u16x16simd>(__builtin_shufflevector(simd_vector_str,
                                                                                               u8x32simd{},
                                                                                               16,  // 0
@@ -7086,6 +7136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                                                               31,  // 30
                                                                                               32   // 31
                                                                                               ))};
+# endif
 
                 ::std::memcpy(functionsec_funcs_storage_typeidx_u16_vector_imp_curr_ptr_tmp, ::std::addressof(u16x16v1), sizeof(u16x16simd));
 

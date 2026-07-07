@@ -93,6 +93,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         using local_offset_t = ::std::size_t;
 
+        template <numeric_details::int_binop Op>
+        inline consteval bool is_nontrapping_int_binop() noexcept
+        {
+            return Op == numeric_details::int_binop::add || Op == numeric_details::int_binop::sub || Op == numeric_details::int_binop::mul ||
+                   Op == numeric_details::int_binop::and_ || Op == numeric_details::int_binop::or_ || Op == numeric_details::int_binop::xor_ ||
+                   Op == numeric_details::int_binop::shl || Op == numeric_details::int_binop::shr_s || Op == numeric_details::int_binop::shr_u ||
+                   Op == numeric_details::int_binop::rotl || Op == numeric_details::int_binop::rotr;
+        }
+
         template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr T read_imm(::std::byte const*& ip) noexcept
         {
@@ -164,9 +173,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
                     out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
                 }
-                else
+                else if constexpr(delay_local_details::is_nontrapping_int_binop<Op>())
                 {
                     out = numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
             }
@@ -206,9 +219,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
                     out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
                 }
-                else
+                else if constexpr(delay_local_details::is_nontrapping_int_binop<Op>())
                 {
                     out = numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
@@ -778,9 +795,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
                     out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
                 }
-                else
+                else if constexpr(delay_local_details::is_nontrapping_int_binop<Op>())
                 {
                     out = numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
             }
@@ -820,9 +841,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
                     out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
                 }
-                else
+                else if constexpr(delay_local_details::is_nontrapping_int_binop<Op>())
                 {
                     out = numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }

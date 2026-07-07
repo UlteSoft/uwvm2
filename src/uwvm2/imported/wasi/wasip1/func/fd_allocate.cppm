@@ -44,7 +44,18 @@ module;
 # include <sys/stat.h>
 #endif
 #if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
-# include <sgidefs.h>
+# if __has_include(<sgidefs.h>)
+#  include <sgidefs.h>
+# endif
+# ifndef _ABIO32
+#  define _ABIO32 1
+# endif
+# ifndef _ABIN32
+#  define _ABIN32 2
+# endif
+# ifndef _ABI64
+#  define _ABI64 3
+# endif
 #endif
 
 export module uwvm2.imported.wasi.wasip1.func:fd_allocate;
@@ -70,4 +81,3 @@ import :posix;
 #endif
 
 #include "fd_allocate.h"
-

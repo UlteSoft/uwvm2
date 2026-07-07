@@ -24,17 +24,27 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
+# include <cerrno>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
 # include <limits>
 # include <memory>
+# include <string>
+# include <system_error>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 # endif
-# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<unwind.h>)
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__linux__) && defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+#  include <sys/mman.h>
+#  include <unistd.h>
+#  ifndef MAP_FIXED_NOREPLACE
+#   define MAP_FIXED_NOREPLACE 0x100000
+#  endif
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && !defined(__arm__) && !defined(__thumb__) && __has_include(<unwind.h>)
 #  include <unwind.h>
 extern "C" void __register_frame(void const*);
 extern "C" void __deregister_frame(void const*);
@@ -63,15 +73,136 @@ extern "C" void __deregister_frame(void const*);
 
 #pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME")
 #undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
-#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<unwind.h>)
+#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && !defined(__arm__) && !defined(__thumb__) && __has_include(<unwind.h>)
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME 1
 #else
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME 0
 #endif
 
+#pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER")
+#undef UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__linux__) && defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER 1
+#else
+# define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER 0
+#endif
+
 namespace uwvm2::runtime::compiler::llvm_jit::details
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER
+    class runtime_llvm_jit_riscv64_low_address_memory_mapper final : public ::llvm::SectionMemoryManager::MemoryMapper
+    {
+        [[nodiscard]] inline static ::std::size_t page_size() noexcept
+        {
+            auto const value{::sysconf(_SC_PAGESIZE)};
+            if(value <= 0) [[unlikely]] { return 4096uz; }
+            return static_cast<::std::size_t>(value);
+        }
+
+        [[nodiscard]] inline static ::std::size_t align_to_page(::std::size_t value) noexcept
+        {
+            auto const ps{page_size()};
+            auto const mask{ps - 1uz};
+            return (value + mask) & ~mask;
+        }
+
+        [[nodiscard]] inline static unsigned mmap_prot(unsigned flags) noexcept
+        {
+            unsigned prot{};
+            if((flags & ::llvm::sys::Memory::MF_READ) != 0u) { prot |= PROT_READ; }
+            if((flags & ::llvm::sys::Memory::MF_WRITE) != 0u) { prot |= PROT_WRITE; }
+            if((flags & ::llvm::sys::Memory::MF_EXEC) != 0u) { prot |= PROT_EXEC; }
+            return prot;
+        }
+
+        [[nodiscard]] inline static ::std::uintptr_t align_address_up(::std::uintptr_t value) noexcept
+        {
+            auto const ps{static_cast<::std::uintptr_t>(page_size())};
+            auto const mask{ps - 1u};
+            return (value + mask) & ~mask;
+        }
+
+        [[nodiscard]] inline static ::std::uintptr_t near_block_hint(::llvm::sys::MemoryBlock const* near_block) noexcept
+        {
+            if(near_block == nullptr || near_block->base() == nullptr || near_block->allocatedSize() == 0uz) { return 0u; }
+            auto const base{reinterpret_cast<::std::uintptr_t>(near_block->base())};
+            auto const size{static_cast<::std::uintptr_t>(near_block->allocatedSize())};
+            if(base > (::std::numeric_limits<::std::uintptr_t>::max)() - size) [[unlikely]] { return 0u; }
+            return align_address_up(base + size);
+        }
+
+    public:
+        inline ::llvm::sys::MemoryBlock allocateMappedMemory(::llvm::SectionMemoryManager::AllocationPurpose,
+                                                             ::std::size_t num_bytes,
+                                                             ::llvm::sys::MemoryBlock const* const near_block,
+                                                             unsigned flags,
+                                                             ::std::error_code& ec) override
+        {
+            constexpr ::std::uintptr_t low_begin{0x10000000u};
+            constexpr ::std::uintptr_t low_end{0x70000000u};
+            constexpr ::std::uintptr_t scan_stride{0x01000000u};
+
+            auto const size{align_to_page(num_bytes == 0uz ? page_size() : num_bytes)};
+            auto const prot{mmap_prot(flags)};
+            auto const map_flags{MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE};
+
+            auto try_map{[&](::std::uintptr_t hint) noexcept -> void*
+                         {
+                             if(hint < low_begin || hint > low_end || static_cast<::std::uintptr_t>(size) > low_end - hint) { return MAP_FAILED; }
+                             return ::mmap(reinterpret_cast<void*>(hint), size, prot, map_flags, -1, 0);
+                         }};
+
+            if(auto const hint{near_block_hint(near_block)}; hint != 0u)
+            {
+                auto const mapped{try_map(hint)};
+                if(mapped != MAP_FAILED)
+                {
+                    ec.clear();
+                    return ::llvm::sys::MemoryBlock{mapped, size};
+                }
+            }
+
+            for(::std::uintptr_t hint{low_begin}; hint <= low_end && static_cast<::std::uintptr_t>(size) <= low_end - hint; hint += scan_stride)
+            {
+                auto const mapped{try_map(hint)};
+                if(mapped != MAP_FAILED)
+                {
+                    ec.clear();
+                    return ::llvm::sys::MemoryBlock{mapped, size};
+                }
+            }
+
+            ec = ::std::error_code(errno == 0 ? ENOMEM : errno, ::std::generic_category());
+            return {};
+        }
+
+        inline ::std::error_code protectMappedMemory(::llvm::sys::MemoryBlock const& block, unsigned flags) override
+        {
+            if(block.base() == nullptr || block.allocatedSize() == 0uz) { return {}; }
+            if(::mprotect(block.base(), block.allocatedSize(), static_cast<int>(mmap_prot(flags))) == 0) { return {}; }
+            return ::std::error_code(errno, ::std::generic_category());
+        }
+
+        inline ::std::error_code releaseMappedMemory(::llvm::sys::MemoryBlock& block) override
+        {
+            if(block.base() == nullptr || block.allocatedSize() == 0uz) { return {}; }
+            if(::munmap(block.base(), block.allocatedSize()) == 0)
+            {
+                block = {};
+                return {};
+            }
+            return ::std::error_code(errno, ::std::generic_category());
+        }
+    };
+
+    [[nodiscard]] inline runtime_llvm_jit_riscv64_low_address_memory_mapper& get_runtime_llvm_jit_riscv64_low_address_memory_mapper() noexcept
+    {
+        static runtime_llvm_jit_riscv64_low_address_memory_mapper mapper{};
+        return mapper;
+    }
+# endif
+
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
     struct runtime_llvm_jit_eh_frame_record
     {
@@ -134,14 +265,29 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     public:
         inline constexpr runtime_llvm_jit_section_memory_manager() noexcept :
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC
+#  if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER
+            ::llvm::SectionMemoryManager(::std::addressof(get_runtime_llvm_jit_riscv64_low_address_memory_mapper()), true)
+#  else
             ::llvm::SectionMemoryManager(nullptr, UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH != 0)
+#  endif
 # else
+#  if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER
+            ::llvm::SectionMemoryManager(::std::addressof(get_runtime_llvm_jit_riscv64_low_address_memory_mapper()))
+#  else
             ::llvm::SectionMemoryManager(nullptr)
+#  endif
 # endif
         {
         }
 
         inline constexpr ~runtime_llvm_jit_section_memory_manager() override { deregisterEHFrames(); }
+
+        [[nodiscard]] inline ::llvm::JITSymbol findSymbol(::std::string const& name) override
+        {
+            auto const address{this->getSymbolAddress(name)};
+            if(address == 0u) { return nullptr; }
+            return ::llvm::JITSymbol{address, ::llvm::JITSymbolFlags::Exported};
+        }
 
         inline constexpr ::std::uint8_t*
             allocateCodeSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name) noexcept override
@@ -276,3 +422,4 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RESERVE_ALLOC")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH")
+#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER")

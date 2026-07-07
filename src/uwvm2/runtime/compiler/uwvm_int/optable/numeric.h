@@ -36,7 +36,7 @@
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
-# if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
+# if defined(UWVM_ENABLE_UWVM_INT_FENV_DEBUG_CHECK) && __has_include(<cfenv>)
 #  include <cfenv>
 # endif
 // import
@@ -238,7 +238,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                return {};
+                static_assert(Op != Op, "unhandled integer unary opcode");
             }
         }
 
@@ -345,7 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                return {};
+                static_assert(Op != Op, "unhandled integer binary opcode");
             }
         }
 
@@ -371,7 +371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         UWVM_ALWAYS_INLINE inline constexpr bool fp_rounding_is_tonearest() noexcept
         {
-# if __has_include(<cfenv>) && defined(FE_TONEAREST)
+# if defined(UWVM_ENABLE_UWVM_INT_FENV_DEBUG_CHECK) && __has_include(<cfenv>) && defined(FE_TONEAREST)
             return ::std::fegetround() == FE_TONEAREST;
 # else
             return true;
@@ -631,7 +631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                return {};
+                static_assert(Op != Op, "unhandled float unary opcode");
             }
         }
 
@@ -690,7 +690,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                return {};
+                static_assert(Op != Op, "unhandled float binary opcode");
             }
         }
 
@@ -718,10 +718,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     OperandT const out{eval_int_unop<Op, wasm_i32, wasm_u32>(v)};
                     details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, curr_stack_top>(out, typeref...);
                 }
-                else
+                else if constexpr(::std::same_as<OperandT, wasm_i64>)
                 {
                     OperandT const out{eval_int_unop<Op, wasm_i64, wasm_u64>(v)};
                     details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, curr_stack_top>(out, typeref...);
+                }
+                else
+                {
+                    static_assert(sizeof(OperandT) == 0, "unhandled integer unary operand type");
                 }
             }
             else
@@ -730,9 +734,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_unop<Op, wasm_i32, wasm_u32>(v); }
-                else
+                else if constexpr(::std::same_as<OperandT, wasm_i64>)
                 {
                     out = eval_int_unop<Op, wasm_i64, wasm_u64>(v);
+                }
+                else
+                {
+                    static_assert(sizeof(OperandT) == 0, "unhandled integer unary operand type");
                 }
 
                 ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
@@ -772,9 +780,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs); }
-                else
+                else if constexpr(::std::same_as<OperandT, wasm_i64>)
                 {
                     out = eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(sizeof(OperandT) == 0, "unhandled integer binary operand type");
                 }
 
                 if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, next_pos>(out, typeref...); }
@@ -791,9 +803,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs); }
-                else
+                else if constexpr(::std::same_as<OperandT, wasm_i64>)
                 {
                     out = eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
+                else
+                {
+                    static_assert(sizeof(OperandT) == 0, "unhandled integer binary operand type");
                 }
 
                 ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));

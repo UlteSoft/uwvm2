@@ -20,6 +20,7 @@ namespace
         //   block
         //     br 0
         //     select       ;; polymorphic; only 2 stack values available (v2, cond)
+        //     drop         ;; clear select's polymorphic result before the empty block end
         //   end
         //   drop; drop; i32.const 7
         {
@@ -39,6 +40,7 @@ namespace
             append_u32_leb(c, 0u);
 
             op(c, wasm_op::select);
+            op(c, wasm_op::drop);
 
             op(c, wasm_op::end);  // end block
 
@@ -114,4 +116,3 @@ int main()
 {
     return test_translate_select_partial_operand_stack_polymorphic();
 }
-

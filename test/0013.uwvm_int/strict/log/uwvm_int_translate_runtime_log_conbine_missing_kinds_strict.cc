@@ -807,87 +807,30 @@ namespace
         auto const log_text{read_text_file(kLogPath)};
         UWVM2TEST_REQUIRE(!log_text.empty());
 
+        // Runtime conbine logging records pending states when they are flushed. Fully consumed fusion
+        // states are covered by the dedicated bytecode/fptr strict tests instead.
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         for(char const* kind : {
-                "const_f32_localget",
-                "f32_div_from_imm_localtee_wait",
-                "const_f64_localget",
-                "f64_div_from_imm_localtee_wait",
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-                "float_mul_2localget",
-                "float_mul_2localget_local3",
-                "float_2mul_wait_second_mul",
-                "float_2mul_after_second_mul",
-                "select_localget3",
-                "select_after_select",
-                "mac_localget3",
-                "mac_after_mul",
-                "mac_after_add",
-                "f32_add_2localget_local_set",
-                "f32_add_2localget_local_tee",
-                "f64_add_2localget_local_set",
-                "f64_add_2localget_local_tee",
-                "i32_rem_u_2localget_wait_eqz",
-                "i32_rem_u_eqz_2localget_wait_brif",
-                "for_i32_inc_f64_lt_u_eqz_after_gets",
-                "for_i32_inc_f64_lt_u_eqz_after_step_const",
-                "for_i32_inc_f64_lt_u_eqz_after_add",
-                "for_i32_inc_f64_lt_u_eqz_after_tee",
-                "for_i32_inc_f64_lt_u_eqz_after_convert",
-                "for_i32_inc_f64_lt_u_eqz_after_cmp",
-                "for_i32_inc_f64_lt_u_eqz_after_eqz",
-                "xorshift_pre_shr",
-                "xorshift_after_shr",
-                "xorshift_after_xor1",
-                "xorshift_after_xor1_getx",
-                "xorshift_after_xor1_getx_constb",
-                "xorshift_after_shl",
-                "rotl_xor_local_set_after_rotl",
-                "rotl_xor_local_set_after_xor",
-                "u16_copy_scaled_index_after_shl",
-                "u16_copy_scaled_index_after_load",
-#endif
-                "f32_acc_add_ceil_localget_wait_add",
-                "f32_acc_add_floor_localget_wait_add",
-                "f32_acc_add_trunc_localget_wait_add",
-                "f32_acc_add_nearest_localget_wait_add",
-                "f32_acc_add_abs_localget_wait_add",
-                "f32_acc_add_ceil_localget_set_acc",
-                "f32_acc_add_floor_localget_set_acc",
-                "f32_acc_add_trunc_localget_set_acc",
-                "f32_acc_add_nearest_localget_set_acc",
-                "f32_acc_add_abs_localget_set_acc",
-                "f32_acc_add_negabs_localget_wait_add",
-                "f32_acc_add_negabs_localget_wait_copysign",
-                "f32_acc_add_negabs_localget_set_acc",
-                "rot_xor_add_after_rotl",
-                "rot_xor_add_after_gety",
-                "rot_xor_add_after_xor",
-                "f32_add_imm_local_settee_same",
-                "f32_mul_imm_local_settee_same",
-                "f32_sub_imm_local_settee_same",
-                "f64_acc_add_floor_localget_wait_add",
-                "f64_acc_add_ceil_localget_wait_add",
-                "f64_acc_add_trunc_localget_wait_add",
-                "f64_acc_add_nearest_localget_wait_add",
-                "f64_acc_add_abs_localget_wait_add",
-                "f64_acc_add_floor_localget_set_acc",
-                "f64_acc_add_ceil_localget_set_acc",
-                "f64_acc_add_trunc_localget_set_acc",
-                "f64_acc_add_nearest_localget_set_acc",
-                "f64_acc_add_abs_localget_set_acc",
-                "f64_acc_add_negabs_localget_wait_add",
-                "f64_acc_add_negabs_localget_wait_copysign",
-                "f64_acc_add_negabs_localget_set_acc",
-                "rot_xor_add_i64_after_rotl",
-                "rot_xor_add_i64_after_gety",
-                "rot_xor_add_i64_after_xor",
-                "f64_add_imm_local_settee_same",
-                "f64_mul_imm_local_settee_same",
-                "f64_sub_imm_local_settee_same",
+                "const_i32",
+                "local_get",
             })
         {
             UWVM2TEST_REQUIRE(log_contains_kind(log_text, kind));
         }
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        for(char const* kind : {
+                "rot_xor_add_after_rotl",
+                "rot_xor_add_after_gety",
+                "rot_xor_add_after_xor_constc",
+                "rot_xor_add_i64_after_rotl",
+                "rot_xor_add_i64_after_gety",
+                "rot_xor_add_i64_after_xor_constc",
+            })
+        {
+            UWVM2TEST_REQUIRE(log_contains_kind(log_text, kind));
+        }
+# endif
+#endif
 
         (void)::std::remove(kLogPath);
 

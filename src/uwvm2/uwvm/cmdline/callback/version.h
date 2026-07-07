@@ -41,7 +41,18 @@
 #  include <Availability.h>
 # endif
 # if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
-#  include <sgidefs.h>
+#  if __has_include(<sgidefs.h>)
+#   include <sgidefs.h>
+#  endif
+#  ifndef _ABIO32
+#   define _ABIO32 1
+#  endif
+#  ifndef _ABIN32
+#   define _ABIN32 2
+#  endif
+#  ifndef _ABI64
+#   define _ABI64 3
+#  endif
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>
@@ -66,10 +77,22 @@
 #endif
 
 #pragma push_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND")
+#pragma push_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND")
 #undef UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND
+#undef UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND
+#if defined(__APPLE__) && !defined(_WIN32)
+# define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND
+#elif defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) &&                                                                                    \
+    (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64)) && !defined(__CYGWIN__)
+# define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND
+#elif (defined(__linux__) || defined(__FreeBSD__)) && ((defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64)) && !defined(__ILP32__))
+# define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND
+#endif
 #if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) &&                                                              \
+    defined(UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND) &&                                                                          \
     ((!defined(_WIN32) && (__has_include(<libunwind.h>) || __has_include(<unwind.h>))) ||                                                                    \
-     (defined(_WIN64) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                \
+     (defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) &&                                                                                    \
+      (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64)) &&                                          \
       !defined(__CYGWIN__)))
 # define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND
 #endif
@@ -771,7 +794,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #elif defined(__MSDOS__)
                                 u8"Microsoft Dos"
 #elif defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
-                                u8"Linux "
+                                u8"Linux Header "
 # if defined(LINUX_VERSION_CODE)
                                 ,
                                 static_cast<::std::make_unsigned_t<decltype(LINUX_VERSION_CODE)>>(LINUX_VERSION_CODE) >> 16u,
@@ -1131,7 +1154,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             using size_type = ::std::size_t;
             constexpr size_type npos{static_cast<size_type>(-1)};
             constexpr bool is_tail_call{
-# if !(defined(__pdp11) || defined(UWVM_VERSION_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_VERSION_TARGET_POWERPC_FAMILY) || defined(__s390x__) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
                 true
 # else
                 false
@@ -1239,10 +1262,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  endif
 # elif defined(__s390x__)
             abi_name = u8"s390x Linux ABI";
-            i32_begin = i64_begin = 3uz;
-            i32_end = i64_end = 6uz;
-            f32_begin = f64_begin = 6uz;
-            f32_end = f64_end = 8uz;
+            abi_note = u8"Stack-top cache: Off (indirect musttail is not stack-stable for long interpreter loops).";
 # elif defined(__s390__) || defined(__SYSC_ZARCH__)
             abi_name = u8"s390 / z/Architecture (31-bit)";
             abi_note = u8"Stack-top cache: Off (i64/f64 passing is ABI-sensitive).";
@@ -1392,6 +1412,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
+#pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_ENABLE_NATIVE_UNWIND")
 #pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_UNWIND")
 
 #ifndef UWVM_MODULE

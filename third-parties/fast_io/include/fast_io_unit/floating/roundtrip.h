@@ -74,6 +74,68 @@ inline constexpr uint64x2 float64_mod5_tb[]{
 
 inline constexpr auto compute_pow10_float64{pow10_float64_tb + 292};
 
+inline constexpr uint64x2 pow10_float64_scan_low_tb[]{
+	{0xEEF453D6923BD65A, 0x113FAA2906A13B40}, // 1e-342
+	{0x9558B4661B6565F8, 0x4AC7CA59A424C508}, // 1e-341
+	{0xBAAEE17FA23EBF76, 0x5D79BCF00D2DF64A}, // 1e-340
+	{0xE95A99DF8ACE6F53, 0xF4D82C2C107973DD}, // 1e-339
+	{0x91D8A02BB6C10594, 0x79071B9B8A4BE86A}, // 1e-338
+	{0xB64EC836A47146F9, 0x9748E2826CDEE285}, // 1e-337
+	{0xE3E27A444D8D98B7, 0xFD1B1B2308169B26}, // 1e-336
+	{0x8E6D8C6AB0787F72, 0xFE30F0F5E50E20F8}, // 1e-335
+	{0xB208EF855C969F4F, 0xBDBD2D335E51A936}, // 1e-334
+	{0xDE8B2B66B3BC4723, 0xAD2C788035E61383}, // 1e-333
+	{0x8B16FB203055AC76, 0x4C3BCB5021AFCC32}, // 1e-332
+	{0xADDCB9E83C6B1793, 0xDF4ABE242A1BBF3E}, // 1e-331
+	{0xD953E8624B85DD78, 0xD71D6DAD34A2AF0E}, // 1e-330
+	{0x87D4713D6F33AA6B, 0x8672648C40E5AD69}, // 1e-329
+	{0xA9C98D8CCB009506, 0x680EFDAF511F18C3}, // 1e-328
+	{0xD43BF0EFFDC0BA48, 0x0212BD1B2566DEF3}, // 1e-327
+	{0x84A57695FE98746D, 0x014BB630F7604B58}, // 1e-326
+	{0xA5CED43B7E3E9188, 0x419EA3BD35385E2E}, // 1e-325
+	{0xCF42894A5DCE35EA, 0x52064CAC828675BA}, // 1e-324
+	{0x818995CE7AA0E1B2, 0x7343EFEBD1940994}, // 1e-323
+	{0xA1EBFB4219491A1F, 0x1014EBE6C5F90BF9}, // 1e-322
+	{0xCA66FA129F9B60A6, 0xD41A26E077774EF7}, // 1e-321
+	{0xFD00B897478238D0, 0x8920B098955522B5}, // 1e-320
+	{0x9E20735E8CB16382, 0x55B46E5F5D5535B1}, // 1e-319
+	{0xC5A890362FDDBC62, 0xEB2189F734AA831E}, // 1e-318
+	{0xF712B443BBD52B7B, 0xA5E9EC7501D523E5}, // 1e-317
+	{0x9A6BB0AA55653B2D, 0x47B233C92125366F}, // 1e-316
+	{0xC1069CD4EABE89F8, 0x999EC0BB696E840B}, // 1e-315
+	{0xF148440A256E2C76, 0xC00670EA43CA250E}, // 1e-314
+	{0x96CD2A865764DBCA, 0x380406926A5E5729}, // 1e-313
+	{0xBC807527ED3E12BC, 0xC605083704F5ECF3}, // 1e-312
+	{0xEBA09271E88D976B, 0xF7864A44C633682F}, // 1e-311
+	{0x93445B8731587EA3, 0x7AB3EE6AFBE0211E}, // 1e-310
+	{0xB8157268FDAE9E4C, 0x5960EA05BAD82965}, // 1e-309
+	{0xE61ACF033D1A45DF, 0x6FB92487298E33BE}, // 1e-308
+	{0x8FD0C16206306BAB, 0xA5D3B6D479F8E057}, // 1e-307
+	{0xB3C4F1BA87BC8696, 0x8F48A4899877186D}, // 1e-306
+	{0xE0B62E2929ABA83C, 0x331ACDABFE94DE88}, // 1e-305
+	{0x8C71DCD9BA0B4925, 0x9FF0C08B7F1D0B15}, // 1e-304
+	{0xAF8E5410288E1B6F, 0x07ECF0AE5EE44DDA}, // 1e-303
+	{0xDB71E91432B1A24A, 0xC9E82CD9F69D6151}, // 1e-302
+	{0x892731AC9FAF056E, 0xBE311C083A225CD3}, // 1e-301
+	{0xAB70FE17C79AC6CA, 0x6DBD630A48AAF407}, // 1e-300
+	{0xD64D3D9DB981787D, 0x092CBBCCDAD5B109}, // 1e-299
+	{0x85F0468293F0EB4E, 0x25BBF56008C58EA6}, // 1e-298
+	{0xA76C582338ED2621, 0xAF2AF2B80AF6F24F}, // 1e-297
+	{0xD1476E2C07286FAA, 0x1AF5AF660DB4AEE2}, // 1e-296
+	{0x82CCA4DB847945CA, 0x50D98D9FC890ED4E}, // 1e-295
+	{0xA37FCE126597973C, 0xE50FF107BAB528A1}, // 1e-294
+	{0xCC5FC196FEFD7D0C, 0x1E53ED49A96272C9}  // 1e-293
+};
+
+[[nodiscard]] inline constexpr uint64x2 compute_pow10_float64_scan(::std::int_least32_t exponent) noexcept
+{
+	if (exponent < -292)
+	{
+		return pow10_float64_scan_low_tb[static_cast<::std::size_t>(exponent + 342)];
+	}
+	return compute_pow10_float64[exponent];
+}
+
 template <typename mantissa_type>
 struct m10_result
 {
@@ -219,16 +281,17 @@ schubfach_asymmetric_interval(::std::int_least32_t e2) noexcept
 	constexpr ::std::int_least32_t mbits{trait::mbits};
 	::std::int_least32_t const minus_k{(e2 * 1262611 - 524031) >> 22};
 	::std::int_least32_t const plus_k{-minus_k};
-	::std::int_least32_t const beta_minus_1{e2 + mul_ln10_div_ln2_floor(plus_k)};
-	::std::uint_least32_t const rshift{static_cast<::std::uint_least32_t>(64 - mbits - beta_minus_1)};
+	::std::int_least32_t const beta{e2 + mul_ln10_div_ln2_floor(plus_k)};
+	::std::uint_least32_t const rshift{static_cast<::std::uint_least32_t>(63 - mbits - beta)};
 	if constexpr (sizeof(flt) == sizeof(::std::uint_least64_t))
 	{
 		uint64x2 const pw{compute_pow10_float64[plus_k]};
-		::std::uint_least64_t const pw_lo{pw.lo}, pw_hi{pw.hi};
-		::std::uint_least64_t const lower_endpoint{(pw_hi - (pw_hi >> (mbits + 1))) >> rshift};
-		::std::uint_least64_t q{(pw_lo + (pw_hi >> mbits)) >> rshift};
-		bool const lower_endpoint_is_not_integer((2 != e2) & (3 != e2));
+		::std::uint_least64_t const pw_hi{pw.hi};
+		::std::uint_least64_t const lower_endpoint{(pw_hi - (pw_hi >> (mbits + 2))) >> rshift};
+		::std::uint_least64_t const upper_endpoint{(pw_hi + (pw_hi >> (mbits + 1))) >> rshift};
+		bool const lower_endpoint_is_not_integer{!(2 <= e2 && e2 <= 4)};
 		::std::uint_least64_t const xi{lower_endpoint + lower_endpoint_is_not_integer};
+		::std::uint_least64_t q{upper_endpoint};
 		q /= 10;
 		if (q * 10 >= xi)
 		{
@@ -237,7 +300,7 @@ schubfach_asymmetric_interval(::std::int_least32_t e2) noexcept
 		q = ((pw_hi >> (rshift - 1)) + 1) >> 1;
 		if (e2 == -77)
 		{
-			q -= (q & 1);
+			q -= (q & 1u);
 		}
 		else
 		{
@@ -249,9 +312,10 @@ schubfach_asymmetric_interval(::std::int_least32_t e2) noexcept
 	else
 	{
 		::std::uint_least64_t const pw{compute_pow10_float32[plus_k]};
-		::std::uint_least64_t const lower_endpoint{(pw - (pw >> (mbits + 1))) >> rshift};
-		::std::uint_least64_t q{(pw >> mbits) >> rshift};
-		bool const lower_endpoint_is_not_integer((2 != e2) & (3 != e2));
+		::std::uint_least64_t const lower_endpoint{(pw - (pw >> (mbits + 2))) >> rshift};
+		::std::uint_least64_t const upper_endpoint{(pw + (pw >> (mbits + 1))) >> rshift};
+		::std::uint_least64_t q{upper_endpoint};
+		bool const lower_endpoint_is_not_integer{!(2 <= e2 && e2 <= 3)};
 		::std::uint_least64_t const xi{lower_endpoint + lower_endpoint_is_not_integer};
 		q /= 10;
 		if (q * 10 >= xi)
@@ -261,7 +325,7 @@ schubfach_asymmetric_interval(::std::int_least32_t e2) noexcept
 		q = ((pw >> (rshift - 1)) + 1) >> 1;
 		if (e2 == -35)
 		{
-			q -= (q & 1);
+			q -= (q & 1u);
 		}
 		else
 		{
@@ -302,6 +366,7 @@ dragonbox_main(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32
 	else
 	{
 		auto e2_temp{e2};
+		auto const raw_m2{m2};
 		e2 -= exponent_bias;
 		m2 |= mflags;
 		::std::uint_least32_t pos_e2{static_cast<::std::uint_least32_t>(-e2)};
@@ -309,7 +374,7 @@ dragonbox_main(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32
 		{
 			return {m2 >> pos_e2, 0};
 		}
-		if (m2 == 0 && e2_temp > 1) [[unlikely]]
+		if (raw_m2 == 0 && e2_temp > 1) [[unlikely]]
 		{
 			return schubfach_asymmetric_interval<flt>(e2);
 		}
@@ -396,7 +461,7 @@ dragonbox_main(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32
 		q += dist_q;
 		if (dist == dist_q_mul100)
 		{
-			bool const approx_y_parity{(dist & 1u) != 0u};
+			bool const approx_y_parity{((dist ^ small_divisor_div2) & 1u) != 0u};
 			if ((mul_parity_float32(two_fc, pow10, beta_minus_1) != approx_y_parity) ||
 				((q & 1) && is_integral_mid_point_float32(two_fc, e2, minus_k)))
 			{
@@ -407,7 +472,860 @@ dragonbox_main(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32
 	}
 }
 
-template <typename flt>
+struct dragonbox_mul_result
+{
+	::std::uint_least64_t integer_part{};
+	bool is_integer{};
+};
+
+struct dragonbox_mul_parity_result
+{
+	bool parity{};
+	bool is_integer{};
+};
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_nearest_normal_left_closed(bool negative, bool is_even) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return is_even;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return !is_even;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_nearest_normal_right_closed(bool negative, bool is_even) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return is_even;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return !is_even;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_nearest_shorter_left_closed(bool negative) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return true;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return false;
+	}
+	else
+	{
+		return ::fast_io::details::dragonbox_nearest_normal_left_closed<rounding>(negative, true);
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_nearest_shorter_right_closed(bool negative) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return true;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return false;
+	}
+	else
+	{
+		return ::fast_io::details::dragonbox_nearest_normal_right_closed<rounding>(negative, true);
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool
+dragonbox_nearest_binary_tie_prefer_down(bool negative, ::std::uint_least64_t decimal_significand) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return (decimal_significand & 1u) != 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return (decimal_significand & 1u) == 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+[[nodiscard]] inline constexpr dragonbox_mul_result
+dragonbox_compute_mul_float32(::std::uint_least64_t u, ::std::uint_least64_t cache) noexcept
+{
+	auto const lower{u * cache};
+	return {::fast_io::intrinsics::umulh(u, cache),
+			(static_cast<::std::uint_least32_t>(lower >> 32u) == 0u)};
+}
+
+[[nodiscard]] inline constexpr dragonbox_mul_parity_result
+dragonbox_compute_mul_parity_float32(::std::uint_least64_t two_f, ::std::uint_least64_t cache,
+									 ::std::int_least32_t beta) noexcept
+{
+	auto const lower{two_f * cache};
+	return {(lower & (::std::uint_least64_t{1u} << static_cast<unsigned>(64 - beta))) != 0u,
+			(static_cast<::std::uint_least32_t>(lower >> static_cast<unsigned>(32 - beta)) == 0u)};
+}
+
+[[nodiscard]] inline constexpr dragonbox_mul_result
+dragonbox_compute_mul_float64(::std::uint_least64_t u, ::std::uint_least64_t cache_lo,
+							  ::std::uint_least64_t cache_hi) noexcept
+{
+	::std::uint_least64_t high0{};
+	auto const low0{::fast_io::intrinsics::umul(u, cache_lo, high0)};
+	auto const mid{static_cast<::std::uint_least64_t>(high0 + u * cache_hi)};
+	return {::fast_io::intrinsics::umulh(u, ::fast_io::intrinsics::pack_ul64(cache_lo, cache_hi)),
+			(low0 | mid) == 0u};
+}
+
+[[nodiscard]] inline constexpr dragonbox_mul_parity_result
+dragonbox_compute_mul_parity_float64(::std::uint_least64_t two_f, ::std::uint_least64_t cache_lo,
+									 ::std::uint_least64_t cache_hi, ::std::int_least32_t beta) noexcept
+{
+	::std::uint_least64_t high0{};
+	auto const low0{::fast_io::intrinsics::umul(two_f, cache_lo, high0)};
+	auto const mid{static_cast<::std::uint_least64_t>(high0 + two_f * cache_hi)};
+	return {(mid & (::std::uint_least64_t{1u} << static_cast<unsigned>(64 - beta))) != 0u,
+			((mid << static_cast<unsigned>(beta)) | (low0 >> static_cast<unsigned>(64 - beta))) == 0u};
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
+dragonbox_nearest_shorter_interval([[maybe_unused]] typename iec559_traits<flt>::mantissa_type m2,
+								   ::std::int_least32_t e2, bool negative) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+	constexpr ::std::int_least32_t mbits{static_cast<::std::int_least32_t>(trait::mbits)};
+	::std::int_least32_t const minus_k{(e2 * 1262611 - 524031) >> 22};
+	::std::int_least32_t const plus_k{-minus_k};
+	::std::int_least32_t const beta{e2 + mul_ln10_div_ln2_floor(plus_k)};
+	::std::uint_least32_t const rshift{static_cast<::std::uint_least32_t>(63 - mbits - beta)};
+	bool const include_left{::fast_io::details::dragonbox_nearest_shorter_left_closed<rounding>(negative)};
+	bool const include_right{::fast_io::details::dragonbox_nearest_shorter_right_closed<rounding>(negative)};
+	if constexpr (sizeof(flt) == sizeof(::std::uint_least64_t))
+	{
+		uint64x2 const pw{compute_pow10_float64[plus_k]};
+		::std::uint_least64_t xi{(pw.hi - (pw.hi >> (mbits + 2))) >> rshift};
+		::std::uint_least64_t zi{(pw.hi + (pw.hi >> (mbits + 1))) >> rshift};
+		if (!include_right && 0 <= e2 && e2 <= 3)
+		{
+			--zi;
+		}
+		if (!include_left || !(2 <= e2 && e2 <= 4))
+		{
+			++xi;
+		}
+		auto q{zi / 10u};
+		if (q * 10u >= xi)
+		{
+			return {static_cast<mantissa_type>(q), minus_k + 1};
+		}
+		q = ((pw.hi >> static_cast<unsigned>(rshift - 1u)) + 1u) >> 1u;
+		if (::fast_io::details::dragonbox_nearest_binary_tie_prefer_down<rounding>(negative, q) && e2 == -77)
+		{
+			--q;
+		}
+		else if (q < xi)
+		{
+			++q;
+		}
+		return {static_cast<mantissa_type>(q), minus_k};
+	}
+	else
+	{
+		::std::uint_least64_t const pw{compute_pow10_float32[plus_k]};
+		::std::uint_least64_t xi{(pw - (pw >> (mbits + 2))) >> rshift};
+		::std::uint_least64_t zi{(pw + (pw >> (mbits + 1))) >> rshift};
+		if (!include_right && 0 <= e2 && e2 <= 2)
+		{
+			--zi;
+		}
+		if (!include_left || !(2 <= e2 && e2 <= 3))
+		{
+			++xi;
+		}
+		auto q{zi / 10u};
+		if (q * 10u >= xi)
+		{
+			return {static_cast<mantissa_type>(q), minus_k + 1};
+		}
+		q = ((pw >> static_cast<unsigned>(rshift - 1u)) + 1u) >> 1u;
+		if (::fast_io::details::dragonbox_nearest_binary_tie_prefer_down<rounding>(negative, q) && e2 == -35)
+		{
+			--q;
+		}
+		else if (q < xi)
+		{
+			++q;
+		}
+		return {static_cast<mantissa_type>(q), minus_k};
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
+dragonbox_main_nearest_policy(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2,
+							  bool negative) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	constexpr ::std::uint_least32_t bias{(static_cast<::std::uint_least32_t>(1 << ebits) >> 1) - 1};
+	constexpr ::std::int_least32_t exponent_bias{bias + mbits};
+	constexpr mantissa_type mflags{static_cast<mantissa_type>(static_cast<mantissa_type>(1) << mbits)};
+	constexpr ::std::int_least32_t kappa{(sizeof(flt) == sizeof(::std::uint_least32_t)) ? 1 : 2};
+	constexpr ::std::uint_least32_t big_divisor{kappa == 2 ? 1000 : 100};
+	constexpr ::std::uint_least32_t small_divisor{big_divisor / 10};
+	constexpr ::std::uint_least32_t small_divisor_div2{small_divisor / 2};
+
+	if (e2 == 0) [[unlikely]]
+	{
+		constexpr ::std::int_least32_t e2bias{1 - static_cast<::std::int_least32_t>(exponent_bias)};
+		e2 = e2bias;
+	}
+	else
+	{
+		auto const raw_mantissa{m2};
+		e2 -= exponent_bias;
+		m2 |= mflags;
+		::std::uint_least32_t pos_e2{static_cast<::std::uint_least32_t>(-e2)};
+		if (pos_e2 < mbits && multiple_of_pow2_unchecked(m2, pos_e2)) [[unlikely]]
+		{
+			return {m2 >> pos_e2, 0};
+		}
+		if (!raw_mantissa) [[unlikely]]
+		{
+			return ::fast_io::details::dragonbox_nearest_shorter_interval<flt, rounding>(m2, e2, negative);
+		}
+	}
+	bool const is_even{(m2 & 1u) == 0u};
+	bool const include_left{::fast_io::details::dragonbox_nearest_normal_left_closed<rounding>(negative, is_even)};
+	bool const include_right{::fast_io::details::dragonbox_nearest_normal_right_closed<rounding>(negative, is_even)};
+	::std::int_least32_t const minus_k{mul_ln2_div_ln10_floor(e2) - kappa};
+	::std::int_least32_t const plus_k{-minus_k};
+	::std::int_least32_t const beta{e2 + mul_ln10_div_ln2_floor(plus_k)};
+	if constexpr (sizeof(flt) == sizeof(::std::uint_least64_t))
+	{
+		uint64x2 const pow10{compute_pow10_float64[plus_k]};
+		::std::uint_least64_t const pow10_lo{pow10.lo};
+		::std::uint_least64_t const pow10_hi{pow10.hi};
+		::std::uint_least32_t const delta{static_cast<::std::uint_least32_t>(pow10_hi >> (63 - beta))};
+		::std::uint_least64_t const two_fc{m2 << 1}, two_fl{two_fc - 1}, two_fr{two_fc + 1};
+		auto const z_result{::fast_io::details::dragonbox_compute_mul_float64(
+			two_fr << static_cast<unsigned>(beta), pow10_lo, pow10_hi)};
+		::std::uint_least64_t q{z_result.integer_part / big_divisor};
+		::std::uint_least32_t r{static_cast<::std::uint_least32_t>(z_result.integer_part % big_divisor)};
+		if (r < delta)
+		{
+			if (r || !z_result.is_integer || include_right)
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			--q;
+			r = big_divisor;
+		}
+		else if (r == delta)
+		{
+			auto const x_result{
+				::fast_io::details::dragonbox_compute_mul_parity_float64(two_fl, pow10_lo, pow10_hi, beta)};
+			if (x_result.parity || (x_result.is_integer && include_left))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+		}
+		q *= 10;
+		::std::uint_least32_t const dist{static_cast<::std::uint_least32_t>(r - delta / 2 + small_divisor_div2)};
+		constexpr ::std::uint_least32_t distq_divisor_divisor{100};
+		::std::uint_least32_t const dist_q{dist / distq_divisor_divisor};
+		::std::uint_least32_t const dist_q_mul100{dist_q * distq_divisor_divisor};
+		q += dist_q;
+		if (dist == dist_q_mul100)
+		{
+			bool const approx_y_parity{(dist & 1u) != 0u};
+			auto const y_result{
+				::fast_io::details::dragonbox_compute_mul_parity_float64(two_fc, pow10_lo, pow10_hi, beta)};
+			if (y_result.parity != approx_y_parity ||
+				(::fast_io::details::dragonbox_nearest_binary_tie_prefer_down<rounding>(negative, q) &&
+				 y_result.is_integer))
+			{
+				--q;
+			}
+		}
+		return {q, minus_k + kappa};
+	}
+	else
+	{
+		::std::uint_least64_t const pow10{compute_pow10_float32[plus_k]};
+		::std::uint_least32_t const delta{static_cast<::std::uint_least32_t>(pow10 >> (63 - beta))};
+		::std::uint_least32_t const two_fc{m2 << 1}, two_fl{two_fc - 1}, two_fr{two_fc + 1};
+		auto const z_result{::fast_io::details::dragonbox_compute_mul_float32(
+			static_cast<::std::uint_least64_t>(two_fr) << static_cast<unsigned>(beta), pow10)};
+		::std::uint_least32_t q{static_cast<::std::uint_least32_t>(z_result.integer_part / big_divisor)};
+		::std::uint_least32_t r{static_cast<::std::uint_least32_t>(z_result.integer_part % big_divisor)};
+		if (r < delta)
+		{
+			if (r || !z_result.is_integer || include_right)
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			--q;
+			r = big_divisor;
+		}
+		else if (r == delta)
+		{
+			auto const x_result{
+				::fast_io::details::dragonbox_compute_mul_parity_float32(two_fl, pow10, beta)};
+			if (x_result.parity || (x_result.is_integer && include_left))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+		}
+		q *= 10;
+		::std::uint_least32_t const dist{static_cast<::std::uint_least32_t>(r - delta / 2 + small_divisor_div2)};
+		::std::uint_least32_t const dist_q{dist / small_divisor};
+		::std::uint_least32_t const dist_q_mul{dist_q * small_divisor};
+		q += dist_q;
+		if (dist == dist_q_mul)
+		{
+			bool const approx_y_parity{((dist ^ small_divisor_div2) & 1u) != 0u};
+			auto const y_result{::fast_io::details::dragonbox_compute_mul_parity_float32(two_fc, pow10, beta)};
+			if (y_result.parity != approx_y_parity ||
+				(::fast_io::details::dragonbox_nearest_binary_tie_prefer_down<rounding>(negative, q) &&
+				 y_result.is_integer))
+			{
+				--q;
+			}
+		}
+		return {q, minus_k + kappa};
+	}
+}
+
+template <typename flt, bool right_closed>
+[[nodiscard]] inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
+dragonbox_main_directed(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2) noexcept
+{
+	using trait = iec559_traits<flt>;
+	using mantissa_type = typename trait::mantissa_type;
+
+	constexpr ::std::size_t mbits{trait::mbits};
+	constexpr ::std::size_t ebits{trait::ebits};
+	constexpr ::std::uint_least32_t bias{(static_cast<::std::uint_least32_t>(1 << ebits) >> 1) - 1};
+	constexpr ::std::int_least32_t exponent_bias{bias + mbits};
+	constexpr mantissa_type mflags{static_cast<mantissa_type>(static_cast<mantissa_type>(1) << mbits)};
+	constexpr ::std::int_least32_t kappa{(sizeof(flt) == sizeof(::std::uint_least32_t)) ? 1 : 2};
+	constexpr ::std::uint_least32_t big_divisor{kappa == 2 ? 1000 : 100};
+
+	bool shorter_interval{};
+	if (e2 == 0) [[unlikely]]
+	{
+		constexpr ::std::int_least32_t e2bias{1 - static_cast<::std::int_least32_t>(exponent_bias)};
+		e2 = e2bias;
+	}
+	else
+	{
+		auto const raw_mantissa{m2};
+		shorter_interval = right_closed && raw_mantissa == 0 && e2 != 1;
+		e2 -= exponent_bias;
+		m2 |= mflags;
+		::std::uint_least32_t pos_e2{static_cast<::std::uint_least32_t>(-e2)};
+		if (pos_e2 < mbits && multiple_of_pow2_unchecked(m2, pos_e2)) [[unlikely]]
+		{
+			return {m2 >> pos_e2, 0};
+		}
+	}
+	::std::uint_least64_t const two_fc{static_cast<::std::uint_least64_t>(m2) << 1u};
+	::std::int_least32_t const minus_k{mul_ln2_div_ln10_floor(e2 - static_cast<::std::int_least32_t>(shorter_interval)) -
+									   kappa};
+	::std::int_least32_t const plus_k{-minus_k};
+	::std::int_least32_t const beta{e2 + mul_ln10_div_ln2_floor(plus_k)};
+	if constexpr (sizeof(flt) == sizeof(::std::uint_least64_t))
+	{
+		uint64x2 const pow10{compute_pow10_float64[plus_k]};
+		::std::uint_least64_t const pow10_lo{pow10.lo};
+		::std::uint_least64_t const pow10_hi{pow10.hi};
+		::std::uint_least32_t const delta{static_cast<::std::uint_least32_t>(
+			pow10_hi >> static_cast<unsigned>(63 - beta + static_cast<::std::int_least32_t>(shorter_interval)))};
+		auto const xi_or_zi{::fast_io::details::dragonbox_compute_mul_float64(
+			two_fc << static_cast<unsigned>(beta), pow10_lo, pow10_hi)};
+		::std::uint_least64_t q{xi_or_zi.integer_part / big_divisor};
+		::std::uint_least32_t r{static_cast<::std::uint_least32_t>(xi_or_zi.integer_part % big_divisor)};
+		if constexpr (!right_closed)
+		{
+			if (!xi_or_zi.is_integer)
+			{
+				++r;
+				if (r == big_divisor)
+				{
+					r = 0;
+					++q;
+				}
+			}
+			if (r)
+			{
+				++q;
+				r = big_divisor - r;
+			}
+			if (r < delta || (r == delta &&
+							  !::fast_io::details::dragonbox_compute_mul_parity_float64(
+								   two_fc + 2u, pow10_lo, pow10_hi, beta)
+								   .parity))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			q *= 10u;
+			q -= r / 100u;
+		}
+		else
+		{
+			if (r < delta ||
+				(r == delta &&
+				 ::fast_io::details::dragonbox_compute_mul_parity_float64(
+					 two_fc - (shorter_interval ? 1u : 2u), pow10_lo, pow10_hi, beta)
+					 .parity))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			q *= 10u;
+			q += r / 100u;
+		}
+		return {q, minus_k + kappa};
+	}
+	else
+	{
+		::std::uint_least64_t const pow10{compute_pow10_float32[plus_k]};
+		::std::uint_least32_t const delta{static_cast<::std::uint_least32_t>(
+			pow10 >> static_cast<unsigned>(63 - beta + static_cast<::std::int_least32_t>(shorter_interval)))};
+		auto xi_or_zi{::fast_io::details::dragonbox_compute_mul_float32(
+			two_fc << static_cast<unsigned>(beta), pow10)};
+		if constexpr (!right_closed)
+		{
+			if (e2 <= -80)
+			{
+				xi_or_zi.is_integer = false;
+			}
+		}
+		::std::uint_least32_t q{static_cast<::std::uint_least32_t>(xi_or_zi.integer_part / big_divisor)};
+		::std::uint_least32_t r{static_cast<::std::uint_least32_t>(xi_or_zi.integer_part % big_divisor)};
+		if constexpr (!right_closed)
+		{
+			if (!xi_or_zi.is_integer)
+			{
+				++r;
+				if (r == big_divisor)
+				{
+					r = 0;
+					++q;
+				}
+			}
+			if (r)
+			{
+				++q;
+				r = big_divisor - r;
+			}
+			if (r < delta || (r == delta &&
+							  !::fast_io::details::dragonbox_compute_mul_parity_float32(
+								   static_cast<::std::uint_least32_t>(two_fc + 2u), pow10, beta)
+								   .parity))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			q *= 10u;
+			q -= r / 10u;
+		}
+		else
+		{
+			if (r < delta ||
+				(r == delta &&
+				 ::fast_io::details::dragonbox_compute_mul_parity_float32(
+					 static_cast<::std::uint_least32_t>(two_fc - (shorter_interval ? 1u : 2u)), pow10, beta)
+					 .parity))
+			{
+				return {q, minus_k + kappa + 1};
+			}
+			q *= 10u;
+			q += r / 10u;
+		}
+		return {q, minus_k + kappa};
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
+dragonbox_main_policy(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2,
+					  bool negative) noexcept
+{
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	{
+		return ::fast_io::details::dragonbox_main_nearest_policy<flt, rounding>(m2, e2, negative);
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_zero)
+	{
+		return ::fast_io::details::dragonbox_main_directed<flt, false>(m2, e2);
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::away_from_zero)
+	{
+		return ::fast_io::details::dragonbox_main_directed<flt, true>(m2, e2);
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity)
+	{
+		return negative ? ::fast_io::details::dragonbox_main_directed<flt, false>(m2, e2)
+						: ::fast_io::details::dragonbox_main_directed<flt, true>(m2, e2);
+	}
+	else
+	{
+		return negative ? ::fast_io::details::dragonbox_main_directed<flt, true>(m2, e2)
+						: ::fast_io::details::dragonbox_main_directed<flt, false>(m2, e2);
+	}
+}
+
+struct dragonbox_decimal_adjusted_mantissa
+{
+	::std::uint_least64_t mantissa{};
+	::std::int_least32_t power2{};
+};
+
+struct dragonbox_decimal_uint128
+{
+	::std::uint_least64_t low{};
+	::std::uint_least64_t high{};
+};
+
+[[nodiscard]] inline constexpr ::std::int_least32_t
+dragonbox_decimal_binary_power(::std::int_least32_t exponent) noexcept
+{
+	return static_cast<::std::int_least32_t>((((152170 + 65536) * exponent) >> 16) + 63);
+}
+
+[[nodiscard]] inline constexpr dragonbox_decimal_uint128
+dragonbox_decimal_mul_64x128_high(::std::uint_least64_t value, ::fast_io::details::uint64x2 cache) noexcept
+{
+	::std::uint_least64_t high{};
+	auto low{::fast_io::intrinsics::umul(value, cache.hi, high)};
+	auto const middle{::fast_io::intrinsics::umulh(value, cache.lo)};
+	low += middle;
+	if (low < middle)
+	{
+		++high;
+	}
+	return {low, high};
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr ::std::uint_least64_t
+dragonbox_decimal_round_mantissa(bool negative, ::std::uint_least64_t mantissa, bool has_tail, bool is_tie) noexcept
+{
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	{
+		if ((mantissa & 1u) != 0u)
+		{
+			if (!is_tie || ::fast_io::details::floating_rounding_nearest_tie_round_up<rounding>(negative, mantissa))
+			{
+				++mantissa;
+			}
+		}
+	}
+	else
+	{
+		if (((mantissa & 1u) != 0u || has_tail) &&
+			::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+		{
+			++mantissa;
+		}
+	}
+	return mantissa >> 1u;
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool
+dragonbox_decimal_compute_adjusted(::std::int_least64_t exponent, ::std::uint_least64_t significand,
+								   bool negative,
+								   dragonbox_decimal_adjusted_mantissa &answer) noexcept
+{
+	using trait = ::fast_io::details::iec559_traits<flt>;
+	if constexpr (sizeof(flt) != sizeof(::std::uint_least32_t) && sizeof(flt) != sizeof(::std::uint_least64_t))
+	{
+		return false;
+	}
+	else
+	{
+		constexpr auto mantissa_explicit_bits{static_cast<::std::int_least32_t>(trait::mbits)};
+		constexpr auto minimum_exponent{
+			-static_cast<::std::int_least32_t>((static_cast<::std::uint_least32_t>(1u) << (trait::ebits - 1u)) - 1u)};
+		constexpr auto infinite_power{
+			static_cast<::std::int_least32_t>((static_cast<::std::uint_least32_t>(1u) << trait::ebits) - 1u)};
+		constexpr auto smallest_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? -65 : -342};
+		constexpr auto largest_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? 38 : 308};
+		constexpr auto min_round_to_even_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? -17 : -4};
+		constexpr auto max_round_to_even_power10{sizeof(flt) == sizeof(::std::uint_least32_t) ? 10 : 23};
+		if (significand == 0 || exponent < smallest_power10)
+		{
+			answer = {};
+			return true;
+		}
+		if (exponent > largest_power10)
+		{
+			answer = {.mantissa = 0, .power2 = infinite_power};
+			return true;
+		}
+		if (exponent < -342 || exponent > 326)
+		{
+			return false;
+		}
+		auto const exponent32{static_cast<::std::int_least32_t>(exponent)};
+		auto const leading_zeroes{static_cast<::std::int_least32_t>(::std::countl_zero(significand))};
+		significand <<= static_cast<unsigned>(leading_zeroes);
+		auto const cache{::fast_io::details::compute_pow10_float64_scan(exponent32)};
+		auto const product{::fast_io::details::dragonbox_decimal_mul_64x128_high(significand, cache)};
+		auto const upperbit{static_cast<::std::int_least32_t>(product.high >> 63u)};
+		auto const shift{upperbit + 64 - mantissa_explicit_bits - 3};
+		auto mantissa{product.high >> static_cast<unsigned>(shift)};
+		auto power2{static_cast<::std::int_least32_t>(
+			::fast_io::details::dragonbox_decimal_binary_power(exponent32) + upperbit - leading_zeroes - minimum_exponent)};
+		if (power2 <= 0)
+		{
+			if (-power2 + 1 >= 64)
+			{
+				answer = {};
+				return true;
+			}
+			auto const subnormal_shift{static_cast<unsigned>(-power2 + 1)};
+			auto const subnormal_tail_mask{(::std::uint_least64_t{1u} << subnormal_shift) - 1u};
+			bool const has_tail{(mantissa & subnormal_tail_mask) != 0u || product.low != 0u};
+			mantissa >>= subnormal_shift;
+			bool const is_tie{!has_tail && (mantissa & 1u) != 0u};
+			mantissa = ::fast_io::details::dragonbox_decimal_round_mantissa<rounding>(
+				negative, mantissa, has_tail, is_tie);
+			answer.power2 = mantissa < (::std::uint_least64_t{1} << mantissa_explicit_bits) ? 0 : 1;
+			answer.mantissa = mantissa;
+			return true;
+		}
+		auto const shifted_back{mantissa << static_cast<unsigned>(shift)};
+		bool const is_tie{product.low <= 1 && min_round_to_even_power10 <= exponent &&
+						  exponent <= max_round_to_even_power10 && (mantissa & 1u) != 0u &&
+						  shifted_back == product.high};
+		bool const has_tail{shifted_back != product.high || product.low != 0u};
+		mantissa = ::fast_io::details::dragonbox_decimal_round_mantissa<rounding>(
+			negative, mantissa, has_tail, is_tie);
+		if (mantissa >= (::std::uint_least64_t{2} << mantissa_explicit_bits))
+		{
+			mantissa = ::std::uint_least64_t{1} << mantissa_explicit_bits;
+			++power2;
+		}
+		mantissa &= ~(::std::uint_least64_t{1} << mantissa_explicit_bits);
+		if (power2 >= infinite_power)
+		{
+			answer = {.mantissa = 0, .power2 = infinite_power};
+			return true;
+		}
+		answer = {.mantissa = mantissa, .power2 = power2};
+		return true;
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_decimal_roundtrips_to(
+	typename iec559_traits<flt>::mantissa_type decimal_mantissa, ::std::int_least32_t decimal_exponent,
+	typename iec559_traits<flt>::mantissa_type binary_mantissa, ::std::int_least32_t binary_exponent,
+	bool negative) noexcept
+{
+	dragonbox_decimal_adjusted_mantissa adjusted;
+	if (!::fast_io::details::dragonbox_decimal_compute_adjusted<flt, rounding>(
+			decimal_exponent, decimal_mantissa, negative, adjusted))
+	{
+		return false;
+	}
+	return adjusted.mantissa == binary_mantissa && adjusted.power2 == binary_exponent;
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_decimal_printable_roundtrips_to(
+	typename iec559_traits<flt>::mantissa_type decimal_mantissa, ::std::int_least32_t decimal_exponent,
+	typename iec559_traits<flt>::mantissa_type binary_mantissa, ::std::int_least32_t binary_exponent,
+	bool negative) noexcept
+{
+	typename iec559_traits<flt>::mantissa_type decimal_mantissa_limit{1u};
+	for (::std::uint_least32_t i{}; i != ::fast_io::details::iec559_traits<flt>::m10digits; ++i)
+	{
+		decimal_mantissa_limit = static_cast<typename iec559_traits<flt>::mantissa_type>(
+			decimal_mantissa_limit * 10u);
+	}
+	return decimal_mantissa &&
+		   decimal_mantissa < decimal_mantissa_limit &&
+		   ::fast_io::details::dragonbox_decimal_roundtrips_to<flt, rounding>(
+			   decimal_mantissa, decimal_exponent, binary_mantissa, binary_exponent, negative);
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool dragonbox_correct_shortest_roundtrip_extend(
+	typename iec559_traits<flt>::mantissa_type base, ::std::int_least32_t exponent,
+	typename iec559_traits<flt>::mantissa_type &m10, ::std::int_least32_t &e10,
+	typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2, bool negative) noexcept
+{
+	typename iec559_traits<flt>::mantissa_type add_limit{1u};
+	for (::std::uint_least32_t extension{}; extension != 3u; ++extension)
+	{
+		auto const next_base{static_cast<typename iec559_traits<flt>::mantissa_type>(base * 10u)};
+		if (next_base / 10u != base)
+		{
+			break;
+		}
+		base = next_base;
+		add_limit = static_cast<typename iec559_traits<flt>::mantissa_type>(add_limit * 10u);
+		--exponent;
+		for (typename iec559_traits<flt>::mantissa_type add{}; add != add_limit; ++add)
+		{
+			auto const extended{static_cast<typename iec559_traits<flt>::mantissa_type>(base + add)};
+			if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+					extended, exponent, m2, e2, negative))
+			{
+				m10 = extended;
+				e10 = exponent;
+				return true;
+			}
+		}
+		for (typename iec559_traits<flt>::mantissa_type sub{1u}; sub != add_limit && sub <= base; ++sub)
+		{
+			auto const extended{static_cast<typename iec559_traits<flt>::mantissa_type>(base - sub)};
+			if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+					extended, exponent, m2, e2, negative))
+			{
+				m10 = extended;
+				e10 = exponent;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+inline constexpr void dragonbox_correct_shortest_roundtrip(typename iec559_traits<flt>::mantissa_type &m10,
+														   ::std::int_least32_t &e10,
+														   typename iec559_traits<flt>::mantissa_type m2,
+														   ::std::int_least32_t e2, bool negative) noexcept
+{
+	if constexpr (sizeof(flt) == sizeof(::std::uint_least32_t) || sizeof(flt) == sizeof(::std::uint_least64_t))
+	{
+		if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(m10, e10, m2, e2, negative))
+		{
+			return;
+		}
+		auto const next{static_cast<typename iec559_traits<flt>::mantissa_type>(m10 + 1u)};
+		if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(next, e10, m2, e2, negative))
+		{
+			m10 = next;
+			return;
+		}
+		if (m10)
+		{
+			auto const previous{static_cast<typename iec559_traits<flt>::mantissa_type>(m10 - 1u)};
+			if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+					previous, e10, m2, e2, negative))
+			{
+				m10 = previous;
+				return;
+			}
+		}
+		auto [nearest_m10, nearest_e10] = ::fast_io::details::dragonbox_main<flt>(m2, e2);
+		auto [nearest_v, nearest_n] = ::fast_io::bitops::rtz_iec559(nearest_m10);
+		nearest_e10 += static_cast<::std::int_least32_t>(static_cast<::std::uint_least32_t>(nearest_n));
+		if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+				nearest_v, nearest_e10, m2, e2, negative))
+		{
+			m10 = nearest_v;
+			e10 = nearest_e10;
+			return;
+		}
+		auto const nearest_next{static_cast<typename iec559_traits<flt>::mantissa_type>(nearest_v + 1u)};
+		if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+				nearest_next, nearest_e10, m2, e2, negative))
+		{
+			m10 = nearest_next;
+			e10 = nearest_e10;
+			return;
+		}
+		if (nearest_v)
+		{
+			auto const nearest_previous{static_cast<typename iec559_traits<flt>::mantissa_type>(nearest_v - 1u)};
+			if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
+					nearest_previous, nearest_e10, m2, e2, negative))
+			{
+				m10 = nearest_previous;
+				e10 = nearest_e10;
+				return;
+			}
+		}
+		if (::fast_io::details::dragonbox_correct_shortest_roundtrip_extend<flt, rounding>(
+				nearest_v, nearest_e10, m10, e10, m2, e2, negative))
+		{
+			return;
+		}
+		(void)::fast_io::details::dragonbox_correct_shortest_roundtrip_extend<flt, rounding>(
+			m10, e10, m10, e10, m2, e2, negative);
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding =
+						   ::fast_io::manipulators::floating_rounding::nearest_to_even>
 #if __has_cpp_attribute(__gnu__::__pure__)
 [[__gnu__::__pure__]]
 #endif
@@ -415,13 +1333,36 @@ template <typename flt>
 [[__gnu__::__hot__]]
 #endif
 inline constexpr m10_result<typename iec559_traits<flt>::mantissa_type>
-dragonbox_impl(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2) noexcept
+dragonbox_impl(typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2, bool negative) noexcept
 {
-	auto [m10, e10] = dragonbox_main<flt>(m2, e2);
+	auto [m10, e10] =
+		[]([[maybe_unused]] typename iec559_traits<flt>::mantissa_type mantissa,
+		   [[maybe_unused]] ::std::int_least32_t exponent,
+		   [[maybe_unused]] bool sign) constexpr noexcept
+	{
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+		{
+			return dragonbox_main<flt>(mantissa, exponent);
+		}
+		else
+		{
+			return ::fast_io::details::dragonbox_main_policy<flt, rounding>(mantissa, exponent, sign);
+		}
+	}(m2, e2, negative);
 	// m10 should not ==0
 	auto [v, n] = ::fast_io::bitops::rtz_iec559(m10);
 	e10 += static_cast<::std::int_least32_t>(static_cast<::std::uint_least32_t>(n));
-	return {v, e10};
+	if constexpr (rounding != ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		::fast_io::details::dragonbox_correct_shortest_roundtrip<flt, rounding>(v, e10, m2, e2, negative);
+		auto [v2, n2] = ::fast_io::bitops::rtz_iec559(v);
+		e10 += static_cast<::std::int_least32_t>(static_cast<::std::uint_least32_t>(n2));
+		return {v2, e10};
+	}
+	else
+	{
+		return {v, e10};
+	}
 }
 
 template <bool comma, ::std::integral char_type, my_unsigned_integral U>
@@ -542,6 +1483,32 @@ inline constexpr char_type *fixed_case0_full_integer(char_type *iter, typename i
 	return fill_zeros_impl(iter, static_cast<::std::uint_least32_t>(real_exp + 1 - olength));
 }
 
+template <bool comma, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_append_json_float_zero(char_type *iter) noexcept
+{
+	*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+	++iter;
+	*iter = char_literal_v<u8'0', char_type>;
+	++iter;
+	return iter;
+}
+
+template <typename flt, bool comma, bool json_float, ::std::integral char_type>
+inline constexpr char_type *fixed_case0_full_integer_maybe_json(
+	char_type *iter, typename iec559_traits<flt>::mantissa_type m10, ::std::int_least32_t olength,
+	::std::int_least32_t real_exp) noexcept
+{
+	iter = fixed_case0_full_integer<flt>(iter, m10, olength, real_exp);
+	if constexpr (json_float)
+	{
+		return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+	}
+	else
+	{
+		return iter;
+	}
+}
+
 template <typename flt, bool comma, ::std::integral char_type>
 inline constexpr char_type *
 fixed_case1_integer_and_point(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
@@ -564,6 +1531,33 @@ fixed_case1_integer_and_point(char_type *iter, typename iec559_traits<flt>::mant
 	return iter;
 }
 
+template <typename flt, bool comma, bool json_float, ::std::integral char_type>
+inline constexpr char_type *
+fixed_case1_integer_and_point_maybe_json(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
+										 ::std::int_least32_t olength,
+										 ::std::int_least32_t real_exp) noexcept
+{
+	auto eposition(real_exp + 1);
+	if (olength == eposition)
+	{
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(iter, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength;
+		if constexpr (json_float)
+		{
+			return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+		}
+	}
+	else
+	{
+		auto tmp{iter};
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(iter + 1u, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength + 1u;
+		my_copy_n(tmp + 1u, static_cast<::std::uint_least32_t>(eposition), tmp);
+		tmp[eposition] = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+	}
+	return iter;
+}
+
 template <typename flt, bool comma, ::std::integral char_type>
 inline constexpr char_type *fixed_case2_all_point(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
 												  ::std::int_least32_t olength, ::std::int_least32_t real_exp) noexcept
@@ -575,7 +1569,7 @@ inline constexpr char_type *fixed_case2_all_point(char_type *iter, typename iec5
 	return iter;
 }
 
-template <typename flt, bool comma, ::std::integral char_type>
+template <typename flt, bool comma, bool json_float = false, ::std::integral char_type>
 inline constexpr char_type *print_rsv_fp_fixed_decision_impl(char_type *iter,
 															 typename iec559_traits<flt>::mantissa_type m10,
 															 ::std::int_least32_t e10) noexcept
@@ -584,11 +1578,11 @@ inline constexpr char_type *print_rsv_fp_fixed_decision_impl(char_type *iter,
 	::std::int_least32_t const real_exp(static_cast<::std::int_least32_t>(e10 + olength - 1));
 	if (olength <= real_exp)
 	{
-		return fixed_case0_full_integer<flt>(iter, m10, olength, real_exp);
+		return fixed_case0_full_integer_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
 	}
 	else if (0 <= real_exp && real_exp < olength)
 	{
-		return fixed_case1_integer_and_point<flt, comma>(iter, m10, olength, real_exp);
+		return fixed_case1_integer_and_point_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
 	}
 	else
 	{
@@ -597,7 +1591,7 @@ inline constexpr char_type *print_rsv_fp_fixed_decision_impl(char_type *iter,
 }
 
 template <typename flt, bool comma, bool uppercase_e, ::fast_io::manipulators::floating_format mt,
-		  ::std::integral char_type>
+		  bool json_float = false, ::std::integral char_type>
 inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename iec559_traits<flt>::mantissa_type m10,
 													   ::std::int_least32_t e10) noexcept
 {
@@ -605,10 +1599,11 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 	{
 		if (-5 < e10 && e10 < 7)
 		{
-			return print_rsv_fp_fixed_decision_impl<flt, comma>(iter, m10, e10);
+			return print_rsv_fp_fixed_decision_impl<flt, comma, json_float>(iter, m10, e10);
 		}
 		return print_rsv_fp_decision_impl<flt, comma, uppercase_e,
-										  ::fast_io::manipulators::floating_format::scientific>(iter, m10, e10);
+										  ::fast_io::manipulators::floating_format::scientific,
+										  false>(iter, m10, e10);
 	}
 	else if constexpr (mt == ::fast_io::manipulators::floating_format::scientific)
 	{
@@ -633,11 +1628,10 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 	{
 		::std::int_least32_t olength{static_cast<::std::int_least32_t>(chars_len<10, true>(m10))};
 		::std::int_least32_t const real_exp{static_cast<::std::int_least32_t>(e10 + olength - 1)};
-		::std::uint_least32_t fixed_length{}, this_case{};
+		::std::uint_least32_t fixed_length{};
 		if (olength <= real_exp)
 		{
 			fixed_length = static_cast<::std::uint_least32_t>(real_exp + 1);
-			this_case = 1;
 		}
 		else if (0 <= real_exp && real_exp < olength)
 		{
@@ -646,7 +1640,6 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 			{
 				--fixed_length;
 			}
-			this_case = 2;
 		}
 		else
 		{
@@ -661,50 +1654,427 @@ inline constexpr char_type *print_rsv_fp_decision_impl(char_type *iter, typename
 			iter = print_rsv_fp_decimal_common_impl<comma>(iter, m10, static_cast<::std::uint_least32_t>(olength));
 			return print_rsv_fp_e_impl<flt, uppercase_e>(iter, real_exp);
 		}
-		// fixed decision
-		switch (this_case)
+		if (olength <= real_exp)
 		{
-		case 1:
-			return fixed_case0_full_integer<flt>(iter, m10, olength, real_exp);
-		case 2:
-		{
-			return fixed_case1_integer_and_point<flt, comma>(iter, m10, olength, real_exp);
+			return fixed_case0_full_integer_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
 		}
-		default:
+		else if (0 <= real_exp)
+		{
+			return fixed_case1_integer_and_point_maybe_json<flt, comma, json_float>(iter, m10, olength, real_exp);
+		}
+		else
 		{
 			return fixed_case2_all_point<flt, comma>(iter, m10, olength, real_exp);
 		}
+	}
+}
+
+inline constexpr ::std::uint_least64_t print_rsv_fp_pow10_0_to_19_table[]{
+	1u,
+	10u,
+	100u,
+	1000u,
+	10000u,
+	100000u,
+	1000000u,
+	10000000u,
+	100000000u,
+	1000000000u,
+	10000000000u,
+	100000000000u,
+	1000000000000u,
+	10000000000000u,
+	100000000000000u,
+	1000000000000000u,
+	10000000000000000u,
+	100000000000000000u,
+	1000000000000000000u,
+	10000000000000000000u};
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool print_rsv_fp_decimal_tie_round_up(
+	bool negative, ::std::uint_least64_t rounded_down) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+	{
+		return (rounded_down & 1u) != 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return (rounded_down & 1u) == 0u;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_plus_infinity)
+	{
+		return !negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_toward_minus_infinity)
+	{
+		return negative;
+	}
+	else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_away_from_zero)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::fast_io::manipulators::floating_rounding rounding>
+[[nodiscard]] inline constexpr bool print_rsv_fp_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down,
+																  ::std::uint_least64_t remainder,
+																  ::std::uint_least64_t divisor) noexcept
+{
+	if (!remainder)
+	{
+		return false;
+	}
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	{
+		auto const half{divisor >> 1u};
+		if (remainder < half)
+		{
+			return false;
+		}
+		if (half < remainder)
+		{
+			return true;
+		}
+		return ::fast_io::details::print_rsv_fp_decimal_tie_round_up<rounding>(negative, rounded_down);
+	}
+	else
+	{
+		return ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative);
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+inline constexpr void print_rsv_fp_round_to_significant(
+	typename iec559_traits<flt>::mantissa_type &m10, ::std::int_least32_t &e10, ::std::size_t precision,
+	bool negative) noexcept
+{
+	using mantissa_type = typename iec559_traits<flt>::mantissa_type;
+	if (!m10)
+	{
+		return;
+	}
+	if (!precision)
+	{
+		precision = 1u;
+	}
+	auto len{static_cast<::std::uint_least32_t>(chars_len<10, true>(m10))};
+	if (precision < len)
+	{
+		auto const cut{static_cast<::std::uint_least32_t>(len - precision)};
+		if (cut < 20u)
+		{
+			auto const divisor{::fast_io::details::print_rsv_fp_pow10_0_to_19_table[cut]};
+			auto quotient{static_cast<::std::uint_least64_t>(m10 / divisor)};
+			auto const remainder{static_cast<::std::uint_least64_t>(m10 - static_cast<mantissa_type>(quotient * divisor))};
+			if (::fast_io::details::print_rsv_fp_decimal_round_up<rounding>(negative, quotient, remainder, divisor))
+			{
+				++quotient;
+			}
+			m10 = static_cast<mantissa_type>(quotient);
+			e10 += static_cast<::std::int_least32_t>(cut);
+			if (precision < 20u &&
+				quotient == ::fast_io::details::print_rsv_fp_pow10_0_to_19_table[precision])
+			{
+				m10 = static_cast<mantissa_type>(quotient / 10u);
+				++e10;
+			}
+		}
+		return;
+	}
+	auto const carrier_precision{precision < ::fast_io::details::iec559_traits<flt>::m10digits
+									 ? precision
+									 : ::fast_io::details::iec559_traits<flt>::m10digits};
+	auto const pad{static_cast<::std::uint_least32_t>(carrier_precision - len)};
+	if (pad && pad < 20u)
+	{
+		auto const multiplier{::fast_io::details::print_rsv_fp_pow10_0_to_19_table[pad]};
+		auto const next{static_cast<mantissa_type>(m10 * multiplier)};
+		if (next / multiplier == m10)
+		{
+			m10 = next;
+			e10 -= static_cast<::std::int_least32_t>(pad);
+		}
+	}
+}
+
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+inline constexpr void print_rsv_fp_round_to_fractional(
+	typename iec559_traits<flt>::mantissa_type &m10, ::std::int_least32_t &e10, ::std::size_t precision,
+	bool negative) noexcept
+{
+	using mantissa_type = typename iec559_traits<flt>::mantissa_type;
+	if (!m10)
+	{
+		return;
+	}
+	auto const target_e10{static_cast<::std::int_least32_t>(
+		0u - static_cast<::std::uint_least32_t>(precision))};
+	if (target_e10 <= e10)
+	{
+		return;
+	}
+	auto const cut{static_cast<::std::uint_least32_t>(target_e10 - e10)};
+	if (20u <= cut)
+	{
+		if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+		{
+			m10 = 0u;
+		}
+		else
+		{
+			m10 = static_cast<mantissa_type>(
+				::fast_io::details::floating_rounding_directed_round_up<rounding>(negative));
+		}
+		e10 = target_e10;
+		return;
+	}
+	auto const divisor{::fast_io::details::print_rsv_fp_pow10_0_to_19_table[cut]};
+	auto quotient{static_cast<::std::uint_least64_t>(m10 / divisor)};
+	auto const remainder{static_cast<::std::uint_least64_t>(m10 - static_cast<mantissa_type>(quotient * divisor))};
+	if (::fast_io::details::print_rsv_fp_decimal_round_up<rounding>(negative, quotient, remainder, divisor))
+	{
+		++quotient;
+	}
+	m10 = static_cast<mantissa_type>(quotient);
+	e10 = target_e10;
+}
+
+template <bool comma, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_append_point_zeros(char_type *iter, ::std::size_t precision) noexcept
+{
+	if (!precision)
+	{
+		return iter;
+	}
+	*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+	++iter;
+	return ::fast_io::details::fill_zeros_impl(iter, precision);
+}
+
+template <typename flt, bool comma, bool json_float = false, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_fixed_precision_impl(char_type *iter,
+															  typename iec559_traits<flt>::mantissa_type m10,
+															  ::std::int_least32_t e10,
+															  ::std::size_t precision) noexcept
+{
+	if (!m10)
+	{
+		*iter = char_literal_v<u8'0', char_type>;
+		++iter;
+		if constexpr (json_float)
+		{
+			if (!precision)
+			{
+				return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+			}
+		}
+		return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(iter, precision);
+	}
+	auto const olength{static_cast<::std::int_least32_t>(chars_len<10, true>(m10))};
+	auto const real_exp{static_cast<::std::int_least32_t>(e10 + olength - 1)};
+	if (0 <= real_exp)
+	{
+		auto const integer_digits{static_cast<::std::int_least32_t>(real_exp + 1)};
+		if (olength <= integer_digits)
+		{
+			::fast_io::details::jeaiii::jeaiii_main_len<true>(
+				iter, m10, static_cast<::std::uint_least32_t>(olength));
+			iter += olength;
+			iter = ::fast_io::details::fill_zeros_impl(
+				iter, static_cast<::std::size_t>(integer_digits - olength));
+			if constexpr (json_float)
+			{
+				if (!precision)
+				{
+					return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+				}
+			}
+			return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(iter, precision);
+		}
+		auto tmp{iter};
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(
+			iter + 1, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength + 1;
+		::fast_io::details::my_copy_n(tmp + 1, static_cast<::std::size_t>(integer_digits), tmp);
+		tmp[integer_digits] = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+		auto const fractional_digits{static_cast<::std::size_t>(olength - integer_digits)};
+		if (fractional_digits < precision)
+		{
+			iter = ::fast_io::details::fill_zeros_impl(iter, precision - fractional_digits);
+		}
+		return iter;
+	}
+	*iter = char_literal_v<u8'0', char_type>;
+	++iter;
+	if (!precision)
+	{
+		return iter;
+	}
+	*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+	++iter;
+	auto const leading_zeroes{static_cast<::std::size_t>(-real_exp - 1)};
+	if (leading_zeroes < precision)
+	{
+		iter = ::fast_io::details::fill_zeros_impl(iter, leading_zeroes);
+		::fast_io::details::jeaiii::jeaiii_main_len<true>(
+			iter, m10, static_cast<::std::uint_least32_t>(olength));
+		iter += olength;
+		auto const fractional_digits{leading_zeroes + static_cast<::std::size_t>(olength)};
+		if (fractional_digits < precision)
+		{
+			iter = ::fast_io::details::fill_zeros_impl(iter, precision - fractional_digits);
+		}
+	}
+	else
+	{
+		iter = ::fast_io::details::fill_zeros_impl(iter, precision);
+	}
+	return iter;
+}
+
+template <typename flt, bool comma, bool uppercase_e, ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_scientific_precision_impl(
+	char_type *iter, typename iec559_traits<flt>::mantissa_type m10, ::std::int_least32_t e10,
+	::std::size_t precision) noexcept
+{
+	auto const olength{static_cast<::std::int_least32_t>(chars_len<10, true>(m10))};
+	auto const real_exp{static_cast<::std::int_least32_t>(e10 + olength - 1)};
+	auto itp1{iter + 1};
+	::fast_io::details::jeaiii::jeaiii_main_len<true>(itp1, m10, static_cast<::std::uint_least32_t>(olength));
+	*iter = *itp1;
+	if (precision)
+	{
+		*itp1 = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+		auto const available{static_cast<::std::size_t>(olength - 1)};
+		iter = itp1 + olength;
+		if (available < precision)
+		{
+			iter = ::fast_io::details::fill_zeros_impl(iter, precision - available);
+		}
+	}
+	else
+	{
+		++iter;
+	}
+	return ::fast_io::details::print_rsv_fp_e_impl<flt, uppercase_e>(iter, real_exp);
+}
+
+template <typename flt, bool comma, bool uppercase_e, ::fast_io::manipulators::floating_format mt,
+		  ::fast_io::manipulators::floating_precision precision_mode,
+		  ::fast_io::manipulators::floating_rounding rounding, bool json_float = false,
+		  ::std::integral char_type>
+inline constexpr char_type *print_rsv_fp_precision_decision_impl(
+	char_type *iter, typename iec559_traits<flt>::mantissa_type m10, ::std::int_least32_t e10,
+	::std::size_t precision, bool negative) noexcept
+{
+	if constexpr (mt == ::fast_io::manipulators::floating_format::scientific)
+	{
+		auto significant_precision{precision + 1u};
+		if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::significant)
+		{
+			significant_precision = precision ? precision : 1u;
+			precision = significant_precision - 1u;
+		}
+		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding>(
+			m10, e10, significant_precision, negative);
+		return ::fast_io::details::print_rsv_fp_scientific_precision_impl<flt, comma, uppercase_e>(
+			iter, m10, e10, precision);
+	}
+	else if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::fractional)
+	{
+		::fast_io::details::print_rsv_fp_round_to_fractional<flt, rounding>(m10, e10, precision, negative);
+		if constexpr (mt == ::fast_io::manipulators::floating_format::general)
+		{
+			return ::fast_io::details::print_rsv_fp_decision_impl<flt, comma, uppercase_e,
+																 ::fast_io::manipulators::floating_format::general,
+																 json_float>(
+				iter, m10, e10);
+		}
+		else
+		{
+			return ::fast_io::details::print_rsv_fp_fixed_precision_impl<flt, comma, json_float>(
+				iter, m10, e10, precision);
+		}
+	}
+	else
+	{
+		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding>(m10, e10, precision, negative);
+		if constexpr (mt == ::fast_io::manipulators::floating_format::fixed)
+		{
+			return ::fast_io::details::print_rsv_fp_fixed_decision_impl<flt, comma, json_float>(iter, m10, e10);
+		}
+		else
+		{
+			return ::fast_io::details::print_rsv_fp_decision_impl<flt, comma, uppercase_e, mt, json_float>(
+				iter, m10, e10);
 		}
 	}
 }
 
 template <bool showpos, bool uppercase, bool uppercase_e, bool comma, ::fast_io::manipulators::floating_format mt,
+		  ::fast_io::manipulators::floating_rounding rounding =
+			  ::fast_io::manipulators::floating_rounding::nearest_to_even,
+		  bool nan_show_sign = true, bool nan_show_type = false, bool json_float = false,
 		  typename flt, ::std::integral char_type>
 inline constexpr char_type *print_rsvflt_define_impl(char_type *iter, flt f) noexcept
 {
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+	{
+		switch (::fast_io::details::current_floating_rounding())
+		{
+		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+			return print_rsvflt_define_impl<showpos, uppercase, uppercase_e, comma, mt,
+											::fast_io::manipulators::floating_rounding::toward_plus_infinity,
+											nan_show_sign, nan_show_type, json_float>(iter, f);
+		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+			return print_rsvflt_define_impl<showpos, uppercase, uppercase_e, comma, mt,
+											::fast_io::manipulators::floating_rounding::toward_minus_infinity,
+											nan_show_sign, nan_show_type, json_float>(iter, f);
+		case ::fast_io::manipulators::floating_rounding::toward_zero:
+			return print_rsvflt_define_impl<showpos, uppercase, uppercase_e, comma, mt,
+											::fast_io::manipulators::floating_rounding::toward_zero,
+											nan_show_sign, nan_show_type, json_float>(iter, f);
+		default:
+			return print_rsvflt_define_impl<showpos, uppercase, uppercase_e, comma, mt,
+											::fast_io::manipulators::floating_rounding::nearest_to_even,
+											nan_show_sign, nan_show_type, json_float>(iter, f);
+		}
+	}
 	if constexpr (::fast_io::manipulators::floating_format::fixed == mt && uppercase_e)
 	{
-		return print_rsvflt_define_impl<showpos, uppercase, false, comma, mt>(iter, f);
+		return print_rsvflt_define_impl<showpos, uppercase, false, comma, mt, rounding, nan_show_sign, nan_show_type,
+										json_float>(iter, f);
 	}
 	else
 	{
 		using trait = iec559_traits<flt>;
 		using mantissa_type = typename trait::mantissa_type;
+		constexpr ::std::size_t mbits{trait::mbits};
 		constexpr ::std::size_t ebits{trait::ebits};
 		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
 		constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 		auto [mantissa, exponent, sign] = get_punned_result(f);
-		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 		if (exponent == exponent_mask_u32)
 		{
-			return prsv_fp_nan_impl<uppercase>(iter, mantissa != 0u);
+			return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
 		}
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 		if (!mantissa && !exponent)
 		{
 			if constexpr (mt != ::fast_io::manipulators::floating_format::scientific)
 			{
 				*iter = char_literal_v<u8'0', char_type>;
 				++iter;
+				if constexpr (json_float)
+				{
+					return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+				}
 				return iter;
 			}
 			else
@@ -712,15 +2082,117 @@ inline constexpr char_type *print_rsvflt_define_impl(char_type *iter, flt f) noe
 				return prsv_fp_dece0<uppercase>(iter);
 			}
 		}
-		auto [m10, e10] = dragonbox_impl<flt>(mantissa, static_cast<::std::int_least32_t>(exponent));
+		auto [m10, e10] = dragonbox_impl<flt, rounding>(mantissa, static_cast<::std::int_least32_t>(exponent), sign);
 		if constexpr (mt == ::fast_io::manipulators::floating_format::fixed)
 		{
-			return print_rsv_fp_fixed_decision_impl<flt, comma>(iter, m10, e10);
+			return print_rsv_fp_fixed_decision_impl<flt, comma, json_float>(iter, m10, e10);
 		}
 		else
 		{
-			return print_rsv_fp_decision_impl<flt, comma, uppercase_e, mt>(iter, m10, e10);
+			return print_rsv_fp_decision_impl<flt, comma, uppercase_e, mt, json_float>(iter, m10, e10);
 		}
+	}
+}
+
+template <bool showpos, bool uppercase, bool uppercase_e, bool comma, ::fast_io::manipulators::floating_format mt,
+		  ::fast_io::manipulators::floating_precision precision_mode =
+			  ::fast_io::manipulators::floating_precision::significant,
+		  ::fast_io::manipulators::floating_rounding rounding =
+			  ::fast_io::manipulators::floating_rounding::nearest_to_even,
+		  bool nan_show_sign = true, bool nan_show_type = false, bool json_float = false,
+		  typename flt, ::std::integral char_type>
+inline constexpr char_type *print_rsvflt_precision_define_impl(char_type *iter, flt f,
+															   ::std::size_t precision) noexcept
+{
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+	{
+		switch (::fast_io::details::current_floating_rounding())
+		{
+		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+			return print_rsvflt_precision_define_impl<
+				showpos, uppercase, uppercase_e, comma, mt, precision_mode,
+				::fast_io::manipulators::floating_rounding::toward_plus_infinity,
+				nan_show_sign, nan_show_type, json_float>(iter, f, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+			return print_rsvflt_precision_define_impl<
+				showpos, uppercase, uppercase_e, comma, mt, precision_mode,
+				::fast_io::manipulators::floating_rounding::toward_minus_infinity,
+				nan_show_sign, nan_show_type, json_float>(iter, f, precision);
+		case ::fast_io::manipulators::floating_rounding::toward_zero:
+			return print_rsvflt_precision_define_impl<
+				showpos, uppercase, uppercase_e, comma, mt, precision_mode,
+				::fast_io::manipulators::floating_rounding::toward_zero,
+				nan_show_sign, nan_show_type, json_float>(iter, f, precision);
+		default:
+			return print_rsvflt_precision_define_impl<
+				showpos, uppercase, uppercase_e, comma, mt, precision_mode,
+				::fast_io::manipulators::floating_rounding::nearest_to_even,
+				nan_show_sign, nan_show_type, json_float>(iter, f, precision);
+		}
+	}
+	if constexpr (::fast_io::manipulators::floating_format::fixed == mt && uppercase_e)
+	{
+		return print_rsvflt_precision_define_impl<showpos, uppercase, false, comma, mt, precision_mode,
+												  rounding, nan_show_sign, nan_show_type, json_float>(iter, f,
+																									  precision);
+	}
+	else
+	{
+		using trait = iec559_traits<flt>;
+		using mantissa_type = typename trait::mantissa_type;
+		constexpr ::std::size_t mbits{trait::mbits};
+		constexpr ::std::size_t ebits{trait::ebits};
+		constexpr mantissa_type exponent_mask{(static_cast<mantissa_type>(1) << ebits) - 1};
+		constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
+		auto [mantissa, exponent, sign] = get_punned_result(f);
+		if (exponent == exponent_mask_u32)
+		{
+			return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
+		}
+		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
+		if (!mantissa && !exponent)
+		{
+			if constexpr (mt == ::fast_io::manipulators::floating_format::scientific)
+			{
+				*iter = char_literal_v<u8'0', char_type>;
+				++iter;
+				if (precision)
+				{
+					*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+					++iter;
+					iter = ::fast_io::details::fill_zeros_impl(iter, precision);
+				}
+				return print_rsv_fp_e_impl<flt, uppercase_e>(iter, 0);
+			}
+			else if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::fractional)
+			{
+				*iter = char_literal_v<u8'0', char_type>;
+				++iter;
+				if constexpr (json_float)
+				{
+					if (!precision)
+					{
+						return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+					}
+				}
+				return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(iter, precision);
+			}
+			else
+			{
+				*iter = char_literal_v<u8'0', char_type>;
+				++iter;
+				if constexpr (json_float)
+				{
+					return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+				}
+				return iter;
+			}
+		}
+		auto [m10, e10] = dragonbox_impl<flt, rounding>(
+			mantissa, static_cast<::std::int_least32_t>(exponent), sign);
+		return ::fast_io::details::print_rsv_fp_precision_decision_impl<
+			flt, comma, uppercase_e, mt, precision_mode, rounding, json_float>(
+			iter, m10, e10, precision, sign);
 	}
 }
 

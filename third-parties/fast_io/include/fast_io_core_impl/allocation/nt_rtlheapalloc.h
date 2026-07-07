@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "nt_preliminary_definition.h"
 
@@ -18,10 +18,7 @@ inline void *nt_rtlallocate_heap_handle_common_impl(void *heaphandle, ::std::siz
 		n = 1;
 	}
 	auto p{::fast_io::win32::nt::RtlAllocateHeap(heaphandle, flag, n)};
-	if (p == nullptr)
-#if __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
+	if (p == nullptr) [[unlikely]]
 	{
 		::fast_io::fast_terminate();
 	}
@@ -37,10 +34,7 @@ inline void *nt_rtlreallocate_heap_handle_common_impl(void *heaphandle, void *ad
 	{
 		n = 1;
 	}
-	if (addr == nullptr)
-#if __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
+	if (addr == nullptr) [[unlikely]]
 	{
 		return ::fast_io::details::nt_rtlallocate_heap_handle_common_impl(heaphandle, n, flag);
 	}
@@ -90,17 +84,11 @@ public:
 #if __has_cpp_attribute(__gnu__::__malloc__)
 	[[__gnu__::__malloc__]]
 #endif
-	static inline void *allocate(::std::size_t n) noexcept
+	static inline void *allocate_conditional_zero(::std::size_t n, bool zero) noexcept
 	{
-		return ::fast_io::details::nt_rtlallocate_heap_common_impl(n, 0u);
+		return ::fast_io::details::nt_rtlallocate_heap_common_impl(n, zero ? 0x00000008u : 0u);
 	}
-#if __has_cpp_attribute(__gnu__::__malloc__)
-	[[__gnu__::__malloc__]]
-#endif
-	static inline void *allocate_zero(::std::size_t n) noexcept
-	{
-		return ::fast_io::details::nt_rtlallocate_heap_common_impl(n, 0x00000008u);
-	}
+#if 0
 	static inline void *reallocate(void *addr, ::std::size_t n) noexcept
 	{
 		return ::fast_io::details::nt_rtlreallocate_heap_common_impl(addr, n, 0u);
@@ -108,6 +96,11 @@ public:
 	static inline void *reallocate_zero(void *addr, ::std::size_t n) noexcept
 	{
 		return ::fast_io::details::nt_rtlreallocate_heap_common_impl(addr, n, 0x00000008u);
+	}
+#endif
+	static inline void *reallocate_conditional_zero(void *addr, ::std::size_t n, bool zeroing) noexcept
+	{
+		return ::fast_io::details::nt_rtlreallocate_heap_common_impl(addr, n, zeroing ? 0x00000008u : 0u);
 	}
 	static inline void deallocate(void *addr) noexcept
 	{

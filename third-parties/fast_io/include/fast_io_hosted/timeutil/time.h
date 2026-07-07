@@ -383,8 +383,14 @@ inline int libc_clock_gettime_checked(clockid_t clk_id, struct timespec *tp) noe
 }
 #endif
 #else
-#if defined(_REDIR_TIME64)
+#if defined(__USE_TIME64_REDIRECTS) || (defined(__GLIBC__) && defined(__USE_TIME_BITS64) && defined(__TIMESIZE) && __TIMESIZE == 32)
+// glibc time64 redirects use the __clock_getres64 symbol on dual-time ABIs.
 extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres64");
+extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("__clock_settime64");
+extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_gettime64");
+#elif defined(_REDIR_TIME64) && _REDIR_TIME64
+// musl follows the kernel-style name here: clock_getres gets "_time64", not "64".
+extern int libc_clock_getres(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_getres_time64");
 extern int libc_clock_settime(clockid_t clk_id, struct timespec const *tp) noexcept __asm__("__clock_settime64");
 extern int libc_clock_gettime(clockid_t clk_id, struct timespec *tp) noexcept __asm__("__clock_gettime64");
 #else

@@ -24,6 +24,7 @@
 
 #include "impl/freestanding.h"
 #include "impl/common.h"
+#include "span.h"
 #include "impl/deque.h"
 
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && \

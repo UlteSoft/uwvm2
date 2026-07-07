@@ -1,6 +1,7 @@
 # Linux
 
 ## Prerequisites
+- Use the latest available Linux kernel headers for your target toolchain before building.
 - Install toolchains and xmake using your distro's package manager:
   - Debian/Ubuntu: `sudo apt install build-essential gcc g++ llvm clang xmake`
   - Fedora/RHEL: `sudo dnf install gcc gcc-c++ llvm clang xmake`

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 extern "C"
 {
@@ -41,10 +41,7 @@ inline void write(basic_avio_context_io_observer<char_type> baciob, char_type co
 			constexpr ::std::size_t mx{INT_MAX};
 			int this_round{INT_MAX};
 			::std::size_t diff{static_cast<::std::size_t>(last - first)};
-			if (diff < mx)
-#if __has_cpp_attribute(likely)
-				[[likely]]
-#endif
+			if (diff < mx) [[likely]]
 			{
 				this_round = diff;
 			}
@@ -73,9 +70,7 @@ inline char_type *read(basic_avio_context_io_observer<char_type> baciob, char_ty
 		int this_round{INT_MAX};
 		::std::size_t diff{static_cast<::std::size_t>(last - first)};
 		if (diff < mx)
-#if __has_cpp_attribute(likely)
 			[[likely]]
-#endif
 		{
 			this_round = diff;
 		}

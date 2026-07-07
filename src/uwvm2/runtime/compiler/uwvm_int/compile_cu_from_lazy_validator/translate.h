@@ -24,6 +24,7 @@
 #ifndef UWVM_MODULE
 // std
 # include <atomic>
+# include <climits>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -62,6 +63,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     // Keep the public lazy-compiler surface expressed in wasm and interpreter terms. The aliases make the code below read as a
     // translation pipeline rather than as a collection of long fully-qualified storage names.
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
+    using wasm1p1_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+    using wasm1p1_numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
+    using wasm1p1_simd_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_simd;
+    using wasm_byte = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
     using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
     using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
     using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -76,6 +81,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
     using full_function_symbol_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
     using local_func_storage_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
+
+    inline constexpr wasm_byte opcode_byte(wasm1p1_code opcode) noexcept { return static_cast<wasm_byte>(opcode); }
+    inline constexpr wasm_u32 opcode_u32(wasm1p1_code opcode) noexcept { return static_cast<wasm_u32>(opcode_byte(opcode)); }
 
     // Lazy validation can either re-run the validator at materialization time or trust that the caller already validated all code.
     // The explicit mode prevents the lazy path from silently weakening validation guarantees.
@@ -297,6 +305,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(pc);
         }
 
+        [[noreturn]] inline constexpr void fail_lazy_feature_required(
+            ::std::byte const* op_begin,
+            ::uwvm2::validation::error::code_validation_error_impl& err,
+            ::std::uint_least32_t value,
+            ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
+            ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) UWVM_THROWS
+        {
+            err.err_curr = op_begin;
+            err.err_selectable.wasm1p1_feature_required.value = value;
+            err.err_selectable.wasm1p1_feature_required.feature = feature;
+            err.err_selectable.wasm1p1_feature_required.subject = subject;
+            err.err_code = code_validation_error_code::wasm1p1_feature_required;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
         template <typename T>
         inline constexpr T read_leb128_immediate(::std::byte const*& code_curr,
                                                  ::std::byte const* code_end,
@@ -335,6 +358,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             code_curr += bytes;
         }
 
+        [[nodiscard]] inline constexpr wasm_byte read_u8_immediate(::std::byte const*& code_curr,
+                                                                    ::std::byte const* code_end,
+                                                                    ::std::byte const* op_begin,
+                                                                    ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            auto const imm_pos{code_curr};
+            skip_fixed_immediate(code_curr, code_end, op_begin, 1uz, err);
+
+            wasm_byte value{};  // No initialization necessary.
+            ::std::memcpy(::std::addressof(value), imm_pos, sizeof(value));
+#if CHAR_BIT > 8
+            value = static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(value) & 0xFFu);
+#endif
+            return value;
+        }
+
+        inline constexpr void ensure_lazy_wasm1p1_value_type_enabled(
+            ::std::byte const* op_begin,
+            wasm_byte type_byte,
+            parser_feature_parameter_t const& wasm_feature_parameter,
+            ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject,
+            ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type_byte)};
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(vt)) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.wasm1p1_invalid_reference_type.value = type_byte;
+                err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::features::value_type_enabled(vt, wasm_feature_parameter)) [[unlikely]]
+            {
+                auto const feature{vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128
+                                       ? ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd
+                                       : ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types};
+                fail_lazy_feature_required(op_begin, err, type_byte, feature, subject);
+            }
+        }
+
         inline constexpr void skip_reserved_memory_index_byte(::std::byte const*& code_curr,
                                                               ::std::byte const* code_end,
                                                               ::std::byte const* op_begin,
@@ -345,6 +409,114 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 fail_lazy_split(op_begin, code_validation_error_code::invalid_memory_index, err, ::fast_io::parse_code::end_of_file);
             }
             ++code_curr;
+        }
+
+        inline constexpr void skip_wasm1p1_block_type(::std::byte const*& code_curr,
+                                                      ::std::byte const* code_end,
+                                                      ::std::byte const* op_begin,
+                                                      runtime_module_storage_t const& curr_module,
+                                                      parser_feature_parameter_t const& wasm_feature_parameter,
+                                                      ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        {
+            if(code_curr == code_end) [[unlikely]]
+            {
+                fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
+            }
+
+            auto const blocktype_begin{code_curr};
+            auto const blocktype{
+                read_leb128_immediate<wasm_i64>(code_curr, code_end, op_begin, code_validation_error_code::illegal_block_type, err)};
+            auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
+
+            auto const fail_illegal_block_type{[&]() constexpr UWVM_THROWS
+                                               {
+                                                   wasm_byte first_blocktype_byte{};
+                                                   ::std::memcpy(::std::addressof(first_blocktype_byte), blocktype_begin, sizeof(first_blocktype_byte));
+#if CHAR_BIT > 8
+                                                   first_blocktype_byte =
+                                                       static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
+#endif
+                                                   err.err_curr = op_begin;
+                                                   err.err_selectable.u8 = first_blocktype_byte;
+                                                   err.err_code = code_validation_error_code::illegal_block_type;
+                                                   ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                               }};
+
+            if(blocktype_encoded_size > 5uz) [[unlikely]] { fail_illegal_block_type(); }
+
+            auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+            switch(blocktype)
+            {
+                case -64:
+                case -1:
+                case -2:
+                case -3:
+                case -4:
+                {
+                    return;
+                }
+                case -5:
+                {
+                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    {
+                        fail_lazy_feature_required(op_begin,
+                                                   err,
+                                                   static_cast<::std::uint_least32_t>(static_cast<wasm_byte>(
+                                                       ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)),
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd,
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+                    return;
+                }
+                case -16:
+                case -17:
+                {
+                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    {
+                        auto const vt{blocktype == -16 ? ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref
+                                                       : ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref};
+                        fail_lazy_feature_required(op_begin,
+                                                   err,
+                                                   static_cast<::std::uint_least32_t>(static_cast<wasm_byte>(vt)),
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                    }
+                    return;
+                }
+                default:
+                {
+                    break;
+                }
+            }
+
+            if(blocktype >= 0)
+            {
+                if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+                {
+                    fail_lazy_feature_required(op_begin,
+                                               err,
+                                               static_cast<::std::uint_least32_t>(static_cast<wasm_u32>(blocktype)),
+                                               ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value,
+                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                }
+
+                auto const types_begin{curr_module.type_section_storage.type_section_begin};
+                auto const types_end{curr_module.type_section_storage.type_section_end};
+                auto const all_type_count_uz{
+                    (types_begin == nullptr || types_end == nullptr) ? 0uz : static_cast<::std::size_t>(types_end - types_begin)};
+                if(static_cast<::std::uint_least64_t>(blocktype) > ::std::numeric_limits<wasm_u32>::max() ||
+                   static_cast<::std::size_t>(blocktype) >= all_type_count_uz) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.illegal_type_index.type_index = blocktype > 0 ? static_cast<wasm_u32>(blocktype) : 0u;
+                    err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
+                    err.err_code = code_validation_error_code::illegal_type_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+                return;
+            }
+
+            fail_illegal_block_type();
         }
 
         inline constexpr ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
@@ -531,11 +703,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::std::byte const* code_end,
                                                                    ::std::byte const* op_begin,
                                                                    wasm1_code curr_opbase,
+                                                                   parser_feature_parameter_t const& wasm_feature_parameter,
                                                                    ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             // Non-structural immediates are skipped precisely so the scanner can continue finding block/loop/if/else/end opcodes
             // without performing full stack validation or semantic checks.
             /// @warning Extension point: every opcode with immediates must be listed here or lazy structural splitting will desynchronize.
+            auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
             switch(curr_opbase)
             {
                 case wasm1_code::br:
@@ -654,6 +828,579 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 default:
                 {
                     auto const op_byte{static_cast<unsigned>(curr_opbase)};
+                    switch(static_cast<wasm_byte>(op_byte))
+                    {
+                        case static_cast<wasm_byte>(wasm1p1_code::select_t):
+                        {
+                            auto const result_type_count{
+                                read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_const_immediate, err)};
+                            if(result_type_count == 0u) { return; }
+                            if(result_type_count != 1u) [[unlikely]]
+                            {
+                                fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err);
+                            }
+                            auto const result_type_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            ensure_lazy_wasm1p1_value_type_enabled(op_begin,
+                                                                    result_type_byte,
+                                                                    wasm_feature_parameter,
+                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction,
+                                                                    err);
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::table_get):
+                        case static_cast<wasm_byte>(wasm1p1_code::table_set):
+                        {
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           static_cast<::std::uint_least32_t>(op_byte),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                            }
+                            (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
+                        case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
+                        {
+                            if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           static_cast<::std::uint_least32_t>(op_byte),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::sign_extension,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                            }
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_null):
+                        {
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           opcode_u32(wasm1p1_code::ref_null),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null);
+                            }
+                            auto const rt_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            auto const rt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(rt_byte)};
+                            using reference_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type;
+                            if(rt != reference_type::funcref && rt != reference_type::externref) [[unlikely]]
+                            {
+                                err.err_curr = op_begin;
+                                err.err_selectable.wasm1p1_invalid_reference_type.value = rt_byte;
+                                err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            }
+                            ensure_lazy_wasm1p1_value_type_enabled(
+                                op_begin,
+                                static_cast<wasm_byte>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(rt)),
+                                wasm_feature_parameter,
+                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type,
+                                err);
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
+                        {
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           opcode_u32(wasm1p1_code::ref_is_null),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type);
+                            }
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::ref_func):
+                        {
+                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           opcode_u32(wasm1p1_code::ref_func),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_func);
+                            }
+                            (void)read_leb128_immediate<wasm_u32>(code_curr,
+                                                                   code_end,
+                                                                   op_begin,
+                                                                   code_validation_error_code::invalid_function_index_encoding,
+                                                                   err);
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
+                        {
+                            auto const subopcode{
+                                read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_opbase, err)};
+                            auto const numeric_code{static_cast<wasm1p1_numeric_code>(subopcode)};
+                            switch(numeric_code)
+                            {
+                                case wasm1p1_numeric_code::i32_trunc_sat_f32_s:
+                                case wasm1p1_numeric_code::i32_trunc_sat_f32_u:
+                                case wasm1p1_numeric_code::i32_trunc_sat_f64_s:
+                                case wasm1p1_numeric_code::i32_trunc_sat_f64_u:
+                                case wasm1p1_numeric_code::i64_trunc_sat_f32_s:
+                                case wasm1p1_numeric_code::i64_trunc_sat_f32_u:
+                                case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
+                                case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
+                                {
+                                    if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::nontrapping_float_to_int,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::memory_init:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_data_index, err);
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::data_drop:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_data_index, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::memory_copy:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::memory_fill:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::table_init:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
+                                                                          code_end,
+                                                                          op_begin,
+                                                                          code_validation_error_code::illegal_element_index,
+                                                                          err);
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::elem_drop:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
+                                                                          code_end,
+                                                                          op_begin,
+                                                                          code_validation_error_code::illegal_element_index,
+                                                                          err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::table_copy:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::table_grow:
+                                case wasm1p1_numeric_code::table_size:
+                                {
+                                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    return;
+                                }
+                                case wasm1p1_numeric_code::table_fill:
+                                {
+                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    {
+                                        fail_lazy_feature_required(op_begin,
+                                                                   err,
+                                                                   subopcode,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                    }
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    return;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.u8 = static_cast<::std::uint_least8_t>(subopcode);
+                                    err.err_code = code_validation_error_code::illegal_opbase;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
+                            }
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
+                        {
+                            if(!wasm1p1_para.enable_simd) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           opcode_u32(wasm1p1_code::simd_prefix),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_v128_const);
+                            }
+
+                            auto const simd_subopcode{
+                                read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_opbase, err)};
+                            auto const simd_code{static_cast<wasm1p1_simd_code>(simd_subopcode)};
+                            auto const skip_simd_memarg{
+                                [&]() constexpr UWVM_THROWS
+                                {
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
+                                                                          code_end,
+                                                                          op_begin,
+                                                                          code_validation_error_code::invalid_memarg_align,
+                                                                          err);
+                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
+                                                                          code_end,
+                                                                          op_begin,
+                                                                          code_validation_error_code::invalid_memarg_offset,
+                                                                          err);
+                                }};
+
+                            switch(simd_code)
+                            {
+                                case wasm1p1_simd_code::v128_load:
+                                case wasm1p1_simd_code::v128_load8x8_s:
+                                case wasm1p1_simd_code::v128_load8x8_u:
+                                case wasm1p1_simd_code::v128_load16x4_s:
+                                case wasm1p1_simd_code::v128_load16x4_u:
+                                case wasm1p1_simd_code::v128_load32x2_s:
+                                case wasm1p1_simd_code::v128_load32x2_u:
+                                case wasm1p1_simd_code::v128_load8_splat:
+                                case wasm1p1_simd_code::v128_load16_splat:
+                                case wasm1p1_simd_code::v128_load32_splat:
+                                case wasm1p1_simd_code::v128_load64_splat:
+                                case wasm1p1_simd_code::v128_store:
+                                case wasm1p1_simd_code::v128_load32_zero:
+                                case wasm1p1_simd_code::v128_load64_zero:
+                                {
+                                    skip_simd_memarg();
+                                    return;
+                                }
+                                case wasm1p1_simd_code::v128_load8_lane:
+                                case wasm1p1_simd_code::v128_load16_lane:
+                                case wasm1p1_simd_code::v128_load32_lane:
+                                case wasm1p1_simd_code::v128_load64_lane:
+                                case wasm1p1_simd_code::v128_store8_lane:
+                                case wasm1p1_simd_code::v128_store16_lane:
+                                case wasm1p1_simd_code::v128_store32_lane:
+                                case wasm1p1_simd_code::v128_store64_lane:
+                                {
+                                    skip_simd_memarg();
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    return;
+                                }
+                                case wasm1p1_simd_code::v128_const:
+                                {
+                                    skip_fixed_immediate(code_curr, code_end, op_begin, 16uz, err);
+                                    return;
+                                }
+                                case wasm1p1_simd_code::i8x16_shuffle:
+                                {
+                                    skip_fixed_immediate(code_curr, code_end, op_begin, 16uz, err);
+                                    return;
+                                }
+                                case wasm1p1_simd_code::i8x16_extract_lane_s:
+                                case wasm1p1_simd_code::i8x16_extract_lane_u:
+                                case wasm1p1_simd_code::i8x16_replace_lane:
+                                case wasm1p1_simd_code::i16x8_extract_lane_s:
+                                case wasm1p1_simd_code::i16x8_extract_lane_u:
+                                case wasm1p1_simd_code::i16x8_replace_lane:
+                                case wasm1p1_simd_code::i32x4_extract_lane:
+                                case wasm1p1_simd_code::i32x4_replace_lane:
+                                case wasm1p1_simd_code::i64x2_extract_lane:
+                                case wasm1p1_simd_code::i64x2_replace_lane:
+                                case wasm1p1_simd_code::f32x4_extract_lane:
+                                case wasm1p1_simd_code::f32x4_replace_lane:
+                                case wasm1p1_simd_code::f64x2_extract_lane:
+                                case wasm1p1_simd_code::f64x2_replace_lane:
+                                {
+                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    return;
+                                }
+                                case wasm1p1_simd_code::i8x16_swizzle:
+                                case wasm1p1_simd_code::i8x16_splat:
+                                case wasm1p1_simd_code::i16x8_splat:
+                                case wasm1p1_simd_code::i32x4_splat:
+                                case wasm1p1_simd_code::i64x2_splat:
+                                case wasm1p1_simd_code::f32x4_splat:
+                                case wasm1p1_simd_code::f64x2_splat:
+                                case wasm1p1_simd_code::i8x16_eq:
+                                case wasm1p1_simd_code::i8x16_ne:
+                                case wasm1p1_simd_code::i8x16_lt_s:
+                                case wasm1p1_simd_code::i8x16_lt_u:
+                                case wasm1p1_simd_code::i8x16_gt_s:
+                                case wasm1p1_simd_code::i8x16_gt_u:
+                                case wasm1p1_simd_code::i8x16_le_s:
+                                case wasm1p1_simd_code::i8x16_le_u:
+                                case wasm1p1_simd_code::i8x16_ge_s:
+                                case wasm1p1_simd_code::i8x16_ge_u:
+                                case wasm1p1_simd_code::i16x8_eq:
+                                case wasm1p1_simd_code::i16x8_ne:
+                                case wasm1p1_simd_code::i16x8_lt_s:
+                                case wasm1p1_simd_code::i16x8_lt_u:
+                                case wasm1p1_simd_code::i16x8_gt_s:
+                                case wasm1p1_simd_code::i16x8_gt_u:
+                                case wasm1p1_simd_code::i16x8_le_s:
+                                case wasm1p1_simd_code::i16x8_le_u:
+                                case wasm1p1_simd_code::i16x8_ge_s:
+                                case wasm1p1_simd_code::i16x8_ge_u:
+                                case wasm1p1_simd_code::i32x4_eq:
+                                case wasm1p1_simd_code::i32x4_ne:
+                                case wasm1p1_simd_code::i32x4_lt_s:
+                                case wasm1p1_simd_code::i32x4_lt_u:
+                                case wasm1p1_simd_code::i32x4_gt_s:
+                                case wasm1p1_simd_code::i32x4_gt_u:
+                                case wasm1p1_simd_code::i32x4_le_s:
+                                case wasm1p1_simd_code::i32x4_le_u:
+                                case wasm1p1_simd_code::i32x4_ge_s:
+                                case wasm1p1_simd_code::i32x4_ge_u:
+                                case wasm1p1_simd_code::f32x4_eq:
+                                case wasm1p1_simd_code::f32x4_ne:
+                                case wasm1p1_simd_code::f32x4_lt:
+                                case wasm1p1_simd_code::f32x4_gt:
+                                case wasm1p1_simd_code::f32x4_le:
+                                case wasm1p1_simd_code::f32x4_ge:
+                                case wasm1p1_simd_code::f64x2_eq:
+                                case wasm1p1_simd_code::f64x2_ne:
+                                case wasm1p1_simd_code::f64x2_lt:
+                                case wasm1p1_simd_code::f64x2_gt:
+                                case wasm1p1_simd_code::f64x2_le:
+                                case wasm1p1_simd_code::f64x2_ge:
+                                case wasm1p1_simd_code::v128_not:
+                                case wasm1p1_simd_code::v128_and:
+                                case wasm1p1_simd_code::v128_andnot:
+                                case wasm1p1_simd_code::v128_or:
+                                case wasm1p1_simd_code::v128_xor:
+                                case wasm1p1_simd_code::v128_bitselect:
+                                case wasm1p1_simd_code::v128_any_true:
+                                case wasm1p1_simd_code::f32x4_demote_f64x2_zero:
+                                case wasm1p1_simd_code::f64x2_promote_low_f32x4:
+                                case wasm1p1_simd_code::i8x16_abs:
+                                case wasm1p1_simd_code::i8x16_neg:
+                                case wasm1p1_simd_code::i8x16_popcnt:
+                                case wasm1p1_simd_code::i8x16_all_true:
+                                case wasm1p1_simd_code::i8x16_bitmask:
+                                case wasm1p1_simd_code::i8x16_narrow_i16x8_s:
+                                case wasm1p1_simd_code::i8x16_narrow_i16x8_u:
+                                case wasm1p1_simd_code::f32x4_ceil:
+                                case wasm1p1_simd_code::f32x4_floor:
+                                case wasm1p1_simd_code::f32x4_trunc:
+                                case wasm1p1_simd_code::f32x4_nearest:
+                                case wasm1p1_simd_code::i8x16_shl:
+                                case wasm1p1_simd_code::i8x16_shr_s:
+                                case wasm1p1_simd_code::i8x16_shr_u:
+                                case wasm1p1_simd_code::i8x16_add:
+                                case wasm1p1_simd_code::i8x16_add_sat_s:
+                                case wasm1p1_simd_code::i8x16_add_sat_u:
+                                case wasm1p1_simd_code::i8x16_sub:
+                                case wasm1p1_simd_code::i8x16_sub_sat_s:
+                                case wasm1p1_simd_code::i8x16_sub_sat_u:
+                                case wasm1p1_simd_code::f64x2_ceil:
+                                case wasm1p1_simd_code::f64x2_floor:
+                                case wasm1p1_simd_code::i8x16_min_s:
+                                case wasm1p1_simd_code::i8x16_min_u:
+                                case wasm1p1_simd_code::i8x16_max_s:
+                                case wasm1p1_simd_code::i8x16_max_u:
+                                case wasm1p1_simd_code::f64x2_trunc:
+                                case wasm1p1_simd_code::i8x16_avgr_u:
+                                case wasm1p1_simd_code::i16x8_extadd_pairwise_i8x16_s:
+                                case wasm1p1_simd_code::i16x8_extadd_pairwise_i8x16_u:
+                                case wasm1p1_simd_code::i32x4_extadd_pairwise_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extadd_pairwise_i16x8_u:
+                                case wasm1p1_simd_code::i16x8_abs:
+                                case wasm1p1_simd_code::i16x8_neg:
+                                case wasm1p1_simd_code::i16x8_q15mulr_sat_s:
+                                case wasm1p1_simd_code::i16x8_all_true:
+                                case wasm1p1_simd_code::i16x8_bitmask:
+                                case wasm1p1_simd_code::i16x8_narrow_i32x4_s:
+                                case wasm1p1_simd_code::i16x8_narrow_i32x4_u:
+                                case wasm1p1_simd_code::i16x8_extend_low_i8x16_s:
+                                case wasm1p1_simd_code::i16x8_extend_high_i8x16_s:
+                                case wasm1p1_simd_code::i16x8_extend_low_i8x16_u:
+                                case wasm1p1_simd_code::i16x8_extend_high_i8x16_u:
+                                case wasm1p1_simd_code::i16x8_shl:
+                                case wasm1p1_simd_code::i16x8_shr_s:
+                                case wasm1p1_simd_code::i16x8_shr_u:
+                                case wasm1p1_simd_code::i16x8_add:
+                                case wasm1p1_simd_code::i16x8_add_sat_s:
+                                case wasm1p1_simd_code::i16x8_add_sat_u:
+                                case wasm1p1_simd_code::i16x8_sub:
+                                case wasm1p1_simd_code::i16x8_sub_sat_s:
+                                case wasm1p1_simd_code::i16x8_sub_sat_u:
+                                case wasm1p1_simd_code::f64x2_nearest:
+                                case wasm1p1_simd_code::i16x8_mul:
+                                case wasm1p1_simd_code::i16x8_min_s:
+                                case wasm1p1_simd_code::i16x8_min_u:
+                                case wasm1p1_simd_code::i16x8_max_s:
+                                case wasm1p1_simd_code::i16x8_max_u:
+                                case wasm1p1_simd_code::i16x8_avgr_u:
+                                case wasm1p1_simd_code::i16x8_extmul_low_i8x16_s:
+                                case wasm1p1_simd_code::i16x8_extmul_high_i8x16_s:
+                                case wasm1p1_simd_code::i16x8_extmul_low_i8x16_u:
+                                case wasm1p1_simd_code::i16x8_extmul_high_i8x16_u:
+                                case wasm1p1_simd_code::i32x4_abs:
+                                case wasm1p1_simd_code::i32x4_neg:
+                                case wasm1p1_simd_code::i32x4_all_true:
+                                case wasm1p1_simd_code::i32x4_bitmask:
+                                case wasm1p1_simd_code::i32x4_extend_low_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extend_high_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extend_low_i16x8_u:
+                                case wasm1p1_simd_code::i32x4_extend_high_i16x8_u:
+                                case wasm1p1_simd_code::i32x4_shl:
+                                case wasm1p1_simd_code::i32x4_shr_s:
+                                case wasm1p1_simd_code::i32x4_shr_u:
+                                case wasm1p1_simd_code::i32x4_add:
+                                case wasm1p1_simd_code::i32x4_sub:
+                                case wasm1p1_simd_code::i32x4_mul:
+                                case wasm1p1_simd_code::i32x4_min_s:
+                                case wasm1p1_simd_code::i32x4_min_u:
+                                case wasm1p1_simd_code::i32x4_max_s:
+                                case wasm1p1_simd_code::i32x4_max_u:
+                                case wasm1p1_simd_code::i32x4_dot_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extmul_low_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extmul_high_i16x8_s:
+                                case wasm1p1_simd_code::i32x4_extmul_low_i16x8_u:
+                                case wasm1p1_simd_code::i32x4_extmul_high_i16x8_u:
+                                case wasm1p1_simd_code::i64x2_abs:
+                                case wasm1p1_simd_code::i64x2_neg:
+                                case wasm1p1_simd_code::i64x2_all_true:
+                                case wasm1p1_simd_code::i64x2_bitmask:
+                                case wasm1p1_simd_code::i64x2_extend_low_i32x4_s:
+                                case wasm1p1_simd_code::i64x2_extend_high_i32x4_s:
+                                case wasm1p1_simd_code::i64x2_extend_low_i32x4_u:
+                                case wasm1p1_simd_code::i64x2_extend_high_i32x4_u:
+                                case wasm1p1_simd_code::i64x2_shl:
+                                case wasm1p1_simd_code::i64x2_shr_s:
+                                case wasm1p1_simd_code::i64x2_shr_u:
+                                case wasm1p1_simd_code::i64x2_add:
+                                case wasm1p1_simd_code::i64x2_sub:
+                                case wasm1p1_simd_code::i64x2_mul:
+                                case wasm1p1_simd_code::i64x2_eq:
+                                case wasm1p1_simd_code::i64x2_ne:
+                                case wasm1p1_simd_code::i64x2_lt_s:
+                                case wasm1p1_simd_code::i64x2_gt_s:
+                                case wasm1p1_simd_code::i64x2_le_s:
+                                case wasm1p1_simd_code::i64x2_ge_s:
+                                case wasm1p1_simd_code::i64x2_extmul_low_i32x4_s:
+                                case wasm1p1_simd_code::i64x2_extmul_high_i32x4_s:
+                                case wasm1p1_simd_code::i64x2_extmul_low_i32x4_u:
+                                case wasm1p1_simd_code::i64x2_extmul_high_i32x4_u:
+                                case wasm1p1_simd_code::f32x4_abs:
+                                case wasm1p1_simd_code::f32x4_neg:
+                                case wasm1p1_simd_code::f32x4_sqrt:
+                                case wasm1p1_simd_code::f32x4_add:
+                                case wasm1p1_simd_code::f32x4_sub:
+                                case wasm1p1_simd_code::f32x4_mul:
+                                case wasm1p1_simd_code::f32x4_div:
+                                case wasm1p1_simd_code::f32x4_min:
+                                case wasm1p1_simd_code::f32x4_max:
+                                case wasm1p1_simd_code::f32x4_pmin:
+                                case wasm1p1_simd_code::f32x4_pmax:
+                                case wasm1p1_simd_code::f64x2_abs:
+                                case wasm1p1_simd_code::f64x2_neg:
+                                case wasm1p1_simd_code::f64x2_sqrt:
+                                case wasm1p1_simd_code::f64x2_add:
+                                case wasm1p1_simd_code::f64x2_sub:
+                                case wasm1p1_simd_code::f64x2_mul:
+                                case wasm1p1_simd_code::f64x2_div:
+                                case wasm1p1_simd_code::f64x2_min:
+                                case wasm1p1_simd_code::f64x2_max:
+                                case wasm1p1_simd_code::f64x2_pmin:
+                                case wasm1p1_simd_code::f64x2_pmax:
+                                case wasm1p1_simd_code::i32x4_trunc_sat_f32x4_s:
+                                case wasm1p1_simd_code::i32x4_trunc_sat_f32x4_u:
+                                case wasm1p1_simd_code::f32x4_convert_i32x4_s:
+                                case wasm1p1_simd_code::f32x4_convert_i32x4_u:
+                                case wasm1p1_simd_code::i32x4_trunc_sat_f64x2_s_zero:
+                                case wasm1p1_simd_code::i32x4_trunc_sat_f64x2_u_zero:
+                                case wasm1p1_simd_code::f64x2_convert_low_i32x4_s:
+                                case wasm1p1_simd_code::f64x2_convert_low_i32x4_u:
+                                {
+                                    return;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.u8 = static_cast<::std::uint_least8_t>(simd_subopcode);
+                                    err.err_code = code_validation_error_code::illegal_opbase;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
+                            }
+                        }
+                    }
+
                     if((op_byte >= static_cast<unsigned>(wasm1_code::i32_eqz) && op_byte <= static_cast<unsigned>(wasm1_code::f64_reinterpret_i64)) ||
                        curr_opbase == wasm1_code::unreachable || curr_opbase == wasm1_code::nop || curr_opbase == wasm1_code::drop ||
                        curr_opbase == wasm1_code::select || curr_opbase == wasm1_code::return_)
@@ -675,6 +1422,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                   lazy_module_storage_t& storage,
                                                                   ::std::size_t local_function_index,
                                                                   lazy_split_config cfg,
+                                                                  parser_feature_parameter_t const& wasm_feature_parameter,
                                                                   ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             // Build the lazy index from the runtime module because it owns the final function ordering used by interpreter dispatch.
@@ -750,16 +1498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
 
-                        if(code_curr == code_end) [[unlikely]]
-                        {
-                            fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
-                        }
-
-                        // block blocktype ...
-                        // [     safe    ] unsafe (could be the section_end)
-                        //       ^^ code_curr
-
-                        ++code_curr;
+                        skip_wasm1p1_block_type(code_curr, code_end, op_begin, curr_module, wasm_feature_parameter, err);
 
                         // block blocktype ...
                         // [     safe    ] unsafe (could be the section_end)
@@ -827,7 +1566,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     }
                     default:
                     {
-                        skip_wasm1_non_structural_immediates(code_curr, code_end, op_begin, curr_opbase, err);
+                        skip_wasm1_non_structural_immediates(code_curr, code_end, op_begin, curr_opbase, wasm_feature_parameter, err);
                         break;
                     }
                 }
@@ -946,6 +1685,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                                                                                   options.compile_options,
                                                                                                                                   storage.compiled,
                                                                                                                                   local_function_index,
+                                                                                                                                  options.validator_feature_parameter,
                                                                                                                                   err);
         }
 
@@ -1084,8 +1824,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     inline constexpr lazy_module_storage_t initialize_lazy_module_storage(runtime_module_storage_t const& curr_module,
                                                                           ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
                                                                           ::uwvm2::validation::error::code_validation_error_impl& err,
-                                                                          lazy_split_config split_config = {}) UWVM_THROWS
+                                                                          lazy_split_config split_config = {},
+                                                                          parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
     {
+        if(wasm_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
         lazy_module_storage_t storage{};
 
         auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
@@ -1102,7 +1845,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         // Build only indexing metadata during initialization. Real validation and bytecode emission can be deferred to the first use.
         for(::std::size_t local_function_index{}; local_function_index != local_func_count; ++local_function_index)
         {
-            details::build_lazy_function_execution_units(curr_module, storage, local_function_index, split_config, err);
+            details::build_lazy_function_execution_units(curr_module, storage, local_function_index, split_config, *wasm_feature_parameter, err);
         }
         return storage;
     }

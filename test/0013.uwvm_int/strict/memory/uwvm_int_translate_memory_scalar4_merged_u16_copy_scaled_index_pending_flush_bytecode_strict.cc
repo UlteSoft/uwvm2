@@ -64,6 +64,7 @@ namespace
     [[nodiscard]] bool contains_any_i32_load16_u_localget_off(ByteStorage const& bc,
                                                               ::uwvm2::object::memory::linear::native_memory_t const& mem) noexcept
     {
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         constexpr auto tuple =
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
         return bytecode_contains_any_i32_curr<Opt>(bc,
@@ -73,12 +74,18 @@ namespace
                                                            bc,
                                                            optable::translate::get_uwvmint_i32_load16_u_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
                                                    });
+#else
+        (void)bc;
+        (void)mem;
+        return false;
+#endif
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage>
     [[nodiscard]] bool contains_any_u16_copy_scaled_index(ByteStorage const& bc,
                                                           ::uwvm2::object::memory::linear::native_memory_t const& mem) noexcept
     {
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         constexpr auto tuple =
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
         return bytecode_contains_any_i32_curr<Opt>(bc,
@@ -88,6 +95,11 @@ namespace
                                                            bc,
                                                            optable::translate::get_uwvmint_u16_copy_scaled_index_fptr_from_tuple<Opt>(curr, mem, tuple));
                                                    });
+#else
+        (void)bc;
+        (void)mem;
+        return false;
+#endif
     }
 
     [[nodiscard]] byte_vec build_memory_scalar4_merged_u16_copy_scaled_index_pending_flush_bytecode_module()
@@ -246,9 +258,11 @@ namespace
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc0, mem)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc1, mem)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc2, mem)));
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc0)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc1)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc2)));
+#endif
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc0, mem)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc1, mem)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc2, mem)));

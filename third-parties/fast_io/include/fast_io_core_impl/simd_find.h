@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace fast_io::details
 {
@@ -7,7 +7,7 @@ inline constexpr auto create_find_simd_vector_with_unsigned_toggle(char_type val
 {
 	::fast_io::freestanding::array<char_type, N> arr;
 	using signed_char_type = ::std::make_signed_t<char_type>;
-	using unsigned_char_type = ::std::make_signed_t<char_type>;
+	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
 	constexpr unsigned_char_type signed_min_unsigned_val{
 		static_cast<unsigned_char_type>(::std::numeric_limits<signed_char_type>::min())};
 	if constexpr (signed_disposition)
@@ -213,7 +213,7 @@ inline constexpr char_type const *find_space_simd_common_impl(char_type const *f
 	else
 	{
 		using unsigned_char_type = ::std::make_unsigned_t<::std::remove_cvref_t<char_type>>;
-		using signed_char_type = ::std::make_unsigned_t<unsigned_char_type>;
+		using signed_char_type = ::std::make_signed_t<unsigned_char_type>;
 		constexpr char_type spacech{char_literal_v<u8' ', ::std::remove_cvref_t<char_type>>};
 		constexpr char_type horizontaltab{char_literal_v<u8'\t', ::std::remove_cvref_t<char_type>>};
 		constexpr char_type verticaltab{char_literal_v<u8'\v', ::std::remove_cvref_t<char_type>>};
@@ -444,9 +444,7 @@ inline constexpr char_type const *find_simd_constant_common_cold_impl(char_type 
 		{
 			::std::size_t diff{static_cast<::std::size_t>(last - first)};
 			if (diff == 0)
-#if __has_cpp_attribute(likely)
 				[[likely]]
-#endif
 			{
 				return first;
 			}
@@ -507,9 +505,7 @@ find_simd_small_optimization_common_impl(char_type const *first, char_type const
 			--diff;
 		}
 		if (diff)
-#if __has_cpp_attribute(likely)
 			[[likely]]
-#endif
 		{
 			return first;
 		}

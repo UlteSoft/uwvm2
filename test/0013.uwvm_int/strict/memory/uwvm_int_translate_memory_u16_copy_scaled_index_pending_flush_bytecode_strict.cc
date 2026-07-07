@@ -93,6 +93,7 @@ namespace
         }
         else
         {
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
             constexpr auto tuple = compiler::details::make_interpreter_tuple<Opt>(
                 ::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
             return bytecode_contains_any_i32_curr<Opt>(
@@ -103,6 +104,11 @@ namespace
                         bc,
                         optable::translate::get_uwvmint_i32_load16_u_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
                 });
+#else
+            (void)bc;
+            (void)mem;
+            return false;
+#endif
         }
     }
 
@@ -118,6 +124,7 @@ namespace
         }
         else
         {
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
             constexpr auto tuple = compiler::details::make_interpreter_tuple<Opt>(
                 ::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
             return bytecode_contains_any_i32_curr<Opt>(
@@ -128,6 +135,11 @@ namespace
                         bc,
                         optable::translate::get_uwvmint_u16_copy_scaled_index_fptr_from_tuple<Opt>(curr, mem, tuple));
                 });
+#else
+            (void)bc;
+            (void)mem;
+            return false;
+#endif
         }
     }
 
@@ -249,8 +261,10 @@ namespace
         if constexpr(Opt.is_tail_call)
         {
             UWVM2TEST_REQUIRE(mem != nullptr);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
             UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc0)));
             UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc1)));
+#endif
             UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc0, *mem)));
             UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc1, *mem)));
             UWVM2TEST_REQUIRE(!(contains_any_u16_copy_scaled_index<Opt>(bc0, *mem)));

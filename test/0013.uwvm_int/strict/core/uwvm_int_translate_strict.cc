@@ -401,22 +401,24 @@ namespace
         }
     };
 
-    [[nodiscard]] constexpr ::std::size_t abi_bytes(wasm_value_type t) noexcept
+    template <typename ValueType>
+    [[nodiscard]] constexpr ::std::size_t abi_bytes(ValueType t) noexcept
     {
-        switch(t)
+        switch(static_cast<::std::uint_least8_t>(t))
         {
-            case wasm_value_type::i32:
-            case wasm_value_type::f32:
+            case static_cast<::std::uint_least8_t>(wasm_value_type::i32):
+            case static_cast<::std::uint_least8_t>(wasm_value_type::f32):
                 return 4uz;
-            case wasm_value_type::i64:
-            case wasm_value_type::f64:
+            case static_cast<::std::uint_least8_t>(wasm_value_type::i64):
+            case static_cast<::std::uint_least8_t>(wasm_value_type::f64):
                 return 8uz;
             default:
                 return 0uz;
         }
     }
 
-    [[nodiscard]] inline ::std::size_t abi_total_bytes(wasm_value_type const* begin, wasm_value_type const* end) noexcept
+    template <typename ValueType>
+    [[nodiscard]] inline ::std::size_t abi_total_bytes(ValueType const* begin, ValueType const* end) noexcept
     {
         ::std::size_t total{};
         for(auto it = begin; it != end; ++it)
@@ -432,6 +434,44 @@ namespace
     struct prepared_runtime
     {
         runtime_module_t const* mod{};
+
+        prepared_runtime() noexcept = default;
+        explicit prepared_runtime(runtime_module_t const* module) noexcept : mod{module} {}
+
+        prepared_runtime(prepared_runtime const&) = delete;
+        prepared_runtime& operator=(prepared_runtime const&) = delete;
+
+        prepared_runtime(prepared_runtime&& other) noexcept : mod{other.mod}
+        {
+            other.mod = nullptr;
+        }
+
+        prepared_runtime& operator=(prepared_runtime&& other) noexcept
+        {
+            if(this != ::std::addressof(other))
+            {
+                reset();
+                mod = other.mod;
+                other.mod = nullptr;
+            }
+            return *this;
+        }
+
+        ~prepared_runtime()
+        {
+            reset();
+        }
+
+        void reset() noexcept
+        {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            if(mod != nullptr)
+            {
+                ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
+                mod = nullptr;
+            }
+#endif
+        }
     };
 
 #if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
@@ -441,6 +481,8 @@ namespace
             ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
         ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler =
             ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only;
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode =
+            ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_path_mode_t::disabled;
     }
 #endif
 
@@ -513,7 +555,7 @@ namespace
             ::fast_io::fast_terminate();
         }
 
-        return prepared_runtime{ .mod = ::std::addressof(it->second) };
+        return prepared_runtime{::std::addressof(it->second)};
     }
 
     template <typename ByteStorage, typename Fptr>

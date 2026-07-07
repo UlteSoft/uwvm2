@@ -34,7 +34,7 @@ inline constexpr void print(T &&t, Args &&...args)
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES)) &&                                     \
 	__has_include(<stdio.h>)
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			::fast_io::details::print_after_io_print_forward<false>(
@@ -79,7 +79,7 @@ inline constexpr void println(T &&t, Args &&...args)
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES)) &&                                     \
 	__has_include(<stdio.h>)
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			::fast_io::details::print_after_io_print_forward<true>(
@@ -116,7 +116,7 @@ inline constexpr void perr(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING) && \
 	  !defined(__AVR__)) ||                                                                                            \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			::fast_io::details::perr_after_io_print_forward<false>(
@@ -155,7 +155,7 @@ inline constexpr void perrln(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING) && \
 	  !defined(__AVR__)) ||                                                                                            \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			::fast_io::details::perr_after_io_print_forward<true>(
@@ -235,7 +235,7 @@ inline constexpr void debug_print(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && \
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			fast_io::details::debug_print_after_io_print_forward<false>(
@@ -274,7 +274,7 @@ inline constexpr void debug_println(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && \
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, Args...>};
+		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
 		if constexpr (type_ok)
 		{
 			fast_io::details::debug_print_after_io_print_forward<true>(

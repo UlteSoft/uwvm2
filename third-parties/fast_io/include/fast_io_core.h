@@ -85,6 +85,7 @@
 
 #include "fast_io_core_impl/integers/chrono.h"
 #include "fast_io_core_impl/iso/isos.h"
+#include "fast_io_core_impl/linux_statx_definitions/impl.h"
 #include "fast_io_core_impl/enums/impl.h"
 
 #ifndef FAST_IO_DISABLE_CODECVT

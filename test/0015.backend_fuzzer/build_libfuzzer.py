@@ -90,7 +90,6 @@ def main() -> int:
 
     include_dirs = [
         root / "src",
-        root / "third-parties" / "fast_float" / "include",
         root / "third-parties" / "fast_io" / "include",
         root / "third-parties" / "bizwen" / "include",
         root / "third-parties" / "boost_unordered" / "include",
@@ -106,6 +105,7 @@ def main() -> int:
         "-DUWVM_USE_UWVM_INT",
         "-DUWVM_USE_LLVM_JIT",
         "-DUWVM_DISABLE_DEBUG_INT",
+        "-DUWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519",
     ]
     add_matrix_defines(defines, args.combine, args.delay)
     add_memory_model_defines(defines, args.memory_model)
@@ -144,6 +144,8 @@ def main() -> int:
         *llvm_ldflags,
         *llvm_libs,
         *llvm_system_libs,
+        "-lssl",
+        "-lcrypto",
         *([sanitizer_flag] if sanitizer_flag else []),
         *split_env_words("UWVM_BACKEND_FUZZER_EXTRA_LDFLAGS"),
         *args.extra_ldflag,

@@ -54,19 +54,40 @@ inline constexpr void string_heap_dilate_uncheck(::fast_io::containers::details:
 	{
 		beginptr = nullptr;
 	}
-	if constexpr (typed_allocator_type::has_reallocate)
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	if consteval
 	{
-		auto [newptr, newcap] = typed_allocator_type::reallocate_at_least(beginptr, rsize + 1u);
+		auto [newptr, newcap] = typed_allocator_type::allocate_at_least(rsize + 1u);
+		if (beginptr != nullptr)
+		{
+			for (::std::size_t i{}; i != strsize; ++i)
+			{
+				::std::construct_at(newptr + i, beginptr[i]);
+			}
+			typed_allocator_type::deallocate_n(beginptr, bfsize);
+		}
 		ptr = newptr;
 		rsize = newcap - 1u;
 	}
 	else
+#endif
 	{
-		auto [newptr, newcap] = typed_allocator_type::reallocate_n_at_least(beginptr, bfsize, rsize + 1u);
-		ptr = newptr;
-		rsize = newcap - 1u;
+		if constexpr (typed_allocator_type::has_reallocate)
+		{
+			auto [newptr, newcap] = typed_allocator_type::reallocate_at_least(beginptr, rsize + 1u);
+			ptr = newptr;
+			rsize = newcap - 1u;
+		}
+		else
+		{
+			auto [newptr, newcap] = typed_allocator_type::reallocate_n_at_least(beginptr, bfsize, rsize + 1u);
+			ptr = newptr;
+			rsize = newcap - 1u;
+		}
 	}
-	imp = {ptr, ptr + strsize, ptr + rsize};
+	imp.begin_ptr = ptr;
+	imp.curr_ptr = ptr + strsize;
+	imp.end_ptr = ptr + rsize;
 }
 
 template <typename allocator_type, ::std::integral chtype>
@@ -88,7 +109,7 @@ inline constexpr void string_push_back_heap_grow_twice(::fast_io::containers::de
 } // namespace details
 
 template <::std::integral chtype, typename alloctype>
-class basic_string 
+class basic_string
 {
 public:
 	using allocator_type = alloctype;
@@ -118,14 +139,18 @@ private:
 			using untyped_allocator_type = generic_allocator_adapter<allocator_type>;
 			using typed_allocator_type = typed_generic_allocator_adapter<untyped_allocator_type, chtype>;
 			auto [ptr, cap]{typed_allocator_type::allocate_at_least(2)};
-			*ptr = 0;
-			this->imp = {ptr, ptr, ptr + static_cast<size_type>(cap - 1u)};
+			::std::construct_at(ptr, char_type{});
+			this->imp.begin_ptr = ptr;
+			this->imp.curr_ptr = ptr;
+			this->imp.end_ptr = ptr + static_cast<size_type>(cap - 1u);
 		}
 		else
 #endif
 		{
 			char_type *const ncstr{const_cast<char_type *>(null_terminated_c_str_v<char_type>)};
-			this->imp = {ncstr, ncstr, ncstr};
+			this->imp.begin_ptr = ncstr;
+			this->imp.curr_ptr = ncstr;
+			this->imp.end_ptr = ncstr;
 		}
 	}
 
@@ -524,7 +549,7 @@ public:
 		this->assign_impl(other.imp.begin_ptr, static_cast<::std::size_t>(other.imp.curr_ptr - other.imp.begin_ptr));
 		return *this;
 	}
-	inline constexpr basic_string& operator=(string_view_type const &other) noexcept
+	inline constexpr basic_string &operator=(string_view_type const &other) noexcept
 	{
 		this->assign(other);
 		return *this;
@@ -888,7 +913,7 @@ public:
 			return this->erase_impl(const_cast<pointer>(first), const_cast<pointer>(last));
 		}
 	}
-	inline constexpr void erase_index(size_type firstidx, size_type lastidx) noexcept
+	inline constexpr size_type erase_index(size_type firstidx, size_type lastidx) noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
 		auto currptr{this->imp.curr_ptr};
@@ -898,6 +923,7 @@ public:
 			::fast_io::fast_terminate();
 		}
 		this->erase_impl(beginptr + firstidx, beginptr + lastidx);
+		return firstidx;
 	}
 	inline constexpr iterator erase(const_iterator it) noexcept
 	{
@@ -911,7 +937,7 @@ public:
 			return this->erase_impl(const_cast<pointer>(it));
 		}
 	}
-	inline constexpr void erase_index(size_type idx) noexcept
+	inline constexpr size_type erase_index(size_type idx) noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
 		auto currptr{this->imp.curr_ptr};
@@ -921,6 +947,7 @@ public:
 			::fast_io::fast_terminate();
 		}
 		this->erase_impl(beginptr + idx);
+		return idx;
 	}
 	inline constexpr void swap(basic_string &other) noexcept
 	{

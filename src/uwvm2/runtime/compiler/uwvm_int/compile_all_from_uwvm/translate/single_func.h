@@ -18,6 +18,339 @@ struct compile_task_split_config
 namespace details
 {
     using full_function_symbol_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
+    using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
+
+    template <typename FeatureTuple>
+    struct validation_module_traits;
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct validation_module_traits<::uwvm2::utils::container::tuple<Fs...>>
+    {
+        using module_storage_t = ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>;
+        using import_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>;
+        using type_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>;
+        using function_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::function_section_storage_t;
+        using code_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>;
+        using table_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>;
+        using memory_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>;
+        using global_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>;
+        using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
+        using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
+        using data_count_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>;
+        using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+        using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+    };
+
+    using validation_module_traits_t = validation_module_traits<::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_features_t>;
+    using validation_module_storage_t = validation_module_traits_t::module_storage_t;
+
+    [[noreturn]] inline constexpr void runtime_storage_bug() noexcept
+    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+        ::fast_io::fast_terminate();
+    }
+
+    [[nodiscard]] inline constexpr validation_module_traits_t::wasm_u32 checked_cast_size_to_wasm_u32(::std::size_t sz) noexcept
+    {
+        using wasm_u32 = validation_module_traits_t::wasm_u32;
+        if(sz > static_cast<::std::size_t>(::std::numeric_limits<wasm_u32>::max())) [[unlikely]] { runtime_storage_bug(); }
+        return static_cast<wasm_u32>(sz);
+    }
+
+    [[nodiscard]] inline constexpr ::std::size_t
+        get_runtime_type_section_count(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
+    {
+        auto const type_begin{curr_module.type_section_storage.type_section_begin};
+        auto const type_end{curr_module.type_section_storage.type_section_end};
+
+        if(type_begin == nullptr || type_end == nullptr) [[unlikely]]
+        {
+            if(type_begin != type_end) [[unlikely]] { runtime_storage_bug(); }
+            return 0uz;
+        }
+
+        auto const type_begin_addr{reinterpret_cast<::std::uintptr_t>(type_begin)};
+        auto const type_end_addr{reinterpret_cast<::std::uintptr_t>(type_end)};
+        if(type_begin_addr > type_end_addr) [[unlikely]] { runtime_storage_bug(); }
+
+        constexpr ::std::size_t type_size{sizeof(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t)};
+        static_assert(type_size != 0uz);
+
+        auto const byte_span{type_end_addr - type_begin_addr};
+        if(byte_span % type_size != 0uz) [[unlikely]] { runtime_storage_bug(); }
+        return byte_span / type_size;
+    }
+
+    [[nodiscard]] inline constexpr validation_module_traits_t::wasm_u32
+        get_runtime_type_index(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+                               ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr) noexcept
+    {
+        if(function_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+
+        auto const type_begin{curr_module.type_section_storage.type_section_begin};
+        auto const type_count{get_runtime_type_section_count(curr_module)};
+        if(type_count == 0uz || type_begin == nullptr) [[unlikely]] { runtime_storage_bug(); }
+
+        auto const type_begin_addr{reinterpret_cast<::std::uintptr_t>(type_begin)};
+        auto const function_type_addr{reinterpret_cast<::std::uintptr_t>(function_type_ptr)};
+        auto const type_end_addr{type_begin_addr + type_count * sizeof(*type_begin)};
+
+        if(function_type_addr < type_begin_addr || function_type_addr >= type_end_addr) [[unlikely]] { runtime_storage_bug(); }
+
+        auto const byte_offset{function_type_addr - type_begin_addr};
+        if(byte_offset % sizeof(*type_begin) != 0uz) [[unlikely]] { runtime_storage_bug(); }
+
+        return checked_cast_size_to_wasm_u32(byte_offset / sizeof(*type_begin));
+    }
+
+    inline constexpr void validate_runtime_module_storage(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
+    {
+        using external_types = validation_module_traits_t::external_types;
+
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.imported_function_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.local_defined_function_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.imported_table_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.local_defined_table_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.imported_memory_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.local_defined_memory_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.imported_global_vec_storage.size()));
+        static_cast<void>(checked_cast_size_to_wasm_u32(curr_module.local_defined_global_vec_storage.size()));
+        static_cast<void>(get_runtime_type_section_count(curr_module));
+
+        for(auto const& imported_func: curr_module.imported_function_vec_storage)
+        {
+            auto const import_type_ptr{imported_func.import_type_ptr};
+            if(import_type_ptr == nullptr || import_type_ptr->imports.type != external_types::func || import_type_ptr->imports.storage.function == nullptr)
+                [[unlikely]]
+            {
+                runtime_storage_bug();
+            }
+            static_cast<void>(get_runtime_type_index(curr_module, import_type_ptr->imports.storage.function));
+        }
+
+        for(auto const& local_func: curr_module.local_defined_function_vec_storage)
+        {
+            if(local_func.function_type_ptr == nullptr || local_func.wasm_code_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            static_cast<void>(get_runtime_type_index(curr_module, local_func.function_type_ptr));
+
+            auto const code_begin{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.expr_begin)};
+            auto const code_end{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.code_end)};
+            if(code_begin == nullptr || code_end == nullptr || code_begin > code_end) [[unlikely]] { runtime_storage_bug(); }
+        }
+
+        for(auto const& imported_table: curr_module.imported_table_vec_storage)
+        {
+            auto const import_type_ptr{imported_table.import_type_ptr};
+            if(import_type_ptr == nullptr || import_type_ptr->imports.type != external_types::table) [[unlikely]] { runtime_storage_bug(); }
+        }
+        for(auto const& local_table: curr_module.local_defined_table_vec_storage)
+        {
+            if(local_table.table_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+        }
+
+        for(auto const& imported_memory: curr_module.imported_memory_vec_storage)
+        {
+            auto const import_type_ptr{imported_memory.import_type_ptr};
+            if(import_type_ptr == nullptr || import_type_ptr->imports.type != external_types::memory) [[unlikely]] { runtime_storage_bug(); }
+        }
+        for(auto const& local_memory: curr_module.local_defined_memory_vec_storage)
+        {
+            if(local_memory.memory_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+        }
+
+        for(auto const& imported_global: curr_module.imported_global_vec_storage)
+        {
+            auto const import_type_ptr{imported_global.import_type_ptr};
+            if(import_type_ptr == nullptr || import_type_ptr->imports.type != external_types::global) [[unlikely]] { runtime_storage_bug(); }
+        }
+        for(auto const& local_global: curr_module.local_defined_global_vec_storage)
+        {
+            if(local_global.global_type_ptr == nullptr || local_global.local_global_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+
+            auto const& global_type{*local_global.global_type_ptr};
+            auto const& local_global_type{local_global.local_global_type_ptr->global};
+            if(global_type.type != local_global_type.type || global_type.is_mutable != local_global_type.is_mutable) [[unlikely]]
+            {
+                runtime_storage_bug();
+            }
+        }
+    }
+
+    [[nodiscard]] inline constexpr validation_module_storage_t
+        build_runtime_validation_module(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module) noexcept
+    {
+        validate_runtime_module_storage(curr_module);
+
+        validation_module_storage_t validation_module{};
+
+        auto& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::import_section_storage_t>(
+            validation_module.sections)};
+        auto& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::type_section_storage_t>(
+            validation_module.sections)};
+        auto& funcsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::function_section_storage_t>(
+            validation_module.sections)};
+        auto& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::code_section_storage_t>(
+            validation_module.sections)};
+        auto& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::table_section_storage_t>(
+            validation_module.sections)};
+        auto& memsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::memory_section_storage_t>(
+            validation_module.sections)};
+        auto& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::global_section_storage_t>(
+            validation_module.sections)};
+        auto& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::element_section_storage_t>(
+            validation_module.sections)};
+        auto& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_section_storage_t>(
+            validation_module.sections)};
+        auto& datacountsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_count_section_storage_t>(
+            validation_module.sections)};
+
+        auto const type_count{get_runtime_type_section_count(curr_module)};
+        typesec.types.reserve(type_count);
+        for(auto type_curr{curr_module.type_section_storage.type_section_begin}; type_curr != curr_module.type_section_storage.type_section_end; ++type_curr)
+        {
+            typesec.types.push_back_unchecked(*type_curr);
+        }
+
+        auto const total_import_count{curr_module.imported_function_vec_storage.size() + curr_module.imported_table_vec_storage.size() +
+                                      curr_module.imported_memory_vec_storage.size() + curr_module.imported_global_vec_storage.size()};
+        importsec.imports.reserve(total_import_count);
+
+        auto const append_runtime_import{[&]<validation_module_traits_t::external_types ExpectedKind>(
+                                             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const* import_type_ptr) constexpr noexcept
+                                             -> ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t const*
+                                         {
+                                             if(import_type_ptr == nullptr || import_type_ptr->imports.type != ExpectedKind) [[unlikely]]
+                                             {
+                                                 runtime_storage_bug();
+                                             }
+
+                                             importsec.imports.push_back_unchecked(*import_type_ptr);
+                                             auto& copied_import{importsec.imports.back_unchecked()};
+
+                                             if constexpr(ExpectedKind == validation_module_traits_t::external_types::func)
+                                             {
+                                                 auto const copied_func_type_ptr{copied_import.imports.storage.function};
+                                                 if(copied_func_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+                                                 auto const type_index{get_runtime_type_index(curr_module, copied_func_type_ptr)};
+                                                 copied_import.imports.storage.function = typesec.types.cbegin() + type_index;
+                                             }
+
+                                             return ::std::addressof(copied_import);
+                                         }};
+
+        auto& imported_funcs{importsec.importdesc.index_unchecked(0uz)};
+        imported_funcs.reserve(curr_module.imported_function_vec_storage.size());
+        for(auto const& imported_func: curr_module.imported_function_vec_storage)
+        {
+            imported_funcs.push_back_unchecked(
+                append_runtime_import.template operator()<validation_module_traits_t::external_types::func>(imported_func.import_type_ptr));
+        }
+
+        auto& imported_tables{importsec.importdesc.index_unchecked(1uz)};
+        imported_tables.reserve(curr_module.imported_table_vec_storage.size());
+        for(auto const& imported_table: curr_module.imported_table_vec_storage)
+        {
+            imported_tables.push_back_unchecked(
+                append_runtime_import.template operator()<validation_module_traits_t::external_types::table>(imported_table.import_type_ptr));
+        }
+
+        auto& imported_memories{importsec.importdesc.index_unchecked(2uz)};
+        imported_memories.reserve(curr_module.imported_memory_vec_storage.size());
+        for(auto const& imported_memory: curr_module.imported_memory_vec_storage)
+        {
+            imported_memories.push_back_unchecked(
+                append_runtime_import.template operator()<validation_module_traits_t::external_types::memory>(imported_memory.import_type_ptr));
+        }
+
+        auto& imported_globals{importsec.importdesc.index_unchecked(3uz)};
+        imported_globals.reserve(curr_module.imported_global_vec_storage.size());
+        for(auto const& imported_global: curr_module.imported_global_vec_storage)
+        {
+            imported_globals.push_back_unchecked(
+                append_runtime_import.template operator()<validation_module_traits_t::external_types::global>(imported_global.import_type_ptr));
+        }
+
+        funcsec.funcs.change_mode(::uwvm2::parser::wasm::standard::wasm1::features::vectypeidx_minimize_storage_mode::u32_vector);
+        funcsec.funcs.storage.typeidx_u32_vector.reserve(curr_module.local_defined_function_vec_storage.size());
+        codesec.codes.reserve(curr_module.local_defined_function_vec_storage.size());
+        for(auto const& local_func: curr_module.local_defined_function_vec_storage)
+        {
+            if(local_func.function_type_ptr == nullptr || local_func.wasm_code_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            funcsec.funcs.storage.typeidx_u32_vector.push_back_unchecked(get_runtime_type_index(curr_module, local_func.function_type_ptr));
+            codesec.codes.push_back_unchecked(*local_func.wasm_code_ptr);
+        }
+
+        tablesec.tables.reserve(curr_module.local_defined_table_vec_storage.size());
+        for(auto const& local_table: curr_module.local_defined_table_vec_storage)
+        {
+            if(local_table.table_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            tablesec.tables.push_back_unchecked(*local_table.table_type_ptr);
+        }
+
+        memsec.memories.reserve(curr_module.local_defined_memory_vec_storage.size());
+        for(auto const& local_memory: curr_module.local_defined_memory_vec_storage)
+        {
+            if(local_memory.memory_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            memsec.memories.push_back_unchecked(*local_memory.memory_type_ptr);
+        }
+
+        globalsec.local_globals.reserve(curr_module.local_defined_global_vec_storage.size());
+        for(auto const& local_global: curr_module.local_defined_global_vec_storage)
+        {
+            if(local_global.local_global_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            globalsec.local_globals.push_back_unchecked(*local_global.local_global_type_ptr);
+        }
+
+        elemsec.elems.reserve(curr_module.local_defined_element_vec_storage.size());
+        for(auto const& local_element: curr_module.local_defined_element_vec_storage)
+        {
+            if(local_element.element_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            elemsec.elems.push_back_unchecked(*local_element.element_type_ptr);
+        }
+
+        datasec.datas.reserve(curr_module.local_defined_data_vec_storage.size());
+        for(auto const& local_data: curr_module.local_defined_data_vec_storage)
+        {
+            if(local_data.data_type_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            datasec.datas.push_back_unchecked(*local_data.data_type_ptr);
+        }
+
+        if(!curr_module.local_defined_data_vec_storage.empty())
+        {
+            datacountsec.present = true;
+            datacountsec.count = checked_cast_size_to_wasm_u32(curr_module.local_defined_data_vec_storage.size());
+        }
+
+        return validation_module;
+    }
+
+    inline constexpr void validate_runtime_module_with_standard_wasm1p1_validator(
+        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+        ::uwvm2::validation::error::code_validation_error_impl& err,
+        parser_feature_parameter_t const* wasm_feature_parameter) UWVM_THROWS
+    {
+        parser_feature_parameter_t const default_wasm_feature_parameter{};
+        auto const& effective_wasm_feature_parameter{wasm_feature_parameter == nullptr ? default_wasm_feature_parameter : *wasm_feature_parameter};
+        auto const validation_module{build_runtime_validation_module(curr_module)};
+        auto const import_func_count{curr_module.imported_function_vec_storage.size()};
+
+        for(::std::size_t local_function_idx{}; local_function_idx != curr_module.local_defined_function_vec_storage.size(); ++local_function_idx)
+        {
+            auto const& local_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_idx)};
+            if(local_func.wasm_code_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+            auto const code_begin{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.expr_begin)};
+            auto const code_end{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.code_end)};
+            ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+                                                                  validation_module,
+                                                                  import_func_count + local_function_idx,
+                                                                  code_begin,
+                                                                  code_end,
+                                                                  err,
+                                                                  effective_wasm_feature_parameter);
+        }
+    }
 
     struct local_function_task_group
     {
@@ -205,6 +538,7 @@ namespace details
                                                            [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                            full_function_symbol_t& storage,
                                                            ::std::size_t compile_local_function_idx,
+                                                           parser_feature_parameter_t const* wasm_feature_parameter,
                                                            ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS{
 // These include fragments are intentionally expanded inside the function body: they share a large
 // translation context by lexical scope while keeping context setup, emit helpers, and dispatch logic
@@ -221,11 +555,12 @@ namespace details
                                                                  [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                                  full_function_symbol_t& storage,
                                                                  local_function_task_group task_group,
+                                                                 parser_feature_parameter_t const* wasm_feature_parameter,
                                                                  ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         for(::std::size_t local_function_idx{task_group.begin_index}; local_function_idx != task_group.end_index; ++local_function_idx)
         {
-            compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, err);
+            compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, wasm_feature_parameter, err);
         }
     }
 
@@ -269,6 +604,7 @@ namespace details
                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                                                          full_function_symbol_t& storage,
                                                          parallel_compile_failure_state& failure_state,
+                                                         parser_feature_parameter_t const* wasm_feature_parameter,
                                                          local_function_task_group task_group)
     {
         // Each scheduled task compiles a contiguous group and reports failure through shared state;
@@ -283,7 +619,7 @@ namespace details
         try
 #endif
         {
-            compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, local_err);
+            compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, wasm_feature_parameter, local_err);
         }
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error const&)
@@ -362,7 +698,8 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
                           [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
                           ::uwvm2::validation::error::code_validation_error_impl& err,
                           ::std::size_t extra_compile_threads,
-                          compile_task_split_config split_config = {}) UWVM_THROWS
+                          compile_task_split_config split_config = {},
+                          details::parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
 {
     // Module compilation happens in two phases: translate all local bodies first, then complete
     // call-info metadata once every compiled function record has a stable address.
@@ -370,6 +707,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
 
     auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
     details::initialize_local_defined_call_info(curr_module, options, storage);
+    details::validate_runtime_module_with_standard_wasm1p1_validator(curr_module, err, wasm_feature_parameter);
 
     split_config = resolve_effective_compile_task_split_config(curr_module, split_config, extra_compile_threads);
 
@@ -377,7 +715,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
     {
         for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
         {
-            details::compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, err);
+            details::compile_all_from_uwvm_local_func<CompileOption>(curr_module, options, storage, local_function_idx, wasm_feature_parameter, err);
         }
         details::aggregate_local_function_storage(storage);
 
@@ -399,7 +737,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
     {
         for(auto const& task_group: task_groups)
         {
-            details::compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, err);
+            details::compile_all_from_uwvm_local_func_group<CompileOption>(curr_module, options, storage, task_group, wasm_feature_parameter, err);
         }
     }
     else
@@ -409,7 +747,13 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
         details::parallel_compile_failure_state failure_state{};
         for(auto const& task_group: task_groups)
         {
-            auto task{details::make_compile_all_from_uwvm_local_func_group_task<CompileOption>(curr_module, options, storage, failure_state, task_group)};
+            auto task{details::make_compile_all_from_uwvm_local_func_group_task<CompileOption>(
+                curr_module,
+                options,
+                storage,
+                failure_state,
+                wasm_feature_parameter,
+                task_group)};
             ::std::construct_at(task_batch.handles.buffer + task_batch.handle_count, task.release());
             ++task_batch.handle_count;
         }
@@ -442,5 +786,6 @@ template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_transl
 inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t
     compile_all_from_uwvm_single_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                       [[maybe_unused]] ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option& options,
-                                      ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
-{ return compile_all_from_uwvm<CompileOption>(curr_module, options, err, 0uz); }
+                                      ::uwvm2::validation::error::code_validation_error_impl& err,
+                                      details::parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
+{ return compile_all_from_uwvm<CompileOption>(curr_module, options, err, 0uz, {}, wasm_feature_parameter); }

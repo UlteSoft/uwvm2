@@ -87,6 +87,10 @@ namespace uwvm2::utils::allocator::fast_io_strict
 #if __has_cpp_attribute(__gnu__::__malloc__)
         [[__gnu__::__malloc__]]
 #endif
+        inline static constexpr void* allocate_conditional_zero(::std::size_t n, bool zero) noexcept
+        { return details::win32_heapalloc_common_impl(n, zero ? 0x00000008u : 0u); }
+
+#if 0
         inline static constexpr void* allocate(::std::size_t n) noexcept
         { return details::win32_heapalloc_common_impl(n, 0u); }
 
@@ -100,6 +104,10 @@ namespace uwvm2::utils::allocator::fast_io_strict
 
         inline static constexpr void* reallocate_zero(void* addr, ::std::size_t n) noexcept
         { return details::win32_heaprealloc_common_impl(addr, n, 0x00000008u); }
+#endif
+
+        inline static constexpr void* reallocate_conditional_zero(void* addr, ::std::size_t n, bool zero) noexcept
+        { return details::win32_heaprealloc_common_impl(addr, n, zero ? 0x00000008u : 0u); }
 
         inline static constexpr void deallocate(void* addr) noexcept
         {

@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Cmp == int_cmp::ge_u) { return static_cast<UnsignedT>(lhs) >= static_cast<UnsignedT>(rhs); }
             else
             {
-                return false;
+                static_assert(Cmp != Cmp, "unhandled integer compare opcode");
             }
         }
 
@@ -118,7 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Cmp == float_cmp::ge) { return lhs >= rhs; }
             else
             {
-                return false;
+                static_assert(Cmp != Cmp, "unhandled float compare opcode");
             }
         }
 
@@ -174,9 +174,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 return CompileOption.i32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
                        CompileOption.i32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos;
             }
-            else
+            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
             {
                 return true;
+            }
+            else
+            {
+                static_assert(sizeof(OperandT) == 0, "unhandled compare operand type");
             }
         }
     }  // namespace details

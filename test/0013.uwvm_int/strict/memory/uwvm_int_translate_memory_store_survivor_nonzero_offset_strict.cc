@@ -193,8 +193,10 @@ namespace
         auto const exp_local_get_i64 = optable::translate::get_uwvmint_local_get_i64_fptr_from_tuple<Opt>(curr_i64, tuple);
         auto const exp_i32_const = optable::translate::get_uwvmint_i32_const_fptr_from_tuple<Opt>(curr_i32, tuple);
         auto const exp_i32_store_plain = optable::translate::get_uwvmint_i32_store_fptr_from_tuple<Opt>(curr_i32, tuple);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_store_local_plus_imm =
             optable::translate::get_uwvmint_i32_store_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_i32);
+#endif
         auto const exp_i64_store_plain = optable::translate::get_uwvmint_i64_store_fptr_from_tuple<Opt>(curr_i64, tuple);
         auto const exp_i64_store32_plain = optable::translate::get_uwvmint_i64_store32_fptr_from_tuple<Opt>(curr_i64, tuple);
 
@@ -205,8 +207,14 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_i32_const));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_i32_store_plain));
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_i32_store_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_i32_store_plain));
+#else
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_i32_const));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_i32_store_plain));
+#endif
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_local_get_i64));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i64_store_plain));

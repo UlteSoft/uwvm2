@@ -34,13 +34,13 @@ case wasm1_code::return_:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -62,17 +62,9 @@ case wasm1_code::return_:
         }
         else
         {
-            auto const result_type{func_frame.result.begin[0]};
-
-            if(curr_size - target_base > 1uz)
+            if(curr_size > target_base + return_arity)
             {
-                emit_local_set_typed_to_no_fill(bytecode, result_type, internal_temp_local_off);
-                if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(bytecode, target_base); }
-                else
-                {
-                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;) { emit_drop_typed_to_no_fill(bytecode, operand_stack.index_unchecked(i).type); }
-                }
-                emit_local_get_typed_to(bytecode, result_type, internal_temp_local_off);
+                emit_preserve_top_values_drop_to_base_restore(bytecode, func_frame.result, target_base, curr_size, false);
             }
 
             emit_return_to(bytecode);
@@ -205,13 +197,13 @@ case wasm1_code::call:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1016,7 +1008,7 @@ case wasm1_code::call_indirect:
 
     if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(!operand_type_matches(idx, curr_operand_stack_value_type::i32)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
@@ -1033,13 +1025,13 @@ case wasm1_code::call_indirect:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1441,13 +1433,15 @@ case wasm1_code::select:
 
     bool cond_from_stack{};
     curr_operand_stack_value_type cond_type{};
+    bool cond_is_unknown{};
     if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
         cond_from_stack = true;
         cond_type = cond.type;
+        cond_is_unknown = cond.is_unknown;
     }
 
-    if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(cond_from_stack && !cond_is_unknown && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond_type);
@@ -1457,21 +1451,25 @@ case wasm1_code::select:
 
     bool v2_from_stack{};
     curr_operand_stack_value_type v2_type{};
+    bool v2_is_unknown{};
     if(auto const v2{try_pop_concrete_operand()}; v2.from_stack)
     {
         v2_from_stack = true;
         v2_type = v2.type;
+        v2_is_unknown = v2.is_unknown;
     }
 
     bool v1_from_stack{};
     curr_operand_stack_value_type v1_type{};
+    bool v1_is_unknown{};
     if(auto const v1{try_peek_concrete_operand()}; v1.from_stack)
     {
         v1_from_stack = true;
         v1_type = v1.type;
+        v1_is_unknown = v1.is_unknown;
     }
 
-    if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
+    if(v1_from_stack && v2_from_stack && !v1_is_unknown && !v2_is_unknown && v1_type != v2_type) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1_type);
@@ -1480,8 +1478,19 @@ case wasm1_code::select:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    bool const have_known_select_value_type{(v1_from_stack && !v1_is_unknown) || (v2_from_stack && !v2_is_unknown)};
+    auto const select_value_type{(v1_from_stack && !v1_is_unknown) ? v1_type : v2_type};
+    if(have_known_select_value_type && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
+    {
+        err.err_curr = op_begin;
+        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
+        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(select_value_type);
+        err.err_code = code_validation_error_code::select_type_mismatch;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
     // Translate: typed `select`.
-    if(v1_from_stack)
+    if(v1_from_stack && !v1_is_unknown)
     {
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         if(conbine_pending.kind == conbine_pending_kind::select_localget3 && v1_type == conbine_pending.vt &&
@@ -1515,6 +1524,11 @@ case wasm1_code::select:
                 emit_opfunc_to(bytecode, translate::get_uwvmint_select_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                 break;
             }
+            case curr_operand_stack_value_type::v128:
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_select_v128_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                break;
+            }
             [[unlikely]] default:
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1526,9 +1540,20 @@ case wasm1_code::select:
     }
 
     // Stack-top cache model: `select` consumes (v2, cond) and keeps v1 (net -2).
-    if(v1_from_stack) { stacktop_after_pop_n_if_reachable(bytecode, 2uz); }
+    if(v1_from_stack && !v1_is_unknown) { stacktop_after_pop_n_if_reachable(bytecode, 2uz); }
 
-    if(!v1_from_stack && v2_from_stack) { operand_stack_push(v2_type); }
+    if(!v1_from_stack)
+    {
+        if(v2_from_stack)
+        {
+            if(v2_is_unknown) { push_unknown_operand(); }
+            else { operand_stack_push(v2_type); }
+        }
+        else if(is_polymorphic)
+        {
+            push_unknown_operand();
+        }
+    }
 
     break;
 }

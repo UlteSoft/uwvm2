@@ -46,6 +46,7 @@ import uwvm2.parser.wasm.standard.wasm1.const_expr;
 import uwvm2.parser.wasm.standard.wasm1.opcode;
 import uwvm2.parser.wasm.standard.wasm1.features;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.features;
 import uwvm2.parser.wasm.standard.wasm3.type;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.object;

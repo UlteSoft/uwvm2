@@ -20,7 +20,8 @@ inline constexpr char_type *prsv_fp_zero_precision_impl(char_type *iter, ::std::
 namespace ryu
 {
 
-template <bool showpos, bool uppercase, bool comma, ::std::integral char_type, ::std::floating_point flt>
+template <bool showpos, bool uppercase, bool comma, bool nan_show_sign = true, bool nan_show_type = false,
+		  ::std::integral char_type, ::std::floating_point flt>
 inline constexpr char_type *float642fixed_buffered_n(char_type *iter, flt f, ::std::size_t precision) noexcept
 {
 	using trait = ::fast_io::details::iec559_traits<flt>;
@@ -33,11 +34,12 @@ inline constexpr char_type *float642fixed_buffered_n(char_type *iter, flt f, ::s
 	constexpr mantissa_type mflags{static_cast<mantissa_type>(static_cast<mantissa_type>(1) << mbits)};
 	constexpr ::std::uint_least32_t exponent_mask_u32{static_cast<::std::uint_least32_t>(exponent_mask)};
 	auto [mantissa, exponent, sign] = ::fast_io::details::get_punned_result(f);
-	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if (exponent == exponent_mask_u32)
 	{
-		return ::fast_io::details::prsv_fp_nan_impl<uppercase>(iter, mantissa);
+		return ::fast_io::details::prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(
+			iter, mantissa, sign);
 	}
+	iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 	if (!mantissa && !exponent)
 	{
 		return ::fast_io::details::prsv_fp_zero_precision_impl<comma>(iter, precision);

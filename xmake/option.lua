@@ -45,6 +45,17 @@ option("llvm-target", function()
     set_default("detect")
 end)
 
+option("target", function()
+    set_description
+    (
+        "Set the compiler target triple.",
+        "The option is automatically added by platform rules that support cross-compilation.",
+        [[    detect: Use the toolchain/platform default target.]],
+        [[    triplet: Set the compiler target as "--target=triplet".]]
+    )
+    set_default("detect")
+end)
+
 option("rtlib", function()
     set_description
     (

@@ -210,17 +210,21 @@ namespace
         UWVM2TEST_REQUIRE(search_curr_i32_f32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc0, optable::translate::get_uwvmint_f32_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32_f32<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc0, optable::translate::get_uwvmint_f32_store_local_plus_imm_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc1));
         UWVM2TEST_REQUIRE(search_curr_i32_f64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_f64_store_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!search_curr_i32_f64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_f64_store_local_plus_imm_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
+#endif
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc2));
         UWVM2TEST_REQUIRE(contains_local_get_i64(bc2));

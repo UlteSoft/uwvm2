@@ -195,8 +195,10 @@ namespace
         auto const log_text{read_text_file(kLogPath)};
         UWVM2TEST_REQUIRE(!log_text.empty());
 
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         UWVM2TEST_REQUIRE(log_contains_kind(log_text, "local_get_const_f32"));
         UWVM2TEST_REQUIRE(log_contains_kind(log_text, "local_get_const_f64"));
+#endif
 
         for(char const* kind : {
                 "f32_add_imm_local_settee_same",

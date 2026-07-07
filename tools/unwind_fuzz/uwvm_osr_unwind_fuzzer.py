@@ -37,7 +37,7 @@ TRAPS = (
 )
 
 
-POLICIES = ("instruction", "unwind", "auto")
+DEFAULT_POLICIES = ("instruction", "auto")
 
 
 OSR_MODES = (
@@ -157,6 +157,14 @@ def run(args, cwd: Path):
     return subprocess.run(args, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
+def detect_call_stack_policies(uwvm: Path, cwd: Path):
+    result = run([str(uwvm), "--help", "runtime"], cwd)
+    help_text = strip_ansi(result.stdout)
+    if re.search(r"runtime-llvm-jit-call-stack[\s\S]{0,300}\[auto\|instruction\|none\|unwind", help_text):
+        return ("instruction", "unwind", "auto")
+    return DEFAULT_POLICIES
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, type=Path)
@@ -170,8 +178,10 @@ def main() -> int:
     base = ns.work_dir if ns.work_dir is not None else Path("/tmp")
     work = base / f"uwvm_osr_unwind_fuzz_{os.getpid()}"
     work.mkdir(parents=True, exist_ok=True)
+    policies = detect_call_stack_policies(ns.uwvm, ns.root)
     print(f"[osr-fuzz] work={work}")
     print(f"[osr-fuzz] seed={ns.seed} cases={ns.cases}")
+    print(f"[osr-fuzz] call-stack-policies={','.join(policies)}")
 
     failures = []
     skipped_no_osr = 0
@@ -194,7 +204,7 @@ def main() -> int:
         skipped_modes = []
         for mode_name, mode_args in OSR_MODES:
             results = []
-            for policy in POLICIES:
+            for policy in policies:
                 out_path = work / f"osr_{case_id:04d}_{trap}_d{depth}.{mode_name}.{policy}.out"
                 log_path = work / f"osr_{case_id:04d}_{trap}_d{depth}.{mode_name}.{policy}.log"
                 args = [
@@ -219,7 +229,7 @@ def main() -> int:
                     continue
                 results.append((policy, parsed, "tiered-osr-request" in log, out_path, r.stdout, log))
 
-            if len(results) == len(POLICIES):
+            if len(results) == len(policies):
                 osr_count = sum(1 for _, _, has_osr, _, _, _ in results if has_osr)
                 if osr_count == 0:
                     skipped_no_osr += 1

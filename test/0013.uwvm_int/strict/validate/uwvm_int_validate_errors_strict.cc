@@ -69,7 +69,7 @@ namespace
             func_type ty{{}, {}};
             func_body fb{};
             op(fb.code, wasm_op::loop);
-            append_u8(fb.code, 0x00u);  // illegal blocktype byte
+            append_u8(fb.code, 0x7au);  // illegal negative blocktype (-6)
             op(fb.code, wasm_op::end);  // end loop
             op(fb.code, wasm_op::end);  // end func
             (void)mb.add_func(::std::move(ty), ::std::move(fb));

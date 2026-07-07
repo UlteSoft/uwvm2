@@ -9,6 +9,14 @@ using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 using wasm_byte = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
 using wasm_value_type = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_value_type_t;
 using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
+using parser_feature_parameter_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t;
+using wasm_v128_t = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128;
+using wasm_funcref_t = ::uwvm2::object::global::wasm_funcref_t;
+using wasm_externref_t = ::uwvm2::object::global::wasm_externref_t;
+
+parser_feature_parameter_t const default_wasm_feature_parameter{};
+auto const& effective_wasm_feature_parameter{wasm_feature_parameter == nullptr ? default_wasm_feature_parameter : *wasm_feature_parameter};
+[[maybe_unused]] auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(effective_wasm_feature_parameter)};
 
 // no necessary to set err to default
 
@@ -27,11 +35,22 @@ struct block_result_type
     wasm_value_type const* end{};
 };
 
+struct block_signature_t
+{
+    block_result_type start{};
+    block_result_type result{};
+};
+
 struct operand_stack_storage_t
-{ wasm_value_type type{}; };
+{
+    wasm_value_type type{};
+    bool is_unknown{};
+};
 
 struct block_t
 {
+    block_result_type label{};
+    block_result_type start{};
     block_result_type result{};
     ::std::size_t operand_stack_base{};
     block_type type{};
@@ -211,16 +230,36 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
 
-    // Translation uses one internal temporary local slot to preserve single-value block results across stack-unwind branches
+    // Translation uses internal temporary local slots to preserve branch arguments across stack-unwind branches
     // (e.g., `br`/`br_if`/`br_table` when `target_base + arity` is not equal to current stack size).
-    constexpr wasm_u32 internal_temp_local_count{1u};
+    auto max_internal_temp_local_count{static_cast<::std::size_t>(curr_func_type.result.end - curr_func_type.result.begin)};
+    auto const type_section_begin_for_temp{curr_module.type_section_storage.type_section_begin};
+    auto const type_section_end_for_temp{curr_module.type_section_storage.type_section_end};
+    if(type_section_begin_for_temp != nullptr && type_section_end_for_temp != nullptr)
+    {
+        for(auto type_curr{type_section_begin_for_temp}; type_curr != type_section_end_for_temp; ++type_curr)
+        {
+            auto const param_count{static_cast<::std::size_t>(type_curr->parameter.end - type_curr->parameter.begin)};
+            auto const result_count{static_cast<::std::size_t>(type_curr->result.end - type_curr->result.begin)};
+            if(param_count > max_internal_temp_local_count) { max_internal_temp_local_count = param_count; }
+            if(result_count > max_internal_temp_local_count) { max_internal_temp_local_count = result_count; }
+        }
+    }
+    if(max_internal_temp_local_count == 0uz) { max_internal_temp_local_count = 1uz; }
+    if(max_internal_temp_local_count > static_cast<::std::size_t>(::std::numeric_limits<wasm_u32>::max()) ||
+       static_cast<::std::size_t>(all_local_count) >
+           static_cast<::std::size_t>(::std::numeric_limits<wasm_u32>::max()) - max_internal_temp_local_count) [[unlikely]]
+    {
+        ::fast_io::fast_terminate();
+    }
+    wasm_u32 const internal_temp_local_count{static_cast<wasm_u32>(max_internal_temp_local_count)};
     wasm_u32 all_local_count_with_internal{all_local_count + internal_temp_local_count};
     local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count_with_internal);
 
     using local_offset_t = ::std::size_t;
-    constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
+    constexpr local_offset_t local_slot_size{sizeof(wasm_v128_t)};
     static_assert(local_slot_size != 0uz);
-    constexpr local_offset_t internal_temp_local_size{8uz};
+    constexpr local_offset_t internal_temp_local_size{sizeof(wasm_v128_t)};
     static_assert(local_slot_size == internal_temp_local_size);
 
     // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
@@ -245,6 +284,18 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
                                                   case wasm_value_type::f64:
                                                   {
                                                       return 8uz;
+                                                  }
+                                                  case wasm_value_type::v128:
+                                                  {
+                                                      return sizeof(wasm_v128_t);
+                                                  }
+                                                  case wasm_value_type::funcref:
+                                                  {
+                                                      return sizeof(wasm_funcref_t);
+                                                  }
+                                                  case wasm_value_type::externref:
+                                                  {
+                                                      return sizeof(wasm_externref_t);
                                                   }
                                                   [[unlikely]] default:
                                                   {
@@ -315,6 +366,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     {
         bool from_stack{};
         curr_operand_stack_value_type type{};
+        bool is_unknown{};
     };
 
     auto const curr_frame_operand_stack_base{[&]() constexpr noexcept -> ::std::size_t
@@ -344,21 +396,36 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     auto const try_pop_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                         {
                                             if(concrete_operand_count() == 0uz) { return {}; }
-                                            auto const vt{operand_stack.back_unchecked().type};
+                                            auto const operand{operand_stack.back_unchecked()};
                                             operand_stack_pop_unchecked();
-                                            return {.from_stack = true, .type = vt};
+                                            return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                         }};
 
     auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                          {
                                              if(concrete_operand_count() == 0uz) { return {}; }
-                                             return {.from_stack = true, .type = operand_stack.back_unchecked().type};
+                                             auto const operand{operand_stack.back_unchecked()};
+                                             return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                          }};
 
     [[maybe_unused]] auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr noexcept
                                                                 {
                                                                     while(count-- != 0uz && concrete_operand_count() != 0uz) { operand_stack_pop_unchecked(); }
                                                                 }};
+
+    auto const operand_type_matches{[](concrete_operand_t operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                    { return !operand.from_stack || operand.is_unknown || operand.type == expected_type; }};
+
+    auto const stack_entry_type_matches{[](operand_stack_storage_t operand, curr_operand_stack_value_type expected_type) constexpr noexcept
+                                        { return operand.is_unknown || operand.type == expected_type; }};
+
+    [[maybe_unused]] auto const push_unknown_operand{[&]() constexpr UWVM_THROWS
+                                                     {
+                                                         // Unknown stack values only model polymorphic validation. Give them a
+                                                         // concrete storage type so byte-size accounting remains well-defined.
+                                                         operand_stack_push(curr_operand_stack_value_type::i32);
+                                                         operand_stack.back_unchecked().is_unknown = true;
+                                                     }};
 
     auto const sync_type_stacks_from_codegen_snapshot{[&](curr_operand_stack_type const& snapshot) constexpr UWVM_THROWS
                                                       {
@@ -445,10 +512,16 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
         ::fast_io::fast_terminate();
     }
 
-    // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
-    // Safe: reserved `all_local_count_with_internal` above.
-    local_offsets.push_back_unchecked(local_bytes);
-    local_bytes_add(local_bytes, internal_temp_local_size);
+    // Internal temp locals come last and each slot is wide enough for any wasm1p1 value.
+    ::uwvm2::utils::container::vector<local_offset_t> internal_temp_local_offsets{};
+    internal_temp_local_offsets.reserve(static_cast<::std::size_t>(internal_temp_local_count));
+    for(wasm_u32 i{}; i != internal_temp_local_count; ++i)
+    {
+        // Safe: reserved `all_local_count_with_internal` above.
+        local_offsets.push_back_unchecked(local_bytes);
+        internal_temp_local_offsets.push_back_unchecked(local_bytes);
+        local_bytes_add(local_bytes, internal_temp_local_size);
+    }
 
     local_func_symbol.local_bytes_max = local_bytes;
 
@@ -481,7 +554,9 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
                                                       }};
 
     // Internal temp local is the first slot after all Wasm-visible locals.
-    local_offset_t const internal_temp_local_off{local_offset_from_index(all_local_count)};
+    local_offset_t const internal_temp_local_off{internal_temp_local_offsets.index_unchecked(0uz)};
+    [[maybe_unused]] local_offset_t const internal_temp_local_bytes{
+        static_cast<local_offset_t>(static_cast<::std::size_t>(internal_temp_local_count) * static_cast<::std::size_t>(internal_temp_local_size))};
     // Parameters occupy the prefix of the locals buffer and are populated by memcpy at runtime.
     // Non-parameter locals must be zero-initialized by the Wasm spec, but we can skip zeroing trailing locals
     // that are never read (no `local.get`).

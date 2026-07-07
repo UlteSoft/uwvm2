@@ -257,6 +257,58 @@ template <typename FunctionPtr>
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
 }
 
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+// Materialize a full process-local address without routing through a JIT data-section constant pool.  RuntimeDyld's
+// RISC-V64 handling can truncate absolute references to the emitted object's own data section.  Build the value from
+// byte-sized immediates seeded by a volatile stack zero so LLVM cannot fold it back into an inttoptr constant.
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_riscv64_immediate_pointer_value(::llvm::IRBuilder<>& ir_builder,
+                                                                                       ::std::uintptr_t host_address,
+                                                                                       ::llvm::Type* pointer_type) noexcept
+{
+    if(host_address == 0u || pointer_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto& llvm_context{ir_builder.getContext()};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto current_block{ir_builder.GetInsertBlock()};
+    auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
+    if(current_function == nullptr || current_function->empty()) [[unlikely]] { return nullptr; }
+
+    auto& entry_block{current_function->getEntryBlock()};
+    ::llvm::IRBuilder<> entry_builder{&entry_block, entry_block.getFirstInsertionPt()};
+    auto zero_slot{entry_builder.CreateAlloca(llvm_intptr_type, nullptr, get_llvm_string_ref(u8"uwvm.riscv64.host.addr.zero"))};
+    zero_slot->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+
+    auto zero_store{ir_builder.CreateStore(::llvm::ConstantInt::get(llvm_intptr_type, 0u), zero_slot)};
+    zero_store->setVolatile(true);
+    zero_store->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+
+    auto address_load{ir_builder.CreateLoad(llvm_intptr_type, zero_slot, get_llvm_string_ref(u8"uwvm.riscv64.host.addr"))};
+    address_load->setVolatile(true);
+    address_load->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    ::llvm::Value* address_value{address_load};
+
+    for(unsigned shift{static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u - 8u)};; shift -= 8u)
+    {
+        if(shift != static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u - 8u))
+        {
+            address_value = ir_builder.CreateShl(address_value, ::llvm::ConstantInt::get(llvm_intptr_type, 8u), get_llvm_string_ref(u8"uwvm.riscv64.host.addr.shl"));
+        }
+
+        auto const chunk{static_cast<::std::uint_least8_t>((host_address >> shift) & 0xffu)};
+        if(chunk != 0u)
+        {
+            address_value = ir_builder.CreateOr(address_value,
+                                                ::llvm::ConstantInt::get(llvm_intptr_type, chunk),
+                                                get_llvm_string_ref(u8"uwvm.riscv64.host.addr.or"));
+        }
+
+        if(shift == 0u) { break; }
+    }
+
+    return ir_builder.CreateIntToPtr(address_value, pointer_type, get_llvm_string_ref(u8"uwvm.host.ptr"));
+}
+#endif
+
 #if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
 // Put host addresses in the JIT module's own data section on targets where MCJIT cannot reliably materialize arbitrary
 // process addresses directly. COFF/Win64 may truncate far host-image addresses.
@@ -319,7 +371,9 @@ template <typename FunctionPtr>
 [[nodiscard]] inline constexpr ::llvm::Value*
     get_llvm_host_pointer_value(::llvm::IRBuilder<>& ir_builder, ::std::uintptr_t host_address, ::llvm::Type* pointer_type) noexcept
 {
-#if UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    return get_llvm_riscv64_immediate_pointer_value(ir_builder, host_address, pointer_type);
+#elif UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER
     return get_llvm_jit_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     static_cast<void>(ir_builder);
@@ -351,20 +405,54 @@ template <typename FunctionPtr>
 #endif
 }
 
-template <auto Function>
-[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_runtime_bridge_function_symbol_name() noexcept
+template <auto Function, typename FunctionSignature = decltype(Function)>
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_runtime_bridge_function_symbol_name(::uwvm2::utils::container::u8string_view discriminator = {}) noexcept
 {
     char const* pretty{__PRETTY_FUNCTION__};
     ::std::size_t pretty_size{};
     while(pretty[pretty_size] != '\0') { ++pretty_size; }
 
-    auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(pretty), pretty_size)};
+    ::uwvm2::utils::container::u8string hash_input{};
+    hash_input.append(reinterpret_cast<char8_t const*>(pretty), pretty_size);
+    if(!discriminator.empty())
+    {
+        hash_input.push_back(u8'#');
+        hash_input.append(discriminator.data(), discriminator.size());
+    }
+
+    auto const hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(hash_input.data()), hash_input.size())};
     return ::uwvm2::utils::container::u8concat_uwvm(u8"uwvm_bridge_", ::fast_io::mnp::hex<false, true>(hash));
+}
+
+[[nodiscard]] inline constexpr ::std::uint_least64_t get_llvm_runtime_bridge_function_type_hash(::llvm::FunctionType const* function_type) noexcept
+{
+    if(function_type == nullptr) [[unlikely]] { return 0u; }
+
+    ::uwvm2::utils::container::u8string type_signature{};
+    raw_uwvm_string_ostream type_stream{type_signature};
+    function_type->print(type_stream);
+    type_stream.flush();
+    return ::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(type_signature.data()), type_signature.size());
+}
+
+template <auto Function>
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
+    get_llvm_runtime_bridge_function_symbol_name(::llvm::FunctionType const* function_type,
+                                                 ::uwvm2::utils::container::u8string_view discriminator = {}) noexcept
+{
+    auto const discriminator_hash{::uwvm2::utils::hash::xxh3_64bits(reinterpret_cast<::std::byte const*>(discriminator.data()), discriminator.size())};
+    return ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_bridge_function_symbol_name<Function>(),
+                                                   u8"_",
+                                                   ::fast_io::mnp::hex<false, true>(discriminator_hash),
+                                                   u8"_",
+                                                   ::fast_io::mnp::hex<false, true>(get_llvm_runtime_bridge_function_type_hash(function_type)));
 }
 
 template <auto Function>
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_runtime_bridge_function_symbol_value(::llvm::IRBuilder<>& ir_builder,
-                                                                                            ::llvm::FunctionType* function_type) noexcept
+                                                                                            ::llvm::FunctionType* function_type,
+                                                                                            ::uwvm2::utils::container::u8string_view discriminator = {}) noexcept
 {
     if(function_type == nullptr) [[unlikely]] { return nullptr; }
 
@@ -373,14 +461,27 @@ template <auto Function>
     auto llvm_module{current_function == nullptr ? nullptr : current_function->getParent()};
     if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-    auto symbol_name{get_llvm_runtime_bridge_function_symbol_name<Function>()};
-    auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
     auto const function_address{get_llvm_runtime_bridge_function_address(Function)};
     if(function_address == 0u) [[unlikely]] { return nullptr; }
 
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // RISC-V64 RuntimeDyld cannot reliably relocate far process-local bridge functions through an external symbol call.
+    // Materialize the bridge address directly; callers that use object caching must disable it for this target.
+    static_cast<void>(llvm_module);
+    static_cast<void>(discriminator);
+    return get_llvm_host_pointer_value(ir_builder, function_address, get_llvm_pointer_type(function_type));
+#else
+    auto symbol_name{get_llvm_runtime_bridge_function_symbol_name<Function>(function_type, discriminator)};
+    auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
+
     ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(function_address));
-    if(auto existing{llvm_module->getFunction(symbol_name_ref)}; existing != nullptr) { return existing; }
+    if(auto existing{llvm_module->getFunction(symbol_name_ref)}; existing != nullptr)
+    {
+        if(existing->getFunctionType() != function_type) [[unlikely]] { return nullptr; }
+        return existing;
+    }
     return ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
+#endif
 }
 
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_pointer(::llvm::IRBuilder<>& ir_builder,
@@ -393,13 +494,17 @@ template <auto Function>
     auto pointer_type{get_llvm_pointer_type(object_type)};
     if(pointer_type == nullptr) [[unlikely]] { return nullptr; }
 
-#if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
+#if defined(__i386__) || defined(_M_IX86)
     // ELF i386 MCJIT can materialize external data symbols as zero under some target-native/QEMU builds.
-    // ELF riscv64 RuntimeDyld handles absolute HI20/LO12 data-symbol relocations as 32-bit addresses and lacks LO12_S.
     // These host objects are process-stable tables/storage, so materialize their full pointer values as constants.
     static_cast<void>(ir_builder);
     static_cast<void>(symbol_name);
     return get_llvm_host_pointer_constant(host_address, pointer_type);
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // ELF RISC-V64 RuntimeDyld handles some absolute HI20/LO12 references as 32-bit addresses and lacks LO12_S.
+    // Avoid both external data symbols and JIT data-section constants by materializing the full pointer in code.
+    static_cast<void>(symbol_name);
+    return get_llvm_host_pointer_value(ir_builder, host_address, pointer_type);
 #else
     auto current_block{ir_builder.GetInsertBlock()};
     auto current_function{current_block == nullptr ? nullptr : current_block->getParent()};
@@ -670,7 +775,44 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
         }
         [[unlikely]] default:
         {
-            return 0uz;
+            using wasm1p1_value_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
+            switch(static_cast<wasm1p1_value_type>(get_runtime_wasm_value_type_encoding(value_type)))
+            {
+                case wasm1p1_value_type::v128:
+                {
+                    return sizeof(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128);
+                }
+                case wasm1p1_value_type::funcref:
+                {
+                    return sizeof(::uwvm2::object::global::wasm_funcref_t);
+                }
+                case wasm1p1_value_type::externref:
+                {
+                    return sizeof(::uwvm2::object::global::wasm_externref_t);
+                }
+                default:
+                {
+                    return 0uz;
+                }
+            }
+        }
+    }
+}
+
+[[nodiscard]] inline constexpr bool is_runtime_wasm_value_type_inline_llvm_jit_scalar(runtime_operand_stack_value_type value_type) noexcept
+{
+    switch(get_runtime_wasm_value_type_encoding(value_type))
+    {
+        case static_cast<::std::uint_least8_t>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(runtime_operand_stack_value_type::i32)):
+        case static_cast<::std::uint_least8_t>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(runtime_operand_stack_value_type::i64)):
+        case static_cast<::std::uint_least8_t>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(runtime_operand_stack_value_type::f32)):
+        case static_cast<::std::uint_least8_t>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(runtime_operand_stack_value_type::f64)):
+        {
+            return true;
+        }
+        default:
+        {
+            return false;
         }
     }
 }
@@ -796,6 +938,12 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     auto const register_name{::llvm::MDString::get(llvm_context, get_llvm_string_ref(u8"x29"))};
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+    // RISC-V64 does not expose native JIT unwind support, and MCJIT has been observed to fault before the trap helper
+    // when lowering llvm.frameaddress in generated trap blocks.  Pass zero and let the runtime use the instruction
+    // call-stack path that is advertised for this target.
+    static_cast<void>(ir_builder);
+    return ::llvm::ConstantInt::get(llvm_intptr_type, 0u);
 #else
     auto const frame_address_ptr{ir_builder.CreateIntrinsic(::llvm::Intrinsic::frameaddress,
                                                             ir_builder.getPtrTy(),
@@ -837,6 +985,15 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {trap_kind_type, llvm_intptr_type, llvm_intptr_type}, false);
 }
 
+inline constexpr void emit_llvm_jit_memory_clobber(::llvm::IRBuilder<>& ir_builder) noexcept
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto anchor_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
+    auto anchor{::llvm::InlineAsm::get(anchor_function_type, get_llvm_string_ref(u8""), get_llvm_string_ref(u8"~{memory}"), true)};
+    auto anchor_call{ir_builder.CreateCall(anchor_function_type, anchor)};
+    anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+}
+
 // Emit a call to the runtime trap handler and a compiler barrier.  The caller is responsible for placing the final
 // unreachable instruction, allowing conditional-trap helpers to create the surrounding blocks.
 inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind) noexcept
@@ -861,10 +1018,7 @@ inline constexpr void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::
     apply_llvm_jit_host_calling_conv(trap_call);
 
     // Keep the trap call observable to LLVM optimizers even when surrounding code looks unreachable or side-effect-free.
-    auto anchor_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
-    auto anchor{::llvm::InlineAsm::get(anchor_function_type, get_llvm_string_ref(u8""), get_llvm_string_ref(u8"~{memory}"), true)};
-    auto anchor_call{ir_builder.CreateCall(anchor_function_type, anchor)};
-    anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+    emit_llvm_jit_memory_clobber(ir_builder);
 }
 
 // Detailed memory trap bridge signature.  The runtime receives the static offset, dynamic offset, overflow flag, memory
@@ -930,10 +1084,7 @@ inline constexpr void emit_llvm_memory_out_of_bounds_trap(::llvm::IRBuilder<>& i
     apply_llvm_jit_host_calling_conv(trap_call);
 
     // Same optimizer anchor used by generic traps; the runtime call must remain visible as a side effect.
-    auto anchor_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
-    auto anchor{::llvm::InlineAsm::get(anchor_function_type, get_llvm_string_ref(u8""), get_llvm_string_ref(u8"~{memory}"), true)};
-    auto anchor_call{ir_builder.CreateCall(anchor_function_type, anchor)};
-    anchor_call->setTailCallKind(::llvm::CallInst::TCK_NoTail);
+    emit_llvm_jit_memory_clobber(ir_builder);
 }
 
 // Split the current block on a boolean condition and emit a generic runtime trap on the true edge.
@@ -1167,6 +1318,41 @@ template <typename Float>
     emit_llvm_conditional_trap(llvm_module, ir_builder, is_overflow, ::uwvm2::runtime::lib::llvm_jit_trap_kind::integer_overflow);
 
     return is_signed ? ir_builder.CreateFPToSI(operand, dest_type) : ir_builder.CreateFPToUI(operand, dest_type);
+}
+
+// Emit a non-trapping saturating float-to-int conversion.  Clamp the operand before FPToSI/FPToUI so LLVM never observes
+// a NaN or out-of-range value on the conversion instruction.
+template <typename Float>
+[[nodiscard]] inline constexpr ::llvm::Value* emit_llvm_trunc_sat_float_to_int(::llvm::IRBuilder<>& ir_builder,
+                                                                               ::llvm::Type* dest_type,
+                                                                               bool is_signed,
+                                                                               Float min_bounds,
+                                                                               Float max_bounds,
+                                                                               ::std::uint_least64_t min_result,
+                                                                               ::std::uint_least64_t max_result,
+                                                                               ::llvm::Value* operand) noexcept
+{
+    if(dest_type == nullptr || operand == nullptr) [[unlikely]] { return nullptr; }
+
+    auto fp_zero{::llvm::ConstantFP::get(operand->getType(), 0.0)};
+    auto int_zero{::llvm::ConstantInt::get(dest_type, 0u)};
+    auto int_min{::llvm::ConstantInt::get(dest_type, min_result)};
+    auto int_max{::llvm::ConstantInt::get(dest_type, max_result)};
+    auto min_bound{::llvm::ConstantFP::get(operand->getType(), static_cast<double>(min_bounds))};
+    auto max_bound{::llvm::ConstantFP::get(operand->getType(), static_cast<double>(max_bounds))};
+
+    auto is_nan{ir_builder.CreateFCmpUNO(operand, operand)};
+    auto is_underflow{ir_builder.CreateFCmpOLE(operand, min_bound)};
+    auto is_overflow{ir_builder.CreateFCmpOGE(operand, max_bound)};
+    auto is_not_convertible{ir_builder.CreateOr(is_nan, ir_builder.CreateOr(is_underflow, is_overflow))};
+    auto safe_operand{ir_builder.CreateSelect(is_not_convertible, fp_zero, operand)};
+    auto converted{is_signed ? ir_builder.CreateFPToSI(safe_operand, dest_type) : ir_builder.CreateFPToUI(safe_operand, dest_type)};
+
+    return ir_builder.CreateSelect(is_nan,
+                                   int_zero,
+                                   ir_builder.CreateSelect(is_underflow,
+                                                           int_min,
+                                                           ir_builder.CreateSelect(is_overflow, int_max, converted)));
 }
 
 // Resolve the declared Wasm function type for any module function index, including imports.  This is a type lookup only;
@@ -1630,6 +1816,75 @@ struct runtime_direct_callee_resolution_t
                                                    .result_bytes = result_bytes};
 }
 
+[[nodiscard]] inline constexpr bool
+    is_runtime_wasm_function_type_inline_llvm_jit_supported(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type) noexcept
+{
+    auto const parameter_begin{wasm_function_type.parameter.begin};
+    auto const parameter_end{wasm_function_type.parameter.end};
+    auto const result_begin{wasm_function_type.result.begin};
+    auto const result_end{wasm_function_type.result.end};
+
+    if(parameter_begin == nullptr && parameter_begin != parameter_end) [[unlikely]] { return false; }
+    if(result_begin == nullptr && result_begin != result_end) [[unlikely]] { return false; }
+
+    auto const parameter_count{parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(parameter_end - parameter_begin)};
+    auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+    if(result_count > 1uz) { return false; }
+
+    for(::std::size_t parameter_index{}; parameter_index != parameter_count; ++parameter_index)
+    {
+        if(!is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(parameter_begin[parameter_index])))
+        {
+            return false;
+        }
+    }
+
+    if(result_count == 1uz &&
+       !is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(result_begin[0])))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+[[nodiscard]] inline constexpr llvm_jit_runtime_wasm_call_abi_layout_t
+    get_runtime_wasm_raw_buffer_abi_layout(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type) noexcept
+{
+    auto const parameter_begin{wasm_function_type.parameter.begin};
+    auto const parameter_end{wasm_function_type.parameter.end};
+    auto const result_begin{wasm_function_type.result.begin};
+    auto const result_end{wasm_function_type.result.end};
+
+    if(parameter_begin == nullptr && parameter_begin != parameter_end) [[unlikely]] { return {}; }
+    if(result_begin == nullptr && result_begin != result_end) [[unlikely]] { return {}; }
+
+    auto const parameter_count{parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(parameter_end - parameter_begin)};
+    auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+
+    ::std::size_t parameter_bytes{};
+    for(::std::size_t parameter_index{}; parameter_index != parameter_count; ++parameter_index)
+    {
+        auto const abi_size{get_runtime_wasm_value_type_abi_size(static_cast<runtime_operand_stack_value_type>(parameter_begin[parameter_index]))};
+        if(abi_size == 0uz || parameter_bytes > ::std::numeric_limits<::std::size_t>::max() - abi_size) [[unlikely]] { return {}; }
+        parameter_bytes += abi_size;
+    }
+
+    ::std::size_t result_bytes{};
+    for(::std::size_t result_index{}; result_index != result_count; ++result_index)
+    {
+        auto const abi_size{get_runtime_wasm_value_type_abi_size(static_cast<runtime_operand_stack_value_type>(result_begin[result_index]))};
+        if(abi_size == 0uz || result_bytes > ::std::numeric_limits<::std::size_t>::max() - abi_size) [[unlikely]] { return {}; }
+        result_bytes += abi_size;
+    }
+
+    return llvm_jit_runtime_wasm_call_abi_layout_t{.valid = true,
+                                                   .parameter_count = parameter_count,
+                                                   .result_count = result_count,
+                                                   .parameter_bytes = parameter_bytes,
+                                                   .result_bytes = result_bytes};
+}
+
 // Materialize raw-call parameter and result buffers in the current LLVM function.  Parameters are stored in Wasm order and
 // with exact scalar ABI sizes so the runtime bridge can unpack them without seeing LLVM types.
 [[nodiscard]] inline constexpr llvm_jit_runtime_raw_call_buffers_t
@@ -1694,6 +1949,192 @@ struct runtime_direct_callee_resolution_t
                                                .param_buffer_address = param_buffer_address,
                                                .result_buffer = result_buffer,
                                                .result_buffer_address = result_buffer_address};
+}
+
+[[nodiscard]] inline constexpr ::llvm::CallInst*
+    emit_runtime_local_func_llvm_jit_interpreter_fallback_bridge_call([[maybe_unused]] ::llvm::Module& llvm_module,
+                                                                      ::llvm::IRBuilder<>& ir_builder,
+                                                                      ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                                      validation_module_traits_t::wasm_u32 function_index,
+                                                                      ::llvm::Value* result_buffer_address,
+                                                                      ::llvm::Value* result_bytes,
+                                                                      ::llvm::Value* param_buffer_address,
+                                                                      ::llvm::Value* param_bytes) noexcept
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
+    if(bridge_function_type == nullptr || result_buffer_address == nullptr || result_bytes == nullptr || param_buffer_address == nullptr ||
+       param_bytes == nullptr) [[unlikely]]
+    {
+        return nullptr;
+    }
+
+    auto const module_symbol_name{get_llvm_runtime_module_object_symbol_name(runtime_module)};
+    auto module_address{
+        get_llvm_external_host_object_address(ir_builder,
+                                              reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module)),
+                                              ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
+    if(module_address == nullptr) [[unlikely]] { return nullptr; }
+
+    auto bridge_pointer{
+        get_llvm_runtime_bridge_function_symbol_value<::uwvm2::runtime::lib::llvm_jit_call_interpreter_defined_raw_api>(ir_builder, bridge_function_type)};
+    if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
+
+    auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+    return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type,
+                                                                  bridge_pointer,
+                                                                  {module_address,
+                                                                   ::llvm::ConstantInt::get(llvm_i32_type, function_index),
+                                                                   result_buffer_address,
+                                                                   result_bytes,
+                                                                   param_buffer_address,
+                                                                   param_bytes}));
+}
+
+[[nodiscard]] inline constexpr bool
+    emit_runtime_local_func_llvm_jit_interpreter_fallback_entries(local_func_storage_t const& local_func_storage,
+                                                                  llvm_jit_module_storage_t& module_storage,
+                                                                  bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
+                                                                  bool emit_unwind_call_stack_frames = false) noexcept
+{
+    auto const function_type_ptr{local_func_storage.function_type_ptr};
+    auto const runtime_module_ptr{local_func_storage.runtime_module_ptr};
+    if(function_type_ptr == nullptr || runtime_module_ptr == nullptr || module_storage.llvm_context_holder == nullptr ||
+       module_storage.llvm_module == nullptr) [[unlikely]]
+    {
+        return false;
+    }
+
+    using wasm_u32 = validation_module_traits_t::wasm_u32;
+    auto const function_index_uz{local_func_storage.function_index};
+    if(function_index_uz > static_cast<::std::size_t>((::std::numeric_limits<wasm_u32>::max)())) [[unlikely]] { return false; }
+    auto const function_index{static_cast<wasm_u32>(function_index_uz)};
+
+    auto const raw_abi_layout{get_runtime_wasm_raw_buffer_abi_layout(*function_type_ptr)};
+    if(!raw_abi_layout.valid) [[unlikely]] { return false; }
+
+    auto& llvm_context{*module_storage.llvm_context_holder};
+    auto llvm_module{module_storage.llvm_module.get()};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto raw_entry_function_type{get_llvm_runtime_raw_call_target_entry_function_type(llvm_context)};
+    if(raw_entry_function_type == nullptr) [[unlikely]] { return false; }
+
+    auto const raw_entry_function_name{get_llvm_wasm_raw_function_name(*runtime_module_ptr, function_index)};
+    auto raw_entry_function{llvm_module->getFunction(get_llvm_string_ref(raw_entry_function_name))};
+    if(raw_entry_function == nullptr)
+    {
+        raw_entry_function = ::llvm::Function::Create(raw_entry_function_type,
+                                                      ::llvm::Function::ExternalLinkage,
+                                                      get_llvm_string_ref(raw_entry_function_name),
+                                                      llvm_module);
+    }
+    else
+    {
+        if(raw_entry_function->getFunctionType() != raw_entry_function_type || !raw_entry_function->empty()) [[unlikely]] { return false; }
+        raw_entry_function->setLinkage(::llvm::Function::ExternalLinkage);
+    }
+    if(raw_entry_function == nullptr) [[unlikely]] { return false; }
+    apply_llvm_jit_raw_entry_calling_conv(*raw_entry_function);
+    if(emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*raw_entry_function); }
+
+    auto raw_entry_block{::llvm::BasicBlock::Create(llvm_context, get_llvm_string_ref(u8"entry"), raw_entry_function)};
+    if(raw_entry_block == nullptr) [[unlikely]] { return false; }
+    ::llvm::IRBuilder<> raw_builder(raw_entry_block);
+
+    auto const raw_result_buffer_address{raw_entry_function->getArg(1u)};
+    auto const raw_result_bytes{raw_entry_function->getArg(2u)};
+    auto const raw_param_buffer_address{raw_entry_function->getArg(3u)};
+    auto const raw_param_bytes{raw_entry_function->getArg(4u)};
+    if(raw_result_buffer_address == nullptr || raw_result_bytes == nullptr || raw_param_buffer_address == nullptr || raw_param_bytes == nullptr) [[unlikely]]
+    {
+        return false;
+    }
+
+    emit_llvm_conditional_trap(*llvm_module,
+                               raw_builder,
+                               raw_builder.CreateICmpNE(raw_param_bytes, ::llvm::ConstantInt::get(llvm_intptr_type, raw_abi_layout.parameter_bytes)));
+    emit_llvm_conditional_trap(*llvm_module,
+                               raw_builder,
+                               raw_builder.CreateICmpNE(raw_result_bytes, ::llvm::ConstantInt::get(llvm_intptr_type, raw_abi_layout.result_bytes)));
+    if(raw_abi_layout.parameter_bytes != 0uz)
+    {
+        emit_llvm_conditional_trap(*llvm_module,
+                                   raw_builder,
+                                   raw_builder.CreateICmpEQ(raw_param_buffer_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+    }
+    if(raw_abi_layout.result_bytes != 0uz)
+    {
+        emit_llvm_conditional_trap(*llvm_module,
+                                   raw_builder,
+                                   raw_builder.CreateICmpEQ(raw_result_buffer_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+    }
+
+    auto raw_bridge_call{emit_runtime_local_func_llvm_jit_interpreter_fallback_bridge_call(*llvm_module,
+                                                                                           raw_builder,
+                                                                                           *runtime_module_ptr,
+                                                                                           function_index,
+                                                                                           raw_result_buffer_address,
+                                                                                           raw_result_bytes,
+                                                                                           raw_param_buffer_address,
+                                                                                           raw_param_bytes)};
+    if(raw_bridge_call == nullptr) [[unlikely]] { return false; }
+    raw_builder.CreateRetVoid();
+    if(!verify_llvm_jit_function(*raw_entry_function, verify_llvm_jit_ir)) [[unlikely]] { return false; }
+
+    if(!is_runtime_wasm_function_type_inline_llvm_jit_supported(*function_type_ptr)) { return true; }
+
+    auto typed_function_type{get_llvm_function_type_from_wasm_function_type(llvm_context, *function_type_ptr)};
+    if(typed_function_type == nullptr) [[unlikely]] { return true; }
+
+    auto const typed_function_name{get_llvm_wasm_function_name(*runtime_module_ptr, function_index)};
+    auto typed_function{llvm_module->getFunction(get_llvm_string_ref(typed_function_name))};
+    if(typed_function == nullptr)
+    {
+        typed_function =
+            ::llvm::Function::Create(typed_function_type, ::llvm::Function::ExternalLinkage, get_llvm_string_ref(typed_function_name), llvm_module);
+    }
+    else
+    {
+        if(typed_function->getFunctionType() != typed_function_type || !typed_function->empty()) [[unlikely]] { return false; }
+        typed_function->setLinkage(::llvm::Function::ExternalLinkage);
+    }
+    if(typed_function == nullptr) [[unlikely]] { return false; }
+    apply_llvm_jit_wasm_calling_conv(*typed_function);
+    if(emit_unwind_call_stack_frames) { apply_llvm_jit_unwind_call_stack_function_attrs(*typed_function); }
+
+    auto typed_entry_block{::llvm::BasicBlock::Create(llvm_context, get_llvm_string_ref(u8"entry"), typed_function)};
+    if(typed_entry_block == nullptr) [[unlikely]] { return false; }
+    ::llvm::IRBuilder<> typed_builder(typed_entry_block);
+
+    ::uwvm2::utils::container::vector<::llvm::Value*> arguments{};
+    arguments.reserve(typed_function->arg_size());
+    for(auto& arg: typed_function->args()) { arguments.push_back(::std::addressof(arg)); }
+
+    auto const raw_call_buffers{emit_runtime_raw_call_buffers(typed_builder,
+                                                              *function_type_ptr,
+                                                              {arguments.data(), arguments.size()},
+                                                              get_llvm_string_ref(u8"fallback.param"),
+                                                              get_llvm_string_ref(u8"fallback.result"))};
+    if(!raw_call_buffers.valid) [[unlikely]] { return false; }
+
+    auto typed_bridge_call{emit_runtime_local_func_llvm_jit_interpreter_fallback_bridge_call(
+        *llvm_module,
+        typed_builder,
+        *runtime_module_ptr,
+        function_index,
+        raw_call_buffers.result_buffer_address,
+        ::llvm::ConstantInt::get(llvm_intptr_type, raw_abi_layout.result_bytes),
+        raw_call_buffers.param_buffer_address,
+        ::llvm::ConstantInt::get(llvm_intptr_type, raw_abi_layout.parameter_bytes))};
+    if(typed_bridge_call == nullptr) [[unlikely]] { return false; }
+
+    if(raw_call_buffers.result_buffer == nullptr) { typed_builder.CreateRetVoid(); }
+    else
+    {
+        typed_builder.CreateRet(typed_builder.CreateLoad(raw_call_buffers.result_buffer->getAllocatedType(), raw_call_buffers.result_buffer));
+    }
+
+    return verify_llvm_jit_function(*typed_function, verify_llvm_jit_ir);
 }
 
 // Compare two Wasm function types structurally.  This is used for direct-call eligibility and canonical type-id
@@ -1962,6 +2403,37 @@ static_assert(sizeof(::std::uint_least32_t) == sizeof(runtime_wasm_u32));
 static_assert(sizeof(::std::uint_least64_t) == sizeof(runtime_wasm_u64));
 static_assert(sizeof(runtime_wasm_u32) == sizeof(runtime_wasm_f32));
 static_assert(sizeof(runtime_wasm_u64) == sizeof(runtime_wasm_f64));
+
+[[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
+    get_llvm_jit_bridge_value_type_name(runtime_operand_stack_value_type value_type) noexcept
+{
+    switch(value_type)
+    {
+        case runtime_operand_stack_value_type::i32: return ::uwvm2::utils::container::u8string_view{u8"i32"};
+        case runtime_operand_stack_value_type::i64: return ::uwvm2::utils::container::u8string_view{u8"i64"};
+        case runtime_operand_stack_value_type::f32: return ::uwvm2::utils::container::u8string_view{u8"f32"};
+        case runtime_operand_stack_value_type::f64: return ::uwvm2::utils::container::u8string_view{u8"f64"};
+        [[unlikely]] default: return ::uwvm2::utils::container::u8string_view{u8"unknown"};
+    }
+}
+
+[[nodiscard]] inline ::uwvm2::utils::container::u8string make_llvm_jit_memory_bridge_symbol_discriminator(
+    ::uwvm2::utils::container::u8string_view bridge_kind,
+    runtime_operand_stack_value_type value_type,
+    ::std::size_t access_bytes,
+    bool signed_access = false) noexcept
+{
+    ::uwvm2::utils::container::u8string out{};
+    ::uwvm2::utils::container::u8string_ref_uwvm out_ref{::std::addressof(out)};
+    ::fast_io::io::print(out_ref,
+                         bridge_kind,
+                         u8":",
+                         get_llvm_jit_bridge_value_type_name(value_type),
+                         u8":",
+                         access_bytes,
+                         signed_access ? ::uwvm2::utils::container::u8string_view{u8":s"} : ::uwvm2::utils::container::u8string_view{u8":u"});
+    return out;
+}
 
 // Result of resolving a table element for call_indirect.  This separates "table slot is empty" from "slot is present but
 // cannot be converted to a same-module direct call".
@@ -2907,6 +3379,132 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
     {
         llvm_jit_memory_bridge_trap();
     }
+}
+
+[[nodiscard]] inline constexpr ::std::uint_least32_t llvm_jit_wasm_i32_bits_to_u32(runtime_wasm_i32 value) noexcept
+{
+    using unsigned_wasm_i32 = ::std::uint32_t;
+    static_assert(sizeof(unsigned_wasm_i32) == sizeof(runtime_wasm_i32));
+    return ::std::bit_cast<unsigned_wasm_i32>(value);
+}
+
+[[nodiscard]] inline constexpr bool llvm_jit_bulk_memory_range_oob(::std::size_t begin, ::std::size_t len, ::std::size_t bound) noexcept
+{ return begin > bound || len > bound - begin; }
+
+template <typename MemoryT, typename Fn>
+[[nodiscard]] inline constexpr bool llvm_jit_with_bulk_memory_snapshot(MemoryT const& memory, Fn&& fn) noexcept
+{
+    if constexpr(MemoryT::can_mmap)
+    {
+        return ::uwvm2::object::memory::linear::with_memory_access_snapshot(memory,
+                                                                            [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                                            { return fn(memory_begin, memory_length); });
+    }
+    else if constexpr(MemoryT::support_multi_thread)
+    {
+#if __cpp_lib_atomic_wait >= 201907L
+        [[maybe_unused]] ::uwvm2::object::memory::linear::memory_operation_guard_t guard{memory.growing_flag_p, memory.active_ops_p};
+#else
+        static_assert(!MemoryT::support_multi_thread);
+#endif
+        return fn(memory.memory_begin, memory.memory_length);
+    }
+    else
+    {
+        return fn(memory.memory_begin, memory.memory_length);
+    }
+}
+
+inline constexpr void llvm_jit_memory_copy_bridge(::std::uintptr_t memory_address,
+                                                  runtime_wasm_i32 dst_i32,
+                                                  runtime_wasm_i32 src_i32,
+                                                  runtime_wasm_i32 len_i32) noexcept
+{
+    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    auto const dst{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(dst_i32))};
+    auto const src{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(src_i32))};
+    auto const len{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(len_i32))};
+
+    if(memory_p == nullptr) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap(0uz, 0u, {.offset = dst, .offset_65_bit = false}, 0uz, len);
+    }
+
+    static_cast<void>(llvm_jit_with_bulk_memory_snapshot(*memory_p,
+                                                         [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                         {
+                                                             if(llvm_jit_bulk_memory_range_oob(src, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = src, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(llvm_jit_bulk_memory_range_oob(dst, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = dst, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(len != 0uz)
+                                                             {
+                                                                 if(memory_begin == nullptr) [[unlikely]]
+                                                                 {
+                                                                     llvm_jit_memory_bridge_trap(0uz,
+                                                                                                 0u,
+                                                                                                 {.offset = dst, .offset_65_bit = false},
+                                                                                                 memory_length,
+                                                                                                 len);
+                                                                 }
+                                                                 ::std::memmove(memory_begin + dst, memory_begin + src, len);
+                                                             }
+                                                             return true;
+                                                         }));
+}
+
+inline constexpr void llvm_jit_memory_fill_bridge(::std::uintptr_t memory_address,
+                                                  runtime_wasm_i32 dst_i32,
+                                                  runtime_wasm_i32 value_i32,
+                                                  runtime_wasm_i32 len_i32) noexcept
+{
+    auto memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    auto const dst{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(dst_i32))};
+    auto const value{static_cast<int>(static_cast<unsigned char>(llvm_jit_wasm_i32_bits_to_u32(value_i32)))};
+    auto const len{static_cast<::std::size_t>(llvm_jit_wasm_i32_bits_to_u32(len_i32))};
+
+    if(memory_p == nullptr) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap(0uz, 0u, {.offset = dst, .offset_65_bit = false}, 0uz, len);
+    }
+
+    static_cast<void>(llvm_jit_with_bulk_memory_snapshot(*memory_p,
+                                                         [&](::std::byte* memory_begin, ::std::size_t memory_length) constexpr noexcept
+                                                         {
+                                                             if(llvm_jit_bulk_memory_range_oob(dst, len, memory_length)) [[unlikely]]
+                                                             {
+                                                                 llvm_jit_memory_bridge_trap(0uz,
+                                                                                             0u,
+                                                                                             {.offset = dst, .offset_65_bit = false},
+                                                                                             memory_length,
+                                                                                             len);
+                                                             }
+                                                             if(len != 0uz)
+                                                             {
+                                                                 if(memory_begin == nullptr) [[unlikely]]
+                                                                 {
+                                                                     llvm_jit_memory_bridge_trap(0uz,
+                                                                                                 0u,
+                                                                                                 {.offset = dst, .offset_65_bit = false},
+                                                                                                 memory_length,
+                                                                                                 len);
+                                                                 }
+                                                                 ::std::memset(memory_begin + dst, value, len);
+                                                             }
+                                                             return true;
+                                                         }));
 }
 
 // Acquire a best-effort address/length snapshot for a local-imported memory.  This is used only for memory.size-style
@@ -5933,6 +6531,8 @@ template <typename CreateValue>
     auto code_curr{instruction_begin};
     auto const code_end{instruction_end};
     constexpr bool result{};
+    using wasm1p1_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
+    using wasm1p1_numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
 
     // Push a typed LLVM value onto the transient operand stack.
     auto const push_operand{[&](runtime_operand_stack_value_type type, ::llvm::Value* value) constexpr noexcept
@@ -5962,13 +6562,24 @@ template <typename CreateValue>
 
     // Local bridge-call helper for dispatcher-only fallbacks.  Higher-level helpers above use the same host convention,
     // but the opcode include files need this compact lambda for memory/global cases.
+    auto const emit_runtime_bridge_call_with_discriminator{
+        [&]<auto bridge_function>(::llvm::FunctionType* bridge_function_type,
+                                  ::llvm::ArrayRef<::llvm::Value*> arguments,
+                                  ::uwvm2::utils::container::u8string_view discriminator) constexpr noexcept -> ::llvm::CallInst*
+        {
+            auto bridge_pointer{get_llvm_runtime_bridge_function_symbol_value<bridge_function>(ir_builder, bridge_function_type, discriminator)};
+            if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
+            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
+        }};
+
     auto const emit_runtime_bridge_call{[&]<auto bridge_function>(::llvm::FunctionType* bridge_function_type,
-                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments) constexpr noexcept -> ::llvm::CallInst*
+                                                                  ::llvm::ArrayRef<::llvm::Value*> arguments,
+                                                                  ::uwvm2::utils::container::u8string_view discriminator = {}) constexpr noexcept
+                                                                  -> ::llvm::CallInst*
                                         {
-                                            auto bridge_pointer{
-                                                get_llvm_runtime_bridge_function_symbol_value<bridge_function>(ir_builder, bridge_function_type)};
-                                            if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
-                                            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
+                                            return emit_runtime_bridge_call_with_discriminator.template operator()<bridge_function>(bridge_function_type,
+                                                                                                                                    arguments,
+                                                                                                                                    discriminator);
                                         }};
 
     // Select one of four scalar bridge functions based on the Wasm value type.  This keeps bridge signatures exact for
@@ -6372,8 +6983,13 @@ template <typename CreateValue>
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
                                  ::std::size_t load_bytes,
-                                 bool signed_load) constexpr noexcept -> ::llvm::CallInst*
+                                 bool signed_load,
+                                 runtime_operand_stack_value_type scalar_value_type) constexpr noexcept -> ::llvm::CallInst*
         {
+            auto discriminator_storage{
+                make_llvm_jit_memory_bridge_symbol_discriminator(u8"local-imported-memory-load", scalar_value_type, load_bytes, signed_load)};
+            auto discriminator{
+                ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
                 switch(load_bytes)
@@ -6383,25 +6999,30 @@ template <typename CreateValue>
                         {
                             return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, true>>(
                                 bridge_function_type,
-                                bridge_arguments);
+                                bridge_arguments,
+                                discriminator);
                         }
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 1uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         if(signed_load)
                         {
                             return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, true>>(
                                 bridge_function_type,
-                                bridge_arguments);
+                                bridge_arguments,
+                                discriminator);
                         }
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 2uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i32, 4uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6415,35 +7036,42 @@ template <typename CreateValue>
                         {
                             return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, true>>(
                                 bridge_function_type,
-                                bridge_arguments);
+                                bridge_arguments,
+                                discriminator);
                         }
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 1uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         if(signed_load)
                         {
                             return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, true>>(
                                 bridge_function_type,
-                                bridge_arguments);
+                                bridge_arguments,
+                                discriminator);
                         }
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 2uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
                         if(signed_load)
                         {
                             return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, true>>(
                                 bridge_function_type,
-                                bridge_arguments);
+                                bridge_arguments,
+                                discriminator);
                         }
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 4uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 8uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_i64, 8uz, false>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6453,14 +7081,16 @@ template <typename CreateValue>
                 if(load_bytes != 4uz) [[unlikely]] { return nullptr; }
                 return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f32, 4uz, false>>(
                     bridge_function_type,
-                    bridge_arguments);
+                    bridge_arguments,
+                    discriminator);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(load_bytes != 8uz) [[unlikely]] { return nullptr; }
                 return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_load_bridge<runtime_wasm_f64, 8uz, false>>(
                     bridge_function_type,
-                    bridge_arguments);
+                    bridge_arguments,
+                    discriminator);
             }
             else
             {
@@ -6472,8 +7102,12 @@ template <typename CreateValue>
     auto const emit_local_imported_memory_store_bridge_call_for_scalar{
         [&]<typename ScalarType>(::llvm::FunctionType* bridge_function_type,
                                  ::llvm::ArrayRef<::llvm::Value*> bridge_arguments,
-                                 ::std::size_t store_bytes) constexpr noexcept -> ::llvm::CallInst*
+                                 ::std::size_t store_bytes,
+                                 runtime_operand_stack_value_type scalar_value_type) constexpr noexcept -> ::llvm::CallInst*
         {
+            auto discriminator_storage{make_llvm_jit_memory_bridge_symbol_discriminator(u8"local-imported-memory-store", scalar_value_type, store_bytes)};
+            auto discriminator{
+                ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
             if constexpr(::std::same_as<ScalarType, runtime_wasm_i32>)
             {
                 switch(store_bytes)
@@ -6481,15 +7115,18 @@ template <typename CreateValue>
                     case 1uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 1uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 2uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i32, 4uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6501,19 +7138,23 @@ template <typename CreateValue>
                     case 1uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 1uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 2uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 2uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 4uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 4uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     case 8uz:
                         return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_i64, 8uz>>(
                             bridge_function_type,
-                            bridge_arguments);
+                            bridge_arguments,
+                            discriminator);
                     [[unlikely]] default:
                         return nullptr;
                 }
@@ -6522,13 +7163,15 @@ template <typename CreateValue>
             {
                 if(store_bytes != 4uz) [[unlikely]] { return nullptr; }
                 return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f32, 4uz>>(bridge_function_type,
-                                                                                                                                        bridge_arguments);
+                                                                                                                                        bridge_arguments,
+                                                                                                                                        discriminator);
             }
             else if constexpr(::std::same_as<ScalarType, runtime_wasm_f64>)
             {
                 if(store_bytes != 8uz) [[unlikely]] { return nullptr; }
                 return emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_store_bridge<runtime_wasm_f64, 8uz>>(bridge_function_type,
-                                                                                                                                        bridge_arguments);
+                                                                                                                                        bridge_arguments,
+                                                                                                                                        discriminator);
             }
             else
             {
@@ -6570,22 +7213,26 @@ template <typename CreateValue>
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_i32>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::i64:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_i64>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::f32:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_f32>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 case runtime_operand_stack_value_type::f64:
                     return emit_local_imported_memory_load_bridge_call_for_scalar.template operator()<runtime_wasm_f64>(bridge_function_type,
                                                                                                                         bridge_arguments,
                                                                                                                         load_bytes,
-                                                                                                                        signed_load);
+                                                                                                                        signed_load,
+                                                                                                                        result_type);
                 [[unlikely]] default:
                 {
                     return nullptr;
@@ -6627,19 +7274,23 @@ template <typename CreateValue>
                 case runtime_operand_stack_value_type::i32:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_i32>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::i64:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_i64>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::f32:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_f32>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 case runtime_operand_stack_value_type::f64:
                     return emit_local_imported_memory_store_bridge_call_for_scalar.template operator()<runtime_wasm_f64>(bridge_function_type,
                                                                                                                          bridge_arguments,
-                                                                                                                         store_bytes);
+                                                                                                                         store_bytes,
+                                                                                                                         value_type);
                 [[unlikely]] default:
                 {
                     return nullptr;
@@ -6672,7 +7323,8 @@ template <typename CreateValue>
     auto const emit_native_memory_load_bridge_call{
         [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
                                   ::llvm::Type* llvm_result_type,
-                                  ::llvm::Value* address_value) constexpr noexcept -> ::llvm::CallInst*
+                                  ::llvm::Value* address_value,
+                                  ::uwvm2::utils::container::u8string_view discriminator) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_result_type == nullptr || address_value == nullptr) [[unlikely]] { return nullptr; }
 
@@ -6685,7 +7337,8 @@ template <typename CreateValue>
             if(memory_address == nullptr) [[unlikely]] { return nullptr; }
             return emit_runtime_bridge_call.template operator()<bridge_function>(
                 bridge_function_type,
-                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value});
+                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value},
+                discriminator);
         }};
 
     // Emit a native-memory store bridge call for fallback paths.
@@ -6693,7 +7346,8 @@ template <typename CreateValue>
         [&]<auto bridge_function>(validation_module_traits_t::wasm_u32 static_offset,
                                   ::llvm::Type* llvm_value_type,
                                   ::llvm::Value* address_value,
-                                  ::llvm::Value* value) constexpr noexcept -> ::llvm::CallInst*
+                                  ::llvm::Value* value,
+                                  ::uwvm2::utils::container::u8string_view discriminator) constexpr noexcept -> ::llvm::CallInst*
         {
             if(memory0_access_info.memory_p == nullptr || llvm_value_type == nullptr || address_value == nullptr || value == nullptr) [[unlikely]]
             {
@@ -6709,7 +7363,8 @@ template <typename CreateValue>
             if(memory_address == nullptr) [[unlikely]] { return nullptr; }
             return emit_runtime_bridge_call.template operator()<bridge_function>(
                 bridge_function_type,
-                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value, value});
+                {memory_address, ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset), address_value, value},
+                discriminator);
         }};
 
     // Emit a native-memory memory.size bridge call when direct length loads are unavailable.
@@ -6737,7 +7392,14 @@ template <typename CreateValue>
         {
             if(memory0_access_info.memory_p != nullptr)
             {
-                return emit_native_memory_load_bridge_call.template operator()<native_bridge_function>(static_offset, llvm_result_type, address_value);
+                auto discriminator_storage{
+                    make_llvm_jit_memory_bridge_symbol_discriminator(u8"native-memory-load", result_type, load_bytes, signed_load)};
+                auto discriminator{
+                    ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
+                return emit_native_memory_load_bridge_call.template operator()<native_bridge_function>(static_offset,
+                                                                                                      llvm_result_type,
+                                                                                                      address_value,
+                                                                                                      discriminator);
             }
             return emit_local_imported_memory_load_bridge_call(static_offset, result_type, llvm_result_type, load_bytes, signed_load, address_value);
         }};
@@ -6754,7 +7416,14 @@ template <typename CreateValue>
         {
             if(memory0_access_info.memory_p != nullptr)
             {
-                return emit_native_memory_store_bridge_call.template operator()<native_bridge_function>(static_offset, llvm_value_type, address_value, value);
+                auto discriminator_storage{make_llvm_jit_memory_bridge_symbol_discriminator(u8"native-memory-store", value_type, store_bytes)};
+                auto discriminator{
+                    ::uwvm2::utils::container::u8string_view{discriminator_storage.data(), discriminator_storage.size()}};
+                return emit_native_memory_store_bridge_call.template operator()<native_bridge_function>(static_offset,
+                                                                                                       llvm_value_type,
+                                                                                                       address_value,
+                                                                                                       value,
+                                                                                                       discriminator);
             }
             return emit_local_imported_memory_store_bridge_call(static_offset, value_type, llvm_value_type, store_bytes, address_value, value);
         }};
@@ -6830,26 +7499,24 @@ template <typename CreateValue>
             {
                 if(load_bytes != 4uz) [[unlikely]] { return nullptr; }
 
-                auto load_inst{
-                    ir_builder.CreateLoad(::llvm::Type::getFloatTy(llvm_context),
-                                          ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getFloatTy(llvm_context))),
-                                          get_llvm_string_ref(u8"memory.load"))};
+                auto load_inst{ir_builder.CreateLoad(llvm_i32_type,
+                                                     ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)),
+                                                     get_llvm_string_ref(u8"memory.load"))};
                 load_inst->setAlignment(memory_alignment);
                 load_inst->setVolatile(true);
-                return load_inst;
+                return ir_builder.CreateBitCast(load_inst, ::llvm::Type::getFloatTy(llvm_context));
             }
 
             if(result_type == runtime_operand_stack_value_type::f64)
             {
                 if(load_bytes != 8uz) [[unlikely]] { return nullptr; }
 
-                auto load_inst{
-                    ir_builder.CreateLoad(::llvm::Type::getDoubleTy(llvm_context),
-                                          ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getDoubleTy(llvm_context))),
-                                          get_llvm_string_ref(u8"memory.load"))};
+                auto load_inst{ir_builder.CreateLoad(llvm_i64_type,
+                                                     ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)),
+                                                     get_llvm_string_ref(u8"memory.load"))};
                 load_inst->setAlignment(memory_alignment);
                 load_inst->setVolatile(true);
-                return load_inst;
+                return ir_builder.CreateBitCast(load_inst, ::llvm::Type::getDoubleTy(llvm_context));
             }
 
             return nullptr;
@@ -6948,9 +7615,10 @@ template <typename CreateValue>
                 if(store_bytes != 4uz) [[unlikely]] { return nullptr; }
 
                 auto store_inst{
-                    ir_builder.CreateStore(value,
-                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getFloatTy(llvm_context))))};
+                    ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i32_type),
+                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)))};
                 store_inst->setAlignment(memory_alignment);
+                store_inst->setVolatile(true);
                 return store_inst;
             }
 
@@ -6958,10 +7626,10 @@ template <typename CreateValue>
             {
                 if(store_bytes != 8uz) [[unlikely]] { return nullptr; }
 
-                auto store_inst{ir_builder.CreateStore(
-                    value,
-                    ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getDoubleTy(llvm_context))))};
+                auto store_inst{ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i64_type),
+                                                       ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)))};
                 store_inst->setAlignment(memory_alignment);
+                store_inst->setVolatile(true);
                 return store_inst;
             }
 
@@ -7202,6 +7870,80 @@ template <typename CreateValue>
                        .template operator()<bridge_function>(static_offset, value_type, llvm_value_type, store_bytes, address.value, value.value) != nullptr;
         }};
 
+    auto const emit_native_memory_copy_bridge_call{
+        [&](::llvm::Value* dst, ::llvm::Value* src, ::llvm::Value* len) constexpr noexcept -> ::llvm::CallInst*
+        {
+            if(!ensure_memory0_access_info() || memory0_access_info.memory_p == nullptr || dst == nullptr || src == nullptr || len == nullptr) [[unlikely]]
+            {
+                return nullptr;
+            }
+
+            auto llvm_void_type{::llvm::Type::getVoidTy(llvm_context)};
+            auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto bridge_function_type{::llvm::FunctionType::get(llvm_void_type, {llvm_intptr_type, llvm_i32_type, llvm_i32_type, llvm_i32_type}, false)};
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_copy_bridge>(bridge_function_type, {memory_address, dst, src, len});
+        }};
+
+    auto const emit_native_memory_fill_bridge_call{
+        [&](::llvm::Value* dst, ::llvm::Value* value, ::llvm::Value* len) constexpr noexcept -> ::llvm::CallInst*
+        {
+            if(!ensure_memory0_access_info() || memory0_access_info.memory_p == nullptr || dst == nullptr || value == nullptr || len == nullptr) [[unlikely]]
+            {
+                return nullptr;
+            }
+
+            auto llvm_void_type{::llvm::Type::getVoidTy(llvm_context)};
+            auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto bridge_function_type{::llvm::FunctionType::get(llvm_void_type, {llvm_intptr_type, llvm_i32_type, llvm_i32_type, llvm_i32_type}, false)};
+            auto memory_address{emit_native_memory_object_address()};
+            if(memory_address == nullptr) [[unlikely]] { return nullptr; }
+            return emit_runtime_bridge_call.template operator()<llvm_jit_memory_fill_bridge>(bridge_function_type, {memory_address, dst, value, len});
+        }};
+
+    auto const emit_memory_copy_call{[&]() constexpr noexcept -> bool
+                                     {
+                                         if(operand_stack.size() < 3uz) [[unlikely]] { return false; }
+
+                                         auto const len{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const src{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const dst{operand_stack.back()};
+                                         operand_stack.pop_back();
+
+                                         if(dst.type != runtime_operand_stack_value_type::i32 || src.type != runtime_operand_stack_value_type::i32 ||
+                                            len.type != runtime_operand_stack_value_type::i32) [[unlikely]]
+                                         {
+                                             return false;
+                                         }
+
+                                         return emit_native_memory_copy_bridge_call(dst.value, src.value, len.value) != nullptr;
+                                     }};
+
+    auto const emit_memory_fill_call{[&]() constexpr noexcept -> bool
+                                     {
+                                         if(operand_stack.size() < 3uz) [[unlikely]] { return false; }
+
+                                         auto const len{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const value{operand_stack.back()};
+                                         operand_stack.pop_back();
+                                         auto const dst{operand_stack.back()};
+                                         operand_stack.pop_back();
+
+                                         if(dst.type != runtime_operand_stack_value_type::i32 || value.type != runtime_operand_stack_value_type::i32 ||
+                                            len.type != runtime_operand_stack_value_type::i32) [[unlikely]]
+                                         {
+                                             return false;
+                                         }
+
+                                         return emit_native_memory_fill_bridge_call(dst.value, value.value, len.value) != nullptr;
+                                     }};
+
     // Complete a Wasm memory.size instruction.
     auto const emit_memory_size_call{[&]() constexpr noexcept -> bool
                                      {
@@ -7333,6 +8075,38 @@ template <typename CreateValue>
                 return code_curr == code_end;
             }
         }
+    }
+
+    if(static_cast<::std::uint_least8_t>(curr_opbase) == static_cast<::std::uint_least8_t>(wasm1p1_code::numeric_prefix))
+    {
+        ++code_curr;
+
+        validation_module_traits_t::wasm_u32 subopcode{};
+        if(!parse_wasm_leb128_immediate(code_curr, code_end, subopcode)) [[unlikely]] { return false; }
+
+        switch(static_cast<wasm1p1_numeric_code>(subopcode))
+        {
+            case wasm1p1_numeric_code::memory_copy:
+            {
+                if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !parse_wasm_reserved_zero_byte(code_curr, code_end) ||
+                   !emit_memory_copy_call()) [[unlikely]]
+                {
+                    return result;
+                }
+                break;
+            }
+            case wasm1p1_numeric_code::memory_fill:
+            {
+                if(!parse_wasm_reserved_zero_byte(code_curr, code_end) || !emit_memory_fill_call()) [[unlikely]] { return result; }
+                break;
+            }
+            [[unlikely]] default:
+            {
+                return result;
+            }
+        }
+
+        return code_curr == code_end;
     }
 
     // Main opcode dispatch for opcodes implemented directly in this file.  Larger opcode families live in include files

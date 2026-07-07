@@ -102,12 +102,11 @@ inline constexpr char_type *cond_lc_print_reserve_define_impl(basic_lc_all<char_
 	}
 	else if constexpr (reserve_printable<char_type, T1>)
 	{
-		constexpr ::std::size_t sz{print_reserve_size(io_reserve_type<char_type, T1>)};
-		return sz;
+		return print_reserve_define(io_reserve_type<char_type, T1>, iter, c);
 	}
 	else
 	{
-		return print_reserve_size(io_reserve_type<char_type, T1>, c);
+		return print_reserve_define(io_reserve_type<char_type, T1>, iter, c);
 	}
 }
 

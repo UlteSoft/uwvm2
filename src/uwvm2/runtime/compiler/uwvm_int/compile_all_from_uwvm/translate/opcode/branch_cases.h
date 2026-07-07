@@ -57,9 +57,8 @@ case wasm1_code::br:
     // frame and larger indices walk outward through the validation control stack.
     auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
     auto& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
-    // Label arity = label_types count. IMPORTANT: for `loop`, label types are parameters (MVP: none),
-    // not result types.
-    auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
+    auto const target_label_types{target_frame.label};
+    auto const target_arity{static_cast<::std::size_t>(target_label_types.end - target_label_types.begin)};
 
     if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"br", target_arity); }
 
@@ -69,14 +68,14 @@ case wasm1_code::br:
         auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const expected_type{target_label_types.begin[target_arity - 1uz - i]};
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -417,9 +416,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
-                                                              wasm_u64 bits{};  // init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += sizeof(bits);
+                                                              auto const bits{read_wasm_le_u64(p)};
+                                                              p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -580,9 +578,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
-                                                              wasm_u64 bits{};  // init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += sizeof(bits);
+                                                              auto const bits{read_wasm_le_u64(p)};
+                                                              p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -713,9 +710,8 @@ case wasm1_code::br:
                                                           {
                                                               if(!consume_op(wasm1_code::f32_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                              wasm_u32 bits;  // no init
-                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                              p += 4;
+                                                              auto const bits{read_wasm_le_u32(p)};
+                                                              p += sizeof(::std::uint32_t);
                                                               return bits == expected_bits;
                                                           }};
 
@@ -996,26 +992,9 @@ case wasm1_code::br:
         }
         else
         {
-            // Wasm1: arity is 0 or 1.
-            auto const result_type{target_frame.result.begin[0]};
-
-            if(curr_size - target_base > 1uz)
+            if(curr_size > target_base + target_arity)
             {
-                // Preserve the result value across dropping extra values.
-                emit_local_set_typed_to_no_fill(bytecode, result_type, internal_temp_local_off);
-
-                // Drop values between [target_base .. curr_size-2].
-                if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(bytecode, target_base); }
-                else
-                {
-                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;) { emit_drop_typed_to_no_fill(bytecode, operand_stack.index_unchecked(i).type); }
-                }
-
-                if constexpr(stacktop_enabled)
-                {
-                    if constexpr(!strict_cf_entry_like_call) { stacktop_fill_to_canonical(bytecode); }
-                }
-                emit_local_get_typed_to(bytecode, result_type, internal_temp_local_off);
+                emit_preserve_top_values_drop_to_base_restore(bytecode, target_label_types, target_base, curr_size, true);
             }
 
             if constexpr(stacktop_enabled)
@@ -1133,9 +1112,8 @@ case wasm1_code::br_if:
     auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
     auto const& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
     auto& target_frame_mut{control_flow_stack.index_unchecked(target_frame_index)};
-    // Label arity = label_types count. IMPORTANT: for `loop`, label types are parameters (MVP: none),
-    // not result types.
-    auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
+    auto const target_label_types{target_frame.label};
+    auto const target_arity{static_cast<::std::size_t>(target_label_types.end - target_label_types.begin)};
 
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
@@ -1150,7 +1128,7 @@ case wasm1_code::br_if:
     // conditionally for the taken edge.
     if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
-        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
@@ -1166,14 +1144,14 @@ case wasm1_code::br_if:
         auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const expected_type{target_label_types.begin[target_arity - 1uz - i]};
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -1181,10 +1159,8 @@ case wasm1_code::br_if:
 
         if(is_polymorphic && concrete_to_check != target_arity)
         {
-            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if`
-            // must still re-establish the fallthrough stack as if the label value
-            // had been popped for the branch and then pushed back.
-            operand_stack_push(target_frame.result.begin[0]);
+            pop_available_concrete_operands(concrete_to_check);
+            for(auto curr{target_label_types.begin}; curr != target_label_types.end; ++curr) { operand_stack_push(*curr); }
         }
     }
 
@@ -2572,9 +2548,8 @@ case wasm1_code::br_if:
                                                       {
                                                           if(!consume_op(wasm1_code::f32_const, p)) { return false; }
                                                           if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                          wasm_u32 bits;  // no init
-                                                          ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                          p += 4;
+                                                          auto const bits{read_wasm_le_u32(p)};
+                                                          p += sizeof(::std::uint32_t);
                                                           return bits == expected_bits;
                                                       }};
 
@@ -2952,20 +2927,7 @@ case wasm1_code::br_if:
                         if(need_repair)
                         {
                             if(target_arity == 0uz) { emit_drop_to_stack_size_no_fill(thunks, target_base); }
-                            else
-                            {
-                                auto const result_type{target_frame.result.begin[0]};
-                                emit_local_set_typed_to_no_fill(thunks, result_type, internal_temp_local_off);
-                                if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(thunks, target_base); }
-                                else
-                                {
-                                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
-                                    {
-                                        emit_drop_typed_to_no_fill(thunks, operand_stack.index_unchecked(i).type);
-                                    }
-                                }
-                                emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
-                            }
+                            else { emit_preserve_top_values_drop_to_base_restore(thunks, target_label_types, target_base, curr_size, false); }
                         }
 
                         stacktop_canonicalize_edge_to_memory(thunks);
@@ -3009,20 +2971,7 @@ case wasm1_code::br_if:
                         }
                         else
                         {
-                            auto const result_type{target_frame.result.begin[0]};
-                            emit_local_set_typed_to_no_fill(thunks, result_type, internal_temp_local_off);
-
-                            if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(thunks, target_base); }
-                            else
-                            {
-                                for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
-                                {
-                                    emit_drop_typed_to_no_fill(thunks, operand_stack.index_unchecked(i).type);
-                                }
-                            }
-
-                            stacktop_fill_to_canonical(thunks);
-                            emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
+                            emit_preserve_top_values_drop_to_base_restore(thunks, target_label_types, target_base, curr_size, true);
                             if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                             {
                                 emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
@@ -3147,21 +3096,7 @@ case wasm1_code::br_if:
                         if constexpr(!strict_cf_entry_like_call) { stacktop_fill_to_canonical(thunks); }
                     }
                 }
-                else
-                {
-                    auto const result_type{target_frame.result.begin[0]};
-                    emit_local_set_typed_to_no_fill(thunks, result_type, internal_temp_local_off);
-                    if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(thunks, target_base); }
-                    else
-                    {
-                        for(::std::size_t i{curr_size - 1uz}; i-- > target_base;) { emit_drop_typed_to_no_fill(thunks, operand_stack.index_unchecked(i).type); }
-                    }
-                    if constexpr(stacktop_enabled)
-                    {
-                        if constexpr(!strict_cf_entry_like_call) { stacktop_fill_to_canonical(thunks); }
-                    }
-                    emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
-                }
+                else { emit_preserve_top_values_drop_to_base_restore(thunks, target_label_types, target_base, curr_size, true); }
             }
 
             if constexpr(stacktop_enabled)
@@ -3312,29 +3247,63 @@ case wasm1_code::br_table:
                                   }
                               }};
 
-    struct get_sig_result_t
-    {
-        ::std::size_t arity{};
-        curr_operand_stack_value_type type{};
-    };
-
     auto const get_sig{[&](wasm_u32 li) constexpr noexcept
                        {
                            auto const& frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - static_cast<::std::size_t>(li))};
-                           ::std::size_t arity{};
-                           curr_operand_stack_value_type type{};
-                           if(frame.type != block_type::loop)
-                           {
-                               arity = static_cast<::std::size_t>(frame.result.end - frame.result.begin);
-                               if(arity != 0uz) { type = frame.result.begin[0]; }
-                           }
-                           return get_sig_result_t{arity, type};
+                           return frame.label;
                        }};
 
     bool have_expected_sig{};
     wasm_u32 expected_label{};
-    ::std::size_t expected_arity{};
-    curr_operand_stack_value_type expected_type{};
+    block_result_type expected_label_types{};
+
+    auto const check_br_table_sig{[&](wasm_u32 li, block_result_type actual_types) constexpr UWVM_THROWS
+                                  {
+                                      if(!have_expected_sig)
+                                      {
+                                          have_expected_sig = true;
+                                          expected_label = li;
+                                          expected_label_types = actual_types;
+                                          return;
+                                      }
+
+                                      auto const expected_arity{static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
+                                      auto const actual_arity{static_cast<::std::size_t>(actual_types.end - actual_types.begin)};
+                                      bool mismatch{expected_arity != actual_arity};
+                                      curr_operand_stack_value_type expected_type{};
+                                      curr_operand_stack_value_type actual_type{};
+
+                                      auto const comparable_count{expected_arity < actual_arity ? expected_arity : actual_arity};
+                                      for(::std::size_t i{}; i != comparable_count; ++i)
+                                      {
+                                          if(expected_label_types.begin[i] != actual_types.begin[i])
+                                          {
+                                              mismatch = true;
+                                              expected_type = expected_label_types.begin[i];
+                                              actual_type = actual_types.begin[i];
+                                              break;
+                                          }
+                                      }
+
+                                      if(mismatch) [[unlikely]]
+                                      {
+                                          if(comparable_count == 0uz || expected_type == curr_operand_stack_value_type{})
+                                          {
+                                              if(expected_arity != 0uz) { expected_type = expected_label_types.begin[0]; }
+                                              if(actual_arity != 0uz) { actual_type = actual_types.begin[0]; }
+                                          }
+
+                                          err.err_curr = op_begin;
+                                          err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
+                                          err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
+                                          err.err_selectable.br_table_target_type_mismatch.expected_arity = static_cast<wasm_u32>(expected_arity);
+                                          err.err_selectable.br_table_target_type_mismatch.actual_arity = static_cast<wasm_u32>(actual_arity);
+                                          err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
+                                          err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                                          err.err_code = code_validation_error_code::br_table_target_type_mismatch;
+                                          ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                      }
+                                  }};
 
     // Reserve once for all explicit targets plus the default target. The earlier byte-count guard
     // proves this addition is bounded and avoids allocator work for impossible encodings.
@@ -3374,26 +3343,7 @@ case wasm1_code::br_table:
         // Safe: reserved one slot per branch target plus the default label above.
         br_table_label_indices.push_back_unchecked(li);
 
-        auto const [arity, type]{get_sig(li)};
-        if(!have_expected_sig)
-        {
-            have_expected_sig = true;
-            expected_label = li;
-            expected_arity = arity;
-            expected_type = type;
-        }
-        else if(arity != expected_arity || (expected_arity != 0uz && type != expected_type)) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
-            err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
-            err.err_selectable.br_table_target_type_mismatch.expected_arity = static_cast<wasm_u32>(expected_arity);
-            err.err_selectable.br_table_target_type_mismatch.actual_arity = static_cast<wasm_u32>(arity);
-            err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-            err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(type);
-            err.err_code = code_validation_error_code::br_table_target_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        check_br_table_sig(li, get_sig(li));
     }
 
     // ... last_target | default_label ...
@@ -3425,28 +3375,10 @@ case wasm1_code::br_table:
     // Safe: reserved one slot per branch target plus the default label above.
     br_table_label_indices.push_back_unchecked(default_label);
 
-    auto const [default_arity, default_type]{get_sig(default_label)};
-    if(!have_expected_sig)
-    {
-        have_expected_sig = true;
-        expected_label = default_label;
-        expected_arity = default_arity;
-        expected_type = default_type;
-    }
-    else if(default_arity != expected_arity || (expected_arity != 0uz && default_type != expected_type)) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
-        err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = default_label;
-        err.err_selectable.br_table_target_type_mismatch.expected_arity = static_cast<wasm_u32>(expected_arity);
-        err.err_selectable.br_table_target_type_mismatch.actual_arity = static_cast<wasm_u32>(default_arity);
-        err.err_selectable.br_table_target_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-        err.err_selectable.br_table_target_type_mismatch.actual_type = to_wasm1_value_type(default_type);
-        err.err_code = code_validation_error_code::br_table_target_type_mismatch;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
+    check_br_table_sig(default_label, get_sig(default_label));
 
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const expected_arity{static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
     auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
     auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
 
@@ -3457,7 +3389,7 @@ case wasm1_code::br_table:
 
     if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(!operand_type_matches(idx, curr_operand_stack_value_type::i32)) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
@@ -3493,13 +3425,14 @@ case wasm1_code::br_table:
         auto const concrete_to_check{available_arg_count < expected_arity ? available_arg_count : expected_arity};
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            auto const curr_expected_type{expected_label_types.begin[expected_arity - 1uz - i]};
+            if(!stack_entry_type_matches(actual_operand, curr_expected_type)) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(curr_expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -3605,17 +3538,7 @@ case wasm1_code::br_table:
                 }
                 else
                 {
-                    emit_local_set_typed_to_no_fill(thunks, expected_type, internal_temp_local_off);
-                    if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(thunks, target_base); }
-                    else
-                    {
-                        for(::std::size_t i{curr_size - 1uz}; i-- > target_base;) { emit_drop_typed_to_no_fill(thunks, operand_stack.index_unchecked(i).type); }
-                    }
-                    if constexpr(stacktop_enabled)
-                    {
-                        if constexpr(!strict_cf_entry_like_call) { stacktop_fill_to_canonical(thunks); }
-                    }
-                    emit_local_get_typed_to(thunks, expected_type, internal_temp_local_off);
+                    emit_preserve_top_values_drop_to_base_restore(thunks, expected_label_types, target_base, curr_size, true);
                 }
             }
 
