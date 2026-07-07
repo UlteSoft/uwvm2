@@ -55,6 +55,13 @@ output_stream_ref_define(basic_generic_dynamic_output_buffer<char_type, buffersi
 	return {__builtin_addressof(diob)};
 }
 
+template <typename T>
+inline constexpr basic_dynamic_output_buffer_ref<T>
+output_stream_ref_define(basic_dynamic_output_buffer_ref<T> diobref) noexcept
+{
+	return diobref;
+}
+
 namespace details
 {
 
@@ -188,6 +195,14 @@ inline constexpr void obuffer_set_curr(
 	char_type *it) noexcept
 {
 	bdobr.dob_ptr->curr_ptr = it;
+}
+
+template <::std::integral char_type, ::std::size_t buffersize, typename allocatortype>
+inline constexpr void output_stream_buffer_flush_define(
+	basic_dynamic_output_buffer_ref<basic_generic_dynamic_output_buffer<char_type, buffersize, allocatortype>>
+		bdobr) noexcept
+{
+	::fast_io::details::grow_twice_define_impl(*bdobr.dob_ptr);
 }
 
 template <::std::integral char_type, ::std::size_t buffersize, typename allocatortype>

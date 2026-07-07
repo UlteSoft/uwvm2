@@ -243,6 +243,24 @@ concept precise_reserve_printable =
 		print_reserve_precise_define(io_reserve_type<char_type, ::std::remove_cvref_t<T>>, ptr, n, t);
 	};
 
+/// @brief      static_precise_reserve_printable
+/// @details    That a type is static precise reserve printable
+///             is that its precise printing size is known as a compile-time
+///             constant without inspecting an object.
+/// @fn         print_reserve_static_precise_size
+/// @brief      Returns the precise size of the printed object as a constant expression.
+/// @tparam     <auto-inferred>
+/// @param      ::fast_io::io_reserve_type_t<char_type, ::std::remove_cvref_t<T>> tag-invoke
+/// @return     ::std::size_t                               the precise size of the output
+template <typename char_type, typename T>
+concept static_precise_reserve_printable =
+	::std::integral<char_type> &&
+	(reserve_printable<char_type, T> || dynamic_reserve_printable<char_type, T>) && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<print_reserve_static_precise_size(
+			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		requires(print_reserve_static_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
+	};
+
 /// @brief      reserve_scatters_printable
 /// @details    That a type is reserve scatters printable
 ///             is that it's composed of seperate parts
@@ -442,6 +460,14 @@ inline constexpr ::std::size_t print_reserve_precise_size(io_reserve_type_t<char
 												   parameter<value_type> para)
 {
 	return print_reserve_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>, para.reference);
+}
+
+template <::std::integral char_type, typename value_type>
+	requires static_precise_reserve_printable<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr ::std::size_t
+print_reserve_static_precise_size(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return print_reserve_static_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>);
 }
 
 template <::std::integral char_type, typename value_type, typename Iter>

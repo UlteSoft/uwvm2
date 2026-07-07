@@ -176,7 +176,7 @@ inline constexpr auto left(T &&t, ::std::size_t n, char_type ch) noexcept
 	}
 	else
 	{
-		return width_ch_t<scalar_placement::left, noref const &, char_type>{t, n};
+		return width_ch_t<scalar_placement::left, noref const &, char_type>{t, n, ch};
 	}
 }
 

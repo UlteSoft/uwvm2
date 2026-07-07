@@ -189,6 +189,45 @@ struct basic_obuffer_view
 };
 
 template <::std::integral char_type>
+inline constexpr basic_io_scatter_t<char_type>
+print_alias_define(io_alias_t, basic_obuffer_view<char_type> const &view) noexcept
+{
+	return {view.cbegin(), view.size()};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_size(io_reserve_type_t<char_type, basic_obuffer_view<char_type>>,
+				   basic_obuffer_view<char_type> const &view) noexcept
+{
+	return view.size();
+}
+
+template <::std::integral char_type>
+inline constexpr char_type *
+print_reserve_define(io_reserve_type_t<char_type, basic_obuffer_view<char_type>>,
+					 char_type *iter, basic_obuffer_view<char_type> const &view) noexcept
+{
+	return ::fast_io::details::non_overlapped_copy_n(view.cbegin(), view.size(), iter);
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_precise_size(io_reserve_type_t<char_type, basic_obuffer_view<char_type>>,
+						   basic_obuffer_view<char_type> const &view) noexcept
+{
+	return view.size();
+}
+
+template <::std::integral char_type>
+inline constexpr char_type *
+print_reserve_precise_define(io_reserve_type_t<char_type, basic_obuffer_view<char_type>>,
+							 char_type *iter, ::std::size_t, basic_obuffer_view<char_type> const &view) noexcept
+{
+	return ::fast_io::details::non_overlapped_copy_n(view.cbegin(), view.size(), iter);
+}
+
+template <::std::integral char_type>
 struct basic_obuffer_view_ref
 {
 	using output_char_type = typename basic_obuffer_view<char_type>::output_char_type;

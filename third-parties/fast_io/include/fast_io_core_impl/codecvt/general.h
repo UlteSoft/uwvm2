@@ -568,7 +568,8 @@ inline constexpr bool print_alias_test_codecvt_impl() noexcept
 		if constexpr (type_has_value_type<alias_type>)
 		{
 			using value_type = typename alias_type::value_type;
-			return ::std::same_as<alias_type, basic_io_scatter_t<value_type>>;
+			return ::std::same_as<alias_type, basic_io_scatter_t<value_type>> ||
+				   ::std::convertible_to<alias_type, basic_io_scatter_t<value_type>>;
 		}
 		else
 		{
@@ -614,6 +615,13 @@ template <encoding_scheme src_scheme = encoding_scheme::execution_charset,
 inline constexpr auto code_cvt(small_scatter_t<char_type, N> t) noexcept
 {
 	return code_cvt_t<src_scheme, dst_scheme, char_type>{{t.base, t.len}};
+}
+
+template <encoding_scheme src_scheme = encoding_scheme::execution_charset,
+		  encoding_scheme dst_scheme = encoding_scheme::execution_charset, ::std::integral char_type, ::std::size_t N>
+inline constexpr auto code_cvt(static_scatter_t<char_type, N> t) noexcept
+{
+	return code_cvt_t<src_scheme, dst_scheme, char_type>{{t.base, N}};
 }
 
 template <encoding_scheme src_scheme = encoding_scheme::execution_charset,
