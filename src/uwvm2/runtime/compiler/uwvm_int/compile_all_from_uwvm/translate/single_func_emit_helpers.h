@@ -294,16 +294,16 @@ auto const emit_imm{[&]<typename T>(T const& v) constexpr UWVM_THROWS { emit_imm
 
 auto const read_wasm_le_u32{[](::std::byte const* p) constexpr noexcept -> ::std::uint32_t
                             {
-                                return static_cast<::std::uint32_t>(::std::to_integer<unsigned char>(p[0])) |
-                                       (static_cast<::std::uint32_t>(::std::to_integer<unsigned char>(p[1])) << 8u) |
-                                       (static_cast<::std::uint32_t>(::std::to_integer<unsigned char>(p[2])) << 16u) |
-                                       (static_cast<::std::uint32_t>(::std::to_integer<unsigned char>(p[3])) << 24u);
+                                ::std::uint32_t value{};
+                                ::std::memcpy(::std::addressof(value), p, sizeof(value));
+                                return ::fast_io::little_endian(value);
                             }};
 
-auto const read_wasm_le_u64{[&](::std::byte const* p) constexpr noexcept -> ::std::uint64_t
+auto const read_wasm_le_u64{[](::std::byte const* p) constexpr noexcept -> ::std::uint64_t
                             {
-                                return static_cast<::std::uint64_t>(read_wasm_le_u32(p)) |
-                                       (static_cast<::std::uint64_t>(read_wasm_le_u32(p + 4uz)) << 32u);
+                                ::std::uint64_t value{};
+                                ::std::memcpy(::std::addressof(value), p, sizeof(value));
+                                return ::fast_io::little_endian(value);
                             }};
 
 auto const read_wasm_f32_const{[&](::std::byte const* p) constexpr noexcept -> ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
