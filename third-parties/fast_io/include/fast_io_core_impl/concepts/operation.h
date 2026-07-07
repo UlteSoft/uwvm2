@@ -125,11 +125,26 @@ template <::std::size_t>
 struct reserve_static_stack_size_constant
 {};
 
+inline constexpr ::std::size_t print_stack_buffer_default_max_bytes{131072u};
+
+inline constexpr ::std::size_t print_stack_buffer_max_bytes() noexcept
+{
+#if defined(FAST_IO_PRINT_STACK_BUFFER_MAX_BYTES)
+	return static_cast<::std::size_t>(FAST_IO_PRINT_STACK_BUFFER_MAX_BYTES);
+#else
+	return ::fast_io::details::print_stack_buffer_default_max_bytes;
+#endif
+}
+
 template <::std::integral char_type>
 inline constexpr ::std::size_t dynamic_reserve_default_static_stack_size() noexcept
 {
-	constexpr ::std::size_t bytes{4096u};
-	if constexpr (sizeof(char_type) < bytes)
+	constexpr ::std::size_t bytes{::fast_io::details::print_stack_buffer_max_bytes()};
+	if constexpr (bytes == 0)
+	{
+		return 0u;
+	}
+	else if constexpr (sizeof(char_type) < bytes)
 	{
 		return bytes / sizeof(char_type);
 	}
@@ -198,6 +213,24 @@ concept context_printable_with_static_buffer_size =
 			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
 		requires(print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != 0);
 		requires(print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
+	};
+
+/// @brief      scatter_fallback_full_output_threshold_stream
+/// @details    Customizes the maximum full-output size, in char_type units,
+///             for coalescing scatter output into a contiguous buffer before
+///             writing it once. The value must be a compile-time std::size_t.
+///             Returning 0 disables this coalescing path for the stream.
+///             The print layer may cap large values before allocating stack storage.
+/// @fn         scatter_fallback_full_output_threshold
+/// @brief      Returns the scatter coalescing threshold, in char_type units.
+template <typename char_type, typename T>
+concept scatter_fallback_full_output_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			scatter_fallback_full_output_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			scatter_fallback_full_output_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
 	};
 
 /// @brief      printable_internal_shift
