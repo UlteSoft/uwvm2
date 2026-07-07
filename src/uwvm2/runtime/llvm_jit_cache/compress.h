@@ -27,7 +27,9 @@
 # include <algorithm>
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
+# include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
@@ -76,11 +78,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         [[nodiscard]] inline constexpr ::std::uint_least32_t native_lz_read_u32(::std::byte const* ptr) noexcept
         {
-            // Manual little-endian loading avoids alignment requirements on object bytes.
-            return static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[0])) |
-                   (static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[1])) << 8u) |
-                   (static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[2])) << 16u) |
-                   (static_cast<::std::uint_least32_t>(::std::to_integer<unsigned>(ptr[3])) << 24u);
+            ::std::uint32_t value{};
+            ::std::memcpy(::std::addressof(value), ptr, sizeof(value));
+            return ::fast_io::little_endian(value);
         }
 
         [[nodiscard]] inline constexpr ::std::uint_least16_t native_lz_hash4(::std::byte const* ptr) noexcept
