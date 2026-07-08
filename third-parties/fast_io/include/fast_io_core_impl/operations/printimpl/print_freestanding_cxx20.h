@@ -3049,12 +3049,231 @@ template <::std::integral char_type, typename T>
 inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t);
 
 template <::std::integral char_type, typename T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr char_type *print_semantic_emit_unchecked_arg(char_type *iter, T &&t)
 {
 	decltype(auto) forwarded{
 		::fast_io::details::decay::print_semantic_input_forward<char_type>(::std::forward<T>(t))};
 	return ::fast_io::operations::decay::print_semantic_emit_unchecked<char_type>(
 		iter, ::std::forward<decltype(forwarded)>(forwarded));
+}
+
+inline constexpr ::std::size_t print_semantic_common_factor_pack_max_size{8u};
+
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr bool print_semantic_common_factor_equal(::fast_io::io_null_t, ::fast_io::io_null_t) noexcept
+{
+	return true;
+}
+
+template <typename T, typename U>
+	requires(!::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t> &&
+			 ::std::same_as<::std::remove_cvref_t<T>, ::std::remove_cvref_t<U>> &&
+			 requires(T const &first, U const &second) {
+				 first.base;
+				 second.base;
+			 })
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr bool print_semantic_common_factor_equal(T const &first, U const &second) noexcept
+{
+	if constexpr (requires {
+					  first.len;
+					  second.len;
+				  })
+	{
+		return first.base == second.base && first.len == second.len;
+	}
+	else
+	{
+		return first.base == second.base;
+	}
+}
+
+template <typename T, typename U>
+	requires(!::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t> &&
+			 ::std::same_as<::std::remove_cvref_t<T>, ::std::remove_cvref_t<U>> &&
+			 requires(T const &first, U const &second) {
+				 first.reference;
+				 second.reference;
+				 requires ::std::integral<::std::remove_cvref_t<decltype(first.reference)>>;
+			 })
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr bool print_semantic_common_factor_equal(T const &first, U const &second) noexcept
+{
+	return first.reference == second.reference;
+}
+
+template <typename T, typename U>
+concept print_semantic_common_factor_comparable = requires(T &&t, U &&u) {
+	{
+		::fast_io::operations::decay::print_semantic_common_factor_equal(
+			::std::forward<T>(t), ::std::forward<U>(u))
+	} -> ::std::same_as<bool>;
+};
+
+template <::std::integral char_type, ::std::size_t index, typename Pack>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type *print_semantic_emit_unchecked_pack_element(char_type *iter, Pack &&pack)
+{
+	return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(
+		iter, ::fast_io::containers::get<index>(::std::forward<Pack>(pack).storage));
+}
+
+template <::std::size_t index, typename Pack1, typename Pack2>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr bool print_semantic_pack_element_common_factor_equal(Pack1 &&pack1, Pack2 &&pack2)
+{
+	decltype(auto) first{::fast_io::containers::get<index>(::std::forward<Pack1>(pack1).storage)};
+	decltype(auto) second{::fast_io::containers::get<index>(::std::forward<Pack2>(pack2).storage)};
+	if constexpr (::fast_io::operations::decay::print_semantic_common_factor_comparable<decltype(first),
+																					   decltype(second)>)
+	{
+		return ::fast_io::operations::decay::print_semantic_common_factor_equal(
+			::std::forward<decltype(first)>(first), ::std::forward<decltype(second)>(second));
+	}
+	else
+	{
+		return false;
+	}
+}
+
+template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type *print_semantic_emit_unchecked_pack_range(char_type *iter, Pack &&pack)
+{
+	if constexpr (first < last)
+	{
+		iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_element<char_type, first>(
+			iter, ::std::forward<Pack>(pack));
+		return ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_range<char_type, first + 1u, last>(
+			iter, ::std::forward<Pack>(pack));
+	}
+	else
+	{
+		return iter;
+	}
+}
+
+template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack1, typename Pack2>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type *print_semantic_emit_unchecked_condition_pack_factored(char_type *iter, bool pred,
+																				 Pack1 &&pack1, Pack2 &&pack2)
+{
+	if constexpr (first < last)
+	{
+		if (::fast_io::operations::decay::print_semantic_pack_element_common_factor_equal<first>(
+				::std::forward<Pack1>(pack1), ::std::forward<Pack2>(pack2)))
+		{
+			iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_element<char_type, first>(
+				iter, ::std::forward<Pack1>(pack1));
+			return ::fast_io::operations::decay::print_semantic_emit_unchecked_condition_pack_factored<
+				char_type, first + 1u, last>(iter, pred, ::std::forward<Pack1>(pack1), ::std::forward<Pack2>(pack2));
+		}
+		if constexpr (first + 1u < last)
+		{
+			constexpr ::std::size_t suffix_index{last - 1u};
+			if (::fast_io::operations::decay::print_semantic_pack_element_common_factor_equal<suffix_index>(
+					::std::forward<Pack1>(pack1), ::std::forward<Pack2>(pack2)))
+			{
+				iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_condition_pack_factored<
+					char_type, first, suffix_index>(iter, pred, ::std::forward<Pack1>(pack1),
+													::std::forward<Pack2>(pack2));
+				return ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_element<char_type,
+																								suffix_index>(
+					iter, ::std::forward<Pack1>(pack1));
+			}
+		}
+		if (pred)
+		{
+			return ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_range<char_type, first, last>(
+				iter, ::std::forward<Pack1>(pack1));
+		}
+		return ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_range<char_type, first, last>(
+			iter, ::std::forward<Pack2>(pack2));
+	}
+	else
+	{
+		return iter;
+	}
+}
+
+template <::std::integral char_type>
+struct print_semantic_condition_pack_factor_result
+{
+	char_type *iter;
+	bool done;
+};
+
+template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack1, typename Pack2>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr print_semantic_condition_pack_factor_result<char_type>
+print_semantic_emit_unchecked_condition_pack_try_factor(char_type *iter, bool pred, Pack1 &&pack1, Pack2 &&pack2)
+{
+	if constexpr (first < last)
+	{
+		if (::fast_io::operations::decay::print_semantic_pack_element_common_factor_equal<first>(
+				::std::forward<Pack1>(pack1), ::std::forward<Pack2>(pack2)))
+		{
+			iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_element<char_type, first>(
+				iter, ::std::forward<Pack1>(pack1));
+			return {::fast_io::operations::decay::print_semantic_emit_unchecked_condition_pack_factored<
+						char_type, first + 1u, last>(iter, pred, ::std::forward<Pack1>(pack1),
+													 ::std::forward<Pack2>(pack2)),
+					true};
+		}
+		if constexpr (first + 1u < last)
+		{
+			constexpr ::std::size_t suffix_index{last - 1u};
+			if (::fast_io::operations::decay::print_semantic_pack_element_common_factor_equal<suffix_index>(
+					::std::forward<Pack1>(pack1), ::std::forward<Pack2>(pack2)))
+			{
+				iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_condition_pack_factored<
+					char_type, first, suffix_index>(iter, pred, ::std::forward<Pack1>(pack1),
+													::std::forward<Pack2>(pack2));
+				iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_pack_element<char_type,
+																								suffix_index>(
+					iter, ::std::forward<Pack1>(pack1));
+				return {iter, true};
+			}
+		}
+	}
+	return {iter, false};
 }
 
 template <::std::integral char_type>
@@ -3147,6 +3366,11 @@ inline constexpr char_type *print_semantic_emit_unchecked_leaf(char_type *iter, 
 }
 
 template <::std::integral char_type, typename T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t)
 {
 	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -3161,11 +3385,46 @@ inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t
 	}
 	else if constexpr (::fast_io::details::decay::print_semantic_condition_v<node_type>)
 	{
-		if (node_ref.pred)
+		using first_type = ::std::remove_cvref_t<decltype(node_ref.t1)>;
+		using second_type = ::std::remove_cvref_t<decltype(node_ref.t2)>;
+		if constexpr (::fast_io::details::print_pack<first_type> && ::fast_io::details::print_pack<second_type>)
 		{
-			return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t1);
+			if constexpr (first_type::size == second_type::size &&
+						  first_type::size <=
+							  ::fast_io::operations::decay::print_semantic_common_factor_pack_max_size)
+			{
+				auto const factor_result{
+					::fast_io::operations::decay::print_semantic_emit_unchecked_condition_pack_try_factor<
+						char_type, 0u, first_type::size>(iter, node_ref.pred, node_ref.t1, node_ref.t2)};
+				if (factor_result.done)
+				{
+					return factor_result.iter;
+				}
+				if (node_ref.pred)
+				{
+					return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter,
+																									  node_ref.t1);
+				}
+				return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t2);
+			}
+			else
+			{
+				if (node_ref.pred)
+				{
+					return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter,
+																									  node_ref.t1);
+				}
+				return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t2);
+			}
 		}
-		return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t2);
+		else
+		{
+			if (node_ref.pred)
+			{
+				return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t1);
+			}
+			return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.t2);
+		}
 	}
 	else if constexpr (::fast_io::details::decay::print_semantic_width_v<node_type>)
 	{
