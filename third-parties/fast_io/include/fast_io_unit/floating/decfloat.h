@@ -1193,9 +1193,20 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 	template <::fast_io::manipulators::floating_rounding rounding, typename T>
 	inline constexpr ::fast_io::parse_code scan_decfloat_assign_overflow_value(T &value, bool negative) noexcept
 	{
-		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_zero ||
-					  (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity && negative) ||
-					  (rounding == ::fast_io::manipulators::floating_rounding::toward_minus_infinity && !negative))
+		bool assign_max_finite{};
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_zero)
+		{
+			assign_max_finite = true;
+		}
+		else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity)
+		{
+			assign_max_finite = negative;
+		}
+		else if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_minus_infinity)
+		{
+			assign_max_finite = !negative;
+		}
+		if (assign_max_finite)
 		{
 			::fast_io::details::scan_decfloat_assign_max_finite(value, negative);
 		}
