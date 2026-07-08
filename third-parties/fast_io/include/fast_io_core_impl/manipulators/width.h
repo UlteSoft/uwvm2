@@ -259,6 +259,7 @@ inline constexpr auto internal(T &&t, ::std::size_t n, char_type ch) noexcept
 
 } // namespace manipulators
 
+#if 0
 namespace details
 {
 
@@ -689,4 +690,5 @@ print_reserve_define(io_reserve_type_t<char_type, ::fast_io::manipulators::width
 	}
 }
 
+#endif
 } // namespace fast_io

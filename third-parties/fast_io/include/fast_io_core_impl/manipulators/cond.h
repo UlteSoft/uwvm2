@@ -104,10 +104,11 @@ inline constexpr auto cond(bool pred, T1 &&t1) noexcept
 	}
 }
 
-} // namespace manipulators
-
-namespace details
-{
+	} // namespace manipulators
+	
+#if 0
+	namespace details
+	{
 
 template <typename T1, typename T2>
 concept cond_transferable_value = ::std::is_trivially_copyable_v<::fast_io::manipulators::condition<T1, T2>> &&
@@ -807,5 +808,6 @@ inline constexpr void print_define(io_reserve_type_t<char_type, ::fast_io::manip
 	{
 		::fast_io::operations::print_freestanding<false>(b, c.t2);
 	}
-}
-} // namespace fast_io
+	}
+#endif
+	} // namespace fast_io
