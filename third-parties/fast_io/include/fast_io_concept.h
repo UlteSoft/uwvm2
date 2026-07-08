@@ -16,6 +16,8 @@
 #include "fast_io_dsal/impl/misc/push_macros.h"
 #include "fast_io_dsal/impl/misc/push_warnings.h"
 
+#include "fast_io_freestanding_impl/stack/impl.h"
+
 #include "fast_io_core_impl/freestanding/addressof.h"
 #include "fast_io_core_impl/concepts/impl.h"
 

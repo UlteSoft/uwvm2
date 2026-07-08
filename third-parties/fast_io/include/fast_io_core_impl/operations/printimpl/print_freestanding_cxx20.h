@@ -3201,6 +3201,132 @@ inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t
 	}
 }
 
+template <bool line, ::std::integral char_type, typename... Args>
+inline consteval ::std::size_t print_semantic_static_precise_total_size() noexcept
+{
+	if constexpr ((::fast_io::details::decay::print_semantic_static_precise_size<char_type, Args>::available && ...))
+	{
+		::std::size_t total{};
+		((total = ::fast_io::details::intrinsics::add_or_overflow_die(
+			  total, ::fast_io::details::decay::print_semantic_static_precise_size<char_type, Args>::size)),
+		 ...);
+		if constexpr (line)
+		{
+			total = ::fast_io::details::intrinsics::add_or_overflow_die(total, static_cast<::std::size_t>(1u));
+		}
+		return total;
+	}
+	else
+	{
+		return SIZE_MAX;
+	}
+}
+
+template <bool line, ::std::integral char_type, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr ::std::size_t print_semantic_precise_total_size(Args &&...args)
+{
+	::std::size_t total{};
+	((total = ::fast_io::details::intrinsics::add_or_overflow_die(
+		  total, ::fast_io::operations::decay::print_semantic_precise_size_arg<char_type>(
+					 args))),
+	 ...);
+	if constexpr (line)
+	{
+		total = ::fast_io::details::intrinsics::add_or_overflow_die(total, static_cast<::std::size_t>(1u));
+	}
+	return total;
+}
+
+template <bool line, ::std::integral char_type, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type *print_semantic_emit_unchecked_run(char_type *iter, Args &&...args)
+{
+	((iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(
+		  iter, ::std::forward<Args>(args))),
+	 ...);
+	if constexpr (line)
+	{
+		*iter = ::fast_io::char_literal_v<u8'\n', char_type>;
+		++iter;
+	}
+	return iter;
+}
+
+template <bool line, ::std::integral char_type, typename outputstmtype, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, Args &&...args)
+{
+	if constexpr ((::fast_io::details::decay::print_semantic_precise_size_ok<
+					   char_type, ::std::remove_cvref_t<Args>>::value &&
+				   ...))
+	{
+		::std::size_t const required{
+			::fast_io::operations::decay::print_semantic_precise_total_size<line, char_type>(
+				args...)};
+		if (required == 0)
+		{
+			return true;
+		}
+		if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<outputstmtype>)
+		{
+			char_type *const curr{obuffer_curr(optstm)};
+			char_type *const end{obuffer_end(optstm)};
+			if (static_cast<::std::size_t>(end - curr) >= required)
+			{
+				char_type *const iter{
+					::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+						curr, ::std::forward<Args>(args)...)};
+				obuffer_set_curr(optstm, iter);
+				return true;
+			}
+		}
+		constexpr ::std::size_t threshold_chars{
+			::fast_io::details::decay::print_scatter_full_output_threshold<char_type, outputstmtype>()};
+		if constexpr (threshold_chars != 0)
+		{
+			constexpr ::std::size_t static_total{
+				::fast_io::operations::decay::print_semantic_static_precise_total_size<line, char_type,
+																					   ::std::remove_cvref_t<Args>...>()};
+			if constexpr (static_total != SIZE_MAX && static_total <= threshold_chars)
+			{
+				constexpr ::std::size_t buffer_size{static_total == 0 ? 1u : static_total};
+				char_type buffer[buffer_size];
+				char_type *const iter{
+					::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+						buffer, ::std::forward<Args>(args)...)};
+				::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+				return true;
+			}
+			else
+			{
+				if (required <= threshold_chars)
+				{
+					char_type buffer[threshold_chars];
+					char_type *const iter{
+						::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+							buffer, ::std::forward<Args>(args)...)};
+					::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 template <bool line, ::std::integral char_type, typename outputstmtype, typename T>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
@@ -3667,9 +3793,14 @@ struct print_semantic_emit_flat_continuation
 #endif
 	inline constexpr void operator()(FilteredArgs &&...filtered_args) const
 	{
-		::fast_io::operations::decay::print_semantic_emit_flat_impl<line, char_type>(
-			optstm, ::fast_io::operations::decay::print_semantic_emit_freestanding_continuation<outputstmtype>{optstm},
-			::std::forward<FilteredArgs>(filtered_args)...);
+		if (!::fast_io::operations::decay::print_semantic_try_precise_coalesce<line, char_type>(
+				optstm, ::std::forward<FilteredArgs>(filtered_args)...))
+		{
+			::fast_io::operations::decay::print_semantic_emit_flat_impl<line, char_type>(
+				optstm,
+				::fast_io::operations::decay::print_semantic_emit_freestanding_continuation<outputstmtype>{optstm},
+				::std::forward<FilteredArgs>(filtered_args)...);
+		}
 	}
 };
 
@@ -3729,7 +3860,30 @@ template <bool line, typename outputstmtype, typename... Args>
 #endif
 inline constexpr decltype(auto) print_freestanding_decay(outputstmtype optstm, Args... args)
 {
-	if constexpr ((::fast_io::details::decay::print_semantic_node<Args> || ...))
+	if constexpr (::fast_io::operations::decay::defines::has_status_print_define<outputstmtype>)
+	{
+		return status_print_define<line>(optstm, args...);
+	}
+	else if constexpr (sizeof...(Args) == 0)
+	{
+		if constexpr (line)
+		{
+			using char_type = typename outputstmtype::output_char_type;
+			return ::fast_io::operations::decay::char_put_decay(optstm, char_literal_v<u8'\n', char_type>);
+		}
+		else
+		{
+			return;
+		}
+	}
+	else if constexpr (::fast_io::operations::decay::defines::has_output_or_io_stream_mutex_ref_define<outputstmtype>)
+	{
+		::fast_io::operations::decay::stream_ref_decay_lock_guard lg{
+			::fast_io::operations::decay::output_stream_mutex_ref_decay(optstm)};
+		return ::fast_io::operations::decay::print_freestanding_decay<line>(
+			::fast_io::operations::decay::output_stream_unlocked_ref_decay(optstm), args...);
+	}
+	else if constexpr ((::fast_io::details::decay::print_semantic_node<Args> || ...))
 	{
 		using char_type = typename outputstmtype::output_char_type;
 		return ::fast_io::operations::decay::print_semantic_emit<line, true, char_type>(optstm, args...);
@@ -3806,7 +3960,7 @@ inline constexpr void print_freestanding(output &&outstm, Args &&...args)
 	if constexpr ((false || ... ||
 				   ::fast_io::details::decay::print_semantic_input_argument_v<char_type, Args &&>))
 	{
-		::fast_io::operations::decay::print_semantic_emit<line, false, char_type>(
+		::fast_io::operations::decay::print_freestanding_decay<line>(
 			outref,
 			::fast_io::details::decay::print_semantic_input_forward<char_type>(
 				::std::forward<Args>(args))...);
