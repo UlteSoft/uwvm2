@@ -1488,17 +1488,180 @@ inline constexpr void dragonbox_shorten_decimal_to_target(
 	}
 }
 
+template <::std::size_t n>
+struct dragonbox_bfloat16_high_fallback_table
+{
+	::std::uint_least16_t values[n]{};
+};
+
+inline constexpr ::std::int_least32_t dragonbox_bfloat16_high_fallback_min_exponent{244};
+inline constexpr ::std::int_least32_t dragonbox_bfloat16_high_fallback_max_exponent{254};
+inline constexpr ::std::uint_least32_t dragonbox_bfloat16_high_fallback_exponent_count{
+	static_cast<::std::uint_least32_t>(dragonbox_bfloat16_high_fallback_max_exponent -
+									   dragonbox_bfloat16_high_fallback_min_exponent + 1)};
+inline constexpr ::std::uint_least32_t dragonbox_bfloat16_mantissa_count{128u};
+inline constexpr ::std::int_least32_t dragonbox_bfloat16_high_fallback_e10_bias{33};
+inline constexpr ::std::uint_least32_t dragonbox_bfloat16_high_fallback_m10_mask{0x0FFFu};
+
+template <typename flt>
+[[nodiscard]] inline constexpr dragonbox_bfloat16_high_fallback_table<
+	dragonbox_bfloat16_high_fallback_exponent_count * dragonbox_bfloat16_mantissa_count>
+dragonbox_make_bfloat16_high_fallback_table() noexcept
+{
+	dragonbox_bfloat16_high_fallback_table<dragonbox_bfloat16_high_fallback_exponent_count *
+										   dragonbox_bfloat16_mantissa_count>
+		table;
+	for (::std::int_least32_t exponent{dragonbox_bfloat16_high_fallback_min_exponent};
+		 exponent <= dragonbox_bfloat16_high_fallback_max_exponent; ++exponent)
+	{
+		for (::std::uint_least32_t mantissa{}; mantissa != dragonbox_bfloat16_mantissa_count; ++mantissa)
+		{
+			auto [m10, e10] = ::fast_io::details::dragonbox_impl<
+				float, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+				static_cast<::fast_io::details::iec559_traits<float>::mantissa_type>(mantissa << 16u),
+				static_cast<::std::int_least32_t>(exponent), false);
+			::fast_io::details::dragonbox_shorten_decimal_to_target<
+				flt, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+				m10, e10, static_cast<typename ::fast_io::details::iec559_traits<flt>::mantissa_type>(mantissa),
+				exponent, false);
+			table.values[static_cast<::std::uint_least32_t>(exponent - dragonbox_bfloat16_high_fallback_min_exponent) *
+							 dragonbox_bfloat16_mantissa_count +
+						 mantissa] = static_cast<::std::uint_least16_t>(
+				(static_cast<::std::uint_least32_t>(e10 - dragonbox_bfloat16_high_fallback_e10_bias) << 12u) | m10);
+		}
+	}
+	return table;
+}
+
+template <typename flt>
+inline constexpr auto dragonbox_bfloat16_high_fallback_nearest_to_even_table{
+	::fast_io::details::dragonbox_make_bfloat16_high_fallback_table<flt>()};
+
+template <typename flt>
+[[nodiscard]] inline constexpr m10_result<::fast_io::details::dragonbox_decimal_mantissa_type<flt>>
+dragonbox_bfloat16_high_fallback_nearest_to_even(
+	typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2) noexcept
+{
+	using decimal_type = ::fast_io::details::dragonbox_decimal_mantissa_type<flt>;
+	auto const packed{
+		::fast_io::details::dragonbox_bfloat16_high_fallback_nearest_to_even_table<flt>.values
+			[static_cast<::std::uint_least32_t>(e2 - dragonbox_bfloat16_high_fallback_min_exponent) *
+				 dragonbox_bfloat16_mantissa_count +
+			 static_cast<::std::uint_least32_t>(m2)]};
+	return {static_cast<decimal_type>(packed & dragonbox_bfloat16_high_fallback_m10_mask),
+			static_cast<::std::int_least32_t>(dragonbox_bfloat16_high_fallback_e10_bias +
+											 static_cast<::std::int_least32_t>(packed >> 12u))};
+}
+
+template <typename flt>
+[[nodiscard]] inline constexpr punning_result<float> dragonbox_narrow_float_punned(
+	flt f, typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2, bool negative) noexcept
+{
+	using trait = ::fast_io::details::iec559_traits<flt>;
+	if constexpr (trait::mbits == 7u && trait::ebits == 8u)
+	{
+		return {static_cast<::fast_io::details::iec559_traits<float>::mantissa_type>(
+					static_cast<::std::uint_least32_t>(m2) << 16u),
+				static_cast<::std::uint_least32_t>(e2), negative};
+	}
+	else if constexpr (trait::mbits == 10u && trait::ebits == 5u)
+	{
+		if (e2 != 0)
+		{
+			return {static_cast<::fast_io::details::iec559_traits<float>::mantissa_type>(
+						static_cast<::std::uint_least32_t>(m2) << 13u),
+					static_cast<::std::uint_least32_t>(e2 + 112), negative};
+		}
+	}
+	return get_punned_result(static_cast<float>(f));
+}
+
 template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+#if __has_cpp_attribute(__gnu__::__cold__)
+[[__gnu__::__cold__]]
+#endif
+#if __has_cpp_attribute(__gnu__::__noinline__)
+[[__gnu__::__noinline__]]
+#endif
 inline constexpr m10_result<::fast_io::details::dragonbox_decimal_mantissa_type<flt>>
 dragonbox_impl_narrow_from_float(flt f, typename iec559_traits<flt>::mantissa_type m2,
 								 ::std::int_least32_t e2, bool negative) noexcept
 {
-	auto [float_mantissa, float_exponent, float_sign] = get_punned_result(static_cast<float>(f));
-	(void)float_sign;
+	auto [float_mantissa, float_exponent, float_sign] =
+		::fast_io::details::dragonbox_narrow_float_punned(f, m2, e2, negative);
 	auto [m10, e10] = ::fast_io::details::dragonbox_impl<float, rounding>(
-		float_mantissa, static_cast<::std::int_least32_t>(float_exponent), negative);
+		float_mantissa, static_cast<::std::int_least32_t>(float_exponent), float_sign);
 	::fast_io::details::dragonbox_shorten_decimal_to_target<flt, rounding>(m10, e10, m2, e2, negative);
 	return {m10, e10};
+}
+
+template <typename flt>
+[[nodiscard]] inline constexpr bool dragonbox_narrow_raw_candidate_needs_fallback(
+	typename iec559_traits<flt>::mantissa_type m2, ::std::int_least32_t e2) noexcept
+{
+	using trait = ::fast_io::details::iec559_traits<flt>;
+	if constexpr (trait::mbits == 10u && trait::ebits == 5u)
+	{
+		return m2 == 0u && (e2 == 8 || e2 == 9);
+	}
+	else if constexpr (trait::mbits == 7u && trait::ebits == 8u)
+	{
+		if (244 <= e2)
+		{
+			return true;
+		}
+		if (m2 != 0u)
+		{
+			return false;
+		}
+		switch (e2)
+		{
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 21:
+		case 44:
+		case 48:
+		case 49:
+		case 50:
+		case 51:
+		case 62:
+		case 63:
+		case 64:
+		case 68:
+		case 92:
+		case 93:
+		case 94:
+		case 107:
+		case 108:
+		case 109:
+		case 110:
+		case 136:
+		case 137:
+		case 157:
+		case 164:
+		case 187:
+		case 188:
+		case 189:
+		case 190:
+		case 191:
+		case 211:
+		case 223:
+		case 224:
+			return true;
+		default:
+			return false;
+		}
+	}
+	else
+	{
+		return true;
+	}
 }
 
 template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
@@ -1508,18 +1671,39 @@ dragonbox_impl_narrow_hybrid(flt f, typename iec559_traits<flt>::mantissa_type m
 {
 	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
 	{
+		if constexpr (::fast_io::details::iec559_traits<flt>::mbits == 7u &&
+					  ::fast_io::details::iec559_traits<flt>::ebits == 8u)
+		{
+			if (dragonbox_bfloat16_high_fallback_min_exponent <= e2 &&
+				e2 <= dragonbox_bfloat16_high_fallback_max_exponent) [[unlikely]]
+			{
+				return ::fast_io::details::dragonbox_bfloat16_high_fallback_nearest_to_even<flt>(m2, e2);
+			}
+		}
+		if constexpr (::fast_io::details::iec559_traits<flt>::mbits == 10u &&
+					  ::fast_io::details::iec559_traits<flt>::ebits == 5u)
+		{
+			if (m2 == 0u)
+			{
+				if (e2 == 8)
+				{
+					return {7812u, -6};
+				}
+				if (e2 == 9)
+				{
+					return {1563u, -5};
+				}
+			}
+		}
 		auto direct{::fast_io::details::dragonbox_main<flt>(m2, e2)};
-		if (direct.m10)
+		if (direct.m10 &&
+			!::fast_io::details::dragonbox_narrow_raw_candidate_needs_fallback<flt>(m2, e2))
 		{
 			auto [trimmed, zeroes] = ::fast_io::bitops::rtz_iec559(direct.m10);
 			auto const trimmed_e10{
 				static_cast<::std::int_least32_t>(direct.e10 + static_cast<::std::int_least32_t>(
 																   static_cast<::std::uint_least32_t>(zeroes)))};
-			if (::fast_io::details::dragonbox_decimal_printable_roundtrips_to<flt, rounding>(
-					trimmed, trimmed_e10, m2, e2, negative))
-			{
-				return {trimmed, trimmed_e10};
-			}
+			return {trimmed, trimmed_e10};
 		}
 	}
 	else
