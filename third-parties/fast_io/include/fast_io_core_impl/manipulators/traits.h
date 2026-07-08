@@ -247,6 +247,69 @@ struct print_semantic_precise_size_ok_impl<char_type, ::fast_io::manipulators::w
 {};
 
 template <::std::integral char_type, typename T>
+inline constexpr bool print_semantic_bounded_leaf_size_ok_v =
+	::fast_io::details::decay::print_semantic_precise_leaf_size_ok_v<char_type, T> ||
+	::fast_io::dynamic_reserve_printable<char_type, ::std::remove_cvref_t<T>>;
+
+template <::std::integral char_type, typename T>
+struct print_semantic_bounded_size_ok_impl
+	: ::std::bool_constant<
+		  ::fast_io::details::decay::print_semantic_bounded_leaf_size_ok_v<char_type, T>>
+{};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_bounded_size_ok
+	: ::fast_io::details::decay::print_semantic_bounded_size_ok_impl<char_type, ::std::remove_cvref_t<T>>
+{};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::parameter<T>>
+	: ::fast_io::details::decay::print_semantic_bounded_size_ok<char_type, T>
+{};
+
+template <::std::integral char_type, typename... Args>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::pack_t<Args...>>
+	: ::std::bool_constant<
+		  (::fast_io::details::decay::print_semantic_bounded_size_ok<
+			   char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>>::value &&
+		   ...)>
+{};
+
+template <::std::integral char_type, typename T1, typename T2>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::condition<T1, T2>>
+	: ::std::bool_constant<
+		  ::fast_io::details::decay::print_semantic_bounded_size_ok<
+			  char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T1>>::value && ::fast_io::details::decay::print_semantic_bounded_size_ok<char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T2>>::value>
+{};
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::width_t<placement, T>>
+	: ::fast_io::details::decay::print_semantic_bounded_size_ok<
+		  char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T>>
+{};
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_placement placement, typename T,
+		  ::std::integral ch_type>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::width_ch_t<placement, T, ch_type>>
+	: ::std::bool_constant<
+		  ::std::same_as<char_type, ch_type> && ::fast_io::details::decay::print_semantic_bounded_size_ok<
+			  char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T>>::value>
+{};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::width_runtime_t<T>>
+	: ::fast_io::details::decay::print_semantic_bounded_size_ok<
+		  char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T>>
+{};
+
+template <::std::integral char_type, typename T, ::std::integral ch_type>
+struct print_semantic_bounded_size_ok_impl<char_type, ::fast_io::manipulators::width_runtime_ch_t<T, ch_type>>
+	: ::std::bool_constant<
+		  ::std::same_as<char_type, ch_type> && ::fast_io::details::decay::print_semantic_bounded_size_ok<
+			  char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T>>::value>
+{};
+
+template <::std::integral char_type, typename T>
 struct print_semantic_params_okay : ::std::false_type
 {};
 

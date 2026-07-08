@@ -35,7 +35,7 @@ struct iec559_traits<__float16>
 	using mantissa_type = ::std::uint_least16_t;
 	inline static constexpr ::std::size_t mbits{10};
 	inline static constexpr ::std::size_t ebits{5};
-	inline static constexpr ::std::uint_least32_t m10digits{4};
+	inline static constexpr ::std::uint_least32_t m10digits{5};
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
@@ -139,7 +139,7 @@ struct iec559_traits<_Float16>
 	using mantissa_type = ::std::uint_least16_t;
 	inline static constexpr ::std::size_t mbits{10};
 	inline static constexpr ::std::size_t ebits{5};
-	inline static constexpr ::std::uint_least32_t m10digits{4};
+	inline static constexpr ::std::uint_least32_t m10digits{5};
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};

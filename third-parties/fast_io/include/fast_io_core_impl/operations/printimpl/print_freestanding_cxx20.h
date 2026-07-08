@@ -4356,6 +4356,11 @@ inline constexpr char_type *print_semantic_emit_unchecked_leaf(char_type *iter, 
 			return iter + precise_size;
 		}
 	}
+	else if constexpr (::fast_io::dynamic_reserve_printable<char_type, value_type>)
+	{
+		// Dynamic reserve leaves have already been admitted by a bounded materialization path.
+		return print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, iter, ::std::forward<T>(t));
+	}
 	else if constexpr (::fast_io::scatter_printable<char_type, value_type>)
 	{
 		// Scatter leaves copy their single contiguous range into the unchecked output buffer.
@@ -4484,10 +4489,8 @@ inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t
 	}
 	else if constexpr (::fast_io::details::decay::print_semantic_width_v<node_type>)
 	{
-		// Width nodes need child length, fill, and placement before writing padded output.
+		// Width nodes materialize their child before padding so dynamic-reserve children use their actual length.
 		using width_traits = ::fast_io::details::decay::print_semantic_width_traits<node_type>;
-		::std::size_t const len{
-			::fast_io::operations::decay::print_semantic_precise_size_arg<char_type>(node_ref.reference)};
 		::std::size_t const width{node_ref.width};
 		char_type const fillch{
 			::fast_io::operations::decay::print_semantic_width_fill_char<char_type, width_traits>(node_ref)};
@@ -4495,52 +4498,50 @@ inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t
 			::fast_io::operations::decay::print_semantic_width_placement<width_traits>(node_ref)};
 		::std::size_t const placement_code{
 			::fast_io::operations::decay::print_semantic_width_placement_code(placement)};
+		char_type *const first{iter};
+		char_type *const last{
+			::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference)};
+		::std::size_t const len{static_cast<::std::size_t>(last - first)};
 		if (width <= len || placement_code == 0u)
 		{
-			// Width that is already satisfied, or disabled placement, emits the child without padding.
-			return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference);
+			// Width that is already satisfied, or disabled placement, leaves the child bytes unchanged.
+			return last;
 		}
 		::std::size_t const padding{width - len};
 		if (placement_code == 1u)
 		{
-			// Left placement emits the child first and appends all padding on the right.
-			iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference);
-			return ::fast_io::details::my_fill_n(iter, padding, fillch);
+			// Left placement appends all padding after the already-emitted child.
+			return ::fast_io::details::my_fill_n(last, padding, fillch);
 		}
 		if (placement_code == 2u)
 		{
-			// Center placement splits padding around the child, biasing the remainder to the right.
+			// Center placement shifts the child right, then fills both sides in place.
 			::std::size_t const left_padding{padding >> 1u};
 			::std::size_t const right_padding{padding - left_padding};
-			iter = ::fast_io::details::my_fill_n(iter, left_padding, fillch);
-			iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference);
-			return ::fast_io::details::my_fill_n(iter, right_padding, fillch);
+			char_type *const child_pos{first + left_padding};
+			::fast_io::details::my_copy(first, last, child_pos);
+			::fast_io::details::my_fill_n(first, left_padding, fillch);
+			::fast_io::details::my_fill_n(child_pos + len, right_padding, fillch);
+			return first + width;
 		}
 		if (placement_code == 4u)
 		{
 			// Internal placement inserts padding after the sign or prefix reported by the child.
 			::std::size_t const internal_len{
 				::fast_io::operations::decay::print_semantic_internal_shift_arg<char_type>(node_ref.reference)};
-			if (internal_len != 0)
+			if (internal_len != 0 && internal_len <= len)
 			{
-				// A non-zero internal shift allows padding to be inserted inside the already-emitted child bytes.
-				char_type *const first{iter};
-				char_type *const last{
-					::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference)};
-				if (len < internal_len)
-				{
-					// An invalid internal span leaves the child output unchanged instead of moving bytes past it.
-					return last;
-				}
+				// A valid internal shift allows padding to be inserted inside the already-emitted child bytes.
 				char_type *const shift_pos{first + internal_len};
 				::fast_io::details::my_copy(shift_pos, last, shift_pos + padding);
 				::fast_io::details::my_fill_n(shift_pos, padding, fillch);
 				return first + width;
 			}
 		}
-		// Right placement, or internal placement without a shift point, emits padding before the child.
-		iter = ::fast_io::details::my_fill_n(iter, padding, fillch);
-		return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(iter, node_ref.reference);
+		// Right placement, or internal placement without a shift point, moves the child behind leading padding.
+		::fast_io::details::my_copy(first, last, first + padding);
+		::fast_io::details::my_fill_n(first, padding, fillch);
+		return first + width;
 	}
 	else
 	{
@@ -4623,6 +4624,203 @@ inline constexpr char_type *print_semantic_emit_unchecked_run(char_type *iter, A
 		++iter;
 	}
 	return iter;
+}
+
+/// @brief    Forward declaration for computing a bounded semantic argument size after input forwarding.
+/// @tparam   char_type the output character type
+/// @tparam   T         the semantic input argument type
+/// @param    t         the argument to measure
+/// @return   ::std::size_t an upper bound for the emitted character count
+template <::std::integral char_type, typename T>
+inline constexpr ::std::size_t print_semantic_bounded_size_arg(T &&t);
+
+/// @brief    Computes an emitted-size upper bound for a semantic leaf.
+/// @details  Precise leaves use their exact size; dynamic-reserve leaves use their object-specific reserve bound.
+/// @tparam   char_type the output character type
+/// @tparam   T         the semantic leaf type
+/// @param    t         the leaf to measure
+/// @return   ::std::size_t an upper bound for the emitted character count
+template <::std::integral char_type, typename T>
+inline constexpr ::std::size_t print_semantic_bounded_size_leaf(T &&t)
+{
+	using value_type = ::std::remove_cvref_t<T>;
+	if constexpr (::fast_io::details::decay::print_semantic_precise_leaf_size_ok_v<char_type, value_type>)
+	{
+		// Existing precise leaves already provide an exact bound.
+		return ::fast_io::operations::decay::print_semantic_precise_size_leaf<char_type>(::std::forward<T>(t));
+	}
+	else if constexpr (::fast_io::dynamic_reserve_printable<char_type, value_type>)
+	{
+		// Dynamic reserve leaves report the maximum buffer size needed for this object.
+		return print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>, ::std::forward<T>(t));
+	}
+}
+
+/// @brief    Continuation that accumulates bounded sizes for expanded semantic pack elements.
+/// @tparam   char_type the output character type
+template <::std::integral char_type>
+struct print_semantic_bounded_size_pack_continuation
+{
+	::std::size_t *totalptr;
+
+	/// @brief    Adds every expanded pack element upper bound to the running total.
+	/// @tparam   PackArgs the expanded pack element types
+	/// @param    pack_args the expanded pack elements
+	template <typename... PackArgs>
+	inline constexpr void operator()(PackArgs &&...pack_args) const
+	{
+		((*totalptr = ::fast_io::details::intrinsics::add_or_overflow_die(
+			  *totalptr,
+			  ::fast_io::operations::decay::print_semantic_bounded_size_arg<char_type>(
+				  ::std::forward<PackArgs>(pack_args)))),
+		 ...);
+	}
+};
+
+/// @brief    Computes an emitted-size upper bound for a semantic node or leaf.
+/// @tparam   char_type the output character type
+/// @tparam   T         the semantic node or leaf type
+/// @param    t         the semantic node or leaf to measure
+/// @return   ::std::size_t an upper bound for the emitted character count
+template <::std::integral char_type, typename T>
+inline constexpr ::std::size_t print_semantic_bounded_size(T &&t)
+{
+	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
+	using node_type = ::std::remove_cvref_t<decltype(node_ref)>;
+	if constexpr (::fast_io::details::print_pack<node_type>)
+	{
+		// Packs sum the upper bound of every stored element.
+		::std::size_t total{};
+		::fast_io::details::decay::print_semantic_pack_apply(
+			::std::forward<decltype(node_ref)>(node_ref),
+			::fast_io::operations::decay::print_semantic_bounded_size_pack_continuation<char_type>{
+				__builtin_addressof(total)});
+		return total;
+	}
+	else if constexpr (::fast_io::details::decay::print_semantic_condition_v<node_type>)
+	{
+		// Conditions need only the branch selected for this object.
+		if (node_ref.pred)
+		{
+			return ::fast_io::operations::decay::print_semantic_bounded_size_arg<char_type>(node_ref.t1);
+		}
+		return ::fast_io::operations::decay::print_semantic_bounded_size_arg<char_type>(node_ref.t2);
+	}
+	else if constexpr (::fast_io::details::decay::print_semantic_width_v<node_type>)
+	{
+		// Width nodes use the larger of the child upper bound and the active field width.
+		using width_traits = ::fast_io::details::decay::print_semantic_width_traits<node_type>;
+		::std::size_t const child_bound{
+			::fast_io::operations::decay::print_semantic_bounded_size_arg<char_type>(node_ref.reference)};
+		::std::size_t const width{node_ref.width};
+		auto const placement{
+			::fast_io::operations::decay::print_semantic_width_placement<width_traits>(node_ref)};
+		::std::size_t const placement_code{
+			::fast_io::operations::decay::print_semantic_width_placement_code(placement)};
+		if (width <= child_bound || placement_code == 0u)
+		{
+			return child_bound;
+		}
+		return width;
+	}
+	else
+	{
+		// Leaf nodes use either an exact size or a dynamic reserve bound.
+		return ::fast_io::operations::decay::print_semantic_bounded_size_leaf<char_type>(
+			::std::forward<decltype(node_ref)>(node_ref));
+	}
+}
+
+/// @brief    Applies semantic input forwarding before bounded-size measurement.
+/// @tparam   char_type the output character type
+/// @tparam   T         the semantic input argument type
+/// @param    t         the argument to measure
+/// @return   ::std::size_t an upper bound for the emitted character count
+template <::std::integral char_type, typename T>
+inline constexpr ::std::size_t print_semantic_bounded_size_arg(T &&t)
+{
+	decltype(auto) forwarded{
+		::fast_io::details::decay::print_semantic_input_forward<char_type>(::std::forward<T>(t))};
+	return ::fast_io::operations::decay::print_semantic_bounded_size<char_type>(
+		::std::forward<decltype(forwarded)>(forwarded));
+}
+
+/// @brief    Computes the run-time bounded size for a semantic print run.
+/// @tparam   line      true when a trailing newline is part of the run
+/// @tparam   char_type the character type of the output run
+/// @tparam   Args      the argument types in the run
+/// @param    args      the arguments whose semantic bounds are measured
+/// @return   ::std::size_t the total upper bound needed by the run
+template <bool line, ::std::integral char_type, typename... Args>
+inline constexpr ::std::size_t print_semantic_bounded_total_size(Args &&...args)
+{
+	::std::size_t total{};
+	((total = ::fast_io::details::intrinsics::add_or_overflow_die(
+		  total, ::fast_io::operations::decay::print_semantic_bounded_size_arg<char_type>(args))),
+	 ...);
+	if constexpr (line)
+	{
+		// The line variant includes the final newline in the measured bound.
+		total = ::fast_io::details::intrinsics::add_or_overflow_die(total, static_cast<::std::size_t>(1u));
+	}
+	return total;
+}
+
+/// @brief    Attempts to coalesce a bounded semantic print run into one contiguous output operation.
+/// @details  This path admits dynamic-reserve leaves by allocating for their upper bound and writing the actual length.
+/// @tparam   line          true when a trailing newline is appended
+/// @tparam   char_type     the character type of the output stream
+/// @tparam   outputstmtype the decayed output stream reference type
+/// @tparam   Args          the argument types in the run
+/// @param    optstm        the output stream reference
+/// @param    args          the arguments to emit
+/// @return   bool          true when the whole run was emitted by this coalescing path
+template <bool line, ::std::integral char_type, typename outputstmtype, typename... Args>
+inline constexpr bool print_semantic_try_bounded_coalesce(outputstmtype optstm, Args &&...args)
+{
+	if constexpr ((::fast_io::details::decay::print_semantic_bounded_size_ok<
+					   char_type, ::std::remove_cvref_t<Args>>::value &&
+				   ...))
+	{
+		// A bounded run can be materialized once when its upper bound fits the available coalescing space.
+		::std::size_t const required{
+			::fast_io::operations::decay::print_semantic_bounded_total_size<line, char_type>(args...)};
+		if (required == 0)
+		{
+			return true;
+		}
+		if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<outputstmtype>)
+		{
+			// Buffered streams can use the existing put area when it can hold the upper bound.
+			char_type *const curr{obuffer_curr(optstm)};
+			char_type *const end{obuffer_end(optstm)};
+			if (static_cast<::std::size_t>(end - curr) >= required)
+			{
+				char_type *const iter{
+					::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+						curr, ::std::forward<Args>(args)...)};
+				obuffer_set_curr(optstm, iter);
+				return true;
+			}
+		}
+		constexpr ::std::size_t threshold_chars{
+			::fast_io::details::decay::print_full_output_coalesce_threshold<char_type, outputstmtype>()};
+		if constexpr (threshold_chars != 0)
+		{
+			// Unbuffered streams use a stack buffer when the upper bound is below their full-output threshold.
+			if (required <= threshold_chars)
+			{
+				char_type buffer[threshold_chars];
+				char_type *const iter{
+					::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+						buffer, ::std::forward<Args>(args)...)};
+				::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+				return true;
+			}
+		}
+	}
+	// At least one requirement for bounded coalescing failed, so the caller must use the normal emit path.
+	return false;
 }
 
 /// @brief    Attempts to coalesce a precise semantic print run into one contiguous output operation.
@@ -5250,7 +5448,7 @@ struct print_semantic_emit_freestanding_continuation
 };
 
 /// @brief    Entry continuation for flattened semantic emission.
-/// @details  It first tries precise coalescing for the whole filtered run, then falls back to semantic flattening.
+/// @details  It tries precise and bounded coalescing for the whole filtered run before semantic flattening.
 /// @tparam   line          true when a trailing newline is appended
 /// @tparam   char_type     the character type of the output stream
 /// @tparam   outputstmtype the decayed output stream reference type
@@ -5259,16 +5457,18 @@ struct print_semantic_emit_flat_continuation
 {
 	outputstmtype optstm;
 
-	/// @brief    Emits a filtered semantic run, preferring precise coalescing before flattening.
+	/// @brief    Emits a filtered semantic run, preferring coalescing before flattening.
 	/// @tparam   FilteredArgs the filtered argument types
 	/// @param    filtered_args the filtered arguments
 	template <typename... FilteredArgs>
 	inline constexpr void operator()(FilteredArgs &&...filtered_args) const
 	{
 		if (!::fast_io::operations::decay::print_semantic_try_precise_coalesce<line, char_type>(
+				optstm, ::std::forward<FilteredArgs>(filtered_args)...) &&
+			!::fast_io::operations::decay::print_semantic_try_bounded_coalesce<line, char_type>(
 				optstm, ::std::forward<FilteredArgs>(filtered_args)...))
 		{
-			// Failed precise coalescing keeps semantics by flattening nodes around ordinary freestanding output.
+			// Failed coalescing keeps semantics by flattening nodes around ordinary freestanding output.
 			::fast_io::operations::decay::print_semantic_emit_flat_impl<line, char_type>(
 				optstm,
 				::fast_io::operations::decay::print_semantic_emit_freestanding_continuation<outputstmtype>{optstm},

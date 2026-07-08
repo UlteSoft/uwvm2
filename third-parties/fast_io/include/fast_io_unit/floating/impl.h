@@ -16,16 +16,34 @@ concept print_floating_has_iec559_traits = requires {
 	typename ::fast_io::details::iec559_traits<::std::remove_cvref_t<T>>::mantissa_type;
 };
 
+template <typename T, bool = ::fast_io::details::print_floating_has_iec559_traits<T>>
+struct print_floating_decimal_direct_supported_impl
+{
+	inline static constexpr bool value{};
+};
+
 template <typename T>
-inline constexpr bool print_floating_decimal_direct_supported{
-	::std::same_as<::std::remove_cvref_t<T>, float> || ::std::same_as<::std::remove_cvref_t<T>, double>
+struct print_floating_decimal_direct_supported_impl<T, true>
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+	inline static constexpr bool value{
+		(trait::mbits <= ::fast_io::details::iec559_traits<float>::mbits &&
+		 trait::ebits <= ::fast_io::details::iec559_traits<float>::ebits &&
+		 sizeof(no_cvref_t) <= sizeof(float)) ||
+		::std::same_as<no_cvref_t, double>
 #ifdef __STDCPP_FLOAT32_T__
-	|| ::std::same_as<::std::remove_cvref_t<T>, _Float32>
+		|| ::std::same_as<no_cvref_t, _Float32>
 #endif
 #ifdef __STDCPP_FLOAT64_T__
-	|| ::std::same_as<::std::remove_cvref_t<T>, _Float64>
+		|| ::std::same_as<no_cvref_t, _Float64>
 #endif
+	};
 };
+
+template <typename T>
+inline constexpr bool print_floating_decimal_direct_supported{
+	::fast_io::details::print_floating_decimal_direct_supported_impl<T>::value};
 
 template <typename T, bool = ::fast_io::details::print_floating_has_iec559_traits<T>>
 struct print_floating_decimal_via_float_impl
