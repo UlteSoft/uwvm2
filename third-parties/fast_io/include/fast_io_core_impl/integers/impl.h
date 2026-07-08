@@ -1037,6 +1037,7 @@ template <bool uppercase = false, typename scalar_type>
 			 (!::std::is_function_v<::std::remove_cvref_t<scalar_type>>))
 inline constexpr auto pointervw(scalar_type t) noexcept
 {
+	// Object pointers and contiguous iterators: print the address value, not pointee text.
 	return ::fast_io::details::scalar_flags_int_cache<
 		::fast_io::details::base_mani_flags_cache<16, uppercase, true, true, false>>(t);
 }
@@ -1045,6 +1046,7 @@ template <bool uppercase = false, typename scalar_type>
 	requires(::std::is_function_v<scalar_type>)
 inline constexpr auto funcvw(scalar_type *t) noexcept
 {
+	// Function pointer entry addresses are kept separate from object/iterator addresses.
 	return ::fast_io::details::scalar_flags_int_cache<
 		::fast_io::details::base_mani_flags_cache<16, uppercase, true, true, false>>(::std::bit_cast<::std::size_t>(t));
 }
@@ -1053,6 +1055,7 @@ template <bool uppercase = false, typename scalar_type>
 	requires(::std::is_member_object_pointer_v<scalar_type>)
 inline constexpr auto fieldptrvw(scalar_type t) noexcept
 {
+	// Pointer-to-member fields are ABI encodings, not object addresses.
 	if constexpr (sizeof(t) == sizeof(::fast_io::manipulators::member_function_pointer_holder_t))
 	{
 		return ::fast_io::details::scalar_flags_int_cache<
@@ -1079,6 +1082,7 @@ template <bool uppercase = false, typename scalar_type>
 	requires(::std::is_member_function_pointer_v<scalar_type> && (sizeof(scalar_type) % sizeof(::std::size_t) == 0))
 inline constexpr auto methodvw(scalar_type t) noexcept
 {
+	// Pointer-to-member functions may be multi-word ABI encodings.
 	if constexpr (sizeof(scalar_type) == sizeof(::std::size_t))
 	{
 		return ::fast_io::details::scalar_flags_int_cache<
@@ -1754,6 +1758,7 @@ inline constexpr auto scientific_get(scalar_type &value, ::std::size_t n) noexce
 template <::std::integral inttype>
 inline constexpr ::std::remove_cvref_t<inttype> bitfieldvw(inttype v) noexcept
 {
+	// Copy bit-fields into an ordinary integer value before formatting.
 	return v;
 }
 
