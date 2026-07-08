@@ -241,6 +241,24 @@ template <typename T>
 			}
 		}
 	}
+	else if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+	{
+		if (-27 <= exponent && exponent <= 27)
+		{
+			no_cvref_t result{static_cast<no_cvref_t>(significand)};
+			auto const &table{::fast_io::details::scan_decfloat_power10_table<no_cvref_t, 28u>};
+			if (exponent < 0)
+			{
+				result /= table.index_unchecked(static_cast<::std::size_t>(-exponent));
+			}
+			else
+			{
+				result *= table.index_unchecked(static_cast<::std::size_t>(exponent));
+			}
+			value = negative ? -result : result;
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -339,6 +357,13 @@ struct scan_decfloat_adjusted_mantissa
 	::std::uint_least64_t mantissa{};
 	::std::int_least32_t power2{};
 };
+
+[[nodiscard]] inline constexpr bool
+scan_decfloat_adjusted_mantissa_equal(scan_decfloat_adjusted_mantissa left,
+									  scan_decfloat_adjusted_mantissa right) noexcept
+{
+	return left.mantissa == right.mantissa && left.power2 == right.power2;
+}
 
 struct scan_decfloat_uint128
 {
@@ -830,9 +855,69 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 		return true;
 	}
 
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_mul_u64(scan_decfloat_bigint &value,
+																	 ::std::uint_least64_t multiplier) noexcept
+	{
+		if (!multiplier || !value.size)
+		{
+			value = {};
+			return true;
+		}
+		__uint128_t carry{};
+		for (::std::size_t index{}; index != value.size; ++index)
+		{
+			auto const product{static_cast<__uint128_t>(value.limb[index]) * multiplier + carry};
+			value.limb[index] = static_cast<::std::uint_least64_t>(product);
+			carry = product >> 64u;
+		}
+		if (carry)
+		{
+			if (value.size == ::fast_io::details::scan_decfloat_bigint_limb_capacity)
+			{
+				return false;
+			}
+			value.limb[value.size] = static_cast<::std::uint_least64_t>(carry);
+			++value.size;
+		}
+		return true;
+	}
+
 	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_add_small(scan_decfloat_bigint &value,
 																	   ::std::uint_least32_t addend) noexcept
 	{
+		if (!value.size)
+		{
+			::fast_io::details::scan_decfloat_bigint_set_u64(value, addend);
+			return true;
+		}
+		__uint128_t sum{static_cast<__uint128_t>(value.limb[0]) + addend};
+		value.limb[0] = static_cast<::std::uint_least64_t>(sum);
+		auto carry{sum >> 64u};
+		for (::std::size_t index{1u}; carry && index != value.size; ++index)
+		{
+			sum = static_cast<__uint128_t>(value.limb[index]) + carry;
+			value.limb[index] = static_cast<::std::uint_least64_t>(sum);
+			carry = sum >> 64u;
+		}
+		if (carry)
+		{
+			if (value.size == ::fast_io::details::scan_decfloat_bigint_limb_capacity)
+			{
+				return false;
+			}
+			value.limb[value.size] = static_cast<::std::uint_least64_t>(carry);
+			++value.size;
+		}
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_add_u64(scan_decfloat_bigint &value,
+																	 ::std::uint_least64_t addend) noexcept
+	{
+		if (!addend)
+		{
+			return true;
+		}
 		if (!value.size)
 		{
 			::fast_io::details::scan_decfloat_bigint_set_u64(value, addend);
@@ -863,11 +948,30 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 														   scan_decfloat_significand_state const &state) noexcept
 	{
 		value = {};
+		constexpr ::std::uint_least64_t chunk_digits{19u};
+		constexpr ::std::uint_least64_t chunk_power{10000000000000000000ull};
+		::std::uint_least64_t chunk{};
+		::std::uint_least64_t count{};
 		for (::std::size_t index{}; index != state.exact_stored_digits; ++index)
 		{
-			if (!::fast_io::details::scan_decfloat_bigint_mul_small(value, 10u) ||
-				!::fast_io::details::scan_decfloat_bigint_add_small(
-					value, static_cast<::std::uint_least32_t>(state.exact_digits[index])))
+			chunk = chunk * 10u + static_cast<::std::uint_least64_t>(state.exact_digits[index]);
+			++count;
+			if (count == chunk_digits)
+			{
+				if (!::fast_io::details::scan_decfloat_bigint_mul_u64(value, chunk_power) ||
+					!::fast_io::details::scan_decfloat_bigint_add_u64(value, chunk))
+				{
+					return false;
+				}
+				chunk = 0;
+				count = 0;
+			}
+		}
+		if (count)
+		{
+			if (!::fast_io::details::scan_decfloat_bigint_mul_u64(
+					value, ::fast_io::details::print_rsv_fp_pow10_0_to_19_table[count]) ||
+				!::fast_io::details::scan_decfloat_bigint_add_u64(value, chunk))
 			{
 				return false;
 			}
@@ -994,18 +1098,64 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 		return true;
 	}
 
-	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_pow5(scan_decfloat_bigint &value,
-																  ::std::uint_least64_t exponent) noexcept
+	inline constexpr ::std::uint_least64_t scan_decfloat_pow5_0_to_27_table[]{
+		1u,
+		5u,
+		25u,
+		125u,
+		625u,
+		3125u,
+		15625u,
+		78125u,
+		390625u,
+		1953125u,
+		9765625u,
+		48828125u,
+		244140625u,
+		1220703125u,
+		6103515625u,
+		30517578125u,
+		152587890625u,
+		762939453125u,
+		3814697265625u,
+		19073486328125u,
+		95367431640625u,
+		476837158203125u,
+		2384185791015625u,
+		11920928955078125u,
+		59604644775390625u,
+		298023223876953125u,
+		1490116119384765625u,
+		7450580596923828125u};
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_mul_pow5(scan_decfloat_bigint &value,
+																	  ::std::uint_least64_t exponent) noexcept
 	{
-		::fast_io::details::scan_decfloat_bigint_set_u64(value, 1u);
-		for (; exponent; --exponent)
+		constexpr ::std::uint_least64_t chunk{27u};
+		for (; exponent >= chunk; exponent -= chunk)
 		{
-			if (!::fast_io::details::scan_decfloat_bigint_mul_small(value, 5u))
+			if (!::fast_io::details::scan_decfloat_bigint_mul_u64(
+					value, ::fast_io::details::scan_decfloat_pow5_0_to_27_table[chunk]))
+			{
+				return false;
+			}
+		}
+		if (exponent != 0)
+		{
+			if (!::fast_io::details::scan_decfloat_bigint_mul_u64(
+					value, ::fast_io::details::scan_decfloat_pow5_0_to_27_table[exponent]))
 			{
 				return false;
 			}
 		}
 		return true;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_pow5(scan_decfloat_bigint &value,
+																  ::std::uint_least64_t exponent) noexcept
+	{
+		::fast_io::details::scan_decfloat_bigint_set_u64(value, 1u);
+		return ::fast_io::details::scan_decfloat_bigint_mul_pow5(value, exponent);
 	}
 
 	[[nodiscard]] inline constexpr ::std::int_least64_t
@@ -1137,6 +1287,119 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 		{
 			return (remainder_nonzero || tail_nonzero) &&
 				   ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative);
+		}
+	}
+
+	template <typename T>
+	[[nodiscard]] inline constexpr ::std::uint_least64_t
+	scan_decfloat_adjusted_significand(scan_decfloat_adjusted_mantissa adjusted) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+		if (adjusted.power2 == 0)
+		{
+			return adjusted.mantissa;
+		}
+		return adjusted.mantissa | (::std::uint_least64_t{1u} << trait::mbits);
+	}
+
+	struct scan_decfloat_extended_mantissa
+	{
+		::std::uint_least64_t mantissa{};
+		::std::int_least64_t power2{};
+	};
+
+	template <typename T>
+	[[nodiscard]] inline constexpr scan_decfloat_extended_mantissa
+	scan_decfloat_adjusted_to_extended_halfway(scan_decfloat_adjusted_mantissa adjusted) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+		constexpr auto bias{static_cast<::std::int_least64_t>(trait::mbits) -
+							static_cast<::std::int_least64_t>(
+								::fast_io::details::scan_decfloat_minimum_exponent<no_cvref_t>())};
+		::fast_io::details::scan_decfloat_extended_mantissa extended;
+		if (adjusted.power2 == 0)
+		{
+			extended.mantissa = adjusted.mantissa;
+			extended.power2 = 1 - bias;
+		}
+		else
+		{
+			extended.mantissa =
+				::fast_io::details::scan_decfloat_adjusted_significand<no_cvref_t>(adjusted);
+			extended.power2 = static_cast<::std::int_least64_t>(adjusted.power2) - bias;
+		}
+		extended.mantissa = static_cast<::std::uint_least64_t>((extended.mantissa << 1u) | 1u);
+		--extended.power2;
+		return extended;
+	}
+
+	template <typename T>
+	[[nodiscard]] inline constexpr bool
+	scan_decfloat_try_nearest_even_compare(T &value, bool negative,
+										   scan_decfloat_significand_state const &state,
+										   ::std::int_least64_t decimal_exponent,
+										   scan_decfloat_adjusted_mantissa lower,
+										   scan_decfloat_adjusted_mantissa upper,
+										   ::fast_io::parse_code &code) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		if constexpr (!::fast_io::details::scan_decfloat_compute_supported<no_cvref_t>)
+		{
+			return false;
+		}
+		else
+		{
+			if (decimal_exponent >= 0 || state.exact_truncated_nonzero)
+			{
+				return false;
+			}
+			::fast_io::details::scan_decfloat_bigint real_digits;
+			if (!::fast_io::details::scan_decfloat_bigint_from_digits(real_digits, state))
+			{
+				return false;
+			}
+			auto const halfway{
+				::fast_io::details::scan_decfloat_adjusted_to_extended_halfway<no_cvref_t>(lower)};
+			::fast_io::details::scan_decfloat_bigint theor_digits;
+			::fast_io::details::scan_decfloat_bigint_set_u64(theor_digits, halfway.mantissa);
+			auto const pow5_exponent{static_cast<::std::uint_least64_t>(-decimal_exponent)};
+			if (!::fast_io::details::scan_decfloat_bigint_mul_pow5(theor_digits, pow5_exponent))
+			{
+				return false;
+			}
+			auto const pow2_exponent{halfway.power2 - decimal_exponent};
+			if (pow2_exponent > 0)
+			{
+				::fast_io::details::scan_decfloat_bigint shifted;
+				if (!::fast_io::details::scan_decfloat_bigint_shift_left(
+						shifted, theor_digits, static_cast<::std::size_t>(pow2_exponent)))
+				{
+					return false;
+				}
+				theor_digits = shifted;
+			}
+			else if (pow2_exponent < 0)
+			{
+				::fast_io::details::scan_decfloat_bigint shifted;
+				if (!::fast_io::details::scan_decfloat_bigint_shift_left(
+						shifted, real_digits, static_cast<::std::size_t>(-pow2_exponent)))
+				{
+					return false;
+				}
+				real_digits = shifted;
+			}
+			auto const order{::fast_io::details::scan_decfloat_bigint_compare(real_digits, theor_digits)};
+			auto const lower_significand{
+				::fast_io::details::scan_decfloat_adjusted_significand<no_cvref_t>(lower)};
+			auto const selected{(order > 0 || (order == 0 && (lower_significand & 1u) != 0u)) ? upper : lower};
+			::fast_io::details::scan_decfloat_to_float(negative, selected, value);
+			code = ((state.significand != 0 && selected.mantissa == 0 && selected.power2 == 0) ||
+					selected.power2 == ::fast_io::details::scan_decfloat_infinite_power<no_cvref_t>())
+					   ? ::fast_io::parse_code::overflow
+					   : ::fast_io::parse_code::ok;
+			return true;
 		}
 	}
 
@@ -1300,12 +1563,10 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 			::std::int_least64_t binary_exponent_adjust{};
 			if (decimal_exponent >= 0)
 			{
-				for (::std::int_least64_t counter{}; counter != decimal_exponent; ++counter)
+				if (!::fast_io::details::scan_decfloat_bigint_mul_pow5(
+						numerator, static_cast<::std::uint_least64_t>(decimal_exponent)))
 				{
-					if (!::fast_io::details::scan_decfloat_bigint_mul_small(numerator, 5u))
-					{
-						return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
-					}
+					return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
 				}
 				binary_exponent_adjust = decimal_exponent;
 			}
@@ -1724,6 +1985,35 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 					adjusted_exponent, state.significand, negative, adjusted))
 			{
 				return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
+			}
+		}
+		else if (state.significand != 0 &&
+				 state.significand != (::std::numeric_limits<::std::uint_least64_t>::max)())
+		{
+			::fast_io::details::scan_decfloat_adjusted_mantissa upper_adjusted;
+			if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+					adjusted_exponent, state.significand, negative, adjusted) &&
+				::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+					adjusted_exponent, state.significand + 1u, negative, upper_adjusted))
+			{
+				if (::fast_io::details::scan_decfloat_adjusted_mantissa_equal(adjusted, upper_adjusted))
+				{
+					return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
+				}
+				if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_even)
+				{
+					auto decimal_exponent{::fast_io::details::scan_decfloat_saturating_add(
+						exponent, -static_cast<::std::int_least64_t>(state.fractional_digits))};
+					decimal_exponent = ::fast_io::details::scan_decfloat_saturating_add(
+						decimal_exponent,
+						static_cast<::std::int_least64_t>(state.significant_digits - state.exact_stored_digits));
+					::fast_io::parse_code code{};
+					if (::fast_io::details::scan_decfloat_try_nearest_even_compare(
+							value, negative, state, decimal_exponent, adjusted, upper_adjusted, code))
+					{
+						return code;
+					}
+				}
 			}
 		}
 	}

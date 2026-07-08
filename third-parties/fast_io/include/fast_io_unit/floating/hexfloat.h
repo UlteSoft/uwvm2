@@ -375,6 +375,77 @@ inline constexpr void scan_hexfloat_ascii8_pack(::std::uint_least64_t val, ::std
 	return (val ^ 0x3030303030303030) != 0;
 }
 
+template <::std::size_t vec_size, ::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type const *
+scan_hexfloat_skip_after_storage_limit_simd(char_type const *first, char_type const *last,
+											bool &truncated_nonzero) noexcept
+{
+	static_assert(sizeof(char_type) == sizeof(char8_t));
+	using unsigned_char_type = ::std::make_unsigned_t<::std::remove_cvref_t<char_type>>;
+	using signed_char_type = ::std::make_signed_t<unsigned_char_type>;
+	constexpr unsigned N{vec_size / sizeof(char_type)};
+	using simd_vector_type = ::fast_io::intrinsics::simd_vector<signed_char_type, N>;
+#if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
+	constexpr simd_vector_type zeroes{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'0', char_type, N>)};
+	constexpr simd_vector_type nines{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'9', char_type, N>)};
+	constexpr simd_vector_type lower_as{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'a', char_type, N>)};
+	constexpr simd_vector_type lower_fs{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'f', char_type, N>)};
+	constexpr simd_vector_type case_bits{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8' ', char_type, N>)};
+#else
+	simd_vector_type zeroes;
+	zeroes.load(::fast_io::details::characters_array_impl<u8'0', char_type, N>.data());
+	simd_vector_type nines;
+	nines.load(::fast_io::details::characters_array_impl<u8'9', char_type, N>.data());
+	simd_vector_type lower_as;
+	lower_as.load(::fast_io::details::characters_array_impl<u8'a', char_type, N>.data());
+	simd_vector_type lower_fs;
+	lower_fs.load(::fast_io::details::characters_array_impl<u8'f', char_type, N>.data());
+	simd_vector_type case_bits;
+	case_bits.load(::fast_io::details::characters_array_impl<u8' ', char_type, N>.data());
+#endif
+	for (; N <= static_cast<::std::size_t>(last - first);)
+	{
+		simd_vector_type vec;
+		vec.load(first);
+		auto const lower{vec | case_bits};
+		auto const valid{((zeroes <= vec) & (vec <= nines)) |
+						 ((lower_as <= lower) & (lower <= lower_fs))};
+		auto const invalid{~valid};
+		if (!::fast_io::intrinsics::is_all_zeros(invalid))
+		{
+			auto const valid_count{::fast_io::intrinsics::vector_mask_countr_zero(invalid)};
+			auto const *const invalid_pos{first + valid_count};
+			using char_unsigned_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+			for (; first != invalid_pos; ++first)
+			{
+				auto digit{static_cast<char_unsigned_type>(*first)};
+				(void)::fast_io::details::char_digit_to_literal<16, char_type>(digit);
+				if (!truncated_nonzero && digit != 0)
+				{
+					truncated_nonzero = true;
+				}
+			}
+			return first;
+		}
+		if (!truncated_nonzero && !::fast_io::intrinsics::is_all_zeros(vec != zeroes))
+		{
+			truncated_nonzero = true;
+		}
+		first += N;
+	}
+	return first;
+}
+
 [[nodiscard]] inline constexpr bool scan_hexfloat_ascii8_nibbles_only(::std::uint_least64_t val,
 																	  ::std::uint_least64_t &nibbles) noexcept
 {
@@ -431,6 +502,13 @@ inline constexpr char_type const *scan_hexfloat_skip_after_storage_limit_run(cha
 		if constexpr (!::fast_io::details::is_ebcdic<char_type> && sizeof(char_type) == sizeof(char8_t) &&
 					  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
 		{
+			constexpr auto simd_size{
+				::fast_io::intrinsics::optimal_simd_vector_run_with_cpu_instruction_size_with_mask_countr};
+			if constexpr (simd_size != 0)
+			{
+				first = ::fast_io::details::scan_hexfloat_skip_after_storage_limit_simd<simd_size>(
+					first, last, truncated_nonzero);
+			}
 			for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
 			{
 				::std::uint_least64_t val;
