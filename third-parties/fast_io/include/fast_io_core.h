@@ -67,7 +67,7 @@
 #include "fast_io_dsal/impl/common.h"
 #include "fast_io_dsal/impl/span.h"
 #include "fast_io_dsal/impl/tuple.h"
-#include "fast_io_core_impl/manipulators/pack.h"
+#include "fast_io_core_impl/manipulators/traits.h"
 #include "fast_io_core_impl/operations/impl.h"
 
 // This should provide an option macro to disable any generation for table in freestanding environments.
@@ -101,6 +101,7 @@
 
 #include "fast_io_core_impl/concat/impl.h"
 #include "fast_io_core_impl/to.h"
+#include "fast_io_core_impl/manipulators/impl.h"
 
 #include "fast_io_core_impl/http_header.h"
 #include "fast_io_core_impl/io_lockable.h"

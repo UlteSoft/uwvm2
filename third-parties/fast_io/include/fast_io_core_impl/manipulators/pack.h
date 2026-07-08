@@ -1,5 +1,7 @@
 #pragma once
 
+#include "traits.h"
+
 namespace fast_io
 {
 
@@ -26,23 +28,6 @@ using pack_alias_type =
 
 namespace manipulators
 {
-
-template <typename T1, typename T2>
-struct condition;
-
-enum class scalar_placement : char8_t;
-
-template <scalar_placement flags, typename T>
-struct width_t;
-
-template <scalar_placement flags, typename T, ::std::integral ch_type>
-struct width_ch_t;
-
-template <typename T>
-struct width_runtime_t;
-
-template <typename T, ::std::integral ch_type>
-struct width_runtime_ch_t;
 
 struct pack_manip_tag_t
 {};
@@ -74,19 +59,5 @@ inline constexpr auto pack(Args &&...args) noexcept
 }
 
 } // namespace manipulators
-
-namespace details
-{
-
-template <typename T>
-inline constexpr bool is_print_pack_v = false;
-
-template <typename... Args>
-inline constexpr bool is_print_pack_v<::fast_io::manipulators::pack_t<Args...>> = true;
-
-template <typename T>
-concept print_pack = is_print_pack_v<::std::remove_cvref_t<T>>;
-
-} // namespace details
 
 } // namespace fast_io
