@@ -283,7 +283,7 @@ struct scan_decfloat_significand_state
 	bool has_nonzero_digit{};
 	bool truncated_nonzero{};
 	bool exact_truncated_nonzero{};
-	char8_t exact_digits[scan_decfloat_exact_digit_capacity]{};
+	char8_t exact_digits[scan_decfloat_exact_digit_capacity];
 };
 
 template <::std::integral char_type>
@@ -339,6 +339,49 @@ inline constexpr void scan_decfloat_append_exact_eight_digits(scan_decfloat_sign
 			break;
 		}
 	}
+}
+
+#if __has_cpp_attribute(__gnu__::__cold__)
+[[__gnu__::__cold__]]
+#endif
+#if __has_cpp_attribute(__gnu__::__noinline__)
+[[__gnu__::__noinline__]]
+#elif __has_cpp_attribute(msvc::noinline)
+[[msvc::noinline]]
+#endif
+inline constexpr void scan_decfloat_append_exact_ascii8_digits_slow(scan_decfloat_significand_state &state,
+																	::std::uint_least64_t val) noexcept
+{
+	for (::std::size_t offset{}; offset != 8u; ++offset)
+	{
+		auto const ch{static_cast<char8_t>((val >> (offset * 8u)) & 0xFFu)};
+		auto const digit{static_cast<char8_t>(ch - u8'0')};
+		::fast_io::details::scan_decfloat_append_exact_digit(state, digit);
+	}
+}
+
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void scan_decfloat_append_exact_ascii8_digits(scan_decfloat_significand_state &state,
+															   ::std::uint_least64_t val) noexcept
+{
+	if constexpr (::std::endian::native == ::std::endian::little &&
+				  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
+	{
+		if (state.exact_stored_digits + 8u <= ::fast_io::details::scan_decfloat_exact_digit_capacity)
+		{
+			auto const digits{static_cast<::std::uint_least64_t>(val - 0x3030303030303030u)};
+			::fast_io::freestanding::my_memcpy(
+				state.exact_digits + state.exact_stored_digits, __builtin_addressof(digits),
+				sizeof(::std::uint_least64_t));
+			state.exact_stored_digits += 8u;
+			return;
+		}
+	}
+	::fast_io::details::scan_decfloat_append_exact_ascii8_digits_slow(state, val);
 }
 
 struct scan_decfloat_adjusted_mantissa
@@ -1107,6 +1150,57 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 		return true;
 	}
 
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+	[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+	[[msvc::forceinline]]
+#endif
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_shift_left_inplace(scan_decfloat_bigint &value,
+																				::std::size_t shift) noexcept
+	{
+		if (!value.size || !shift)
+		{
+			return true;
+		}
+		auto const limb_shift{shift / 64u};
+		auto const bit_shift{shift % 64u};
+		if (value.size + limb_shift + (bit_shift != 0u) >
+			::fast_io::details::scan_decfloat_bigint_limb_capacity)
+		{
+			return false;
+		}
+		if (limb_shift)
+		{
+			for (auto index{value.size}; index != 0u;)
+			{
+				--index;
+				value.limb[index + limb_shift] = value.limb[index];
+			}
+			for (::std::size_t index{}; index != limb_shift; ++index)
+			{
+				value.limb[index] = 0u;
+			}
+			value.size += limb_shift;
+		}
+		if (bit_shift)
+		{
+			::std::uint_least64_t carry{};
+			for (::std::size_t index{limb_shift}; index != value.size; ++index)
+			{
+				auto const word{value.limb[index]};
+				value.limb[index] = static_cast<::std::uint_least64_t>((word << bit_shift) | carry);
+				carry = static_cast<::std::uint_least64_t>(word >> (64u - bit_shift));
+			}
+			if (carry)
+			{
+				value.limb[value.size] = carry;
+				++value.size;
+			}
+		}
+		::fast_io::details::scan_decfloat_bigint_normalize(value);
+		return true;
+	}
+
 	inline constexpr ::std::uint_least64_t scan_decfloat_pow5_0_to_27_table[]{
 		1u,
 		5u,
@@ -1382,23 +1476,19 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 			auto const pow2_exponent{halfway.power2 - decimal_exponent};
 			if (pow2_exponent > 0)
 			{
-				::fast_io::details::scan_decfloat_bigint shifted;
-				if (!::fast_io::details::scan_decfloat_bigint_shift_left(
-						shifted, theor_digits, static_cast<::std::size_t>(pow2_exponent)))
+				if (!::fast_io::details::scan_decfloat_bigint_shift_left_inplace(
+						theor_digits, static_cast<::std::size_t>(pow2_exponent)))
 				{
 					return false;
 				}
-				::fast_io::details::scan_decfloat_bigint_copy(theor_digits, shifted);
 			}
 			else if (pow2_exponent < 0)
 			{
-				::fast_io::details::scan_decfloat_bigint shifted;
-				if (!::fast_io::details::scan_decfloat_bigint_shift_left(
-						shifted, real_digits, static_cast<::std::size_t>(-pow2_exponent)))
+				if (!::fast_io::details::scan_decfloat_bigint_shift_left_inplace(
+						real_digits, static_cast<::std::size_t>(-pow2_exponent)))
 				{
 					return false;
 				}
-				::fast_io::details::scan_decfloat_bigint_copy(real_digits, shifted);
 			}
 			auto const order{::fast_io::details::scan_decfloat_bigint_compare(real_digits, theor_digits)};
 			auto const lower_significand{
@@ -1710,7 +1800,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 													   ::std::uint_least64_t significand) noexcept
 	{
 		auto const original{significand};
-		char8_t buffer[20]{};
+		char8_t buffer[20];
 		::std::size_t size{};
 		for (; significand; significand /= 10u)
 		{
@@ -1802,6 +1892,133 @@ scan_decfloat_ascii8_has_nonzero_digit(::std::uint_least64_t val) noexcept
 	return (val ^ 0x3030303030303030u) != 0;
 }
 
+template <::std::size_t vec_size, ::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type const *
+scan_decfloat_skip_after_exact_limit_simd(char_type const *first, char_type const *last,
+										  bool &tail_nonzero) noexcept
+{
+	static_assert(sizeof(char_type) == sizeof(char8_t));
+	using unsigned_char_type = ::std::make_unsigned_t<::std::remove_cvref_t<char_type>>;
+	using signed_char_type = ::std::make_signed_t<unsigned_char_type>;
+	constexpr unsigned N{vec_size / sizeof(char_type)};
+	using simd_vector_type = ::fast_io::intrinsics::simd_vector<signed_char_type, N>;
+#if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
+	constexpr simd_vector_type zeroes{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'0', char_type, N>)};
+	constexpr simd_vector_type nines{
+		::std::bit_cast<simd_vector_type>(::fast_io::details::characters_array_impl<u8'9', char_type, N>)};
+#else
+	simd_vector_type zeroes;
+	zeroes.load(::fast_io::details::characters_array_impl<u8'0', char_type, N>.data());
+	simd_vector_type nines;
+	nines.load(::fast_io::details::characters_array_impl<u8'9', char_type, N>.data());
+#endif
+	for (; N <= static_cast<::std::size_t>(last - first);)
+	{
+		simd_vector_type vec;
+		vec.load(first);
+		auto const valid{(zeroes <= vec) & (vec <= nines)};
+		auto const invalid{~valid};
+		if (!::fast_io::intrinsics::is_all_zeros(invalid))
+		{
+			auto const valid_count{::fast_io::intrinsics::vector_mask_countr_zero(invalid)};
+			auto const *const invalid_pos{first + valid_count};
+			for (; first != invalid_pos; ++first)
+			{
+				if (!tail_nonzero && *first != ::fast_io::char_literal_v<u8'0', char_type>)
+				{
+					tail_nonzero = true;
+				}
+			}
+			return first;
+		}
+		if (!tail_nonzero && !::fast_io::intrinsics::is_all_zeros(vec != zeroes))
+		{
+			tail_nonzero = true;
+		}
+		first += N;
+	}
+	return first;
+}
+
+template <::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type const *scan_decfloat_skip_after_exact_limit_run(
+	char_type const *first, char_type const *last, bool after_decimal,
+	scan_decfloat_significand_state &state) noexcept
+{
+	auto const *const original_first{first};
+	auto tail_nonzero{state.exact_truncated_nonzero};
+#ifdef __cpp_if_consteval
+	if !consteval
+#else
+	if (!__builtin_is_constant_evaluated())
+#endif
+	{
+		if constexpr (!::fast_io::details::is_ebcdic<char_type> && sizeof(char_type) == sizeof(char8_t) &&
+					  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
+		{
+			constexpr auto simd_size{
+				::fast_io::intrinsics::optimal_simd_vector_run_with_cpu_instruction_size_with_mask_countr};
+			if constexpr (simd_size != 0)
+			{
+				first = ::fast_io::details::scan_decfloat_skip_after_exact_limit_simd<simd_size>(
+					first, last, tail_nonzero);
+			}
+			for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
+			{
+				::std::uint_least64_t val;
+				::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+				if constexpr (::std::endian::little != ::std::endian::native)
+				{
+					val = ::fast_io::little_endian(val);
+				}
+				if (!::fast_io::details::scan_decfloat_ascii8_is_digits(val))
+				{
+					break;
+				}
+				if (!tail_nonzero && ::fast_io::details::scan_decfloat_ascii8_has_nonzero_digit(val))
+				{
+					tail_nonzero = true;
+				}
+				first += sizeof(::std::uint_least64_t);
+			}
+		}
+	}
+	char8_t digit{};
+	for (; first != last && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
+	{
+		if (!tail_nonzero && digit != 0)
+		{
+			tail_nonzero = true;
+		}
+	}
+	auto const skipped{static_cast<::std::uint_least64_t>(first - original_first)};
+	if (skipped)
+	{
+		if (after_decimal)
+		{
+			state.fractional_digits += skipped;
+		}
+		state.significant_digits += skipped;
+		if (tail_nonzero)
+		{
+			state.exact_truncated_nonzero = true;
+			state.truncated_nonzero = true;
+		}
+	}
+	return first;
+}
+
 [[nodiscard]] inline constexpr ::std::uint_least32_t
 scan_decfloat_ascii8_parse(::std::uint_least64_t val) noexcept
 {
@@ -1863,6 +2080,61 @@ inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significan
 	}
 }
 
+template <typename T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr void scan_decfloat_append_eight_ascii_digits(scan_decfloat_significand_state &state,
+															  bool after_decimal,
+															  ::std::uint_least64_t val) noexcept
+{
+	constexpr auto digit_limit{::fast_io::details::scan_decfloat_significand_digit_limit<T>};
+	auto const digits{::fast_io::details::scan_decfloat_ascii8_parse(val)};
+	state.has_digit = true;
+	if (after_decimal)
+	{
+		state.fractional_digits += 8u;
+	}
+	if (!state.has_nonzero_digit)
+	{
+		if (digits == 0)
+		{
+			return;
+		}
+		state.has_nonzero_digit = true;
+	}
+	state.significant_digits += 8u;
+	::fast_io::details::scan_decfloat_append_exact_ascii8_digits(state, val);
+	if (state.stored_digits == digit_limit)
+	{
+		if (digits != 0)
+		{
+			state.truncated_nonzero = true;
+		}
+		return;
+	}
+	auto const available{digit_limit - state.stored_digits};
+	if (8u <= available)
+	{
+		state.significand = state.significand * 100000000u + static_cast<::std::uint_least64_t>(digits);
+		state.stored_digits += 8u;
+		return;
+	}
+	auto const divisor{::fast_io::details::scan_decfloat_pow10_0_to_8_table[8u - available]};
+	auto const stored_part{digits / divisor};
+	auto const truncated_part{digits - stored_part * divisor};
+	state.significand =
+		state.significand * ::fast_io::details::scan_decfloat_pow10_0_to_8_table[available] +
+		static_cast<::std::uint_least64_t>(stored_part);
+	state.stored_digits = digit_limit;
+	if (truncated_part != 0)
+	{
+		state.truncated_nonzero = true;
+	}
+}
+
 template <typename T, ::std::integral char_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
@@ -1896,6 +2168,13 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 			{
 				for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
 				{
+					if (state.has_nonzero_digit && state.stored_digits == digit_limit &&
+						state.exact_stored_digits == ::fast_io::details::scan_decfloat_exact_digit_capacity)
+					{
+						first = ::fast_io::details::scan_decfloat_skip_after_exact_limit_run(
+							first, last, after_decimal, state);
+						break;
+					}
 					::std::uint_least64_t val;
 					::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
 					if constexpr (::std::endian::little != ::std::endian::native)
@@ -1919,8 +2198,7 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 						if (state.exact_stored_digits !=
 							::fast_io::details::scan_decfloat_exact_digit_capacity)
 						{
-							::fast_io::details::scan_decfloat_append_exact_eight_digits(
-								state, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+							::fast_io::details::scan_decfloat_append_exact_ascii8_digits(state, val);
 						}
 						else if (!state.exact_truncated_nonzero && has_nonzero)
 						{
@@ -1933,8 +2211,8 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 					}
 					else
 					{
-						::fast_io::details::scan_decfloat_append_eight_digits<T>(
-							state, after_decimal, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+						::fast_io::details::scan_decfloat_append_eight_ascii_digits<T>(
+							state, after_decimal, val);
 					}
 					first += sizeof(::std::uint_least64_t);
 				}
