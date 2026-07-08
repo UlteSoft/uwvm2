@@ -2001,6 +2001,147 @@ inline constexpr void print_n_scatters(basic_io_scatter_t<scattertype> *pscatter
 	}
 }
 
+/// @brief    Computes the total character count for N scatter-printable/null arguments.
+/// @tparam   n         the number of argument positions to consume
+/// @tparam   char_type the print character type
+/// @tparam   T         the current argument type
+/// @tparam   Args      the remaining argument types
+/// @param    t         the current argument
+/// @param    args      the remaining arguments
+/// @return   ::std::size_t the combined scatter character count
+template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr ::std::size_t print_n_scatter_total_size(
+#if __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	T t,
+#if __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	Args... args)
+{
+	if constexpr (n == 0)
+	{
+		return 0;
+	}
+	else
+	{
+		using nocvreft = ::std::remove_cvref_t<T>;
+		::std::size_t current{};
+		if constexpr (!::std::same_as<nocvreft, ::fast_io::io_null_t>)
+		{
+			current = print_scatter_define(::fast_io::io_reserve_type<char_type, nocvreft>, t).len;
+		}
+		if constexpr (n == 1)
+		{
+			return current;
+		}
+		else
+		{
+			return ::fast_io::details::intrinsics::add_or_overflow_die(
+				current, ::fast_io::details::decay::print_n_scatter_total_size<n - 1, char_type>(args...));
+		}
+	}
+}
+
+/// @brief    Copies N scatter-printable/null arguments into a contiguous buffer.
+/// @tparam   n         the number of argument positions to consume
+/// @tparam   char_type the print character type
+/// @tparam   T         the current argument type
+/// @tparam   Args      the remaining argument types
+/// @param    ptr       the current output cursor
+/// @param    t         the current argument
+/// @param    args      the remaining arguments
+/// @return   char_type* one past the copied scatter output
+template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr char_type *print_n_scatter_materialize(char_type *ptr,
+#if __has_cpp_attribute(maybe_unused)
+														[[maybe_unused]]
+#endif
+														T t,
+#if __has_cpp_attribute(maybe_unused)
+														[[maybe_unused]]
+#endif
+														Args... args)
+{
+	if constexpr (n == 0)
+	{
+		return ptr;
+	}
+	else
+	{
+		using nocvreft = ::std::remove_cvref_t<T>;
+		if constexpr (!::std::same_as<nocvreft, ::fast_io::io_null_t>)
+		{
+			auto scatter{print_scatter_define(::fast_io::io_reserve_type<char_type, nocvreft>, t)};
+			ptr = ::fast_io::details::decay::print_small_scatter_copy_n(scatter.base, scatter.len, ptr);
+		}
+		if constexpr (n == 1)
+		{
+			return ptr;
+		}
+		else
+		{
+			return ::fast_io::details::decay::print_n_scatter_materialize<n - 1, char_type>(ptr, args...);
+		}
+	}
+}
+
+/// @brief    Tries to emit a scatter-only prefix as one contiguous output range.
+/// @tparam   needprintlf   true when the final emitted output should append a newline
+/// @tparam   position      the number of argument positions included in the scatter prefix
+/// @tparam   char_type     the print character type
+/// @tparam   outputstmtype the decayed output stream reference type
+/// @tparam   T             the current argument type
+/// @tparam   Args          the remaining argument types
+/// @param    optstm        the output stream reference
+/// @param    t             the current argument
+/// @param    args          the remaining arguments
+/// @return   bool true when the prefix was emitted without building scatter descriptors
+template <bool needprintlf, ::std::size_t position, ::std::integral char_type, typename outputstmtype, typename T,
+		  typename... Args>
+inline constexpr bool print_controls_scatters_try_materialize(outputstmtype optstm, T t, Args... args)
+{
+	constexpr ::std::size_t threshold_chars{
+		::fast_io::details::decay::print_full_output_coalesce_threshold<char_type, outputstmtype>()};
+	if constexpr (threshold_chars != 0 &&
+				  ::fast_io::details::decay::print_has_direct_write_operations<outputstmtype> &&
+				  ::fast_io::details::decay::print_stack_buffer_size_within_limit<threshold_chars, char_type>)
+	{
+		::std::size_t const total_size{::fast_io::details::intrinsics::add_or_overflow_die(
+			::fast_io::details::decay::print_n_scatter_total_size<position, char_type>(t, args...),
+			static_cast<::std::size_t>(needprintlf))};
+		if (total_size == 0)
+		{
+			return true;
+		}
+		if (total_size <= threshold_chars)
+		{
+			char_type buffer[threshold_chars];
+			char_type *ptr{
+				::fast_io::details::decay::print_n_scatter_materialize<position, char_type>(buffer, t, args...)};
+			if constexpr (needprintlf)
+			{
+				*ptr = ::fast_io::char_literal_v<u8'\n', char_type>;
+				++ptr;
+			}
+			::fast_io::operations::decay::write_all_decay(optstm, buffer, ptr);
+			return true;
+		}
+	}
+	return false;
+}
+
 /// @brief    Computes the combined run-time reserve size for dynamic reserve arguments in a prefix.
 /// @tparam   n         the number of argument positions to inspect
 /// @tparam   char_type the print character type
@@ -2493,6 +2634,11 @@ inline constexpr void print_controls_scatters(outputstmtype optstm, T t, Args...
 	using scatter_type = ::std::conditional_t<
 		::fast_io::operations::decay::defines::has_any_of_write_or_seek_pwrite_bytes_operations<outputstmtype>,
 		::fast_io::io_scatter_t, ::fast_io::basic_io_scatter_t<char_type>>;
+	if (::fast_io::details::decay::print_controls_scatters_try_materialize<needprintlf, position, char_type>(
+			optstm, t, args...))
+	{
+		return;
+	}
 	if constexpr (::fast_io::details::decay::print_stack_buffer_size_within_limit<scatterscount, scatter_type>)
 	{
 		// Small scatter descriptor runs are built on the stack and written once.

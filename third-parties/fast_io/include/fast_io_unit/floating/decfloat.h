@@ -2288,6 +2288,67 @@ template <::std::integral char_type>
 [[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
 scan_decfloat_exponent(char_type const *first, char_type const *last, ::std::int_least64_t &exponent) noexcept
 {
+	if constexpr (sizeof(char_type) == sizeof(char8_t) && !::fast_io::details::is_ebcdic<char_type>)
+	{
+#ifdef __cpp_if_consteval
+		if !consteval
+#else
+		if (!__builtin_is_constant_evaluated())
+#endif
+		{
+			auto const *const original_first{first};
+			if (first == last)
+			{
+				return {first, ::fast_io::parse_code::invalid};
+			}
+			using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+			constexpr auto plus{static_cast<unsigned_char_type>(u8'+')};
+			constexpr auto minus{static_cast<unsigned_char_type>(u8'-')};
+			constexpr auto zero{static_cast<unsigned_char_type>(u8'0')};
+			bool negative{};
+			auto uch{static_cast<unsigned_char_type>(*first)};
+			if (uch == minus)
+			{
+				negative = true;
+				++first;
+			}
+			else if (uch == plus)
+			{
+				++first;
+			}
+			if (first == last)
+			{
+				return {first, ::fast_io::parse_code::invalid};
+			}
+			uch = static_cast<unsigned_char_type>(*first);
+			auto digit{static_cast<unsigned_char_type>(uch - zero)};
+			if (10u <= digit)
+			{
+				return {first, ::fast_io::parse_code::invalid};
+			}
+			::std::uint_least64_t value{static_cast<::std::uint_least64_t>(digit)};
+			++first;
+			::std::size_t digit_count{1u};
+			for (; first != last; ++first)
+			{
+				uch = static_cast<unsigned_char_type>(*first);
+				digit = static_cast<unsigned_char_type>(uch - zero);
+				if (10u <= digit)
+				{
+					break;
+				}
+				if (digit_count == 18u)
+				{
+					return ::fast_io::details::scan_hexfloat_exponent(original_first, last, exponent);
+				}
+				value = value * 10u + static_cast<::std::uint_least64_t>(digit);
+				++digit_count;
+			}
+			exponent = negative ? -static_cast<::std::int_least64_t>(value) :
+								  static_cast<::std::int_least64_t>(value);
+			return {first, ::fast_io::parse_code::ok};
+		}
+	}
 	return ::fast_io::details::scan_hexfloat_exponent(first, last, exponent);
 }
 
@@ -3078,7 +3139,7 @@ scan_decfloat_context_special_define(::fast_io::details::scan_decfloat_context<c
 	auto const append_result{::fast_io::details::scan_floating_context_append(state.special_buffer, begin, end)};
 	if (append_result.code != ::fast_io::parse_code::partial)
 	{
-		return append_result;
+		return {append_result.iter, append_result.code};
 	}
 	T parsed_value{};
 	auto const *buffer_begin{state.special_buffer.buffer.data()};
@@ -3098,7 +3159,19 @@ scan_decfloat_context_special_define(::fast_io::details::scan_decfloat_context<c
 	{
 		if (parse_result.iter == buffer_end)
 		{
-			return {end, ::fast_io::parse_code::partial};
+			if (::fast_io::details::scan_hexfloat_special_end_may_extend<flags.nan_payload_scan>(
+					buffer_begin, buffer_end))
+			{
+				if (append_result.truncated)
+				{
+					return {append_result.iter, ::fast_io::parse_code::overflow};
+				}
+				return {end, ::fast_io::parse_code::partial};
+			}
+			value = parsed_value;
+			return {::fast_io::details::scan_floating_context_map_iter(
+						state.special_buffer, old_size, begin, append_result.iter, parse_result.iter),
+					::fast_io::parse_code::ok};
 		}
 		if (::fast_io::details::scan_hexfloat_special_parse_may_extend<flags.nan_payload_scan>(
 				parse_result.iter, buffer_end))
@@ -3112,11 +3185,19 @@ scan_decfloat_context_special_define(::fast_io::details::scan_decfloat_context<c
 	}
 	if (parse_result.iter == buffer_end)
 	{
+		if (append_result.truncated)
+		{
+			return {append_result.iter, ::fast_io::parse_code::overflow};
+		}
 		return {end, ::fast_io::parse_code::partial};
 	}
 	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
 		parse_result.code == ::fast_io::parse_code::partial)
 	{
+		if (append_result.truncated)
+		{
+			return {append_result.iter, ::fast_io::parse_code::overflow};
+		}
 		return {end, ::fast_io::parse_code::partial};
 	}
 	if (parse_result.code == ::fast_io::parse_code::invalid)
@@ -3124,6 +3205,10 @@ scan_decfloat_context_special_define(::fast_io::details::scan_decfloat_context<c
 		if (buffer_begin != buffer_end &&
 			!::fast_io::char_category::is_c_space(*(buffer_end - 1)))
 		{
+			if (append_result.truncated)
+			{
+				return {append_result.iter, ::fast_io::parse_code::overflow};
+			}
 			return {end, ::fast_io::parse_code::partial};
 		}
 	}

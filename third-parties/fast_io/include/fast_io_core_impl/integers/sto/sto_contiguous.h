@@ -593,6 +593,46 @@ inline constexpr ::fast_io::freestanding::array<T, n> generate_pow_table() noexc
 template <char8_t base, my_unsigned_integral T, ::std::size_t n>
 inline constexpr ::fast_io::freestanding::array<T, n> pow_table_n{::fast_io::details::generate_pow_table<base, T, n>()};
 
+template <::std::integral char_type, my_unsigned_integral T>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
+inline constexpr parse_result<char_type const *>
+scan_int_contiguous_ascii_hex_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
+{
+	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
+	using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
+	constexpr ::std::size_t max_size{::fast_io::details::max_int_size_result<unsigned_type, 16>};
+	::std::size_t const diff{static_cast<::std::size_t>(last - first)};
+	::std::size_t mn_val{max_size};
+	if (diff < mn_val)
+	{
+		mn_val = diff;
+	}
+	auto first_phase_last{first + mn_val};
+	T res{out};
+	for (; first != first_phase_last; ++first) [[likely]]
+	{
+		auto const digit{::fast_io::details::sto_ascii_digit_table_lookup<char_type>(
+			static_cast<unsigned_char_type>(*first))};
+		if (15u < digit) [[unlikely]]
+		{
+			break;
+		}
+		res = static_cast<T>((static_cast<unsigned_type>(res) << 4u) | static_cast<unsigned_type>(digit));
+	}
+	if (first == last)
+	{
+		out = res;
+		return {first, parse_code::ok};
+	}
+	auto ret{scan_int_contiguous_none_simd_space_part_check_overflow_impl<16, char_type, T>(first, last, res)};
+	out = res;
+	return ret;
+}
+
 template <char8_t base, ::std::integral char_type, my_unsigned_integral T>
 inline parse_result<char_type const *>
 runtime_scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, char_type const *last, T &out) noexcept
@@ -1030,6 +1070,14 @@ scan_int_contiguous_none_simd_space_part_define_impl(char_type const *first, cha
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
+		using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
+		if constexpr (base == 16 && sizeof(char_type) == sizeof(char8_t) &&
+					  !::fast_io::details::is_ebcdic<char_type> &&
+					  sizeof(unsigned_type) <= sizeof(::std::uint_least64_t))
+		{
+			return ::fast_io::details::scan_int_contiguous_ascii_hex_space_part_define_impl<char_type, T>(
+				first, last, res);
+		}
 		return runtime_scan_int_contiguous_none_simd_space_part_define_impl<base, char_type, T>(first, last, res);
 	}
 	else

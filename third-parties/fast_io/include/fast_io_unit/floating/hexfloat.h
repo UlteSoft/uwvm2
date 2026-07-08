@@ -263,6 +263,43 @@ scan_hexfloat_special_parse_may_extend(char_type const *first, char_type const *
 	return false;
 }
 
+template <::fast_io::manipulators::floating_nan_payload_scan nan_payload_scan, ::std::integral char_type>
+[[nodiscard]] inline constexpr bool
+scan_hexfloat_special_end_may_extend(char_type const *first, char_type const *last) noexcept
+{
+	if (first == last)
+	{
+		return false;
+	}
+	auto scan{first};
+	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
+	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
+	if (*scan == plus || *scan == minus)
+	{
+		++scan;
+	}
+	auto const len{static_cast<::std::size_t>(last - scan)};
+	if (len == 3u)
+	{
+		if (::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(scan[0]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(scan[1]) &&
+			::fast_io::details::scan_hexfloat_caseless_equal<u8'f', u8'F'>(scan[2]))
+		{
+			return true;
+		}
+		if constexpr (nan_payload_scan != ::fast_io::manipulators::floating_nan_payload_scan::none)
+		{
+			if (::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(scan[0]) &&
+				::fast_io::details::scan_hexfloat_caseless_equal<u8'a', u8'A'>(scan[1]) &&
+				::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(scan[2]))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 template <typename storage_type_t>
 struct scan_hexfloat_significand_state
 {
@@ -1511,6 +1548,14 @@ struct scan_floating_context
 	::std::size_t size{};
 };
 
+template <::std::integral char_type>
+struct scan_floating_context_append_result
+{
+	char_type const *iter{};
+	::fast_io::parse_code code{};
+	bool truncated{};
+};
+
 template <::std::integral char_type, bool noskipws>
 inline constexpr char_type const *scan_floating_context_skip_space(char_type const *first,
 																   char_type const *last) noexcept
@@ -1546,22 +1591,24 @@ scan_floating_context_map_iter(scan_floating_context<char_type> const &state, ::
 }
 
 template <::std::integral char_type>
-[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+[[nodiscard]] inline constexpr ::fast_io::details::scan_floating_context_append_result<char_type>
 scan_floating_context_append(scan_floating_context<char_type> &state, char_type const *chunk_begin,
 							 char_type const *chunk_end) noexcept
 {
 	auto const chunk_size{static_cast<::std::size_t>(chunk_end - chunk_begin)};
 	if (!chunk_size)
 	{
-		return {chunk_end, ::fast_io::parse_code::partial};
+		return {chunk_end, ::fast_io::parse_code::partial, false};
 	}
-	if (scan_floating_context<char_type>::capacity - state.size < chunk_size)
+	auto const available{scan_floating_context<char_type>::capacity - state.size};
+	if (!available)
 	{
-		return {chunk_begin, ::fast_io::parse_code::overflow};
+		return {chunk_begin, ::fast_io::parse_code::overflow, true};
 	}
-	::fast_io::freestanding::non_overlapped_copy_n(chunk_begin, chunk_size, state.buffer.data() + state.size);
-	state.size += chunk_size;
-	return {chunk_end, ::fast_io::parse_code::partial};
+	auto const copied{chunk_size < available ? chunk_size : available};
+	::fast_io::freestanding::non_overlapped_copy_n(chunk_begin, copied, state.buffer.data() + state.size);
+	state.size += copied;
+	return {chunk_begin + copied, ::fast_io::parse_code::partial, copied != chunk_size};
 }
 
 enum class scan_hexfloat_context_phase : ::std::uint_least8_t
@@ -1687,7 +1734,7 @@ scan_hexfloat_context_special_define(
 	auto const append_result{::fast_io::details::scan_floating_context_append(state.special_buffer, begin, end)};
 	if (append_result.code != ::fast_io::parse_code::partial)
 	{
-		return append_result;
+		return {append_result.iter, append_result.code};
 	}
 	T parsed_value{};
 	auto const *buffer_begin{state.special_buffer.buffer.data()};
@@ -1698,7 +1745,19 @@ scan_hexfloat_context_special_define(
 	{
 		if (parse_result.iter == buffer_end)
 		{
-			return {end, ::fast_io::parse_code::partial};
+			if (::fast_io::details::scan_hexfloat_special_end_may_extend<flags.nan_payload_scan>(
+					buffer_begin, buffer_end))
+			{
+				if (append_result.truncated)
+				{
+					return {append_result.iter, ::fast_io::parse_code::overflow};
+				}
+				return {end, ::fast_io::parse_code::partial};
+			}
+			value = parsed_value;
+			return {::fast_io::details::scan_floating_context_map_iter(
+						state.special_buffer, old_size, begin, append_result.iter, parse_result.iter),
+					::fast_io::parse_code::ok};
 		}
 		if (::fast_io::details::scan_hexfloat_special_parse_may_extend<flags.nan_payload_scan>(
 				parse_result.iter, buffer_end))
@@ -1712,11 +1771,19 @@ scan_hexfloat_context_special_define(
 	}
 	if (parse_result.iter == buffer_end)
 	{
+		if (append_result.truncated)
+		{
+			return {append_result.iter, ::fast_io::parse_code::overflow};
+		}
 		return {end, ::fast_io::parse_code::partial};
 	}
 	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
 		parse_result.code == ::fast_io::parse_code::partial)
 	{
+		if (append_result.truncated)
+		{
+			return {append_result.iter, ::fast_io::parse_code::overflow};
+		}
 		return {end, ::fast_io::parse_code::partial};
 	}
 	if (parse_result.code == ::fast_io::parse_code::invalid)
@@ -1724,6 +1791,10 @@ scan_hexfloat_context_special_define(
 		if (buffer_begin != buffer_end &&
 			!::fast_io::char_category::is_c_space(*(buffer_end - 1)))
 		{
+			if (append_result.truncated)
+			{
+				return {append_result.iter, ::fast_io::parse_code::overflow};
+			}
 			return {end, ::fast_io::parse_code::partial};
 		}
 	}
