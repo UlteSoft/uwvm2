@@ -167,15 +167,21 @@ concept minimum_buffer_output_stream_require_size_impl =
 inline constexpr ::std::size_t print_stack_buffer_default_max_bytes{
 	::fast_io::details::print_stack_buffer_default_max_bytes};
 
+using default_print_stack_policy = ::fast_io::details::default_print_stack_policy;
+
+template <::std::size_t requested_max_bytes>
+using print_stack_policy = ::fast_io::details::print_stack_policy<requested_max_bytes>;
+
+template <typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t print_stack_buffer_max_bytes() noexcept
 {
-	return ::fast_io::details::print_stack_buffer_max_bytes();
+	return ::fast_io::details::print_stack_buffer_max_bytes<stack_policy>();
 }
 
-template <typename element_type>
+template <typename element_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t print_stack_buffer_max_element_count() noexcept
 {
-	constexpr ::std::size_t max_bytes{::fast_io::details::decay::print_stack_buffer_max_bytes()};
+	constexpr ::std::size_t max_bytes{::fast_io::details::decay::print_stack_buffer_max_bytes<stack_policy>()};
 	if constexpr (max_bytes < sizeof(element_type))
 	{
 		return 0u;
@@ -186,18 +192,18 @@ inline constexpr ::std::size_t print_stack_buffer_max_element_count() noexcept
 	}
 }
 
-template <::std::integral char_type>
+template <::std::integral char_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t print_stack_buffer_max_size() noexcept
 {
-	return ::fast_io::details::decay::print_stack_buffer_max_element_count<char_type>();
+	return ::fast_io::details::decay::print_stack_buffer_max_element_count<char_type, stack_policy>();
 }
 
-template <::std::size_t requested_size, typename element_type>
+template <::std::size_t requested_size, typename element_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr bool print_stack_buffer_size_within_limit =
 	requested_size != 0 &&
-	requested_size <= ::fast_io::details::decay::print_stack_buffer_max_element_count<element_type>();
+	requested_size <= ::fast_io::details::decay::print_stack_buffer_max_element_count<element_type, stack_policy>();
 
-template <::std::size_t static_stack_size, ::std::integral char_type>
+template <::std::size_t static_stack_size, ::std::integral char_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t dynamic_print_reserve_static_stack_budget() noexcept
 {
 	/*
@@ -205,7 +211,7 @@ inline constexpr ::std::size_t dynamic_print_reserve_static_stack_budget() noexc
 	A print run can contain many dynamic producers, so directly merging all hints into one
 	stack array can create a large frame and defeat the stack-safety purpose of this path.
 	*/
-	constexpr ::std::size_t run_cap{::fast_io::details::decay::print_stack_buffer_max_size<char_type>()};
+	constexpr ::std::size_t run_cap{::fast_io::details::decay::print_stack_buffer_max_size<char_type, stack_policy>()};
 	if constexpr (static_stack_size < run_cap)
 	{
 		return static_stack_size;
@@ -216,7 +222,7 @@ inline constexpr ::std::size_t dynamic_print_reserve_static_stack_budget() noexc
 	}
 }
 
-template <bool line, ::std::integral char_type, typename T>
+template <bool line, ::std::integral char_type, typename T, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t dynamic_print_reserve_static_stack_size()
 {
 	using nocvreft = ::std::remove_cvref_t<T>;
@@ -225,7 +231,7 @@ inline constexpr ::std::size_t dynamic_print_reserve_static_stack_size()
 		constexpr ::std::size_t static_stack_size{
 			print_reserve_static_stack_size(::fast_io::io_reserve_type<char_type, nocvreft>)};
 		static_assert(!line || static_stack_size != SIZE_MAX);
-		return ::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<static_stack_size, char_type>() +
+		return ::fast_io::details::decay::dynamic_print_reserve_static_stack_budget<static_stack_size, char_type, stack_policy>() +
 			   static_cast<::std::size_t>(line);
 	}
 	else

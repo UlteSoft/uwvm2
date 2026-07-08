@@ -125,21 +125,10 @@ template <::std::size_t>
 struct reserve_static_stack_size_constant
 {};
 
-inline constexpr ::std::size_t print_stack_buffer_default_max_bytes{131072u};
-
-inline constexpr ::std::size_t print_stack_buffer_max_bytes() noexcept
-{
-#if defined(FAST_IO_PRINT_STACK_BUFFER_MAX_BYTES)
-	return static_cast<::std::size_t>(FAST_IO_PRINT_STACK_BUFFER_MAX_BYTES);
-#else
-	return ::fast_io::details::print_stack_buffer_default_max_bytes;
-#endif
-}
-
-template <::std::integral char_type>
+template <::std::integral char_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t dynamic_reserve_default_static_stack_size() noexcept
 {
-	constexpr ::std::size_t bytes{::fast_io::details::print_stack_buffer_max_bytes()};
+	constexpr ::std::size_t bytes{::fast_io::details::print_stack_buffer_max_bytes<stack_policy>()};
 	if constexpr (bytes == 0)
 	{
 		return 0u;
