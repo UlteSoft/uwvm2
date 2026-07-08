@@ -249,7 +249,8 @@ struct print_semantic_precise_size_ok_impl<char_type, ::fast_io::manipulators::w
 template <::std::integral char_type, typename T>
 inline constexpr bool print_semantic_bounded_leaf_size_ok_v =
 	::fast_io::details::decay::print_semantic_precise_leaf_size_ok_v<char_type, T> ||
-	::fast_io::dynamic_reserve_printable<char_type, ::std::remove_cvref_t<T>>;
+	::fast_io::dynamic_reserve_printable<char_type, ::std::remove_cvref_t<T>> ||
+	::fast_io::reserve_printable<char_type, ::std::remove_cvref_t<T>>;
 
 template <::std::integral char_type, typename T>
 struct print_semantic_bounded_size_ok_impl

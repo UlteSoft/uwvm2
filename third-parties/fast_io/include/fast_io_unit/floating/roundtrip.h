@@ -2666,7 +2666,7 @@ inline constexpr char_type *print_rsvflt_precision_define_impl(char_type *iter, 
 				return iter;
 			}
 			else if constexpr (precision_mode ==
-							   ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero)
+							   ::fast_io::manipulators::floating_precision::significant_preserve_trailing_zero)
 			{
 				*iter = char_literal_v<u8'0', char_type>;
 				++iter;

@@ -3358,6 +3358,20 @@ struct print_semantic_lvalue_prefix_continuation
 	}
 };
 
+template <typename... Args>
+[[nodiscard]] inline constexpr ::fast_io::containers::tuple<Args...>
+print_semantic_pack_pointer_tuple(Args... args) noexcept
+{
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#endif
+	return ::fast_io::containers::tuple<Args...>{args...};
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+}
+
 /// @brief    Completes semantic pack expansion when no input arguments remain.
 /// @tparam   already_forwarded true when non-pack inputs were already print-forwarded
 /// @tparam   char_type         the print character type
@@ -3454,7 +3468,9 @@ struct print_semantic_pack_expand_middle_continuation
 		return operator_impl(
 			::fast_io::details::decay::print_semantic_pack_expand_tail_continuation<
 				already_forwarded, char_type, continuation, ExpandedPackArgs...>{
-				contptr, {__builtin_addressof(expanded_pack_args)...}},
+				contptr,
+				::fast_io::details::decay::print_semantic_pack_pointer_tuple(
+					__builtin_addressof(expanded_pack_args)...)},
 			::std::make_index_sequence<sizeof...(Args)>{});
 	}
 };
@@ -3509,7 +3525,8 @@ inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont, 
 			::std::forward<T>(t),
 			::fast_io::details::decay::print_semantic_pack_expand_initial_continuation<
 				already_forwarded, char_type, continuation, Args...>{__builtin_addressof(cont),
-																	 {__builtin_addressof(args)...}});
+																	 ::fast_io::details::decay::print_semantic_pack_pointer_tuple(
+																		 __builtin_addressof(args)...)});
 	}
 	else if constexpr (already_forwarded)
 	{
@@ -4361,6 +4378,11 @@ inline constexpr char_type *print_semantic_emit_unchecked_leaf(char_type *iter, 
 		// Dynamic reserve leaves have already been admitted by a bounded materialization path.
 		return print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, iter, ::std::forward<T>(t));
 	}
+	else if constexpr (::fast_io::reserve_printable<char_type, value_type>)
+	{
+		// Static reserve leaves have already been admitted by a bounded materialization path.
+		return print_reserve_define(::fast_io::io_reserve_type<char_type, value_type>, iter, ::std::forward<T>(t));
+	}
 	else if constexpr (::fast_io::scatter_printable<char_type, value_type>)
 	{
 		// Scatter leaves copy their single contiguous range into the unchecked output buffer.
@@ -4653,6 +4675,11 @@ inline constexpr ::std::size_t print_semantic_bounded_size_leaf(T &&t)
 	{
 		// Dynamic reserve leaves report the maximum buffer size needed for this object.
 		return print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>, ::std::forward<T>(t));
+	}
+	else if constexpr (::fast_io::reserve_printable<char_type, value_type>)
+	{
+		// Static reserve leaves expose a compile-time object-independent upper bound.
+		return print_reserve_size(::fast_io::io_reserve_type<char_type, value_type>);
 	}
 }
 

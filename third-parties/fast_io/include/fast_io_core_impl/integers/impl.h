@@ -65,8 +65,8 @@ enum class floating_precision : ::std::uint_least8_t
 {
 	significant,
 	fractional,
-	significant_preserve_tailing_zero,
-	fractional_preserve_tailing_zero
+	significant_preserve_trailing_zero,
+	fractional_preserve_trailing_zero
 };
 
 enum class floating_rounding : ::std::uint_least8_t
@@ -378,17 +378,17 @@ inline constexpr ::fast_io::manipulators::scalar_flags floating_precision_roundi
 template <::fast_io::manipulators::floating_precision precision>
 inline constexpr bool floating_precision_is_significant{
 	precision == ::fast_io::manipulators::floating_precision::significant ||
-	precision == ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero};
+	precision == ::fast_io::manipulators::floating_precision::significant_preserve_trailing_zero};
 
 template <::fast_io::manipulators::floating_precision precision>
 inline constexpr bool floating_precision_is_fractional{
 	precision == ::fast_io::manipulators::floating_precision::fractional ||
-	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_tailing_zero};
+	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_trailing_zero};
 
 template <::fast_io::manipulators::floating_precision precision>
 inline constexpr bool floating_precision_preserves_trailing_zero{
-	precision == ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero ||
-	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_tailing_zero};
+	precision == ::fast_io::manipulators::floating_precision::significant_preserve_trailing_zero ||
+	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_trailing_zero};
 
 inline constexpr ::fast_io::manipulators::scalar_flags
 set_json_float_flag(::fast_io::manipulators::scalar_flags flags, bool json_float) noexcept
@@ -919,7 +919,23 @@ inline constexpr auto base(scalar_type t) noexcept
 }
 
 template <::std::size_t bs, bool shbase = false, bool full = false, bool oct_c2y = false, typename scalar_type>
+	requires((2 <= bs && bs <= 36) && (::fast_io::details::character_integral<scalar_type>))
+inline constexpr auto base(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<bs, false, shbase, full, false, false, oct_c2y>>(t);
+}
+
+template <::std::size_t bs, bool shbase = false, bool full = false, bool oct_c2y = false, typename scalar_type>
 	requires((2 <= bs && bs <= 36) && (::fast_io::details::scalar_integrals<scalar_type>))
+inline constexpr auto baseupper(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<bs, true, shbase, full, false, false, oct_c2y>>(t);
+}
+
+template <::std::size_t bs, bool shbase = false, bool full = false, bool oct_c2y = false, typename scalar_type>
+	requires((2 <= bs && bs <= 36) && (::fast_io::details::character_integral<scalar_type>))
 inline constexpr auto baseupper(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
@@ -935,7 +951,23 @@ inline constexpr auto hex(scalar_type t) noexcept
 }
 
 template <bool shbase = false, bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
+inline constexpr auto hex(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<16, false, shbase, full>>(t);
+}
+
+template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto hexupper(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<16, true, shbase, full>>(t);
+}
+
+template <bool shbase = false, bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto hexupper(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
@@ -951,7 +983,23 @@ inline constexpr auto hex0x(scalar_type t) noexcept
 }
 
 template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
+inline constexpr auto hex0x(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<16, false, true, full>>(
+		t);
+}
+
+template <bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto hex0xupper(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<16, true, true, full>>(
+		t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto hex0xupper(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<16, true, true, full>>(
@@ -1081,7 +1129,7 @@ inline constexpr auto uhexupperfull(scalar_type t) noexcept
 
 // Character code units are deliberately separated from the default numeric
 // print path even though they satisfy ::std::integral. Use chvw for a character
-// view and char_as_integer when the numeric value of a character code unit is intended.
+// view, and dec when the numeric value of a code unit is intended.
 template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
 inline constexpr auto dec(scalar_type t) noexcept
@@ -1092,7 +1140,7 @@ inline constexpr auto dec(scalar_type t) noexcept
 
 template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::character_integral<scalar_type>)
-inline constexpr auto char_as_integer(scalar_type t) noexcept
+inline constexpr auto dec(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
 		::fast_io::details::base_mani_flags_cache<10, false, shbase, full>>(t);
@@ -1100,6 +1148,14 @@ inline constexpr auto char_as_integer(scalar_type t) noexcept
 
 template <bool shbase = false, bool full = false, bool oct_c2y = false, bool uppercase_showbase = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto oct(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<8, uppercase_showbase, shbase, full, false, false, oct_c2y>>(t);
+}
+
+template <bool shbase = false, bool full = false, bool oct_c2y = false, bool uppercase_showbase = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto oct(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
@@ -1115,7 +1171,23 @@ inline constexpr auto oct0(scalar_type t) noexcept
 }
 
 template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
+inline constexpr auto oct0(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<8, false, true, full>>(
+		t);
+}
+
+template <bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto oct0o(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<8, false, true, full, false, false, true>>(t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto oct0o(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<
@@ -1130,8 +1202,24 @@ inline constexpr auto bin(scalar_type t) noexcept
 		::fast_io::details::base_mani_flags_cache<2, false, shbase, full>>(t);
 }
 
+template <bool shbase = false, bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
+inline constexpr auto bin(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<2, false, shbase, full>>(t);
+}
+
 template <bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
+inline constexpr auto bin0b(scalar_type t) noexcept
+{
+	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<2, false, true, full>>(
+		t);
+}
+
+template <bool full = false, typename scalar_type>
+	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto bin0b(scalar_type t) noexcept
 {
 	return ::fast_io::details::scalar_flags_int_cache<::fast_io::details::base_mani_flags_cache<2, false, true, full>>(
