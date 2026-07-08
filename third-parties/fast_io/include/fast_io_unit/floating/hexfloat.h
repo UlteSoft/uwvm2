@@ -676,6 +676,11 @@ inline constexpr char_type const *scan_hexfloat_significand_run(char_type const 
 }
 
 template <::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 [[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
 scan_hexfloat_exponent(char_type const *first, char_type const *last, ::std::int_least64_t &exponent) noexcept
 {

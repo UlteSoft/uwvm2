@@ -296,20 +296,9 @@ struct scan_decfloat_fast_result
 
 inline constexpr ::std::uint_least64_t scan_decfloat_uint64_significand_digit_limit{19u};
 
-template <typename T>
+template <typename>
 inline constexpr ::std::uint_least64_t scan_decfloat_significand_digit_limit{
-	[]() constexpr noexcept {
-		using trait = ::fast_io::details::iec559_traits<::std::remove_cvref_t<T>>;
-		constexpr ::std::uint_least64_t digits{static_cast<::std::uint_least64_t>(trait::m10digits) + 2u};
-		if constexpr (digits < ::fast_io::details::scan_decfloat_uint64_significand_digit_limit)
-		{
-			return digits;
-		}
-		else
-		{
-			return ::fast_io::details::scan_decfloat_uint64_significand_digit_limit;
-		}
-	}()};
+	::fast_io::details::scan_decfloat_uint64_significand_digit_limit};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_min_power10{-342};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_max_power10{326};
 inline constexpr ::std::uint_least64_t scan_decfloat_pow10_0_to_8_table[]{
@@ -597,6 +586,11 @@ scan_decfloat_mul_64x128_high(::std::uint_least64_t value, ::fast_io::details::u
 
 template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 [[nodiscard]] inline constexpr bool scan_decfloat_compute_adjusted(::std::int_least64_t exponent,
 																   ::std::uint_least64_t significand,
 																   bool negative,
@@ -815,9 +809,24 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 
 	struct scan_decfloat_bigint
 	{
-		::std::uint_least64_t limb[scan_decfloat_bigint_limb_capacity]{};
+		::std::uint_least64_t limb[scan_decfloat_bigint_limb_capacity];
 		::std::size_t size{};
 	};
+
+	inline constexpr void scan_decfloat_bigint_clear(scan_decfloat_bigint &value) noexcept
+	{
+		value.size = 0u;
+	}
+
+	inline constexpr void scan_decfloat_bigint_copy(scan_decfloat_bigint &out,
+													scan_decfloat_bigint const &in) noexcept
+	{
+		out.size = in.size;
+		for (::std::size_t index{}; index != in.size; ++index)
+		{
+			out.limb[index] = in.limb[index];
+		}
+	}
 
 	inline constexpr void scan_decfloat_bigint_normalize(scan_decfloat_bigint &value) noexcept
 	{
@@ -860,7 +869,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 	{
 		if (!multiplier || !value.size)
 		{
-			value = {};
+			::fast_io::details::scan_decfloat_bigint_clear(value);
 			return true;
 		}
 		__uint128_t carry{};
@@ -947,7 +956,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 	inline constexpr bool scan_decfloat_bigint_from_digits(scan_decfloat_bigint &value,
 														   scan_decfloat_significand_state const &state) noexcept
 	{
-		value = {};
+		::fast_io::details::scan_decfloat_bigint_clear(value);
 		constexpr ::std::uint_least64_t chunk_digits{19u};
 		constexpr ::std::uint_least64_t chunk_power{10000000000000000000ull};
 		::std::uint_least64_t chunk{};
@@ -1065,7 +1074,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 																		scan_decfloat_bigint const &in,
 																		::std::size_t shift) noexcept
 	{
-		out = {};
+		::fast_io::details::scan_decfloat_bigint_clear(out);
 		if (!in.size)
 		{
 			return true;
@@ -1212,7 +1221,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 		}
 		else
 		{
-			divisor = denominator;
+			::fast_io::details::scan_decfloat_bigint_copy(divisor, denominator);
 		}
 		auto const dividend_bits{
 			::fast_io::details::scan_decfloat_bigint_bit_width(numerator) +
@@ -1251,7 +1260,8 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 				}
 			}
 		}
-		::fast_io::details::scan_decfloat_bigint twice_remainder{remainder};
+		::fast_io::details::scan_decfloat_bigint twice_remainder;
+		::fast_io::details::scan_decfloat_bigint_copy(twice_remainder, remainder);
 		(void)::fast_io::details::scan_decfloat_bigint_shl1_add_bit(twice_remainder, false);
 		return {.quotient = quotient,
 				.twice_remainder_compare =
@@ -1378,7 +1388,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 				{
 					return false;
 				}
-				theor_digits = shifted;
+				::fast_io::details::scan_decfloat_bigint_copy(theor_digits, shifted);
 			}
 			else if (pow2_exponent < 0)
 			{
@@ -1388,7 +1398,7 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 				{
 					return false;
 				}
-				real_digits = shifted;
+				::fast_io::details::scan_decfloat_bigint_copy(real_digits, shifted);
 			}
 			auto const order{::fast_io::details::scan_decfloat_bigint_compare(real_digits, theor_digits)};
 			auto const lower_significand{
@@ -1939,6 +1949,11 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 }
 
 template <::std::integral char_type>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 [[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
 scan_decfloat_exponent(char_type const *first, char_type const *last, ::std::int_least64_t &exponent) noexcept
 {
@@ -2183,6 +2198,11 @@ scan_decfloat_assign_precision(T &value, bool negative, scan_decfloat_significan
 
 template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+#if __has_cpp_attribute(__gnu__::__always_inline__)
+[[__gnu__::__always_inline__]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
+#endif
 [[nodiscard]] inline constexpr ::fast_io::parse_code
 scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t significand,
 						   ::std::uint_least64_t fractional_digits,
