@@ -4806,7 +4806,8 @@ template <bool line, ::std::integral char_type, typename outputstmtype, typename
 inline constexpr bool print_semantic_try_bounded_coalesce(outputstmtype optstm, Args &&...args)
 {
 	if constexpr ((::fast_io::details::decay::print_semantic_bounded_size_ok<
-					   char_type, ::std::remove_cvref_t<Args>>::value &&
+					   char_type,
+					   ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>>::value &&
 				   ...))
 	{
 		// A bounded run can be materialized once when its upper bound fits the available coalescing space.
@@ -4844,6 +4845,21 @@ inline constexpr bool print_semantic_try_bounded_coalesce(outputstmtype optstm, 
 				::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
 				return true;
 			}
+			constexpr ::std::size_t materialize_limit{
+				::fast_io::details::decay::print_stack_buffer_max_size<char_type>()};
+			if constexpr (materialize_limit != 0)
+			{
+				if (required <= materialize_limit)
+				{
+					::fast_io::details::buffer_alloc_arr_ptr<char_type, false> buffer(required);
+					char_type *const first{buffer.get()};
+					char_type *const last{
+						::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+							first, ::std::forward<Args>(args)...)};
+					::fast_io::operations::decay::write_all_decay(optstm, first, last);
+					return true;
+				}
+			}
 		}
 	}
 	// At least one requirement for bounded coalescing failed, so the caller must use the normal emit path.
@@ -4864,7 +4880,8 @@ template <bool line, ::std::integral char_type, typename outputstmtype, typename
 inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, Args &&...args)
 {
 	if constexpr ((::fast_io::details::decay::print_semantic_precise_size_ok<
-					   char_type, ::std::remove_cvref_t<Args>>::value &&
+					   char_type,
+					   ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>>::value &&
 				   ...))
 	{
 		// A fully precise run can be measured before choosing a coalesced output strategy.
@@ -4898,7 +4915,7 @@ inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, 
 			// A non-zero full-output threshold permits bounded stack-buffer coalescing.
 			constexpr ::std::size_t static_total{
 				::fast_io::operations::decay::print_semantic_static_precise_total_size<line, char_type,
-																					   ::std::remove_cvref_t<Args>...>()};
+																					   ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>...>()};
 			if constexpr (static_total != SIZE_MAX && static_total <= threshold_chars)
 			{
 				// A compile-time bounded run uses an exactly-sized stack buffer and one write operation.

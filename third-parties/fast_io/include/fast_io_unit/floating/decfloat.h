@@ -592,7 +592,16 @@ template <::fast_io::manipulators::floating_rounding rounding>
 [[nodiscard]] inline constexpr ::std::uint_least64_t
 scan_decfloat_round_mantissa(bool negative, ::std::uint_least64_t mantissa, bool has_tail, bool is_tie) noexcept
 {
-	if constexpr (::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		auto rounded_down{mantissa >> 1u};
+		if (((mantissa & 1u) != 0u || has_tail) && ((rounded_down & 1u) == 0u))
+		{
+			++rounded_down;
+		}
+		return rounded_down;
+	}
+	else if constexpr (::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
 	{
 		if ((mantissa & 1u) != 0u)
 		{
@@ -1406,7 +1415,11 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 																   bool remainder_nonzero,
 																   bool tail_nonzero) noexcept
 	{
-		if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+		{
+			return (remainder_nonzero || tail_nonzero) && ((quotient & 1u) == 0u);
+		}
+		else if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
 		{
 			if (twice_remainder_compare < 0)
 			{
@@ -1865,7 +1878,11 @@ scan_decfloat_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down
 	{
 		return false;
 	}
-	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::nearest_to_odd)
+	{
+		return (rounded_down & 1u) == 0u;
+	}
+	else if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
 	{
 		auto const half{divisor >> 1u};
 		if (remainder < half)
