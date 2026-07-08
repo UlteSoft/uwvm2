@@ -64,7 +64,9 @@ enum class floating_nan_payload_scan : ::std::uint_fast8_t
 enum class floating_precision : ::std::uint_least8_t
 {
 	significant,
-	fractional
+	fractional,
+	significant_preserve_tailing_zero,
+	fractional_preserve_tailing_zero
 };
 
 enum class floating_rounding : ::std::uint_least8_t
@@ -372,6 +374,21 @@ template <::fast_io::manipulators::scalar_flags flags,
 inline constexpr ::fast_io::manipulators::scalar_flags floating_precision_rounding_mani_flags_cache{
 	::fast_io::details::set_floating_rounding_flag(
 		::fast_io::details::set_floating_precision_flag(flags, precision), rounding)};
+
+template <::fast_io::manipulators::floating_precision precision>
+inline constexpr bool floating_precision_is_significant{
+	precision == ::fast_io::manipulators::floating_precision::significant ||
+	precision == ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero};
+
+template <::fast_io::manipulators::floating_precision precision>
+inline constexpr bool floating_precision_is_fractional{
+	precision == ::fast_io::manipulators::floating_precision::fractional ||
+	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_tailing_zero};
+
+template <::fast_io::manipulators::floating_precision precision>
+inline constexpr bool floating_precision_preserves_trailing_zero{
+	precision == ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero ||
+	precision == ::fast_io::manipulators::floating_precision::fractional_preserve_tailing_zero};
 
 inline constexpr ::fast_io::manipulators::scalar_flags
 set_json_float_flag(::fast_io::manipulators::scalar_flags flags, bool json_float) noexcept
@@ -760,7 +777,7 @@ inline constexpr auto scalar_flags_int_cache(scalar_type t) noexcept
 }
 
 template <typename scalar_type>
-concept scalar_integrals = ::fast_io::details::my_integral<scalar_type> ||
+concept scalar_integrals = ::fast_io::details::non_character_integral<scalar_type> ||
 						   ::std::same_as<::std::nullptr_t, ::std::remove_cvref_t<scalar_type>> ||
 						   ::std::same_as<::std::byte, ::std::remove_cvref_t<scalar_type>> ||
 						   ::std::same_as<bool, ::std::remove_cvref_t<scalar_type>> ||
@@ -1064,7 +1081,7 @@ inline constexpr auto uhexupperfull(scalar_type t) noexcept
 
 // Character code units are deliberately separated from the default numeric
 // print path even though they satisfy ::std::integral. Use chvw for a character
-// view and cintegral when the numeric value of a character code unit is intended.
+// view and char_as_integer when the numeric value of a character code unit is intended.
 template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
 inline constexpr auto dec(scalar_type t) noexcept
@@ -1077,7 +1094,8 @@ template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::character_integral<scalar_type>)
 inline constexpr auto char_as_integer(scalar_type t) noexcept
 {
-	return dec<shbase, full>(t);
+	return ::fast_io::details::scalar_flags_int_cache<
+		::fast_io::details::base_mani_flags_cache<10, false, shbase, full>>(t);
 }
 
 template <bool shbase = false, bool full = false, bool oct_c2y = false, bool uppercase_showbase = false, typename scalar_type>
@@ -1160,22 +1178,54 @@ inline constexpr auto hexfloat0x(scalar_type t) noexcept
 		static_cast<float_alias_type>(t)};
 }
 
-template <bool uppercase = false, typename scalar_type>
+template <bool uppercase = false,
+		  floating_precision precision_mode = floating_precision::significant,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
-	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false>, float_alias_type>{
+	return scalar_manip_precision_t<
+		::fast_io::details::floating_precision_rounding_mani_flags_cache<
+			::fast_io::details::hexafloat_mani_flags_cache<uppercase, false>, precision_mode, rounding_policy>,
+		float_alias_type>{
 		static_cast<float_alias_type>(t), n};
 }
 
-template <bool uppercase = false, typename scalar_type>
+template <floating_precision precision_mode,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool uppercase = false,
+		  typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat(scalar_type t, ::std::size_t n) noexcept
+{
+	return hexfloat<uppercase, precision_mode, rounding_policy>(t, n);
+}
+
+template <bool uppercase = false,
+		  floating_precision precision_mode = floating_precision::significant,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat0x(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
-	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>, float_alias_type>{
+	return scalar_manip_precision_t<
+		::fast_io::details::floating_precision_rounding_mani_flags_cache<
+			::fast_io::details::hexafloat_mani_flags_cache<uppercase, false, true>, precision_mode, rounding_policy>,
+		float_alias_type>{
 		static_cast<float_alias_type>(t), n};
+}
+
+template <floating_precision precision_mode,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool uppercase = false,
+		  typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto hexfloat0x(scalar_type t, ::std::size_t n) noexcept
+{
+	return hexfloat0x<uppercase, precision_mode, rounding_policy>(t, n);
 }
 
 template <bool uppercase = false, typename scalar_type>
@@ -1196,22 +1246,54 @@ inline constexpr auto comma_hexfloat0x(scalar_type t) noexcept
 		static_cast<float_alias_type>(t)};
 }
 
-template <bool uppercase = false, typename scalar_type>
+template <bool uppercase = false,
+		  floating_precision precision_mode = floating_precision::significant,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
-	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true>, float_alias_type>{
+	return scalar_manip_precision_t<
+		::fast_io::details::floating_precision_rounding_mani_flags_cache<
+			::fast_io::details::hexafloat_mani_flags_cache<uppercase, true>, precision_mode, rounding_policy>,
+		float_alias_type>{
 		static_cast<float_alias_type>(t), n};
 }
 
-template <bool uppercase = false, typename scalar_type>
+template <floating_precision precision_mode,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool uppercase = false,
+		  typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat(scalar_type t, ::std::size_t n) noexcept
+{
+	return comma_hexfloat<uppercase, precision_mode, rounding_policy>(t, n);
+}
+
+template <bool uppercase = false,
+		  floating_precision precision_mode = floating_precision::significant,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat0x(scalar_type t, ::std::size_t n) noexcept
 {
 	using float_alias_type = ::fast_io::details::float_alias_type<scalar_type>;
-	return scalar_manip_precision_t<::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>, float_alias_type>{
+	return scalar_manip_precision_t<
+		::fast_io::details::floating_precision_rounding_mani_flags_cache<
+			::fast_io::details::hexafloat_mani_flags_cache<uppercase, true, true>, precision_mode, rounding_policy>,
+		float_alias_type>{
 		static_cast<float_alias_type>(t), n};
+}
+
+template <floating_precision precision_mode,
+		  floating_rounding rounding_policy = floating_rounding::nearest_to_even,
+		  bool uppercase = false,
+		  typename scalar_type>
+	requires(::fast_io::details::my_floating_point<scalar_type>)
+inline constexpr auto comma_hexfloat0x(scalar_type t, ::std::size_t n) noexcept
+{
+	return comma_hexfloat0x<uppercase, precision_mode, rounding_policy>(t, n);
 }
 
 template <bool uppercase = false, typename scalar_type>

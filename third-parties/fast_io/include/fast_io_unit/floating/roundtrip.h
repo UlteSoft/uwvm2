@@ -1749,7 +1749,7 @@ template <::fast_io::manipulators::floating_rounding rounding>
 	}
 }
 
-template <typename flt, ::fast_io::manipulators::floating_rounding rounding>
+template <typename flt, ::fast_io::manipulators::floating_rounding rounding, bool preserve_trailing_zero = false>
 inline constexpr void print_rsv_fp_round_to_significant(
 	typename iec559_traits<flt>::mantissa_type &m10, ::std::int_least32_t &e10, ::std::size_t precision,
 	bool negative) noexcept
@@ -1785,6 +1785,10 @@ inline constexpr void print_rsv_fp_round_to_significant(
 				++e10;
 			}
 		}
+		return;
+	}
+	if constexpr (!preserve_trailing_zero)
+	{
 		return;
 	}
 	auto const carrier_precision{precision < ::fast_io::details::iec559_traits<flt>::m10digits
@@ -1843,6 +1847,20 @@ inline constexpr void print_rsv_fp_round_to_fractional(
 	}
 	m10 = static_cast<mantissa_type>(quotient);
 	e10 = target_e10;
+}
+
+template <typename mantissa_type>
+inline constexpr void print_rsv_fp_trim_trailing_zero(mantissa_type &m10, ::std::int_least32_t &e10) noexcept
+{
+	if (!m10)
+	{
+		return;
+	}
+	for (; m10 % 10u == 0u;)
+	{
+		m10 /= 10u;
+		++e10;
+	}
 }
 
 template <bool comma, ::std::integral char_type>
@@ -1938,7 +1956,7 @@ inline constexpr char_type *print_rsv_fp_fixed_precision_impl(char_type *iter,
 	return iter;
 }
 
-template <typename flt, bool comma, bool uppercase_e, ::std::integral char_type>
+template <typename flt, bool comma, bool uppercase_e, bool preserve_trailing_zero = false, ::std::integral char_type>
 inline constexpr char_type *print_rsv_fp_scientific_precision_impl(
 	char_type *iter, typename iec559_traits<flt>::mantissa_type m10, ::std::int_least32_t e10,
 	::std::size_t precision) noexcept
@@ -1950,12 +1968,31 @@ inline constexpr char_type *print_rsv_fp_scientific_precision_impl(
 	*iter = *itp1;
 	if (precision)
 	{
-		*itp1 = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
 		auto const available{static_cast<::std::size_t>(olength - 1)};
-		iter = itp1 + olength;
-		if (available < precision)
+		if constexpr (preserve_trailing_zero)
 		{
-			iter = ::fast_io::details::fill_zeros_impl(iter, precision - available);
+			*itp1 = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+			iter = itp1 + olength;
+			if (available < precision)
+			{
+				iter = ::fast_io::details::fill_zeros_impl(iter, precision - available);
+			}
+		}
+		else
+		{
+			auto used{available < precision ? available : precision};
+			for (; used && itp1[used] == char_literal_v<u8'0', char_type>; --used)
+			{
+			}
+			if (used)
+			{
+				*itp1 = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+				iter = itp1 + used + 1u;
+			}
+			else
+			{
+				++iter;
+			}
 		}
 	}
 	else
@@ -1973,22 +2010,37 @@ inline constexpr char_type *print_rsv_fp_precision_decision_impl(
 	char_type *iter, typename iec559_traits<flt>::mantissa_type m10, ::std::int_least32_t e10,
 	::std::size_t precision, bool negative) noexcept
 {
+	constexpr bool uses_significant_precision{
+		::fast_io::details::floating_precision_is_significant<precision_mode>};
+	constexpr bool uses_fractional_precision{
+		::fast_io::details::floating_precision_is_fractional<precision_mode>};
+	constexpr bool preserve_trailing_zero{
+		::fast_io::details::floating_precision_preserves_trailing_zero<precision_mode>};
 	if constexpr (mt == ::fast_io::manipulators::floating_format::scientific)
 	{
 		auto significant_precision{precision + 1u};
-		if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::significant)
+		if constexpr (uses_significant_precision)
 		{
 			significant_precision = precision ? precision : 1u;
 			precision = significant_precision - 1u;
 		}
-		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding>(
+		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding, preserve_trailing_zero>(
 			m10, e10, significant_precision, negative);
-		return ::fast_io::details::print_rsv_fp_scientific_precision_impl<flt, comma, uppercase_e>(
+		if constexpr (!preserve_trailing_zero)
+		{
+			::fast_io::details::print_rsv_fp_trim_trailing_zero(m10, e10);
+		}
+		return ::fast_io::details::print_rsv_fp_scientific_precision_impl<flt, comma, uppercase_e,
+																		 preserve_trailing_zero>(
 			iter, m10, e10, precision);
 	}
-	else if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::fractional)
+	else if constexpr (uses_fractional_precision)
 	{
 		::fast_io::details::print_rsv_fp_round_to_fractional<flt, rounding>(m10, e10, precision, negative);
+		if constexpr (!preserve_trailing_zero)
+		{
+			::fast_io::details::print_rsv_fp_trim_trailing_zero(m10, e10);
+		}
 		if constexpr (mt == ::fast_io::manipulators::floating_format::general)
 		{
 			return ::fast_io::details::print_rsv_fp_decision_impl<flt, comma, uppercase_e,
@@ -1998,13 +2050,26 @@ inline constexpr char_type *print_rsv_fp_precision_decision_impl(
 		}
 		else
 		{
-			return ::fast_io::details::print_rsv_fp_fixed_precision_impl<flt, comma, json_float>(
-				iter, m10, e10, precision);
+			if constexpr (preserve_trailing_zero)
+			{
+				return ::fast_io::details::print_rsv_fp_fixed_precision_impl<flt, comma, json_float>(
+					iter, m10, e10, precision);
+			}
+			else
+			{
+				return ::fast_io::details::print_rsv_fp_fixed_decision_impl<flt, comma, json_float>(
+					iter, m10, e10);
+			}
 		}
 	}
 	else
 	{
-		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding>(m10, e10, precision, negative);
+		::fast_io::details::print_rsv_fp_round_to_significant<flt, rounding, preserve_trailing_zero>(
+			m10, e10, precision, negative);
+		if constexpr (!preserve_trailing_zero)
+		{
+			::fast_io::details::print_rsv_fp_trim_trailing_zero(m10, e10);
+		}
 		if constexpr (mt == ::fast_io::manipulators::floating_format::fixed)
 		{
 			return ::fast_io::details::print_rsv_fp_fixed_decision_impl<flt, comma, json_float>(iter, m10, e10);
@@ -2156,26 +2221,52 @@ inline constexpr char_type *print_rsvflt_precision_define_impl(char_type *iter, 
 			{
 				*iter = char_literal_v<u8'0', char_type>;
 				++iter;
-				if (precision)
+				if constexpr (::fast_io::details::floating_precision_preserves_trailing_zero<precision_mode>)
 				{
-					*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
-					++iter;
-					iter = ::fast_io::details::fill_zeros_impl(iter, precision);
+					if constexpr (::fast_io::details::floating_precision_is_significant<precision_mode>)
+					{
+						precision = precision ? precision - 1u : 0u;
+					}
+					if (precision)
+					{
+						*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
+						++iter;
+						iter = ::fast_io::details::fill_zeros_impl(iter, precision);
+					}
 				}
 				return print_rsv_fp_e_impl<flt, uppercase_e>(iter, 0);
 			}
-			else if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::fractional)
+			else if constexpr (::fast_io::details::floating_precision_is_fractional<precision_mode>)
 			{
 				*iter = char_literal_v<u8'0', char_type>;
 				++iter;
 				if constexpr (json_float)
 				{
-					if (!precision)
+					if (!precision || !::fast_io::details::floating_precision_preserves_trailing_zero<precision_mode>)
 					{
 						return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
 					}
 				}
-				return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(iter, precision);
+				if constexpr (::fast_io::details::floating_precision_preserves_trailing_zero<precision_mode>)
+				{
+					return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(iter, precision);
+				}
+				return iter;
+			}
+			else if constexpr (precision_mode ==
+							   ::fast_io::manipulators::floating_precision::significant_preserve_tailing_zero)
+			{
+				*iter = char_literal_v<u8'0', char_type>;
+				++iter;
+				if constexpr (json_float)
+				{
+					if (precision <= 1u)
+					{
+						return ::fast_io::details::print_rsv_fp_append_json_float_zero<comma>(iter);
+					}
+				}
+				return ::fast_io::details::print_rsv_fp_append_point_zeros<comma>(
+					iter, precision ? precision - 1u : 0u);
 			}
 			else
 			{

@@ -348,8 +348,9 @@ inline constexpr ::std::size_t
 print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_precision_t<flags, flt>>,
 				   manipulators::scalar_manip_precision_t<flags, flt> f) noexcept
 {
-	static_assert(flags.precision == manipulators::floating_precision::significant,
-				  "fast_io hexfloat precision supports only total/significant hexadecimal digit precision");
+	static_assert(::fast_io::details::floating_precision_is_significant<flags.precision> ||
+					  ::fast_io::details::floating_precision_is_fractional<flags.precision>,
+				  "fast_io hexfloat precision supports significant and fractional hexadecimal digit precision");
 	using trait = ::fast_io::details::iec559_traits<flt>;
 	::std::size_t base_size{};
 	if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double>
@@ -389,7 +390,8 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_preci
 			flags.nan_show_type>;
 	}
 	return ::fast_io::details::intrinsics::add_or_overflow_die(
-		::fast_io::details::intrinsics::add_or_overflow_die(base_size, f.precision), 8u);
+		::fast_io::details::intrinsics::add_or_overflow_die(base_size, f.precision),
+		::fast_io::details::floating_precision_is_fractional<flags.precision> ? 9u : 8u);
 }
 
 template <::std::integral char_type, manipulators::scalar_flags flags, details::my_floating_point flt>
@@ -398,8 +400,9 @@ inline constexpr char_type *print_reserve_define(
 	io_reserve_type_t<char_type, manipulators::scalar_manip_precision_t<flags, flt>>,
 	char_type *iter, manipulators::scalar_manip_precision_t<flags, flt> f) noexcept
 {
-	static_assert(flags.precision == manipulators::floating_precision::significant,
-				  "fast_io hexfloat precision supports only total/significant hexadecimal digit precision");
+	static_assert(::fast_io::details::floating_precision_is_significant<flags.precision> ||
+					  ::fast_io::details::floating_precision_is_fractional<flags.precision>,
+				  "fast_io hexfloat precision supports significant and fractional hexadecimal digit precision");
 	if constexpr (::std::same_as<::std::remove_cvref_t<flt>, long double>
 #if defined(__SIZEOF_FLOAT128__) || defined(__FLOAT128__)
 				  || ::std::same_as<::std::remove_cvref_t<flt>, __float128>
@@ -412,7 +415,7 @@ inline constexpr char_type *print_reserve_define(
 		{
 			return details::print_rsvhexfloat_precision_define_impl<
 				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
-				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				flags.comma, flags.rounding, flags.precision, flags.nan_show_sign, flags.nan_show_type>(
 				iter, static_cast<__float80>(f.reference), f.precision);
 		}
 		else
@@ -422,21 +425,21 @@ inline constexpr char_type *print_reserve_define(
 		{
 			return details::print_rsvhexfloat_precision_define_impl<
 				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
-				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				flags.comma, flags.rounding, flags.precision, flags.nan_show_sign, flags.nan_show_type>(
 				iter, static_cast<__float128>(f.reference), f.precision);
 		}
 		else
 #endif
 			return details::print_rsvhexfloat_precision_define_impl<
 				flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e,
-				flags.comma, flags.rounding, flags.nan_show_sign, flags.nan_show_type>(
+				flags.comma, flags.rounding, flags.precision, flags.nan_show_sign, flags.nan_show_type>(
 				iter, static_cast<double>(f.reference), f.precision);
 	}
 	else
 	{
 		return details::print_rsvhexfloat_precision_define_impl<
 			flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.uppercase_e, flags.comma,
-			flags.rounding, flags.nan_show_sign, flags.nan_show_type>(iter, f.reference, f.precision);
+			flags.rounding, flags.precision, flags.nan_show_sign, flags.nan_show_type>(iter, f.reference, f.precision);
 	}
 }
 
@@ -452,7 +455,7 @@ print_reserve_size(io_reserve_type_t<char_type, manipulators::scalar_manip_preci
 				  manipulators::floating_format::decimal == flags.floating);
 	using no_cvref_t = ::std::remove_cvref_t<flt>;
 	constexpr auto reserve_floating{
-		(flags.precision == manipulators::floating_precision::fractional &&
+		(::fast_io::details::floating_precision_is_fractional<flags.precision> &&
 		 flags.floating == manipulators::floating_format::decimal)
 			? manipulators::floating_format::fixed
 			: flags.floating};

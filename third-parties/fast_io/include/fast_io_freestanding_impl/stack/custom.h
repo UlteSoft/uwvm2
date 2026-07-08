@@ -38,33 +38,37 @@ Different libraries or binaries built with different edited values may therefore
 coexist without requiring their print stack policy instantiations to be shared.
 The tradeoff is possible code-size growth from separate template instantiations.
 */
-template <typename = void>
+
+namespace details
+{
+inline constexpr ::std::size_t default_stack_buffer_value{
+#if defined(__KERNEL__) || defined(_KERNEL) || defined(_KERNEL_MODE)
+	256u
+#elif defined(__EMSCRIPTEN__) || defined(__wasm32__) || defined(__wasm64__) || defined(__wasm__)
+	4u * 1024u
+#elif !defined(__STDC_HOSTED__) || (__STDC_HOSTED__ == 0)
+	256u
+#elif defined(_WIN32) || defined(__CYGWIN__)
+	32u * 1024u
+#elif defined(__APPLE__) && defined(__MACH__)
+	16u * 1024u
+#elif defined(__linux__) && defined(__gnu_linux__)
+	64u * 1024u
+#elif defined(__linux__)
+	4u * 1024u
+#elif defined(__unix__) || defined(__unix) || defined(unix)
+	16u * 1024u
+#else
+	16u * 1024u
+#endif
+};
+} // namespace details
+
+// Users and downstream vendors may manually replace `value` below to tune the default maximum number of bytes that stack-based print materialization may use.
+template <::std::size_t custom_value = details::default_stack_buffer_value>
 struct print_stack_buffer_default_max_bytes
 {
-	static inline constexpr ::std::size_t default_value{
-#if defined(__KERNEL__) || defined(_KERNEL) || defined(_KERNEL_MODE)
-		256u
-#elif defined(__EMSCRIPTEN__) || defined(__wasm32__) || defined(__wasm64__) || defined(__wasm__)
-		4u * 1024u
-#elif !defined(__STDC_HOSTED__) || (__STDC_HOSTED__ == 0)
-		256u
-#elif defined(_WIN32) || defined(__CYGWIN__)
-		32u * 1024u
-#elif defined(__APPLE__) && defined(__MACH__)
-		16u * 1024u
-#elif defined(__linux__) && defined(__gnu_linux__)
-		64u * 1024u
-#elif defined(__linux__)
-		4u * 1024u
-#elif defined(__unix__) || defined(__unix) || defined(unix)
-		16u * 1024u
-#else
-		16u * 1024u
-#endif
-	};
-
-	// Users and downstream vendors may manually replace `value` below to tune the default maximum number of bytes that stack-based print materialization may use.
-	static inline constexpr ::std::size_t value{default_value};
+	static inline constexpr ::std::size_t value{custom_value};
 };
 
 } // namespace fast_io::custom

@@ -949,7 +949,7 @@ scan_decfloat_assign_precision(T &value, bool negative, scan_decfloat_significan
 	{
 		auto adjusted_exponent{::fast_io::details::scan_decfloat_adjusted_exponent(state, exponent)};
 		auto significand{state.significand};
-		if constexpr (precision_mode == ::fast_io::manipulators::floating_precision::significant)
+		if constexpr (::fast_io::details::floating_precision_is_significant<precision_mode>)
 		{
 			if (!precision)
 			{
@@ -1440,6 +1440,179 @@ scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::sca
 {
 	return ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
 		begin, end, value.reference, value.precision);
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr auto
+scan_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>) noexcept
+{
+	return io_type_t<::fast_io::details::scan_floating_context<char_type>>{};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_result<char_type const *>
+scan_context_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
+					::fast_io::details::scan_floating_context<char_type> &state, char_type const *begin,
+					char_type const *end,
+					::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		begin = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(begin, end);
+		if (begin == end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+	}
+	auto const old_size{state.size};
+	auto const append_result{::fast_io::details::scan_floating_context_append(state, begin, end)};
+	if (append_result.code != ::fast_io::parse_code::partial)
+	{
+		return append_result;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
+		buffer_begin, buffer_end, parsed_value)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		if (parse_result.iter == buffer_end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+		value.reference = parsed_value;
+		return {::fast_io::details::scan_floating_context_map_iter(
+					state, old_size, begin, end, parse_result.iter),
+				::fast_io::parse_code::ok};
+	}
+	if (parse_result.iter == buffer_end)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
+		parse_result.code == ::fast_io::parse_code::partial)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	return {::fast_io::details::scan_floating_context_map_iter(state, old_size, begin, end, parse_result.iter),
+			parse_result.code};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_code
+scan_context_eof_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
+						::fast_io::details::scan_floating_context<char_type> &state,
+						::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		return ::fast_io::parse_code::end_of_file;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
+		buffer_begin, buffer_end, parsed_value)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		value.reference = parsed_value;
+	}
+	return parse_result.code;
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr auto
+scan_context_type(io_reserve_type_t<char_type,
+									::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>) noexcept
+{
+	return io_type_t<::fast_io::details::scan_floating_context<char_type>>{};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_result<char_type const *>
+scan_context_define(io_reserve_type_t<char_type,
+									  ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
+					::fast_io::details::scan_floating_context<char_type> &state, char_type const *begin,
+					char_type const *end,
+					::fast_io::manipulators::scalar_manip_precision_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		begin = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(begin, end);
+		if (begin == end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+	}
+	auto const old_size{state.size};
+	auto const append_result{::fast_io::details::scan_floating_context_append(state, begin, end)};
+	if (append_result.code != ::fast_io::parse_code::partial)
+	{
+		return append_result;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
+		buffer_begin, buffer_end, parsed_value, value.precision)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		if (parse_result.iter == buffer_end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+		value.reference = parsed_value;
+		return {::fast_io::details::scan_floating_context_map_iter(
+					state, old_size, begin, end, parse_result.iter),
+				::fast_io::parse_code::ok};
+	}
+	if (parse_result.iter == buffer_end)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
+		parse_result.code == ::fast_io::parse_code::partial)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	return {::fast_io::details::scan_floating_context_map_iter(state, old_size, begin, end, parse_result.iter),
+			parse_result.code};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_code
+scan_context_eof_define(io_reserve_type_t<char_type,
+										  ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
+						::fast_io::details::scan_floating_context<char_type> &state,
+						::fast_io::manipulators::scalar_manip_precision_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		return ::fast_io::parse_code::end_of_file;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
+		buffer_begin, buffer_end, parsed_value, value.precision)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		value.reference = parsed_value;
+	}
+	return parse_result.code;
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, details::my_floating_point T>

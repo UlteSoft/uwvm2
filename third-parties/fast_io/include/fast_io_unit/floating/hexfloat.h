@@ -1026,6 +1026,8 @@ template <::fast_io::manipulators::floating_rounding rounding>
 template <bool showbase, bool showbase_uppercase, bool showpos, bool uppercase, bool uppercase_e, bool comma,
 		  ::fast_io::manipulators::floating_rounding rounding =
 			  ::fast_io::manipulators::floating_rounding::nearest_to_even,
+		  ::fast_io::manipulators::floating_precision precision_mode =
+			  ::fast_io::manipulators::floating_precision::significant,
 		  bool nan_show_sign = true, bool nan_show_type = false, typename flt, ::std::integral char_type>
 inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *iter, flt f,
 																	::std::size_t precision) noexcept
@@ -1037,23 +1039,23 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
 			return print_rsvhexfloat_precision_define_impl<
 				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
-				::fast_io::manipulators::floating_rounding::toward_plus_infinity, nan_show_sign, nan_show_type>(
-				iter, f, precision);
+				::fast_io::manipulators::floating_rounding::toward_plus_infinity, precision_mode, nan_show_sign,
+				nan_show_type>(iter, f, precision);
 		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
 			return print_rsvhexfloat_precision_define_impl<
 				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
-				::fast_io::manipulators::floating_rounding::toward_minus_infinity, nan_show_sign, nan_show_type>(
-				iter, f, precision);
+				::fast_io::manipulators::floating_rounding::toward_minus_infinity, precision_mode, nan_show_sign,
+				nan_show_type>(iter, f, precision);
 		case ::fast_io::manipulators::floating_rounding::toward_zero:
 			return print_rsvhexfloat_precision_define_impl<
 				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
-				::fast_io::manipulators::floating_rounding::toward_zero, nan_show_sign, nan_show_type>(
-				iter, f, precision);
+				::fast_io::manipulators::floating_rounding::toward_zero, precision_mode, nan_show_sign,
+				nan_show_type>(iter, f, precision);
 		default:
 			return print_rsvhexfloat_precision_define_impl<
 				showbase, showbase_uppercase, showpos, uppercase, uppercase_e, comma,
-				::fast_io::manipulators::floating_rounding::nearest_to_even, nan_show_sign, nan_show_type>(
-				iter, f, precision);
+				::fast_io::manipulators::floating_rounding::nearest_to_even, precision_mode, nan_show_sign,
+				nan_show_type>(iter, f, precision);
 		}
 	}
 	else
@@ -1074,9 +1076,18 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 		{
 			return prsv_fp_nan_impl<showpos, uppercase, nan_show_sign, nan_show_type, mbits>(iter, mantissa, sign);
 		}
-		if (!precision)
+		constexpr bool fractional_precision{
+			::fast_io::details::floating_precision_is_fractional<precision_mode>};
+		constexpr bool preserve_trailing_zero{
+			::fast_io::details::floating_precision_preserves_trailing_zero<precision_mode>};
+		::std::size_t total_precision{precision};
+		if constexpr (fractional_precision)
 		{
-			precision = 1u;
+			++total_precision;
+		}
+		else if (!total_precision)
+		{
+			total_precision = 1u;
 		}
 		iter = print_rsv_fp_sign_impl<showpos>(iter, sign);
 		if constexpr (showbase)
@@ -1086,11 +1097,12 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 		if (!mantissa && !exponent)
 		{
 			iter = print_rsvhexfloat_digit_impl<uppercase>(iter, 0u);
-			if (1u < precision)
+			auto const digits_to_print{preserve_trailing_zero ? total_precision : 1u};
+			if (1u < digits_to_print)
 			{
 				*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
 				++iter;
-				iter = ::fast_io::details::my_fill_n(iter, precision - 1u, char_literal_v<u8'0', char_type>);
+				iter = ::fast_io::details::my_fill_n(iter, digits_to_print - 1u, char_literal_v<u8'0', char_type>);
 			}
 			*iter = char_literal_v < uppercase_e ? u8'P' : u8'p', char_type > ;
 			++iter;
@@ -1116,16 +1128,16 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 				(aligned_mantissa >> shift) & static_cast<mantissa_type>(0xFu));
 		};
 		char8_t digits[total_hex_digits + 1u]{};
-		auto const retained_digits{precision < total_hex_digits ? precision : total_hex_digits};
+		auto const retained_digits{total_precision < total_hex_digits ? total_precision : total_hex_digits};
 		for (::std::size_t index{}; index != retained_digits; ++index)
 		{
 			digits[index] = static_cast<char8_t>(hex_digit_at(index));
 		}
-		if (precision < total_hex_digits)
+		if (total_precision < total_hex_digits)
 		{
-			auto const next_digit{hex_digit_at(precision)};
+			auto const next_digit{hex_digit_at(total_precision)};
 			bool tail_nonzero{};
-			for (auto index{precision + 1u}; index != total_hex_digits; ++index)
+			for (auto index{total_precision + 1u}; index != total_hex_digits; ++index)
 			{
 				if (hex_digit_at(index))
 				{
@@ -1134,9 +1146,9 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 				}
 			}
 			if (::fast_io::details::print_rsvhexfloat_round_up<rounding>(
-					sign, digits[precision - 1u], next_digit, tail_nonzero))
+					sign, digits[total_precision - 1u], next_digit, tail_nonzero))
 			{
-				for (auto index{precision}; index; --index)
+				for (auto index{total_precision}; index; --index)
 				{
 					auto &digit{digits[index - 1u]};
 					if (digit != 0xFu)
@@ -1157,18 +1169,30 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 				}
 			}
 		}
+		auto digits_to_print{retained_digits};
+		if constexpr (preserve_trailing_zero)
+		{
+			digits_to_print = total_precision;
+		}
+		else
+		{
+			for (; 1u < digits_to_print && !digits[digits_to_print - 1u]; --digits_to_print)
+			{
+			}
+		}
 		iter = print_rsvhexfloat_digit_impl<uppercase>(iter, digits[0]);
-		if (1u < precision)
+		if (1u < digits_to_print)
 		{
 			*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
 			++iter;
-			for (::std::size_t index{1u}; index != retained_digits; ++index)
+			auto const digit_limit{digits_to_print < retained_digits ? digits_to_print : retained_digits};
+			for (::std::size_t index{1u}; index != digit_limit; ++index)
 			{
 				iter = print_rsvhexfloat_digit_impl<uppercase>(iter, digits[index]);
 			}
-			if (retained_digits < precision)
+			if (digit_limit < digits_to_print)
 			{
-				iter = ::fast_io::details::my_fill_n(iter, precision - retained_digits,
+				iter = ::fast_io::details::my_fill_n(iter, digits_to_print - digit_limit,
 													 char_literal_v<u8'0', char_type>);
 			}
 		}
@@ -1182,6 +1206,67 @@ template <bool showbase, typename mantissa_type>
 inline constexpr ::std::size_t print_rsvhexfloat_size_cache{
 	print_integer_reserved_size_cache<16, showbase, true, false, mantissa_type> + 6 +
 	print_integer_reserved_size_cache<10, true, true, false, ::std::int_least32_t>};
+
+template <::std::integral char_type>
+struct scan_floating_context
+{
+	static inline constexpr ::std::size_t capacity{8192u};
+	::fast_io::freestanding::array<char_type, capacity> buffer;
+	::std::size_t size{};
+};
+
+template <::std::integral char_type, bool noskipws>
+inline constexpr char_type const *scan_floating_context_skip_space(char_type const *first,
+																   char_type const *last) noexcept
+{
+	if constexpr (noskipws)
+	{
+		return first;
+	}
+	else
+	{
+		return ::fast_io::details::find_space_common_impl<false, true>(first, last);
+	}
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr char_type const *
+scan_floating_context_map_iter(scan_floating_context<char_type> const &state, ::std::size_t old_size,
+							   char_type const *chunk_begin, char_type const *chunk_end,
+							   char_type const *parsed_iter) noexcept
+{
+	auto const offset{static_cast<::std::size_t>(parsed_iter - state.buffer.data())};
+	if (offset <= old_size)
+	{
+		return chunk_begin;
+	}
+	auto const consumed{offset - old_size};
+	auto const chunk_size{static_cast<::std::size_t>(chunk_end - chunk_begin)};
+	if (chunk_size < consumed)
+	{
+		return chunk_end;
+	}
+	return chunk_begin + consumed;
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_floating_context_append(scan_floating_context<char_type> &state, char_type const *chunk_begin,
+							 char_type const *chunk_end) noexcept
+{
+	auto const chunk_size{static_cast<::std::size_t>(chunk_end - chunk_begin)};
+	if (!chunk_size)
+	{
+		return {chunk_end, ::fast_io::parse_code::partial};
+	}
+	if (scan_floating_context<char_type>::capacity - state.size < chunk_size)
+	{
+		return {chunk_begin, ::fast_io::parse_code::overflow};
+	}
+	::fast_io::freestanding::non_overlapped_copy_n(chunk_begin, chunk_size, state.buffer.data() + state.size);
+	state.size += chunk_size;
+	return {chunk_end, ::fast_io::parse_code::partial};
+}
 
 } // namespace details
 
@@ -1236,6 +1321,91 @@ scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::sca
 		}
 	}
 	return ::fast_io::details::scan_hexfloat_contiguous_define_impl<char_type, flags>(begin, end, value.reference);
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  ::fast_io::details::my_floating_point T>
+	requires(flags.floating == ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr auto
+scan_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>) noexcept
+{
+	return io_type_t<::fast_io::details::scan_floating_context<char_type>>{};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  ::fast_io::details::my_floating_point T>
+	requires(flags.floating == ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_result<char_type const *>
+scan_context_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
+					::fast_io::details::scan_floating_context<char_type> &state, char_type const *begin,
+					char_type const *end,
+					::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		begin = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(begin, end);
+		if (begin == end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+	}
+	auto const old_size{state.size};
+	auto const append_result{::fast_io::details::scan_floating_context_append(state, begin, end)};
+	if (append_result.code != ::fast_io::parse_code::partial)
+	{
+		return append_result;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_hexfloat_contiguous_define_impl<char_type, flags>(
+		buffer_begin, buffer_end, parsed_value)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		if (parse_result.iter == buffer_end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+		value.reference = parsed_value;
+		return {::fast_io::details::scan_floating_context_map_iter(
+					state, old_size, begin, end, parse_result.iter),
+				::fast_io::parse_code::ok};
+	}
+	if (parse_result.iter == buffer_end)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
+		parse_result.code == ::fast_io::parse_code::partial)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	return {::fast_io::details::scan_floating_context_map_iter(state, old_size, begin, end, parse_result.iter),
+			parse_result.code};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  ::fast_io::details::my_floating_point T>
+	requires(flags.floating == ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::fast_io::parse_code
+scan_context_eof_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
+						::fast_io::details::scan_floating_context<char_type> &state,
+						::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
+{
+	if (!state.size)
+	{
+		return ::fast_io::parse_code::end_of_file;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.size};
+	auto parse_result{::fast_io::details::scan_hexfloat_contiguous_define_impl<char_type, flags>(
+		buffer_begin, buffer_end, parsed_value)};
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		value.reference = parsed_value;
+	}
+	return parse_result.code;
 }
 
 } // namespace fast_io
