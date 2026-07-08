@@ -344,6 +344,31 @@ inline constexpr ::std::size_t print_scatter_full_output_threshold() noexcept
 	}
 }
 
+template <::std::integral char_type, typename outputstmtype>
+inline constexpr ::std::size_t print_full_output_coalesce_threshold() noexcept
+{
+	if constexpr (::fast_io::full_output_coalesce_threshold_stream<char_type, outputstmtype>)
+	{
+		constexpr ::std::size_t threshold{
+			full_output_coalesce_threshold(
+				::fast_io::io_reserve_type<char_type, ::std::remove_cvref_t<outputstmtype>>)};
+		constexpr ::std::size_t max_threshold{
+			::fast_io::details::decay::print_scatter_full_output_threshold_max_chars<char_type>()};
+		if constexpr (threshold < max_threshold)
+		{
+			return threshold;
+		}
+		else
+		{
+			return max_threshold;
+		}
+	}
+	else
+	{
+		return ::fast_io::details::decay::print_scatter_full_output_threshold<char_type, outputstmtype>();
+	}
+}
+
 template <typename outputstmtype>
 inline constexpr bool print_has_direct_write_bytes_operations =
 	::fast_io::operations::decay::defines::has_write_all_bytes_overflow_define<outputstmtype> ||
@@ -3294,7 +3319,7 @@ inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, 
 			}
 		}
 		constexpr ::std::size_t threshold_chars{
-			::fast_io::details::decay::print_scatter_full_output_threshold<char_type, outputstmtype>()};
+			::fast_io::details::decay::print_full_output_coalesce_threshold<char_type, outputstmtype>()};
 		if constexpr (threshold_chars != 0)
 		{
 			constexpr ::std::size_t static_total{

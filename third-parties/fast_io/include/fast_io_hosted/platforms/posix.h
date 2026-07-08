@@ -552,6 +552,13 @@ inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
 	return static_cast<::std::size_t>(256u / sizeof(char_type) + 1u);
 }
 
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t full_output_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	return static_cast<::std::size_t>(256u / sizeof(char_type) + 1u);
+}
+
 #if defined(__CYGWIN__)
 
 // https://github.com/cygwin/cygwin/blob/c43ec5f5951c7f4b882a0f8e619601a45ae70a91/newlib/libc/include/sys/_default_fcntl.h#L168

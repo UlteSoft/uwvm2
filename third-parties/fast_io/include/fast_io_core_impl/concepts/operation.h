@@ -222,6 +222,24 @@ concept scatter_fallback_full_output_threshold_stream =
 		} -> ::std::same_as<::std::size_t>;
 	};
 
+/// @brief      full_output_coalesce_threshold_stream
+/// @details    Customizes the maximum full semantic output size, in char_type
+///             units, for materializing a precise print run into contiguous
+///             storage before writing it once. This is independent of scatter
+///             writev fallback policy; streams may choose different thresholds.
+///             Returning 0 disables this coalescing path for the stream.
+/// @fn         full_output_coalesce_threshold
+/// @brief      Returns the whole-output coalescing threshold, in char_type units.
+template <typename char_type, typename T>
+concept full_output_coalesce_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			full_output_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			full_output_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
+	};
+
 /// @brief      printable_internal_shift
 /// @details    Defines the behaviour when printed with ::fast_io::mnp::width<::fast_io::mnp::scalar_placement::internal>
 /// @fn         print_define_internal_shift

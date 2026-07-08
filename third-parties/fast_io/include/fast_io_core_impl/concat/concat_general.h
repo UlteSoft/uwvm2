@@ -266,10 +266,41 @@ inline constexpr void basic_general_concat_decay_ref_impl_precise(T &str, Arg ar
 	strlike_set_curr(io_strlike_type<ch_type, T>, str, ptr);
 }
 
+template <::std::integral ch_type, typename... Args>
+inline constexpr bool basic_general_concat_semantic_precise_ok =
+	(false || ... || ::fast_io::details::decay::print_semantic_node<Args>) &&
+	(::fast_io::details::decay::print_semantic_precise_size_ok<ch_type, ::std::remove_cvref_t<Args>>::value && ...);
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr void basic_general_concat_decay_ref_impl_semantic_precise(T &str, Args... args)
+{
+	::std::size_t const precise_size{
+		::fast_io::operations::decay::print_semantic_precise_total_size<line, ch_type>(args...)};
+	if constexpr (sso_buffer_strlike<ch_type, T>)
+	{
+		constexpr ::std::size_t local_cap{strlike_sso_size(io_strlike_type<ch_type, T>)};
+		if (local_cap < precise_size)
+		{
+			strlike_reserve(io_strlike_type<ch_type, T>, str, precise_size);
+		}
+	}
+	else
+	{
+		strlike_reserve(io_strlike_type<ch_type, T>, str, precise_size);
+	}
+	auto first{strlike_begin(io_strlike_type<ch_type, T>, str)};
+	auto ptr{::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, ch_type>(first, args...)};
+	strlike_set_curr(io_strlike_type<ch_type, T>, str, ptr);
+}
+
 template <bool line, ::std::integral ch_type, typename T, typename... Args>
 inline constexpr void basic_general_concat_decay_ref_impl(T &str, Args... args)
 {
-	if constexpr (((reserve_printable<ch_type, Args> || scatter_printable<ch_type, Args> ||
+	if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
+	{
+		basic_general_concat_decay_ref_impl_semantic_precise<line, ch_type>(str, args...);
+	}
+	else if constexpr (((reserve_printable<ch_type, Args> || scatter_printable<ch_type, Args> ||
 					dynamic_reserve_printable<ch_type, Args>) &&
 				   ...))
 	{
@@ -352,7 +383,22 @@ inline constexpr T basic_general_concat_phase1_decay_impl(Args... args)
 	}
 	else
 	{
-		if constexpr (buffer_strlike<ch_type, T>)
+		if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
+		{
+			if constexpr (buffer_strlike<ch_type, T>)
+			{
+				T str;
+				basic_general_concat_decay_ref_impl_semantic_precise<line, ch_type>(str, args...);
+				return str;
+			}
+			else
+			{
+				basic_concat_buffer<ch_type> buffer;
+				basic_general_concat_decay_ref_impl_semantic_precise<line, ch_type>(buffer, args...);
+				return strlike_construct_define(io_strlike_type<ch_type, T>, buffer.buffer_begin, buffer.buffer_curr);
+			}
+		}
+		else if constexpr (buffer_strlike<ch_type, T>)
 		{
 			T str;
 			basic_general_concat_decay_ref_impl<line, ch_type>(str, args...);
