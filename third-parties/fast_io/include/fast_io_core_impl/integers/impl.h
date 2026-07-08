@@ -2333,7 +2333,8 @@ inline constexpr void print_reserve_integral_define_precise(char_type *start, ::
 			}
 			if constexpr (base == 10 && (::std::numeric_limits<::std::uint_least32_t>::digits == 32u))
 			{
-				return ::fast_io::details::jeaiii::jeaiii_main_len(first, u, static_cast<::std::uint_least32_t>(n));
+				return ::fast_io::details::jeaiii::jeaiii_main_len(
+					first, u, static_cast<::std::uint_least32_t>((start + n) - first));
 			}
 			else
 			{

@@ -127,6 +127,61 @@ inline constexpr basic_io_scatter_t<ch_type> print_scatter_define_extract_one(T 
 	return print_scatter_define(io_reserve_type<ch_type, ::std::remove_cvref_t<T>>, t);
 }
 
+template <::std::integral ch_type>
+inline constexpr ::std::size_t calculate_scatter_total_size(basic_io_scatter_t<ch_type> const *first,
+															basic_io_scatter_t<ch_type> const *last)
+{
+	::std::size_t total_size{};
+	for (; first != last; ++first)
+	{
+		total_size = ::fast_io::details::intrinsics::add_or_overflow_die(total_size, first->len);
+	}
+	return total_size;
+}
+
+template <::std::integral ch_type>
+inline constexpr ch_type *copy_scatter_chain_to_buffer(ch_type *iter, basic_io_scatter_t<ch_type> const *first,
+													   basic_io_scatter_t<ch_type> const *last)
+{
+	for (; first != last; ++first)
+	{
+		iter = non_overlapped_copy_n(first->base, first->len, iter);
+	}
+	return iter;
+}
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr void basic_general_concat_decay_ref_impl_all_scatter(T &str, Args... args)
+{
+	basic_io_scatter_t<ch_type> scatters[]{
+		print_scatter_define(io_reserve_type<ch_type, ::std::remove_cvref_t<Args>>, args)...};
+	::std::size_t total_size{calculate_scatter_total_size<ch_type>(scatters, scatters + sizeof...(Args))};
+	if constexpr (line)
+	{
+		total_size = ::fast_io::details::intrinsics::add_or_overflow_die(total_size, static_cast<::std::size_t>(1u));
+	}
+	if constexpr (sso_buffer_strlike<ch_type, T>)
+	{
+		constexpr ::std::size_t local_cap{strlike_sso_size(io_strlike_type<ch_type, T>)};
+		if (local_cap < total_size)
+		{
+			strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
+		}
+	}
+	else
+	{
+		strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
+	}
+	auto ptr{copy_scatter_chain_to_buffer(strlike_begin(io_strlike_type<ch_type, T>, str), scatters,
+										  scatters + sizeof...(Args))};
+	if constexpr (line)
+	{
+		*ptr = char_literal_v<u8'\n', ch_type>;
+		++ptr;
+	}
+	strlike_set_curr(io_strlike_type<ch_type, T>, str, ptr);
+}
+
 template <bool line, ::std::integral ch_type, typename T, typename Arg>
 inline constexpr T basic_general_concat_decay_impl_precise(T &str, Arg arg)
 {
@@ -219,6 +274,12 @@ inline constexpr T basic_general_concat_decay_impl(Args... args)
 				basic_io_scatter_t<ch_type> scatter{print_scatter_define_extract_one<ch_type>(args...)};
 				return strlike_construct_define(io_strlike_type<ch_type, T>(scatter.base, scatter.base + scatter.len));
 			}
+			else if constexpr ((scatter_printable<ch_type, Args> && ...))
+			{
+				T str;
+				basic_general_concat_decay_ref_impl_all_scatter<line, ch_type>(str, args...);
+				return str;
+			}
 			else
 			{
 				::std::size_t total_size{::fast_io::details::intrinsics::add_or_overflow_die(
@@ -301,8 +362,8 @@ inline constexpr void basic_general_concat_decay_ref_impl(T &str, Args... args)
 		basic_general_concat_decay_ref_impl_semantic_precise<line, ch_type>(str, args...);
 	}
 	else if constexpr (((reserve_printable<ch_type, Args> || scatter_printable<ch_type, Args> ||
-					dynamic_reserve_printable<ch_type, Args>) &&
-				   ...))
+						 dynamic_reserve_printable<ch_type, Args>) &&
+						...))
 	{
 		constexpr ::std::size_t sz{calculate_scatter_reserve_size<ch_type, Args...>()};
 		if constexpr (line)
@@ -342,12 +403,19 @@ inline constexpr void basic_general_concat_decay_ref_impl(T &str, Args... args)
 		}
 		else
 		{
-			::std::size_t total_size{::fast_io::details::intrinsics::add_or_overflow_die(
-				sz_with_line, calculate_scatter_dynamic_reserve_size_with_scatter<ch_type>(args...))};
-			strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
-			strlike_set_curr(io_strlike_type<ch_type, T>, str,
-							 print_reserve_define_chain_scatter_impl<line>(
-								 strlike_begin(io_strlike_type<ch_type, T>, str), args...));
+			if constexpr ((scatter_printable<ch_type, Args> && ...))
+			{
+				basic_general_concat_decay_ref_impl_all_scatter<line, ch_type>(str, args...);
+			}
+			else
+			{
+				::std::size_t total_size{::fast_io::details::intrinsics::add_or_overflow_die(
+					sz_with_line, calculate_scatter_dynamic_reserve_size_with_scatter<ch_type>(args...))};
+				strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
+				strlike_set_curr(io_strlike_type<ch_type, T>, str,
+								 print_reserve_define_chain_scatter_impl<line>(
+									 strlike_begin(io_strlike_type<ch_type, T>, str), args...));
+			}
 		}
 	}
 	else
