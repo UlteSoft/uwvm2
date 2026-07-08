@@ -604,10 +604,16 @@ scan_decfloat_round_mantissa(bool negative, ::std::uint_least64_t mantissa, bool
 	}
 	else
 	{
-		if (((mantissa & 1u) != 0u || has_tail) &&
-			::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
+		if (::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
 		{
-			++mantissa;
+			if ((mantissa & 1u) != 0u)
+			{
+				++mantissa;
+			}
+			else if (has_tail)
+			{
+				mantissa += ::std::uint_least64_t{2u};
+			}
 		}
 	}
 	return mantissa >> 1u;
@@ -650,13 +656,35 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 		constexpr auto mantissa_explicit_bits{static_cast<::std::int_least32_t>(trait::mbits)};
 		constexpr auto minimum_exponent{::fast_io::details::scan_decfloat_minimum_exponent<no_cvref_t>()};
 		constexpr auto infinite_power{::fast_io::details::scan_decfloat_infinite_power<no_cvref_t>()};
-		if (significand == 0 || exponent < ::fast_io::details::scan_decfloat_smallest_power10<no_cvref_t>())
+		constexpr auto max_finite_mantissa{(::std::uint_least64_t{1u} << mantissa_explicit_bits) - 1u};
+		if (significand == 0)
 		{
+			answer = {};
+			return true;
+		}
+		if (exponent < ::fast_io::details::scan_decfloat_smallest_power10<no_cvref_t>())
+		{
+			if constexpr (!::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
+			{
+				if (::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = 1u, .power2 = 0};
+					return true;
+				}
+			}
 			answer = {};
 			return true;
 		}
 		if (exponent > ::fast_io::details::scan_decfloat_largest_power10<no_cvref_t>())
 		{
+			if constexpr (!::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
+			{
+				if (!::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = max_finite_mantissa, .power2 = infinite_power - 1};
+					return true;
+				}
+			}
 			answer = {.mantissa = 0, .power2 = infinite_power};
 			return true;
 		}
@@ -735,6 +763,14 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 		mantissa &= ~(::std::uint_least64_t{1} << mantissa_explicit_bits);
 		if (power2 >= infinite_power)
 		{
+			if constexpr (!::fast_io::details::scan_decfloat_nearest_rounding<rounding>)
+			{
+				if (!::fast_io::details::scan_decfloat_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = max_finite_mantissa, .power2 = infinite_power - 1};
+					return true;
+				}
+			}
 			answer = {.mantissa = 0, .power2 = infinite_power};
 			return true;
 		}

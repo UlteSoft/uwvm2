@@ -1115,10 +1115,16 @@ dragonbox_decimal_round_mantissa(bool negative, ::std::uint_least64_t mantissa, 
 	}
 	else
 	{
-		if (((mantissa & 1u) != 0u || has_tail) &&
-			::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+		if (::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
 		{
-			++mantissa;
+			if ((mantissa & 1u) != 0u)
+			{
+				++mantissa;
+			}
+			else if (has_tail)
+			{
+				mantissa += ::std::uint_least64_t{2u};
+			}
 		}
 	}
 	return mantissa >> 1u;
@@ -1149,13 +1155,35 @@ dragonbox_decimal_compute_adjusted(::std::int_least64_t exponent, ::std::uint_le
 		constexpr auto largest_power10{use_binary32_bounds ? 38 : 308};
 		constexpr auto min_round_to_even_power10{use_binary32_bounds ? -17 : -4};
 		constexpr auto max_round_to_even_power10{use_binary32_bounds ? 10 : 23};
-		if (significand == 0 || exponent < smallest_power10)
+		constexpr auto max_finite_mantissa{(::std::uint_least64_t{1u} << mantissa_explicit_bits) - 1u};
+		if (significand == 0)
 		{
+			answer = {};
+			return true;
+		}
+		if (exponent < smallest_power10)
+		{
+			if constexpr (!::fast_io::details::floating_rounding_is_nearest<rounding>)
+			{
+				if (::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = 1u, .power2 = 0};
+					return true;
+				}
+			}
 			answer = {};
 			return true;
 		}
 		if (exponent > largest_power10)
 		{
+			if constexpr (!::fast_io::details::floating_rounding_is_nearest<rounding>)
+			{
+				if (!::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = max_finite_mantissa, .power2 = infinite_power - 1};
+					return true;
+				}
+			}
 			answer = {.mantissa = 0, .power2 = infinite_power};
 			return true;
 		}
@@ -1206,6 +1234,14 @@ dragonbox_decimal_compute_adjusted(::std::int_least64_t exponent, ::std::uint_le
 		mantissa &= ~(::std::uint_least64_t{1} << mantissa_explicit_bits);
 		if (power2 >= infinite_power)
 		{
+			if constexpr (!::fast_io::details::floating_rounding_is_nearest<rounding>)
+			{
+				if (!::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+				{
+					answer = {.mantissa = max_finite_mantissa, .power2 = infinite_power - 1};
+					return true;
+				}
+			}
 			answer = {.mantissa = 0, .power2 = infinite_power};
 			return true;
 		}
