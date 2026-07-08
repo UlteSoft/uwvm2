@@ -1744,6 +1744,8 @@ inline constexpr char_type* printrsvcontiguousimpl(char_type* iter,Arg arg,Args.
 #endif
 
 template <bool ln, typename output, typename T, typename... Args>
+// Force-inline rationale: this is the small top-level control recursion for a known line flag; inlining lets the
+// newline case and the final single-control tail fold into the selected output path instead of leaving a call chain.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1775,6 +1777,8 @@ inline constexpr void print_controls_line(output outstm, T t, Args... args)
 }
 
 template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+// Force-inline rationale: reserve-only emission is a pre-sized cursor advance; inlining exposes the fixed recursion
+// depth so null arguments disappear and the cursor updates become straight-line stores.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1815,6 +1819,8 @@ inline constexpr char_type *print_n_reserve(char_type *ptr, T t, Args... args)
 }
 
 template <::std::size_t n, ::std::integral char_type, typename scattertype, typename T, typename... Args>
+// Force-inline rationale: scatter descriptor construction is pure template dispatch; inlining keeps the descriptor
+// count, byte/character scatter conversion, and null elision visible to the final scatter write.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1871,6 +1877,8 @@ inline constexpr void print_n_scatters(basic_io_scatter_t<scattertype> *pscatter
 }
 
 template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+// Force-inline rationale: dynamic reserve sizing feeds a single allocation decision; inlining folds non-dynamic
+// arguments to zero and keeps overflow-checked additions adjacent to the caller's allocation branch.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1910,6 +1918,8 @@ inline constexpr ::std::size_t ndynamic_print_reserve_size(T t, Args... args)
 }
 
 template <::std::size_t n, ::std::integral char_type, typename T, typename... Args>
+// Force-inline rationale: static stack-budget aggregation decides whether the dynamic reserve path can stay on the
+// stack; inlining lets the all-static/heap-fallback branch collapse before code generation.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -1973,6 +1983,8 @@ inline constexpr bool ndynamic_print_reserve_has_static_stack_size()
 
 template <bool needprintlf, ::std::size_t n, ::std::integral char_type, typename scattertype, typename T,
 		  typename... Args>
+// Force-inline rationale: the forward declaration carries the same attribute as the definitions so compilers that
+// bind force-inline on the first declaration do not outline the reserve/scatter cursor state machine.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2004,6 +2016,8 @@ inline constexpr bool print_next_is_reserve() noexcept
 
 template <bool needprintlf, ::std::size_t n, ::std::integral char_type, typename scattertype, typename T,
 		  typename... Args>
+// Force-inline rationale: this continuation coalesces adjacent reserve fragments into one scatter entry; inlining
+// keeps the base pointer, current pointer, and next-argument classification in one foldable cursor pipeline.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2071,6 +2085,8 @@ inline constexpr auto print_n_scatters_reserve_cont(basic_io_scatter_t<scatterty
 
 template <bool needprintlf, ::std::size_t n, ::std::integral char_type, typename scattertype, typename T,
 		  typename... Args>
+// Force-inline rationale: the mixed reserve/scatter materializer is the boundary where compile-time argument classes
+// become descriptor writes; inlining avoids outlining the recursive state that determines the final scatter count.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2277,6 +2293,8 @@ inline constexpr void print_controls_scatters_reserve(outputstmtype optstm, T t,
 
 template <bool needprintlf, ::std::size_t position, ::std::size_t stack_buffer_size, bool has_static_stack_size,
 		  ::std::integral char_type, typename outputstmtype, typename scatter_type, typename T, typename... Args>
+// Force-inline rationale: the dynamic reserve writer has a hot stack-buffer fast path; inlining lets the caller's
+// known stack budget and total-size branch select stack storage or heap storage without an extra outlined frame.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2308,6 +2326,8 @@ inline constexpr void print_controls_dynamic_scatters_reserve_with_scatter(outpu
 
 template <bool needprintlf, ::std::size_t position, ::std::size_t scatterscount, ::std::size_t stack_buffer_size,
 		  bool has_static_stack_size, ::std::integral char_type, typename outputstmtype, typename T, typename... Args>
+// Force-inline rationale: this wrapper chooses stack versus heap scatter storage from template constants; inlining
+// keeps that storage decision adjacent to the dynamic reserve writer and prevents a redundant allocator-shaped call.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2353,6 +2373,8 @@ inline constexpr bool print_controls_dynamic_scatters_reserve_fast_entry_availab
 }
 
 template <bool line, typename outputstmtype, typename T, typename... Args>
+// Force-inline rationale: the fast entry is reached only after compile-time contiguous-scatter analysis succeeds;
+// inlining preserves those constants so the selected reserve/scatter path is emitted directly at the semantic boundary.
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -2791,11 +2813,6 @@ inline constexpr bool print_semantic_input_argument_v =
 		::fast_io::details::decay::print_semantic_input_forward_t<char_type, T>>;
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr decltype(auto) print_semantic_input_forward(T &&t) noexcept
 {
 	if constexpr (::fast_io::details::decay::print_semantic_node_no_parameter_v<
@@ -2811,11 +2828,6 @@ inline constexpr decltype(auto) print_semantic_input_forward(T &&t) noexcept
 }
 
 template <typename T, typename continuation, ::std::size_t... I>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr decltype(auto) print_semantic_pack_apply_impl(T &&t, continuation &&cont,
 															   ::std::index_sequence<I...>)
 {
@@ -2824,11 +2836,6 @@ inline constexpr decltype(auto) print_semantic_pack_apply_impl(T &&t, continuati
 }
 
 template <typename T, typename continuation>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr decltype(auto) print_semantic_pack_apply(T &&t, continuation &&cont)
 {
 	using pack_type =
@@ -2844,11 +2851,6 @@ struct print_semantic_value_prefix_continuation
 	::std::remove_reference_t<T> *valueptr;
 
 	template <typename... TailArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator()(TailArgs &&...tail_args) const
 	{
 		return (*contptr)(::std::forward<T>(*valueptr), ::std::forward<TailArgs>(tail_args)...);
@@ -2862,11 +2864,6 @@ struct print_semantic_lvalue_prefix_continuation
 	T *valueptr;
 
 	template <typename... TailArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator()(TailArgs &&...tail_args) const
 	{
 		return (*contptr)(*valueptr, ::std::forward<TailArgs>(tail_args)...);
@@ -2874,11 +2871,6 @@ struct print_semantic_lvalue_prefix_continuation
 };
 
 template <bool already_forwarded, ::std::integral char_type, typename continuation>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont)
 {
 	return cont();
@@ -2894,11 +2886,6 @@ struct print_semantic_pack_expand_tail_continuation
 	::fast_io::containers::tuple<::std::remove_reference_t<ExpandedPackArgs> *...> expandedptrs;
 
 	template <::std::size_t... I, typename... TailArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator_impl(::std::index_sequence<I...>, TailArgs &&...tail_args) const
 	{
 		return (*contptr)(::std::forward<ExpandedPackArgs>(*::fast_io::containers::get<I>(expandedptrs))...,
@@ -2906,11 +2893,6 @@ struct print_semantic_pack_expand_tail_continuation
 	}
 
 	template <typename... TailArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator()(TailArgs &&...tail_args) const
 	{
 		return operator_impl(::std::make_index_sequence<sizeof...(ExpandedPackArgs)>{},
@@ -2925,11 +2907,6 @@ struct print_semantic_pack_expand_middle_continuation
 	::fast_io::containers::tuple<::std::remove_reference_t<Args> *...> const *argptrs;
 
 	template <typename tail_continuation, ::std::size_t... I>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator_impl(tail_continuation &&tail_cont, ::std::index_sequence<I...>) const
 	{
 		return ::fast_io::details::decay::print_semantic_pack_expand<already_forwarded, char_type>(
@@ -2938,11 +2915,6 @@ struct print_semantic_pack_expand_middle_continuation
 	}
 
 	template <typename... ExpandedPackArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator()(ExpandedPackArgs &&...expanded_pack_args) const
 	{
 		return operator_impl(
@@ -2960,11 +2932,6 @@ struct print_semantic_pack_expand_initial_continuation
 	::fast_io::containers::tuple<::std::remove_reference_t<Args> *...> argptrs;
 
 	template <typename... PackArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr decltype(auto) operator()(PackArgs &&...pack_args) const
 	{
 		return ::fast_io::details::decay::print_semantic_pack_expand<false, char_type>(
@@ -2975,11 +2942,6 @@ struct print_semantic_pack_expand_initial_continuation
 };
 
 template <bool already_forwarded, ::std::integral char_type, typename continuation, typename T, typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont, T &&t, Args &&...args)
 {
 	if constexpr (::fast_io::details::print_pack<T> ||
@@ -3011,11 +2973,6 @@ inline constexpr decltype(auto) print_semantic_pack_expand(continuation &&cont, 
 }
 
 template <bool had_null, bool has_value, typename continuation>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 #if __has_cpp_attribute(__gnu__::__flatten__)
 [[__gnu__::__flatten__]]
 #endif
@@ -3032,11 +2989,6 @@ inline constexpr decltype(auto) print_semantic_filter_nulls(continuation &&cont)
 }
 
 template <bool had_null, bool has_value, typename continuation, typename T, typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 #if __has_cpp_attribute(__gnu__::__flatten__)
 [[__gnu__::__flatten__]]
 #endif
@@ -3115,11 +3067,6 @@ template <bool line, bool already_forwarded, ::std::integral char_type, typename
 inline constexpr void print_semantic_emit(outputstmtype optstm, Args &&...args);
 
 template <::std::integral char_type, typename outputstmtype>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr void print_semantic_write_fill(outputstmtype optstm, ::std::size_t n, char_type ch)
 {
 	if (n == 0)
@@ -3140,11 +3087,6 @@ template <::std::integral char_type, typename T>
 inline constexpr ::std::size_t print_semantic_precise_size_arg(T &&t);
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_precise_size_leaf(T &&t)
 {
 	using value_type = ::std::remove_cvref_t<T>;
@@ -3204,22 +3146,12 @@ inline constexpr ::std::size_t print_semantic_precise_size_leaf(T &&t)
 }
 
 template <typename placement_type>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_width_placement_code(placement_type placement) noexcept
 {
 	return static_cast<::std::size_t>(placement);
 }
 
 template <::std::integral char_type, typename width_traits, typename width_reference_type>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type print_semantic_width_fill_char(width_reference_type &&wr) noexcept
 {
 	if constexpr (width_traits::has_fill_char)
@@ -3233,11 +3165,6 @@ inline constexpr char_type print_semantic_width_fill_char(width_reference_type &
 }
 
 template <typename width_traits, typename width_reference_type>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr auto print_semantic_width_placement(width_reference_type &&wr) noexcept
 {
 	if constexpr (width_traits::runtime_placement)
@@ -3254,11 +3181,6 @@ template <::std::integral char_type, typename T>
 inline constexpr ::std::size_t print_semantic_internal_shift_arg(T &&t);
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_internal_shift(T &&t)
 {
 	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -3292,11 +3214,6 @@ inline constexpr ::std::size_t print_semantic_internal_shift(T &&t)
 }
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_internal_shift_arg(T &&t)
 {
 	decltype(auto) forwarded{
@@ -3322,11 +3239,6 @@ struct print_semantic_precise_size_pack_continuation
 };
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_precise_size(T &&t)
 {
 	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -3375,11 +3287,6 @@ inline constexpr ::std::size_t print_semantic_precise_size(T &&t)
 }
 
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_precise_size_arg(T &&t)
 {
 	decltype(auto) forwarded{
@@ -3400,11 +3307,6 @@ inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t
 /// @param    t          the argument to print
 /// @return   char_type* a pointer one past the emitted argument
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked_arg(char_type *iter, T &&t)
 {
 	decltype(auto) forwarded{
@@ -3422,11 +3324,6 @@ inline constexpr ::std::size_t print_semantic_common_factor_pack_max_size{8u};
 /// @param    <unnamed>  the first null node
 /// @param    <unnamed>  the second null node
 /// @return   bool       true because both nodes emit no output
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr bool print_semantic_common_factor_equal(::fast_io::io_null_t, ::fast_io::io_null_t) noexcept
 {
 	return true;
@@ -3447,11 +3344,6 @@ template <typename T, typename U>
 				 first.base;
 				 second.base;
 			 })
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr bool print_semantic_common_factor_equal(T const &first, U const &second) noexcept
 {
 	if constexpr (requires {
@@ -3485,11 +3377,6 @@ template <typename T, typename U>
 				 second.reference;
 				 requires ::std::integral<::std::remove_cvref_t<decltype(first.reference)>>;
 			 })
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr bool print_semantic_common_factor_equal(T const &first, U const &second) noexcept
 {
 	return first.reference == second.reference;
@@ -3516,11 +3403,6 @@ concept print_semantic_common_factor_comparable = requires(T &&t, U &&u) {
 /// @param    pack       the pack whose indexed element is printed
 /// @return   char_type* a pointer one past the emitted element
 template <::std::integral char_type, ::std::size_t index, typename Pack>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked_pack_element(char_type *iter, Pack &&pack)
 {
 	return ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(
@@ -3535,11 +3417,6 @@ inline constexpr char_type *print_semantic_emit_unchecked_pack_element(char_type
 /// @param    pack2 the pack from the false branch
 /// @return   bool  true when the indexed elements provably emit identical output
 template <::std::size_t index, typename Pack1, typename Pack2>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr bool print_semantic_pack_element_common_factor_equal(Pack1 &&pack1, Pack2 &&pack2)
 {
 	decltype(auto) first{::fast_io::containers::get<index>(::std::forward<Pack1>(pack1).storage)};
@@ -3567,11 +3444,6 @@ inline constexpr bool print_semantic_pack_element_common_factor_equal(Pack1 &&pa
 /// @param    pack       the pack providing the emitted elements
 /// @return   char_type* a pointer one past the emitted range
 template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked_pack_range(char_type *iter, Pack &&pack)
 {
 	if constexpr (first < last)
@@ -3603,11 +3475,6 @@ inline constexpr char_type *print_semantic_emit_unchecked_pack_range(char_type *
 /// @param    pack2      the pack emitted when pred is false
 /// @return   char_type* a pointer one past the emitted condition-pack range
 template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack1, typename Pack2>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked_condition_pack_factored(char_type *iter, bool pred,
 																				 Pack1 &&pack1, Pack2 &&pack2)
 {
@@ -3677,11 +3544,6 @@ struct print_semantic_condition_pack_factor_result
 /// @param    pack2      the pack emitted when pred is false
 /// @return   print_semantic_condition_pack_factor_result<char_type> the updated cursor and success flag
 template <::std::integral char_type, ::std::size_t first, ::std::size_t last, typename Pack1, typename Pack2>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr print_semantic_condition_pack_factor_result<char_type>
 print_semantic_emit_unchecked_condition_pack_try_factor(char_type *iter, bool pred, Pack1 &&pack1, Pack2 &&pack2)
 {
@@ -3835,11 +3697,6 @@ inline constexpr char_type *print_semantic_emit_unchecked_leaf(char_type *iter, 
 /// @param    t          the node to emit
 /// @return   char_type* a pointer one past the emitted node
 template <::std::integral char_type, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked(char_type *iter, T &&t)
 {
 	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -4010,11 +3867,6 @@ inline consteval ::std::size_t print_semantic_static_precise_total_size() noexce
 /// @param    args      the arguments whose semantic sizes are measured
 /// @return   ::std::size_t the total number of characters needed by the run
 template <bool line, ::std::integral char_type, typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr ::std::size_t print_semantic_precise_total_size(Args &&...args)
 {
 	::std::size_t total{};
@@ -4038,11 +3890,6 @@ inline constexpr ::std::size_t print_semantic_precise_total_size(Args &&...args)
 /// @param    args      the arguments to emit in order
 /// @return   char_type* a pointer one past the emitted run
 template <bool line, ::std::integral char_type, typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr char_type *print_semantic_emit_unchecked_run(char_type *iter, Args &&...args)
 {
 	((iter = ::fast_io::operations::decay::print_semantic_emit_unchecked_arg<char_type>(
@@ -4068,11 +3915,6 @@ inline constexpr char_type *print_semantic_emit_unchecked_run(char_type *iter, A
 /// @param    args          the arguments to emit
 /// @return   bool          true when the whole run was emitted by this coalescing path
 template <bool line, ::std::integral char_type, typename outputstmtype, typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, Args &&...args)
 {
 	if constexpr ((::fast_io::details::decay::print_semantic_precise_size_ok<
@@ -4155,11 +3997,6 @@ inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, 
 /// @param    placement_code the normalized width placement code
 /// @param    len           the precise child length
 template <bool line, ::std::integral char_type, typename outputstmtype, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr void print_semantic_emit_width_direct(outputstmtype optstm, T &&reference, ::std::size_t width,
 													   char_type fillch, ::std::size_t placement_code,
 													   ::std::size_t len)
@@ -4437,11 +4274,6 @@ struct print_semantic_emit_node_pack_continuation
 /// @param    optstm        the output stream reference
 /// @param    t             the width node to emit
 template <bool line, ::std::integral char_type, typename outputstmtype, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr void print_semantic_emit_width(outputstmtype optstm, T &&t)
 {
 	auto &&width_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -4552,11 +4384,6 @@ inline constexpr void print_semantic_emit_width(outputstmtype optstm, T &&t)
 /// @param    optstm        the output stream reference
 /// @param    t             the semantic node to emit
 template <bool line, ::std::integral char_type, typename outputstmtype, typename T>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 inline constexpr void print_semantic_emit_node(outputstmtype optstm, T &&t)
 {
 	auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
@@ -4596,11 +4423,6 @@ inline constexpr void print_semantic_emit_node(outputstmtype optstm, T &&t)
 /// @tparam   outputstmtype the decayed output stream reference type
 /// @tparam   continuation  the accumulated prefix continuation type
 template <bool line, ::std::integral char_type, typename outputstmtype, typename continuation>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 #if __has_cpp_attribute(__gnu__::__flatten__)
 [[__gnu__::__flatten__]]
 #endif
@@ -4619,11 +4441,6 @@ struct print_semantic_emit_flat_prefix_continuation
 	::std::remove_reference_t<T> *valueptr;
 
 	template <bool prefix_line, typename... Prefix>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void operator()(Prefix &&...prefix) const
 	{
 		contptr->template operator()<prefix_line>(::std::forward<T>(*valueptr),
@@ -4642,11 +4459,6 @@ struct print_semantic_emit_flat_prefix_continuation
 /// @tparam   Args          the remaining argument types
 template <bool line, ::std::integral char_type, typename outputstmtype, typename continuation, typename T,
 		  typename... Args>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-[[msvc::forceinline]]
-#endif
 #if __has_cpp_attribute(__gnu__::__flatten__)
 [[__gnu__::__flatten__]]
 #endif
@@ -4679,11 +4491,6 @@ struct print_semantic_emit_freestanding_continuation
 	outputstmtype optstm;
 
 	template <bool prefix_line, typename... Prefix>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void operator()(Prefix &&...prefix) const
 	{
 		using char_type = typename outputstmtype::output_char_type;
@@ -4714,11 +4521,6 @@ struct print_semantic_emit_flat_continuation
 	outputstmtype optstm;
 
 	template <typename... FilteredArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void operator()(FilteredArgs &&...filtered_args) const
 	{
 		if (!::fast_io::operations::decay::print_semantic_try_precise_coalesce<line, char_type>(
@@ -4741,11 +4543,6 @@ struct print_semantic_filter_flat_continuation
 	::std::remove_reference_t<emit_flat_type> *emitflatptr;
 
 	template <typename... FlatArgs>
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void operator()(FlatArgs &&...flat_args) const
 	{
 		::fast_io::details::decay::print_semantic_filter_nulls<false, false>(
