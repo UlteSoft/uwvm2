@@ -252,15 +252,20 @@ inline constexpr bool scan_decfloat_clinger_environment_independent{
 #endif
 };
 
+inline constexpr ::std::size_t scan_decfloat_exact_digit_capacity{768u};
+
 struct scan_decfloat_significand_state
 {
 	::std::uint_least64_t significand{};
 	::std::uint_least64_t significant_digits{};
 	::std::uint_least64_t stored_digits{};
 	::std::uint_least64_t fractional_digits{};
+	::std::uint_least16_t exact_stored_digits{};
 	bool has_digit{};
 	bool has_nonzero_digit{};
 	bool truncated_nonzero{};
+	bool exact_truncated_nonzero{};
+	char8_t exact_digits[scan_decfloat_exact_digit_capacity]{};
 };
 
 template <::std::integral char_type>
@@ -291,6 +296,43 @@ inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_min_power10{-342};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_max_power10{326};
 inline constexpr ::std::uint_least64_t scan_decfloat_pow10_0_to_8_table[]{
 	1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u};
+
+inline constexpr void scan_decfloat_append_exact_digit(scan_decfloat_significand_state &state,
+													   char8_t digit) noexcept
+{
+	if (state.exact_stored_digits != ::fast_io::details::scan_decfloat_exact_digit_capacity)
+	{
+		state.exact_digits[state.exact_stored_digits] = digit;
+		++state.exact_stored_digits;
+	}
+	else if (digit != 0)
+	{
+		state.exact_truncated_nonzero = true;
+	}
+}
+
+inline constexpr void scan_decfloat_append_exact_eight_digits(scan_decfloat_significand_state &state,
+															  ::std::uint_least32_t digits) noexcept
+{
+	if (state.exact_stored_digits == ::fast_io::details::scan_decfloat_exact_digit_capacity)
+	{
+		if (digits != 0)
+		{
+			state.exact_truncated_nonzero = true;
+		}
+		return;
+	}
+	for (auto divisor{10000000u}; divisor != 0u; divisor /= 10u)
+	{
+		auto const digit{static_cast<char8_t>(digits / divisor)};
+		digits -= static_cast<::std::uint_least32_t>(digit) * divisor;
+		::fast_io::details::scan_decfloat_append_exact_digit(state, digit);
+		if (divisor == 1u)
+		{
+			break;
+		}
+	}
+}
 
 struct scan_decfloat_adjusted_mantissa
 {
@@ -743,6 +785,668 @@ scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t 
 	return ::fast_io::parse_code::ok;
 }
 
+#ifdef __SIZEOF_INT128__
+	inline constexpr ::std::size_t scan_decfloat_bigint_limb_capacity{288u};
+
+	struct scan_decfloat_bigint
+	{
+		::std::uint_least64_t limb[scan_decfloat_bigint_limb_capacity]{};
+		::std::size_t size{};
+	};
+
+	inline constexpr void scan_decfloat_bigint_normalize(scan_decfloat_bigint &value) noexcept
+	{
+		for (; value.size && value.limb[value.size - 1u] == 0u; --value.size)
+		{
+		}
+	}
+
+	inline constexpr void scan_decfloat_bigint_set_u64(scan_decfloat_bigint &value,
+													   ::std::uint_least64_t word) noexcept
+	{
+		value.limb[0] = word;
+		value.size = word == 0u ? 0u : 1u;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_mul_small(scan_decfloat_bigint &value,
+																	   ::std::uint_least32_t multiplier) noexcept
+	{
+		__uint128_t carry{};
+		for (::std::size_t index{}; index != value.size; ++index)
+		{
+			auto const product{static_cast<__uint128_t>(value.limb[index]) * multiplier + carry};
+			value.limb[index] = static_cast<::std::uint_least64_t>(product);
+			carry = product >> 64u;
+		}
+		if (carry)
+		{
+			if (value.size == ::fast_io::details::scan_decfloat_bigint_limb_capacity)
+			{
+				return false;
+			}
+			value.limb[value.size] = static_cast<::std::uint_least64_t>(carry);
+			++value.size;
+		}
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_add_small(scan_decfloat_bigint &value,
+																	   ::std::uint_least32_t addend) noexcept
+	{
+		if (!value.size)
+		{
+			::fast_io::details::scan_decfloat_bigint_set_u64(value, addend);
+			return true;
+		}
+		__uint128_t sum{static_cast<__uint128_t>(value.limb[0]) + addend};
+		value.limb[0] = static_cast<::std::uint_least64_t>(sum);
+		auto carry{sum >> 64u};
+		for (::std::size_t index{1u}; carry && index != value.size; ++index)
+		{
+			sum = static_cast<__uint128_t>(value.limb[index]) + carry;
+			value.limb[index] = static_cast<::std::uint_least64_t>(sum);
+			carry = sum >> 64u;
+		}
+		if (carry)
+		{
+			if (value.size == ::fast_io::details::scan_decfloat_bigint_limb_capacity)
+			{
+				return false;
+			}
+			value.limb[value.size] = static_cast<::std::uint_least64_t>(carry);
+			++value.size;
+		}
+		return true;
+	}
+
+	inline constexpr bool scan_decfloat_bigint_from_digits(scan_decfloat_bigint &value,
+														   scan_decfloat_significand_state const &state) noexcept
+	{
+		value = {};
+		for (::std::size_t index{}; index != state.exact_stored_digits; ++index)
+		{
+			if (!::fast_io::details::scan_decfloat_bigint_mul_small(value, 10u) ||
+				!::fast_io::details::scan_decfloat_bigint_add_small(
+					value, static_cast<::std::uint_least32_t>(state.exact_digits[index])))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr ::std::size_t
+	scan_decfloat_bigint_bit_width(scan_decfloat_bigint const &value) noexcept
+	{
+		if (!value.size)
+		{
+			return 0u;
+		}
+		return (value.size - 1u) * 64u +
+			   static_cast<::std::size_t>(::std::bit_width(value.limb[value.size - 1u]));
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_get_bit(scan_decfloat_bigint const &value,
+																	 ::std::size_t bit) noexcept
+	{
+		auto const limb_index{bit / 64u};
+		if (limb_index >= value.size)
+		{
+			return false;
+		}
+		return ((value.limb[limb_index] >> (bit % 64u)) & 1u) != 0u;
+	}
+
+	[[nodiscard]] inline constexpr int scan_decfloat_bigint_compare(scan_decfloat_bigint const &left,
+																	scan_decfloat_bigint const &right) noexcept
+	{
+		if (left.size != right.size)
+		{
+			return left.size < right.size ? -1 : 1;
+		}
+		for (auto index{left.size}; index != 0u;)
+		{
+			--index;
+			if (left.limb[index] != right.limb[index])
+			{
+				return left.limb[index] < right.limb[index] ? -1 : 1;
+			}
+		}
+		return 0;
+	}
+
+	inline constexpr void scan_decfloat_bigint_sub_assign(scan_decfloat_bigint &left,
+														  scan_decfloat_bigint const &right) noexcept
+	{
+		::std::uint_least64_t borrow{};
+		for (::std::size_t index{}; index != left.size; ++index)
+		{
+			auto const subtrahend{index < right.size ? right.limb[index] : ::std::uint_least64_t{}};
+			auto const old{left.limb[index]};
+			auto const with_borrow{static_cast<::std::uint_least64_t>(subtrahend + borrow)};
+			left.limb[index] = static_cast<::std::uint_least64_t>(old - with_borrow);
+			borrow = old < with_borrow || (borrow && with_borrow == 0u);
+		}
+		::fast_io::details::scan_decfloat_bigint_normalize(left);
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_shl1_add_bit(scan_decfloat_bigint &value,
+																		  bool bit) noexcept
+	{
+		::std::uint_least64_t carry{static_cast<::std::uint_least64_t>(bit)};
+		for (::std::size_t index{}; index != value.size; ++index)
+		{
+			auto const next_carry{value.limb[index] >> 63u};
+			value.limb[index] = static_cast<::std::uint_least64_t>((value.limb[index] << 1u) | carry);
+			carry = next_carry;
+		}
+		if (carry)
+		{
+			if (value.size == ::fast_io::details::scan_decfloat_bigint_limb_capacity)
+			{
+				return false;
+			}
+			value.limb[value.size] = carry;
+			++value.size;
+		}
+		else if (bit && !value.size)
+		{
+			value.limb[0] = 1u;
+			value.size = 1u;
+		}
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_shift_left(scan_decfloat_bigint &out,
+																		scan_decfloat_bigint const &in,
+																		::std::size_t shift) noexcept
+	{
+		out = {};
+		if (!in.size)
+		{
+			return true;
+		}
+		auto const limb_shift{shift / 64u};
+		auto const bit_shift{shift % 64u};
+		if (in.size + limb_shift + (bit_shift != 0u) >
+			::fast_io::details::scan_decfloat_bigint_limb_capacity)
+		{
+			return false;
+		}
+		for (::std::size_t index{}; index != limb_shift; ++index)
+		{
+			out.limb[index] = 0u;
+		}
+		::std::uint_least64_t carry{};
+		for (::std::size_t index{}; index != in.size; ++index)
+		{
+			auto const word{in.limb[index]};
+			out.limb[index + limb_shift] = static_cast<::std::uint_least64_t>((word << bit_shift) | carry);
+			carry = bit_shift == 0u ? 0u : static_cast<::std::uint_least64_t>(word >> (64u - bit_shift));
+		}
+		out.size = in.size + limb_shift;
+		if (carry)
+		{
+			out.limb[out.size] = carry;
+			++out.size;
+		}
+		::fast_io::details::scan_decfloat_bigint_normalize(out);
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr bool scan_decfloat_bigint_pow5(scan_decfloat_bigint &value,
+																  ::std::uint_least64_t exponent) noexcept
+	{
+		::fast_io::details::scan_decfloat_bigint_set_u64(value, 1u);
+		for (; exponent; --exponent)
+		{
+			if (!::fast_io::details::scan_decfloat_bigint_mul_small(value, 5u))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	[[nodiscard]] inline constexpr ::std::int_least64_t
+	scan_decfloat_bigint_floor_log2_ratio(scan_decfloat_bigint const &numerator,
+										  scan_decfloat_bigint const &denominator) noexcept
+	{
+		auto const numerator_bits{::fast_io::details::scan_decfloat_bigint_bit_width(numerator)};
+		auto const denominator_bits{::fast_io::details::scan_decfloat_bigint_bit_width(denominator)};
+		auto exponent{static_cast<::std::int_least64_t>(numerator_bits) -
+					  static_cast<::std::int_least64_t>(denominator_bits)};
+		::fast_io::details::scan_decfloat_bigint shifted;
+		if (exponent >= 0)
+		{
+			(void)::fast_io::details::scan_decfloat_bigint_shift_left(
+				shifted, denominator, static_cast<::std::size_t>(exponent));
+			if (::fast_io::details::scan_decfloat_bigint_compare(numerator, shifted) < 0)
+			{
+				--exponent;
+			}
+		}
+		else
+		{
+			(void)::fast_io::details::scan_decfloat_bigint_shift_left(
+				shifted, numerator, static_cast<::std::size_t>(-exponent));
+			if (::fast_io::details::scan_decfloat_bigint_compare(shifted, denominator) < 0)
+			{
+				--exponent;
+			}
+		}
+		return exponent;
+	}
+
+	struct scan_decfloat_bigint_div_result
+	{
+		__uint128_t quotient{};
+		int twice_remainder_compare{};
+		bool remainder_nonzero{};
+		bool quotient_overflow{};
+	};
+
+	[[nodiscard]] inline constexpr scan_decfloat_bigint_div_result
+	scan_decfloat_bigint_div_shifted_to_u128(scan_decfloat_bigint const &numerator,
+											 scan_decfloat_bigint const &denominator,
+											 ::std::int_least64_t binary_shift) noexcept
+	{
+		::fast_io::details::scan_decfloat_bigint divisor;
+		if (binary_shift < 0)
+		{
+			if (!::fast_io::details::scan_decfloat_bigint_shift_left(
+					divisor, denominator, static_cast<::std::size_t>(-binary_shift)))
+			{
+				return {.quotient_overflow = true};
+			}
+		}
+		else
+		{
+			divisor = denominator;
+		}
+		auto const dividend_bits{
+			::fast_io::details::scan_decfloat_bigint_bit_width(numerator) +
+			(binary_shift > 0 ? static_cast<::std::size_t>(binary_shift) : 0u)};
+		::fast_io::details::scan_decfloat_bigint remainder;
+		__uint128_t quotient{};
+		bool quotient_overflow{};
+		for (auto bit_index{dividend_bits}; bit_index != 0u;)
+		{
+			--bit_index;
+			bool bit{};
+			if (binary_shift > 0)
+			{
+				auto const shift{static_cast<::std::size_t>(binary_shift)};
+				bit = bit_index >= shift &&
+					  ::fast_io::details::scan_decfloat_bigint_get_bit(numerator, bit_index - shift);
+			}
+			else
+			{
+				bit = ::fast_io::details::scan_decfloat_bigint_get_bit(numerator, bit_index);
+			}
+			if (!::fast_io::details::scan_decfloat_bigint_shl1_add_bit(remainder, bit))
+			{
+				return {.quotient_overflow = true};
+			}
+			if (::fast_io::details::scan_decfloat_bigint_compare(remainder, divisor) >= 0)
+			{
+				::fast_io::details::scan_decfloat_bigint_sub_assign(remainder, divisor);
+				if (bit_index < 128u)
+				{
+					quotient |= static_cast<__uint128_t>(1u) << bit_index;
+				}
+				else
+				{
+					quotient_overflow = true;
+				}
+			}
+		}
+		::fast_io::details::scan_decfloat_bigint twice_remainder{remainder};
+		(void)::fast_io::details::scan_decfloat_bigint_shl1_add_bit(twice_remainder, false);
+		return {.quotient = quotient,
+				.twice_remainder_compare =
+					::fast_io::details::scan_decfloat_bigint_compare(twice_remainder, divisor),
+				.remainder_nonzero = remainder.size != 0u,
+				.quotient_overflow = quotient_overflow};
+	}
+
+	template <::fast_io::manipulators::floating_rounding rounding>
+	[[nodiscard]] inline constexpr bool scan_decfloat_big_round_up(bool negative, __uint128_t quotient,
+																   int twice_remainder_compare,
+																   bool remainder_nonzero,
+																   bool tail_nonzero) noexcept
+	{
+		if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
+		{
+			if (twice_remainder_compare < 0)
+			{
+				return false;
+			}
+			if (twice_remainder_compare > 0 || tail_nonzero)
+			{
+				return true;
+			}
+			if (!remainder_nonzero)
+			{
+				return false;
+			}
+			return ::fast_io::details::floating_rounding_nearest_tie_round_up<rounding>(
+				negative, static_cast<::std::uint_least64_t>(quotient) << 1u);
+		}
+		else
+		{
+			return (remainder_nonzero || tail_nonzero) &&
+				   ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative);
+		}
+	}
+
+	template <typename T>
+	inline constexpr void scan_decfloat_assign_min_subnormal(T &value, bool negative) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+		using mantissa_type = typename trait::mantissa_type;
+		constexpr auto mbits{trait::mbits};
+		constexpr auto ebits{trait::ebits};
+		if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+		{
+			::fast_io::details::fp_assign_float80_bits(value, 1u, 0u, negative);
+		}
+		else
+		{
+			mantissa_type bits{1u};
+			if (negative)
+			{
+				bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
+			}
+			::fast_io::details::fp_assign_bits(value, bits);
+		}
+	}
+
+	template <typename T>
+	inline constexpr void scan_decfloat_assign_max_finite(T &value, bool negative) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+		using mantissa_type = typename trait::mantissa_type;
+		constexpr auto mbits{trait::mbits};
+		constexpr auto ebits{trait::ebits};
+		if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+		{
+			::fast_io::details::fp_assign_float80_bits(value, static_cast<::std::uint_least64_t>(~::std::uint_least64_t{}),
+													   (static_cast<::std::uint_least32_t>(1u) << ebits) - 2u,
+													   negative);
+		}
+		else
+		{
+			constexpr mantissa_type exponent{(static_cast<mantissa_type>(1u) << ebits) - 2u};
+			constexpr mantissa_type fraction{(static_cast<mantissa_type>(1u) << mbits) - 1u};
+			mantissa_type bits{static_cast<mantissa_type>((exponent << mbits) | fraction)};
+			if (negative)
+			{
+				bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
+			}
+			::fast_io::details::fp_assign_bits(value, bits);
+		}
+	}
+
+	template <::fast_io::manipulators::floating_rounding rounding, typename T>
+	inline constexpr ::fast_io::parse_code scan_decfloat_assign_overflow_value(T &value, bool negative) noexcept
+	{
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::toward_zero ||
+					  (rounding == ::fast_io::manipulators::floating_rounding::toward_plus_infinity && negative) ||
+					  (rounding == ::fast_io::manipulators::floating_rounding::toward_minus_infinity && !negative))
+		{
+			::fast_io::details::scan_decfloat_assign_max_finite(value, negative);
+		}
+		else
+		{
+			::fast_io::details::fp_assign_infinity(value, negative);
+		}
+		return ::fast_io::parse_code::overflow;
+	}
+
+	template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+							  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+	[[nodiscard]] inline constexpr ::fast_io::parse_code
+	scan_decfloat_assign_big(T &value, bool negative, scan_decfloat_significand_state const &state,
+							 ::std::int_least64_t exponent) noexcept
+	{
+		using no_cvref_t = ::std::remove_cvref_t<T>;
+		using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+		using mantissa_type = typename trait::mantissa_type;
+		constexpr ::std::size_t mbits{trait::mbits};
+		constexpr ::std::size_t ebits{trait::ebits};
+		constexpr ::std::size_t precision_bits{mbits + 1u};
+		constexpr auto bias{
+			static_cast<::std::int_least64_t>((static_cast<::std::uint_least32_t>(1u) << ebits) >> 1u) - 1};
+		constexpr auto min_exponent{1 - bias};
+		constexpr auto max_exponent{bias};
+		if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+		{
+			switch (::fast_io::details::current_floating_rounding())
+			{
+			case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+				return ::fast_io::details::scan_decfloat_assign_big<
+					T, ::fast_io::manipulators::floating_rounding::toward_plus_infinity>(
+					value, negative, state, exponent);
+			case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+				return ::fast_io::details::scan_decfloat_assign_big<
+					T, ::fast_io::manipulators::floating_rounding::toward_minus_infinity>(
+					value, negative, state, exponent);
+			case ::fast_io::manipulators::floating_rounding::toward_zero:
+				return ::fast_io::details::scan_decfloat_assign_big<
+					T, ::fast_io::manipulators::floating_rounding::toward_zero>(
+					value, negative, state, exponent);
+			default:
+				return ::fast_io::details::scan_decfloat_assign_big<
+					T, ::fast_io::manipulators::floating_rounding::nearest_to_even>(
+					value, negative, state, exponent);
+			}
+		}
+		else
+		{
+			if (!state.exact_stored_digits)
+			{
+				value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+				return ::fast_io::parse_code::ok;
+			}
+			auto decimal_exponent{::fast_io::details::scan_decfloat_saturating_add(
+				exponent, -static_cast<::std::int_least64_t>(state.fractional_digits))};
+			decimal_exponent = ::fast_io::details::scan_decfloat_saturating_add(
+				decimal_exponent,
+				static_cast<::std::int_least64_t>(state.significant_digits - state.exact_stored_digits));
+			auto const decimal_top_exponent{::fast_io::details::scan_decfloat_saturating_add(
+				decimal_exponent, static_cast<::std::int_least64_t>(state.exact_stored_digits - 1u))};
+			constexpr auto high_guard{static_cast<::std::int_least64_t>(trait::e10max + 2u)};
+			constexpr auto low_guard{static_cast<::std::int_least64_t>(trait::e10max + trait::m10digits + 16u)};
+			if (decimal_top_exponent > high_guard)
+			{
+				return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
+			}
+			if (decimal_top_exponent < -low_guard)
+			{
+				if constexpr (!::fast_io::details::floating_rounding_is_nearest<rounding>)
+				{
+					if (state.has_nonzero_digit &&
+						::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+					{
+						::fast_io::details::scan_decfloat_assign_min_subnormal(value, negative);
+						return ::fast_io::parse_code::overflow;
+					}
+				}
+				value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+				return ::fast_io::parse_code::overflow;
+			}
+
+			::fast_io::details::scan_decfloat_bigint numerator;
+			if (!::fast_io::details::scan_decfloat_bigint_from_digits(numerator, state))
+			{
+				return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
+			}
+			::fast_io::details::scan_decfloat_bigint denominator;
+			::fast_io::details::scan_decfloat_bigint_set_u64(denominator, 1u);
+			::std::int_least64_t binary_exponent_adjust{};
+			if (decimal_exponent >= 0)
+			{
+				for (::std::int_least64_t counter{}; counter != decimal_exponent; ++counter)
+				{
+					if (!::fast_io::details::scan_decfloat_bigint_mul_small(numerator, 5u))
+					{
+						return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
+					}
+				}
+				binary_exponent_adjust = decimal_exponent;
+			}
+			else
+			{
+				auto const pow5_exponent{static_cast<::std::uint_least64_t>(-decimal_exponent)};
+				if (!::fast_io::details::scan_decfloat_bigint_pow5(denominator, pow5_exponent))
+				{
+					value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+					return ::fast_io::parse_code::overflow;
+				}
+				binary_exponent_adjust = decimal_exponent;
+			}
+
+			::std::int_least64_t binary_exponent{};
+			if (decimal_exponent >= 0)
+			{
+				binary_exponent = static_cast<::std::int_least64_t>(
+									  ::fast_io::details::scan_decfloat_bigint_bit_width(numerator)) -
+								  1 + binary_exponent_adjust;
+			}
+			else
+			{
+				binary_exponent =
+					::fast_io::details::scan_decfloat_bigint_floor_log2_ratio(numerator, denominator) +
+					binary_exponent_adjust;
+			}
+
+			bool subnormal{};
+			::std::int_least64_t target_exponent{binary_exponent};
+			::std::int_least64_t scale_exponent{};
+			if (binary_exponent >= min_exponent)
+			{
+				scale_exponent = binary_exponent - static_cast<::std::int_least64_t>(precision_bits - 1u);
+			}
+			else
+			{
+				subnormal = true;
+				target_exponent = min_exponent;
+				scale_exponent = min_exponent - static_cast<::std::int_least64_t>(precision_bits - 1u);
+			}
+
+			auto const division{::fast_io::details::scan_decfloat_bigint_div_shifted_to_u128(
+				numerator, denominator, binary_exponent_adjust - scale_exponent)};
+			if (division.quotient_overflow)
+			{
+				return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
+			}
+			auto significand{division.quotient};
+			if (::fast_io::details::scan_decfloat_big_round_up<rounding>(
+					negative, significand, division.twice_remainder_compare,
+					division.remainder_nonzero, state.exact_truncated_nonzero))
+			{
+				++significand;
+			}
+			auto const hidden_bit{static_cast<__uint128_t>(1u) << mbits};
+			auto const carry_bit{hidden_bit << 1u};
+			if (!subnormal)
+			{
+				if (significand >= carry_bit)
+				{
+					significand >>= 1u;
+					++target_exponent;
+				}
+				if (target_exponent > max_exponent)
+				{
+					return ::fast_io::details::scan_decfloat_assign_overflow_value<rounding>(value, negative);
+				}
+				if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+				{
+					::fast_io::details::fp_assign_float80_bits(
+						value, static_cast<::std::uint_least64_t>(significand),
+						static_cast<::std::uint_least32_t>(target_exponent + bias), negative);
+				}
+				else
+				{
+					auto fraction{static_cast<mantissa_type>(significand - hidden_bit)};
+					auto bits{static_cast<mantissa_type>(
+						(static_cast<mantissa_type>(static_cast<::std::uint_least64_t>(target_exponent + bias)) << mbits) |
+						fraction)};
+					if (negative)
+					{
+						bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
+					}
+					::fast_io::details::fp_assign_bits(value, bits);
+				}
+				return ::fast_io::parse_code::ok;
+			}
+			if (!significand)
+			{
+				value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+				return ::fast_io::parse_code::overflow;
+			}
+			if (significand >= hidden_bit)
+			{
+				if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+				{
+					::fast_io::details::fp_assign_float80_bits(value, static_cast<::std::uint_least64_t>(hidden_bit),
+															   1u, negative);
+				}
+				else
+				{
+					mantissa_type bits{static_cast<mantissa_type>(mantissa_type{1u} << mbits)};
+					if (negative)
+					{
+						bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
+					}
+					::fast_io::details::fp_assign_bits(value, bits);
+				}
+			}
+			else if constexpr (::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)
+			{
+				::fast_io::details::fp_assign_float80_bits(
+					value, static_cast<::std::uint_least64_t>(significand), 0u, negative);
+			}
+			else
+			{
+				auto bits{static_cast<mantissa_type>(significand)};
+				if (negative)
+				{
+					bits |= static_cast<mantissa_type>(static_cast<mantissa_type>(1u) << (mbits + ebits));
+				}
+				::fast_io::details::fp_assign_bits(value, bits);
+			}
+			return ::fast_io::parse_code::ok;
+		}
+	}
+#endif
+
+	inline constexpr void scan_decfloat_state_from_u64(scan_decfloat_significand_state &state,
+													   ::std::uint_least64_t significand) noexcept
+	{
+		auto const original{significand};
+		char8_t buffer[20]{};
+		::std::size_t size{};
+		for (; significand; significand /= 10u)
+		{
+			buffer[size] = static_cast<char8_t>(significand % 10u);
+			++size;
+		}
+		state.has_digit = true;
+		state.has_nonzero_digit = size != 0u;
+		state.significant_digits = size;
+		state.stored_digits = size;
+		state.significand = original;
+		for (auto index{size}; index != 0u;)
+		{
+			--index;
+			::fast_io::details::scan_decfloat_append_exact_digit(state, buffer[index]);
+		}
+	}
+
 template <::fast_io::manipulators::floating_rounding rounding>
 [[nodiscard]] inline constexpr bool
 scan_decfloat_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down,
@@ -791,6 +1495,7 @@ inline constexpr void scan_decfloat_append_digit(scan_decfloat_significand_state
 		state.has_nonzero_digit = true;
 	}
 	++state.significant_digits;
+	::fast_io::details::scan_decfloat_append_exact_digit(state, digit);
 	if (state.stored_digits != digit_limit)
 	{
 		state.significand = state.significand * 10u + static_cast<::std::uint_least64_t>(digit);
@@ -847,6 +1552,7 @@ inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significan
 		state.has_nonzero_digit = true;
 	}
 	state.significant_digits += 8u;
+	::fast_io::details::scan_decfloat_append_exact_eight_digits(state, digits);
 	if (state.stored_digits == digit_limit)
 	{
 		if (digits != 0)
@@ -926,8 +1632,19 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 							state.fractional_digits += 8u;
 						}
 						state.significant_digits += 8u;
-						if (!state.truncated_nonzero &&
-							::fast_io::details::scan_decfloat_ascii8_has_nonzero_digit(val))
+						auto const has_nonzero{
+							::fast_io::details::scan_decfloat_ascii8_has_nonzero_digit(val)};
+						if (state.exact_stored_digits !=
+							::fast_io::details::scan_decfloat_exact_digit_capacity)
+						{
+							::fast_io::details::scan_decfloat_append_exact_eight_digits(
+								state, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+						}
+						else if (!state.exact_truncated_nonzero && has_nonzero)
+						{
+							state.exact_truncated_nonzero = true;
+						}
+						if (!state.truncated_nonzero && has_nonzero)
 						{
 							state.truncated_nonzero = true;
 						}
@@ -998,28 +1715,17 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 				return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
 			}
 		}
-		else
-		{
-			::fast_io::details::scan_decfloat_adjusted_mantissa adjusted_next;
-			if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-					adjusted_exponent, state.significand, negative, adjusted) &&
-				::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-					adjusted_exponent, state.significand + 1u, negative, adjusted_next) &&
-				adjusted.mantissa == adjusted_next.mantissa && adjusted.power2 == adjusted_next.power2)
-			{
-				return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
-			}
-		}
 	}
+#ifdef __SIZEOF_INT128__
+	return ::fast_io::details::scan_decfloat_assign_big<T, rounding>(value, negative, state, exponent);
+#else
 	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
 	{
 		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
 			value, negative, state.significand, adjusted_exponent);
 	}
-	else
-	{
-		return ::fast_io::parse_code::partial;
-	}
+	return ::fast_io::parse_code::partial;
+#endif
 }
 
 template <typename T, ::fast_io::manipulators::floating_rounding rounding =
@@ -1051,15 +1757,18 @@ scan_decfloat_assign_significand(T &value, bool negative, ::std::uint_least64_t 
 			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
 		}
 	}
+#ifdef __SIZEOF_INT128__
+	::fast_io::details::scan_decfloat_significand_state state;
+	::fast_io::details::scan_decfloat_state_from_u64(state, significand);
+	return ::fast_io::details::scan_decfloat_assign_big<T, rounding>(value, negative, state, adjusted_exponent);
+#else
 	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
 	{
 		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
 			value, negative, significand, adjusted_exponent);
 	}
-	else
-	{
-		return ::fast_io::parse_code::partial;
-	}
+	return ::fast_io::parse_code::partial;
+#endif
 }
 
 template <typename T, ::fast_io::manipulators::floating_precision precision_mode,
@@ -1198,15 +1907,18 @@ scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t signif
 			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
 		}
 	}
+#ifdef __SIZEOF_INT128__
+	::fast_io::details::scan_decfloat_significand_state state;
+	::fast_io::details::scan_decfloat_state_from_u64(state, significand);
+	return ::fast_io::details::scan_decfloat_assign_big<T, rounding>(value, negative, state, adjusted_exponent);
+#else
 	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
 	{
 		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
 			value, negative, significand, adjusted_exponent);
 	}
-	else
-	{
-		return ::fast_io::parse_code::partial;
-	}
+	return ::fast_io::parse_code::partial;
+#endif
 }
 
 template <typename T>

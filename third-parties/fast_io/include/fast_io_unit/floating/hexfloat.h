@@ -409,25 +409,74 @@ inline constexpr void scan_hexfloat_ascii8_pack(::std::uint_least64_t val, ::std
 	return true;
 }
 
-template <typename state_type>
+template <::std::integral char_type, typename state_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
 [[msvc::forceinline]]
 #endif
-inline constexpr void scan_hexfloat_skip_ascii8_after_storage_limit(state_type &state, bool after_decimal,
-																	bool has_nonzero_digit) noexcept
+inline constexpr char_type const *scan_hexfloat_skip_after_storage_limit_run(char_type const *first,
+																			 char_type const *last,
+																			 bool after_decimal,
+																			 state_type &state) noexcept
 {
-	state.has_digit = true;
-	if (after_decimal)
+	auto const *const original_first{first};
+	auto truncated_nonzero{state.truncated_nonzero};
+#ifdef __cpp_if_consteval
+	if !consteval
+#else
+	if (!__builtin_is_constant_evaluated())
+#endif
 	{
-		state.fractional_hex_digits += 8u;
+		if constexpr (!::fast_io::details::is_ebcdic<char_type> && sizeof(char_type) == sizeof(char8_t) &&
+					  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
+		{
+			for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
+			{
+				::std::uint_least64_t val;
+				::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+				if constexpr (::std::endian::little != ::std::endian::native)
+				{
+					val = ::fast_io::little_endian(val);
+				}
+				if (!::fast_io::details::scan_hexfloat_ascii8_is_xdigits(val))
+				{
+					break;
+				}
+				if (!truncated_nonzero &&
+					::fast_io::details::scan_hexfloat_ascii8_has_nonzero_digit(val))
+				{
+					truncated_nonzero = true;
+				}
+				first += sizeof(::std::uint_least64_t);
+			}
+		}
 	}
-	state.significant_hex_digits += 8u;
-	if (!state.truncated_nonzero && has_nonzero_digit)
+	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
+	for (; first != last; ++first)
 	{
-		state.truncated_nonzero = true;
+		auto uch{static_cast<unsigned_char_type>(*first)};
+		if (::fast_io::details::char_digit_to_literal<16, char_type>(uch))
+		{
+			break;
+		}
+		if (!truncated_nonzero && uch != 0)
+		{
+			truncated_nonzero = true;
+		}
 	}
+	auto const skipped{static_cast<::std::int_least64_t>(first - original_first)};
+	if (skipped)
+	{
+		state.has_digit = true;
+		if (after_decimal)
+		{
+			state.fractional_hex_digits += skipped;
+		}
+		state.significant_hex_digits += skipped;
+		state.truncated_nonzero = truncated_nonzero;
+	}
+	return first;
 }
 
 template <::std::size_t stored_hex_digits_limit, typename state_type>
@@ -508,6 +557,10 @@ inline constexpr char_type const *scan_hexfloat_significand_run(char_type const 
 		{
 			for (; static_cast<::std::size_t>(last - first) >= sizeof(::std::uint_least64_t);)
 			{
+				if (state.has_nonzero_digit && state.stored_hex_digits == stored_hex_digits_limit)
+				{
+					return ::fast_io::details::scan_hexfloat_skip_after_storage_limit_run(first, last, after_decimal, state);
+				}
 				::std::uint_least64_t val;
 				::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
 				if constexpr (::std::endian::little != ::std::endian::native)
@@ -515,17 +568,6 @@ inline constexpr char_type const *scan_hexfloat_significand_run(char_type const 
 					val = ::fast_io::little_endian(val);
 				}
 				::std::uint_least64_t nibbles{};
-				if (state.has_nonzero_digit && state.stored_hex_digits == stored_hex_digits_limit)
-				{
-					if (!::fast_io::details::scan_hexfloat_ascii8_is_xdigits(val))
-					{
-						break;
-					}
-					::fast_io::details::scan_hexfloat_skip_ascii8_after_storage_limit(state, after_decimal,
-						::fast_io::details::scan_hexfloat_ascii8_has_nonzero_digit(val));
-					first += sizeof(::std::uint_least64_t);
-					continue;
-				}
 				::std::uint_least64_t packed{};
 				if (!::fast_io::details::scan_hexfloat_ascii8_nibbles(val, nibbles, packed))
 				{
@@ -536,6 +578,10 @@ inline constexpr char_type const *scan_hexfloat_significand_run(char_type const 
 				first += sizeof(::std::uint_least64_t);
 			}
 		}
+	}
+	if (state.has_nonzero_digit && state.stored_hex_digits == stored_hex_digits_limit)
+	{
+		return ::fast_io::details::scan_hexfloat_skip_after_storage_limit_run(first, last, after_decimal, state);
 	}
 	using unsigned_char_type = ::fast_io::details::my_make_unsigned_t<char_type>;
 	for (; first != last; ++first)
@@ -645,7 +691,8 @@ template <::fast_io::details::my_unsigned_integral storage_type>
 	return static_cast<storage_type>((storage_type{1} << static_cast<unsigned>(bits)) - storage_type{1});
 }
 
-template <::fast_io::details::my_unsigned_integral storage_type>
+template <::fast_io::manipulators::floating_rounding rounding,
+		  ::fast_io::details::my_unsigned_integral storage_type>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -654,8 +701,31 @@ template <::fast_io::details::my_unsigned_integral storage_type>
 [[nodiscard]] inline constexpr storage_type scan_hexfloat_round_shift(storage_type stored,
 																	  ::std::int_least64_t remaining_bits,
 																	  bool truncated_nonzero,
+																	  bool negative,
 																	  ::std::int_least64_t shift) noexcept
 {
+	if constexpr (rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+	{
+		switch (::fast_io::details::current_floating_rounding())
+		{
+		case ::fast_io::manipulators::floating_rounding::toward_plus_infinity:
+			return ::fast_io::details::scan_hexfloat_round_shift<
+				::fast_io::manipulators::floating_rounding::toward_plus_infinity>(
+				stored, remaining_bits, truncated_nonzero, negative, shift);
+		case ::fast_io::manipulators::floating_rounding::toward_minus_infinity:
+			return ::fast_io::details::scan_hexfloat_round_shift<
+				::fast_io::manipulators::floating_rounding::toward_minus_infinity>(
+				stored, remaining_bits, truncated_nonzero, negative, shift);
+		case ::fast_io::manipulators::floating_rounding::toward_zero:
+			return ::fast_io::details::scan_hexfloat_round_shift<
+				::fast_io::manipulators::floating_rounding::toward_zero>(
+				stored, remaining_bits, truncated_nonzero, negative, shift);
+		default:
+			return ::fast_io::details::scan_hexfloat_round_shift<
+				::fast_io::manipulators::floating_rounding::nearest_to_even>(
+				stored, remaining_bits, truncated_nonzero, negative, shift);
+		}
+	}
 	constexpr auto storage_bits{static_cast<::std::int_least64_t>(sizeof(storage_type) *
 																 ::std::numeric_limits<unsigned char>::digits)};
 	auto const stored_bits{::fast_io::details::scan_hexfloat_bit_width(stored)};
@@ -674,6 +744,14 @@ template <::fast_io::details::my_unsigned_integral storage_type>
 	}
 	if (shift_in_stored > stored_bits)
 	{
+		if constexpr (!::fast_io::details::floating_rounding_is_nearest<rounding>)
+		{
+			if ((stored != 0u || truncated_nonzero) &&
+				::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+			{
+				return 1u;
+			}
+		}
 		return 0u;
 	}
 
@@ -696,14 +774,30 @@ template <::fast_io::details::my_unsigned_integral storage_type>
 			below_half = below_half || (stored & below_mask) != 0u;
 		}
 	}
-	if (half && (below_half || (quotient & 1u) != 0u))
+	bool const discarded_nonzero{half || below_half};
+	if constexpr (::fast_io::details::floating_rounding_is_nearest<rounding>)
 	{
-		++quotient;
+		if (half &&
+			(below_half ||
+			 ::fast_io::details::floating_rounding_nearest_tie_round_up<rounding>(
+				 negative, static_cast<::std::uint_least64_t>(quotient) << 1u)))
+		{
+			++quotient;
+		}
+	}
+	else
+	{
+		if (discarded_nonzero && ::fast_io::details::floating_rounding_directed_round_up<rounding>(negative))
+		{
+			++quotient;
+		}
 	}
 	return quotient;
 }
 
-template <typename T, ::fast_io::details::my_unsigned_integral storage_type>
+template <typename T, ::fast_io::details::my_unsigned_integral storage_type,
+		  ::fast_io::manipulators::floating_rounding rounding =
+			  ::fast_io::manipulators::floating_rounding::nearest_to_even>
 #if __has_cpp_attribute(__gnu__::__always_inline__)
 [[__gnu__::__always_inline__]]
 #elif __has_cpp_attribute(msvc::forceinline)
@@ -746,8 +840,9 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 	{
 		if (exponent2 >= min_exponent)
 		{
-			auto significand{::fast_io::details::scan_hexfloat_round_shift(
+			auto significand{::fast_io::details::scan_hexfloat_round_shift<rounding>(
 				stored, remaining_bits, truncated_nonzero,
+				negative,
 				total_bits - static_cast<::std::int_least64_t>(precision_bits))};
 			auto exponent_field{static_cast<::std::uint_least32_t>(exponent2 + bias)};
 			if (significand == static_cast<storage_type>(storage_type{1} << precision_bits))
@@ -766,7 +861,8 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 
 		auto const subnormal_shift{(min_exponent - static_cast<::std::int_least64_t>(mbits)) - binary_exponent};
 		auto const fraction{
-			::fast_io::details::scan_hexfloat_round_shift(stored, remaining_bits, truncated_nonzero, subnormal_shift)};
+			::fast_io::details::scan_hexfloat_round_shift<rounding>(stored, remaining_bits, truncated_nonzero,
+																	negative, subnormal_shift)};
 		if (fraction == 0u)
 		{
 			return ::fast_io::parse_code::overflow;
@@ -792,8 +888,9 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 
 		if (exponent2 >= min_exponent)
 		{
-			auto significand{::fast_io::details::scan_hexfloat_round_shift(
+			auto significand{::fast_io::details::scan_hexfloat_round_shift<rounding>(
 				stored, remaining_bits, truncated_nonzero,
+				negative,
 				total_bits - static_cast<::std::int_least64_t>(precision_bits))};
 			if (significand == static_cast<storage_type>(storage_type{1} << precision_bits))
 			{
@@ -818,7 +915,8 @@ inline constexpr ::fast_io::parse_code scan_hexfloat_assign_ieee_result(T &value
 
 		auto const subnormal_shift{(min_exponent - static_cast<::std::int_least64_t>(mbits)) - binary_exponent};
 		auto const fraction{
-			::fast_io::details::scan_hexfloat_round_shift(stored, remaining_bits, truncated_nonzero, subnormal_shift)};
+			::fast_io::details::scan_hexfloat_round_shift<rounding>(stored, remaining_bits, truncated_nonzero,
+																	negative, subnormal_shift)};
 		if (fraction == 0u)
 		{
 			return ::fast_io::parse_code::overflow;
@@ -927,7 +1025,7 @@ scan_hexfloat_contiguous_scalar_define_impl(char_type const *begin, char_type co
 									   : significand_state.fractional_hex_digits * 4};
 	auto const binary_exponent{exponent < int64_min + fractional_exponent ? int64_min : exponent - fractional_exponent};
 	return {exponent_result.iter,
-			::fast_io::details::scan_hexfloat_assign_ieee_result(
+			::fast_io::details::scan_hexfloat_assign_ieee_result<T, storage_type, flags.rounding>(
 				value, negative, significand_state.stored, significand_state.stored_hex_digits,
 				significand_state.significant_hex_digits, significand_state.truncated_nonzero, binary_exponent)};
 }
@@ -1028,7 +1126,7 @@ scan_hexfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 	auto const binary_exponent{exponent < int64_min + fractional_exponent ? int64_min
 																		  : exponent - fractional_exponent};
 	return {exponent_result.iter,
-			::fast_io::details::scan_hexfloat_assign_ieee_result(
+			::fast_io::details::scan_hexfloat_assign_ieee_result<T, storage_type, flags.rounding>(
 				value, negative, significand_state.stored, significand_state.stored_hex_digits,
 				significand_state.significant_hex_digits, significand_state.truncated_nonzero, binary_exponent)};
 }
@@ -1465,7 +1563,7 @@ scan_hexfloat_context_assign(
 	auto const exponent{::fast_io::details::scan_hexfloat_context_exponent(state)};
 	auto const binary_exponent{exponent < int64_min + fractional_exponent ? int64_min
 																		   : exponent - fractional_exponent};
-	return ::fast_io::details::scan_hexfloat_assign_ieee_result(
+	return ::fast_io::details::scan_hexfloat_assign_ieee_result<T, storage_type, flags.rounding>(
 		value, state.negative, state.significand_state.stored, state.significand_state.stored_hex_digits,
 		state.significand_state.significant_hex_digits, state.significand_state.truncated_nonzero,
 		binary_exponent);
@@ -1832,12 +1930,42 @@ inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase 
 	return {t};
 }
 
+template <::fast_io::manipulators::floating_rounding rounding_policy, bool noskipws = false, bool prefix = false,
+		  bool allow_leading_plus = false, ::fast_io::details::my_floating_point scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
+									::fast_io::manipulators::scalar_flags{
+										.showbase = prefix,
+										.noskipws = noskipws,
+										.floating = ::fast_io::manipulators::floating_format::hexfloat,
+										.allow_leading_plus = allow_leading_plus},
+									::fast_io::manipulators::floating_precision::significant, rounding_policy>,
+								scalar_type &>
+	hexfloat_get(scalar_type &t) noexcept
+{
+	return {t};
+}
+
 template <bool noskipws = false, bool allow_leading_plus = false,
 		  ::fast_io::details::my_floating_point scalar_type>
 inline constexpr scalar_manip_t<::fast_io::manipulators::scalar_flags{.showbase = true,
 																	  .noskipws = noskipws,
 																	  .floating = ::fast_io::manipulators::floating_format::hexfloat,
 																	  .allow_leading_plus = allow_leading_plus},
+								scalar_type &>
+	hexfloat0x_get(scalar_type &t) noexcept
+{
+	return {t};
+}
+
+template <::fast_io::manipulators::floating_rounding rounding_policy, bool noskipws = false,
+		  bool allow_leading_plus = false, ::fast_io::details::my_floating_point scalar_type>
+inline constexpr scalar_manip_t<::fast_io::details::floating_precision_rounding_mani_flags_cache<
+									::fast_io::manipulators::scalar_flags{
+										.showbase = true,
+										.noskipws = noskipws,
+										.floating = ::fast_io::manipulators::floating_format::hexfloat,
+										.allow_leading_plus = allow_leading_plus},
+									::fast_io::manipulators::floating_precision::significant, rounding_policy>,
 								scalar_type &>
 	hexfloat0x_get(scalar_type &t) noexcept
 {
