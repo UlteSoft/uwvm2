@@ -549,6 +549,9 @@ template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
+	// Keep scatter fallback conservative: this path first builds scatter descriptors, then copies the payload
+	// into a stack buffer only to avoid writev overhead for very small runs. POSIX write/writev measurements
+	// put the useful crossover around a 256-byte payload budget.
 	return static_cast<::std::size_t>(256u / sizeof(char_type) + 1u);
 }
 
@@ -556,7 +559,10 @@ template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t full_output_coalesce_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	return static_cast<::std::size_t>(256u / sizeof(char_type) + 1u);
+	// Full-output coalescing happens before scatter descriptors are materialized, so it avoids both descriptor
+	// setup and writev for tiny multi-part prints. Benchmarks showed wins through roughly 2 KiB, while larger
+	// stack buffers brought little extra benefit and more stack pressure.
+	return static_cast<::std::size_t>(2048u / sizeof(char_type) + 1u);
 }
 
 #if defined(__CYGWIN__)
