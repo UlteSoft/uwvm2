@@ -12,8 +12,17 @@ struct sized_range_view_t
 	iterator begin;
 	::std::size_t size;
 };
+
 template <::std::integral char_type, ::std::input_iterator I>
 sized_range_view_t(basic_io_scatter_t<char_type>, I, ::std::size_t) -> sized_range_view_t<char_type, I>;
+
+template <typename scatter_type, ::std::input_iterator I>
+	requires requires(scatter_type scatter) {
+		typename ::std::remove_cvref_t<scatter_type>::value_type;
+		static_cast<basic_io_scatter_t<typename ::std::remove_cvref_t<scatter_type>::value_type>>(scatter);
+	}
+sized_range_view_t(scatter_type, I, ::std::size_t)
+	-> sized_range_view_t<typename ::std::remove_cvref_t<scatter_type>::value_type, I>;
 
 template <::std::integral ch_type, ::std::input_iterator It>
 struct range_view_t
@@ -24,8 +33,16 @@ struct range_view_t
 	iterator begin;
 	iterator end;
 };
+
 template <::std::integral char_type, ::std::input_iterator I>
 range_view_t(basic_io_scatter_t<char_type>, I, I) -> range_view_t<char_type, I>;
+
+template <typename scatter_type, ::std::input_iterator I>
+	requires requires(scatter_type scatter) {
+		typename ::std::remove_cvref_t<scatter_type>::value_type;
+		static_cast<basic_io_scatter_t<typename ::std::remove_cvref_t<scatter_type>::value_type>>(scatter);
+	}
+range_view_t(scatter_type, I, I) -> range_view_t<typename ::std::remove_cvref_t<scatter_type>::value_type, I>;
 
 template <::std::integral char_type, ::std::input_iterator It>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, sized_range_view_t<char_type, It>>,
