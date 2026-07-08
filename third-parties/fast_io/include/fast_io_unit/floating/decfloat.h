@@ -71,10 +71,32 @@ template <typename T>
 inline constexpr bool scan_decfloat_compute_supported{
 	::fast_io::details::scan_decfloat_compute_supported_impl<T>::value};
 
+template <typename T, bool = ::fast_io::details::scan_decfloat_has_iec559_traits<T>>
+struct scan_decfloat_native_wide_supported_impl
+{
+	inline static constexpr bool value{};
+};
+
+template <typename T>
+struct scan_decfloat_native_wide_supported_impl<T, true>
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+	inline static constexpr bool value{!::fast_io::details::scan_decfloat_compute_supported<no_cvref_t> &&
+									   (sizeof(typename trait::mantissa_type) > sizeof(::std::uint_least64_t) ||
+										trait::e10max > ::fast_io::details::iec559_traits<double>::e10max ||
+										::fast_io::details::fp_floating_point_is_float80<no_cvref_t>)};
+};
+
+template <typename T>
+inline constexpr bool scan_decfloat_native_wide_supported{
+	::fast_io::details::scan_decfloat_native_wide_supported_impl<T>::value};
+
 template <typename T>
 concept scan_decfloat_supported_floating_point =
 	::fast_io::details::my_floating_point<::std::remove_cvref_t<T>> &&
-	::fast_io::details::scan_decfloat_compute_supported<T>;
+	(::fast_io::details::scan_decfloat_compute_supported<T> ||
+	 ::fast_io::details::scan_decfloat_native_wide_supported<T>);
 
 template <typename T, bool = ::fast_io::details::scan_decfloat_has_iec559_traits<T>>
 struct scan_decfloat_binary32_like_impl
@@ -249,7 +271,22 @@ struct scan_decfloat_fast_result
 	bool handled{};
 };
 
-inline constexpr ::std::uint_least64_t scan_decfloat_significand_digit_limit{19u};
+inline constexpr ::std::uint_least64_t scan_decfloat_uint64_significand_digit_limit{19u};
+
+template <typename T>
+inline constexpr ::std::uint_least64_t scan_decfloat_significand_digit_limit{
+	[]() constexpr noexcept {
+		using trait = ::fast_io::details::iec559_traits<::std::remove_cvref_t<T>>;
+		constexpr ::std::uint_least64_t digits{static_cast<::std::uint_least64_t>(trait::m10digits) + 2u};
+		if constexpr (digits < ::fast_io::details::scan_decfloat_uint64_significand_digit_limit)
+		{
+			return digits;
+		}
+		else
+		{
+			return ::fast_io::details::scan_decfloat_uint64_significand_digit_limit;
+		}
+	}()};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_min_power10{-342};
 inline constexpr ::std::int_least32_t scan_decfloat_dragonbox_max_power10{326};
 inline constexpr ::std::uint_least64_t scan_decfloat_pow10_0_to_8_table[]{
@@ -646,6 +683,66 @@ scan_decfloat_adjusted_exponent(scan_decfloat_significand_state const &state,
 		static_cast<::std::int_least64_t>(state.significant_digits - state.stored_digits));
 }
 
+template <typename T, ::fast_io::manipulators::floating_rounding rounding =
+						  ::fast_io::manipulators::floating_rounding::nearest_to_even>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_assign_native_wide(T &value, bool negative, ::std::uint_least64_t significand,
+								 ::std::int_least64_t adjusted_exponent) noexcept
+{
+	using no_cvref_t = ::std::remove_cvref_t<T>;
+	using trait = ::fast_io::details::iec559_traits<no_cvref_t>;
+	if (!significand)
+	{
+		value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+		return ::fast_io::parse_code::ok;
+	}
+	constexpr auto e10max{static_cast<::std::int_least64_t>(trait::e10max)};
+	constexpr auto underflow_guard{
+		static_cast<::std::int_least64_t>(trait::e10max + trait::m10digits + 8u)};
+	if (adjusted_exponent > e10max)
+	{
+		::fast_io::details::fp_assign_infinity(value, negative);
+		return ::fast_io::parse_code::overflow;
+	}
+	if (adjusted_exponent < -underflow_guard)
+	{
+		value = negative ? -static_cast<no_cvref_t>(0.0) : static_cast<no_cvref_t>(0.0);
+		return ::fast_io::parse_code::overflow;
+	}
+	no_cvref_t result{static_cast<no_cvref_t>(significand)};
+	auto const &table{::fast_io::details::scan_decfloat_power10_table<no_cvref_t, 20u>};
+	constexpr ::std::int_least64_t chunk{19};
+	if (adjusted_exponent < 0)
+	{
+		auto exponent{-adjusted_exponent};
+		for (; exponent >= chunk; exponent -= chunk)
+		{
+			result /= table.index_unchecked(static_cast<::std::size_t>(chunk));
+		}
+		if (exponent)
+		{
+			result /= table.index_unchecked(static_cast<::std::size_t>(exponent));
+		}
+	}
+	else
+	{
+		for (; adjusted_exponent >= chunk; adjusted_exponent -= chunk)
+		{
+			result *= table.index_unchecked(static_cast<::std::size_t>(chunk));
+		}
+		if (adjusted_exponent)
+		{
+			result *= table.index_unchecked(static_cast<::std::size_t>(adjusted_exponent));
+		}
+	}
+	value = negative ? -result : result;
+	if (result == static_cast<no_cvref_t>(0.0))
+	{
+		return ::fast_io::parse_code::overflow;
+	}
+	return ::fast_io::parse_code::ok;
+}
+
 template <::fast_io::manipulators::floating_rounding rounding>
 [[nodiscard]] inline constexpr bool
 scan_decfloat_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down,
@@ -675,9 +772,11 @@ scan_decfloat_decimal_round_up(bool negative, ::std::uint_least64_t rounded_down
 	}
 }
 
+template <typename T>
 inline constexpr void scan_decfloat_append_digit(scan_decfloat_significand_state &state, char8_t digit,
 												 bool after_decimal) noexcept
 {
+	constexpr auto digit_limit{::fast_io::details::scan_decfloat_significand_digit_limit<T>};
 	state.has_digit = true;
 	if (after_decimal)
 	{
@@ -692,7 +791,7 @@ inline constexpr void scan_decfloat_append_digit(scan_decfloat_significand_state
 		state.has_nonzero_digit = true;
 	}
 	++state.significant_digits;
-	if (state.stored_digits != ::fast_io::details::scan_decfloat_significand_digit_limit)
+	if (state.stored_digits != digit_limit)
 	{
 		state.significand = state.significand * 10u + static_cast<::std::uint_least64_t>(digit);
 		++state.stored_digits;
@@ -710,6 +809,12 @@ scan_decfloat_ascii8_is_digits(::std::uint_least64_t val) noexcept
 			 0x8080808080808080u) == 0);
 }
 
+[[nodiscard]] inline constexpr bool
+scan_decfloat_ascii8_has_nonzero_digit(::std::uint_least64_t val) noexcept
+{
+	return (val ^ 0x3030303030303030u) != 0;
+}
+
 [[nodiscard]] inline constexpr ::std::uint_least32_t
 scan_decfloat_ascii8_parse(::std::uint_least64_t val) noexcept
 {
@@ -722,10 +827,12 @@ scan_decfloat_ascii8_parse(::std::uint_least64_t val) noexcept
 	return static_cast<::std::uint_least32_t>(val);
 }
 
+template <typename T>
 inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significand_state &state,
 														bool after_decimal,
 														::std::uint_least32_t digits) noexcept
 {
+	constexpr auto digit_limit{::fast_io::details::scan_decfloat_significand_digit_limit<T>};
 	state.has_digit = true;
 	if (after_decimal)
 	{
@@ -740,7 +847,7 @@ inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significan
 		state.has_nonzero_digit = true;
 	}
 	state.significant_digits += 8u;
-	if (state.stored_digits == ::fast_io::details::scan_decfloat_significand_digit_limit)
+	if (state.stored_digits == digit_limit)
 	{
 		if (digits != 0)
 		{
@@ -748,7 +855,7 @@ inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significan
 		}
 		return;
 	}
-	auto const available{::fast_io::details::scan_decfloat_significand_digit_limit - state.stored_digits};
+	auto const available{digit_limit - state.stored_digits};
 	if (8u <= available)
 	{
 		state.significand = state.significand * 100000000u + static_cast<::std::uint_least64_t>(digits);
@@ -761,7 +868,7 @@ inline constexpr void scan_decfloat_append_eight_digits(scan_decfloat_significan
 	state.significand =
 		state.significand * ::fast_io::details::scan_decfloat_pow10_0_to_8_table[available] +
 		static_cast<::std::uint_least64_t>(stored_part);
-	state.stored_digits = ::fast_io::details::scan_decfloat_significand_digit_limit;
+	state.stored_digits = digit_limit;
 	if (truncated_part != 0)
 	{
 		state.truncated_nonzero = true;
@@ -778,10 +885,10 @@ inline constexpr char_type const *
 scan_decfloat_digits(char_type const *first, char_type const *last, bool after_decimal,
 					 scan_decfloat_significand_state &state) noexcept
 {
+	constexpr auto digit_limit{::fast_io::details::scan_decfloat_significand_digit_limit<T>};
 	char8_t digit{};
 	if constexpr (sizeof(char_type) == sizeof(char8_t) && !::fast_io::details::is_ebcdic<char_type> &&
-				  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u &&
-				  ::fast_io::details::scan_decfloat_binary64_like<T>)
+				  ::std::numeric_limits<::std::uint_least64_t>::digits == 64u)
 	{
 #ifdef __cpp_if_consteval
 		if !consteval
@@ -795,7 +902,7 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 				{
 					return first;
 				}
-				::fast_io::details::scan_decfloat_append_digit(state, digit, after_decimal);
+				::fast_io::details::scan_decfloat_append_digit<T>(state, digit, after_decimal);
 			}
 			if (static_cast<::std::size_t>(last - first) >= 2u * sizeof(::std::uint_least64_t))
 			{
@@ -811,8 +918,25 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 					{
 						break;
 					}
-					::fast_io::details::scan_decfloat_append_eight_digits(
-						state, after_decimal, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+					if (state.has_nonzero_digit &&
+						state.stored_digits == digit_limit)
+					{
+						if (after_decimal)
+						{
+							state.fractional_digits += 8u;
+						}
+						state.significant_digits += 8u;
+						if (!state.truncated_nonzero &&
+							::fast_io::details::scan_decfloat_ascii8_has_nonzero_digit(val))
+						{
+							state.truncated_nonzero = true;
+						}
+					}
+					else
+					{
+						::fast_io::details::scan_decfloat_append_eight_digits<T>(
+							state, after_decimal, ::fast_io::details::scan_decfloat_ascii8_parse(val));
+					}
 					first += sizeof(::std::uint_least64_t);
 				}
 			}
@@ -820,7 +944,7 @@ scan_decfloat_digits(char_type const *first, char_type const *last, bool after_d
 	}
 	for (; first != last && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
 	{
-		::fast_io::details::scan_decfloat_append_digit(state, digit, after_decimal);
+		::fast_io::details::scan_decfloat_append_digit<T>(state, digit, after_decimal);
 	}
 	return first;
 }
@@ -863,28 +987,39 @@ template <typename T, ::fast_io::manipulators::floating_rounding rounding =
 			return ::fast_io::parse_code::ok;
 		}
 	}
-	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
-	if (!state.truncated_nonzero)
+	if constexpr (::fast_io::details::scan_decfloat_compute_supported<no_cvref_t>)
 	{
-		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-				adjusted_exponent, state.significand, negative, adjusted))
+		::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
+		if (!state.truncated_nonzero)
 		{
-			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
+			if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+					adjusted_exponent, state.significand, negative, adjusted))
+			{
+				return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
+			}
 		}
+		else
+		{
+			::fast_io::details::scan_decfloat_adjusted_mantissa adjusted_next;
+			if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+					adjusted_exponent, state.significand, negative, adjusted) &&
+				::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+					adjusted_exponent, state.significand + 1u, negative, adjusted_next) &&
+				adjusted.mantissa == adjusted_next.mantissa && adjusted.power2 == adjusted_next.power2)
+			{
+				return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
+			}
+		}
+	}
+	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
+	{
+		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
+			value, negative, state.significand, adjusted_exponent);
 	}
 	else
 	{
-		::fast_io::details::scan_decfloat_adjusted_mantissa adjusted_next;
-		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-				adjusted_exponent, state.significand, negative, adjusted) &&
-			::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-				adjusted_exponent, state.significand + 1u, negative, adjusted_next) &&
-			adjusted.mantissa == adjusted_next.mantissa && adjusted.power2 == adjusted_next.power2)
-		{
-			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, state.significand, adjusted);
-		}
+		return ::fast_io::parse_code::partial;
 	}
-	return ::fast_io::parse_code::partial;
 }
 
 template <typename T, ::fast_io::manipulators::floating_rounding rounding =
@@ -907,13 +1042,24 @@ scan_decfloat_assign_significand(T &value, bool negative, ::std::uint_least64_t 
 			return ::fast_io::parse_code::ok;
 		}
 	}
-	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
-	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-			adjusted_exponent, significand, negative, adjusted))
+	if constexpr (::fast_io::details::scan_decfloat_compute_supported<no_cvref_t>)
 	{
-		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+		::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
+		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+				adjusted_exponent, significand, negative, adjusted))
+		{
+			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+		}
 	}
-	return ::fast_io::parse_code::partial;
+	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
+	{
+		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
+			value, negative, significand, adjusted_exponent);
+	}
+	else
+	{
+		return ::fast_io::parse_code::partial;
+	}
 }
 
 template <typename T, ::fast_io::manipulators::floating_precision precision_mode,
@@ -1043,13 +1189,24 @@ scan_decfloat_assign_short(T &value, bool negative, ::std::uint_least64_t signif
 			return ::fast_io::parse_code::ok;
 		}
 	}
-	::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
-	if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
-			adjusted_exponent, significand, negative, adjusted))
+	if constexpr (::fast_io::details::scan_decfloat_compute_supported<no_cvref_t>)
 	{
-		return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+		::fast_io::details::scan_decfloat_adjusted_mantissa adjusted;
+		if (::fast_io::details::scan_decfloat_compute_adjusted<no_cvref_t, rounding>(
+				adjusted_exponent, significand, negative, adjusted))
+		{
+			return ::fast_io::details::scan_decfloat_assign_adjusted(value, negative, significand, adjusted);
+		}
 	}
-	return ::fast_io::parse_code::partial;
+	if constexpr (::fast_io::details::scan_decfloat_native_wide_supported<no_cvref_t>)
+	{
+		return ::fast_io::details::scan_decfloat_assign_native_wide<T, rounding>(
+			value, negative, significand, adjusted_exponent);
+	}
+	else
+	{
+		return ::fast_io::parse_code::partial;
+	}
 }
 
 template <typename T>
@@ -1137,13 +1294,14 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 		else
 #endif
 		{
+			constexpr auto digit_limit{::fast_io::details::scan_decfloat_significand_digit_limit<T>};
 			::std::uint_least64_t significand{};
 			::std::uint_least64_t digit_count{};
 			::std::uint_least64_t fractional_digits{};
 			char8_t digit{};
 			for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
 			{
-				if (digit_count == ::fast_io::details::scan_decfloat_significand_digit_limit)
+				if (digit_count == digit_limit)
 				{
 					return {};
 				}
@@ -1156,7 +1314,7 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 			{
 				++first;
 				auto const *fraction_begin{first};
-				for (; digit_count + 8u <= ::fast_io::details::scan_decfloat_significand_digit_limit &&
+				for (; digit_count + 8u <= digit_limit &&
 					   static_cast<::std::size_t>(end - first) >= sizeof(::std::uint_least64_t);)
 				{
 					::std::uint_least64_t val;
@@ -1177,7 +1335,7 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 				}
 				for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
 				{
-					if (digit_count == ::fast_io::details::scan_decfloat_significand_digit_limit)
+					if (digit_count == digit_limit)
 					{
 						return {};
 					}
@@ -1409,6 +1567,450 @@ scan_decfloat_contiguous_define(char_type const *begin, char_type const *end, T 
 		begin, end, value, precision);
 }
 
+enum class scan_decfloat_context_phase : ::std::uint_least8_t
+{
+	start,
+	after_sign,
+	integer,
+	fraction,
+	exponent_start,
+	exponent_after_sign,
+	exponent_digits,
+	special
+};
+
+template <::std::integral char_type>
+struct scan_decfloat_context
+{
+	::fast_io::details::scan_decfloat_significand_state significand_state;
+	::fast_io::details::scan_floating_context<char_type> special_buffer;
+	::std::uint_least64_t exponent{};
+	::fast_io::details::scan_decfloat_context_phase phase{};
+	char_type sign_char{};
+	bool negative{};
+	bool has_sign{};
+	bool has_decimal_point{};
+	bool has_exponent_marker{};
+	bool exponent_negative{};
+	bool exponent_has_digit{};
+	bool exponent_overflow{};
+	bool special_sign_prefixed{};
+};
+
+template <::std::integral char_type>
+inline constexpr void scan_decfloat_context_append_exponent_digit(
+	::fast_io::details::scan_decfloat_context<char_type> &state, char8_t digit) noexcept
+{
+	state.exponent_has_digit = true;
+	constexpr auto exponent_limit{
+		static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::int_least64_t>::max)())};
+	auto const value{static_cast<::std::uint_least64_t>(digit)};
+	if (state.exponent > (exponent_limit - value) / 10u)
+	{
+		state.exponent = exponent_limit;
+		state.exponent_overflow = true;
+	}
+	else if (!state.exponent_overflow)
+	{
+		state.exponent = state.exponent * 10u + value;
+	}
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr ::std::int_least64_t
+scan_decfloat_context_exponent(::fast_io::details::scan_decfloat_context<char_type> const &state) noexcept
+{
+	return state.exponent_negative ? -static_cast<::std::int_least64_t>(state.exponent)
+								   : static_cast<::std::int_least64_t>(state.exponent);
+}
+
+template <typename T, ::fast_io::manipulators::scalar_flags flags, bool use_precision,
+		  ::std::integral char_type>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_context_assign(::fast_io::details::scan_decfloat_context<char_type> const &state, T &value,
+							 ::std::size_t precision = 0) noexcept
+{
+	if (!state.significand_state.has_digit)
+	{
+		return ::fast_io::parse_code::invalid;
+	}
+	if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
+	{
+		if (!state.has_exponent_marker || !state.exponent_has_digit)
+		{
+			return ::fast_io::parse_code::invalid;
+		}
+	}
+	if (!state.significand_state.has_nonzero_digit)
+	{
+		value = state.negative ? -static_cast<T>(0.0) : static_cast<T>(0.0);
+		return ::fast_io::parse_code::ok;
+	}
+	auto const exponent{state.exponent_has_digit
+							? ::fast_io::details::scan_decfloat_context_exponent(state)
+							: ::std::int_least64_t{}};
+	if constexpr (use_precision)
+	{
+		return ::fast_io::details::scan_decfloat_assign_precision<T, flags.precision, flags.rounding>(
+			value, state.negative, state.significand_state, exponent, precision);
+	}
+	else
+	{
+		if constexpr (flags.rounding == ::fast_io::manipulators::floating_rounding::current_environment)
+		{
+			return ::fast_io::details::scan_decfloat_assign_current_environment(
+				value, state.negative, state.significand_state, exponent);
+		}
+		else
+		{
+			return ::fast_io::details::scan_decfloat_assign<T, flags.rounding>(
+				value, state.negative, state.significand_state, exponent);
+		}
+	}
+}
+
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_decfloat_context_append_special_prefix(::fast_io::details::scan_decfloat_context<char_type> &state,
+											char_type const *chunk_begin) noexcept
+{
+	if (state.has_sign && !state.special_sign_prefixed)
+	{
+		if (state.special_buffer.size == state.special_buffer.capacity)
+		{
+			return {chunk_begin, ::fast_io::parse_code::overflow};
+		}
+		state.special_buffer.buffer.index_unchecked(state.special_buffer.size) = state.sign_char;
+		++state.special_buffer.size;
+		state.special_sign_prefixed = true;
+	}
+	return {chunk_begin, ::fast_io::parse_code::partial};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T, bool use_precision>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_decfloat_context_special_define(::fast_io::details::scan_decfloat_context<char_type> &state,
+									 char_type const *begin, char_type const *end, T &value,
+									 ::std::size_t precision = 0) noexcept
+{
+	auto prefix_result{::fast_io::details::scan_decfloat_context_append_special_prefix(state, begin)};
+	if (prefix_result.code != ::fast_io::parse_code::partial)
+	{
+		return prefix_result;
+	}
+	auto const old_size{state.special_buffer.size};
+	auto const append_result{::fast_io::details::scan_floating_context_append(state.special_buffer, begin, end)};
+	if (append_result.code != ::fast_io::parse_code::partial)
+	{
+		return append_result;
+	}
+	T parsed_value{};
+	auto const *buffer_begin{state.special_buffer.buffer.data()};
+	auto const *buffer_end{buffer_begin + state.special_buffer.size};
+	::fast_io::parse_result<char_type const *> parse_result;
+	if constexpr (use_precision)
+	{
+		parse_result = ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
+			buffer_begin, buffer_end, parsed_value, precision);
+	}
+	else
+	{
+		parse_result = ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
+			buffer_begin, buffer_end, parsed_value);
+	}
+	if (parse_result.code == ::fast_io::parse_code::ok)
+	{
+		if (parse_result.iter == buffer_end)
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+		if (::fast_io::details::scan_hexfloat_special_parse_may_extend<flags.nan_payload_scan>(
+				parse_result.iter, buffer_end))
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+		value = parsed_value;
+		return {::fast_io::details::scan_floating_context_map_iter(
+					state.special_buffer, old_size, begin, end, parse_result.iter),
+				::fast_io::parse_code::ok};
+	}
+	if (parse_result.iter == buffer_end)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
+		parse_result.code == ::fast_io::parse_code::partial)
+	{
+		return {end, ::fast_io::parse_code::partial};
+	}
+	if (parse_result.code == ::fast_io::parse_code::invalid)
+	{
+		if (buffer_begin != buffer_end &&
+			!::fast_io::char_category::is_c_space(*(buffer_end - 1)))
+		{
+			return {end, ::fast_io::parse_code::partial};
+		}
+	}
+	return {::fast_io::details::scan_floating_context_map_iter(
+				state.special_buffer, old_size, begin, end, parse_result.iter),
+			parse_result.code};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T, bool use_precision>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_decfloat_context_numeric_define(::fast_io::details::scan_decfloat_context<char_type> &state,
+									 char_type const *first, char_type const *end, T &value,
+									 ::std::size_t precision) noexcept;
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T, bool use_precision>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_decfloat_context_finish_or_exponent(::fast_io::details::scan_decfloat_context<char_type> &state,
+										 char_type const *first, char_type const *end, T &value,
+										 ::std::size_t precision = 0) noexcept
+{
+	constexpr auto lower_e{::fast_io::char_literal_v<u8'e', char_type>};
+	constexpr auto upper_e{::fast_io::char_literal_v<u8'E', char_type>};
+	if constexpr (flags.floating != ::fast_io::manipulators::floating_format::fixed)
+	{
+		if (first != end && (*first == lower_e || *first == upper_e))
+		{
+			state.has_exponent_marker = true;
+			state.phase = ::fast_io::details::scan_decfloat_context_phase::exponent_start;
+			++first;
+			if (first == end)
+			{
+				return {first, ::fast_io::parse_code::partial};
+			}
+			return ::fast_io::details::scan_decfloat_context_numeric_define<char_type, flags, T, use_precision>(
+				state, first, end, value, precision);
+		}
+	}
+	auto code{::fast_io::details::scan_decfloat_context_assign<T, flags, use_precision>(state, value, precision)};
+	return {first, code};
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T, bool use_precision>
+[[nodiscard]] inline constexpr ::fast_io::parse_result<char_type const *>
+scan_decfloat_context_numeric_define(::fast_io::details::scan_decfloat_context<char_type> &state,
+									 char_type const *first, char_type const *end, T &value,
+									 ::std::size_t precision) noexcept
+{
+	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
+	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
+	constexpr auto dot{::fast_io::char_literal_v<u8'.', char_type>};
+	for (;;)
+	{
+		switch (state.phase)
+		{
+		case ::fast_io::details::scan_decfloat_context_phase::start:
+			if (!state.significand_state.has_digit && !state.has_sign)
+			{
+				first = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(first, end);
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+			}
+			if (*first == minus)
+			{
+				state.negative = true;
+				state.has_sign = true;
+				state.sign_char = *first;
+				++first;
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::after_sign;
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+				break;
+			}
+			if constexpr (flags.allow_leading_plus)
+			{
+				if (*first == plus)
+				{
+					state.has_sign = true;
+					state.sign_char = *first;
+					++first;
+					state.phase = ::fast_io::details::scan_decfloat_context_phase::after_sign;
+					if (first == end)
+					{
+						return {end, ::fast_io::parse_code::partial};
+					}
+					break;
+				}
+			}
+			state.phase = ::fast_io::details::scan_decfloat_context_phase::integer;
+			break;
+		case ::fast_io::details::scan_decfloat_context_phase::after_sign:
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			state.phase = ::fast_io::details::scan_decfloat_context_phase::integer;
+			break;
+		case ::fast_io::details::scan_decfloat_context_phase::integer:
+		{
+			char8_t digit{};
+			if (first != end && *first == dot)
+			{
+				state.has_decimal_point = true;
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::fraction;
+				++first;
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+				break;
+			}
+			auto const *before_digits{first};
+			first = ::fast_io::details::scan_decfloat_digits<T, char_type>(
+				first, end, false, state.significand_state);
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			if (first == before_digits && !state.significand_state.has_digit &&
+				!::fast_io::details::scan_decfloat_decimal_digit(*first, digit))
+			{
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::special;
+				return ::fast_io::details::scan_decfloat_context_special_define<char_type, flags, T, use_precision>(
+					state, first, end, value, precision);
+			}
+			if (first != end && *first == dot)
+			{
+				state.has_decimal_point = true;
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::fraction;
+				++first;
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+				break;
+			}
+			return ::fast_io::details::scan_decfloat_context_finish_or_exponent<char_type, flags, T, use_precision>(
+				state, first, end, value, precision);
+		}
+		case ::fast_io::details::scan_decfloat_context_phase::fraction:
+			first = ::fast_io::details::scan_decfloat_digits<T, char_type>(
+				first, end, true, state.significand_state);
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			if (!state.significand_state.has_digit)
+			{
+				return {first, ::fast_io::parse_code::invalid};
+			}
+			return ::fast_io::details::scan_decfloat_context_finish_or_exponent<char_type, flags, T, use_precision>(
+				state, first, end, value, precision);
+		case ::fast_io::details::scan_decfloat_context_phase::exponent_start:
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			if (*first == minus)
+			{
+				state.exponent_negative = true;
+				++first;
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::exponent_after_sign;
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+				break;
+			}
+			if (*first == plus)
+			{
+				++first;
+				state.phase = ::fast_io::details::scan_decfloat_context_phase::exponent_after_sign;
+				if (first == end)
+				{
+					return {end, ::fast_io::parse_code::partial};
+				}
+				break;
+			}
+			state.phase = ::fast_io::details::scan_decfloat_context_phase::exponent_digits;
+			break;
+		case ::fast_io::details::scan_decfloat_context_phase::exponent_after_sign:
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			state.phase = ::fast_io::details::scan_decfloat_context_phase::exponent_digits;
+			break;
+		case ::fast_io::details::scan_decfloat_context_phase::exponent_digits:
+		{
+			char8_t digit{};
+			for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
+			{
+				::fast_io::details::scan_decfloat_context_append_exponent_digit(state, digit);
+			}
+			if (first == end)
+			{
+				return {end, ::fast_io::parse_code::partial};
+			}
+			if (!state.exponent_has_digit)
+			{
+				if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
+				{
+					return {first, ::fast_io::parse_code::invalid};
+				}
+			}
+			auto code{::fast_io::details::scan_decfloat_context_assign<T, flags, use_precision>(
+				state, value, precision)};
+			return {first, code};
+		}
+		case ::fast_io::details::scan_decfloat_context_phase::special:
+			return ::fast_io::details::scan_decfloat_context_special_define<char_type, flags, T, use_precision>(
+				state, first, end, value, precision);
+		}
+	}
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  scan_decfloat_supported_floating_point T, bool use_precision>
+[[nodiscard]] inline constexpr ::fast_io::parse_code
+scan_decfloat_context_eof(::fast_io::details::scan_decfloat_context<char_type> &state, T &value,
+						  ::std::size_t precision = 0) noexcept
+{
+	if (state.phase == ::fast_io::details::scan_decfloat_context_phase::special)
+	{
+		if (!state.special_buffer.size)
+		{
+			return ::fast_io::parse_code::end_of_file;
+		}
+		T parsed_value{};
+		auto const *buffer_begin{state.special_buffer.buffer.data()};
+		auto const *buffer_end{buffer_begin + state.special_buffer.size};
+		::fast_io::parse_result<char_type const *> parse_result;
+		if constexpr (use_precision)
+		{
+			parse_result = ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
+				buffer_begin, buffer_end, parsed_value, precision);
+		}
+		else
+		{
+			parse_result = ::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
+				buffer_begin, buffer_end, parsed_value);
+		}
+		if (parse_result.code == ::fast_io::parse_code::ok)
+		{
+			value = parsed_value;
+		}
+		return parse_result.code;
+	}
+	if (state.phase == ::fast_io::details::scan_decfloat_context_phase::start && !state.significand_state.has_digit &&
+		!state.has_sign)
+	{
+		return ::fast_io::parse_code::end_of_file;
+	}
+	return ::fast_io::details::scan_decfloat_context_assign<T, flags, use_precision>(state, value, precision);
+}
+
 } // namespace details
 
 template <details::scan_decfloat_supported_floating_point T>
@@ -1448,7 +2050,7 @@ template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags
 inline constexpr auto
 scan_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>) noexcept
 {
-	return io_type_t<::fast_io::details::scan_floating_context<char_type>>{};
+	return io_type_t<::fast_io::details::scan_decfloat_context<char_type>>{};
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -1456,51 +2058,12 @@ template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags
 	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
 inline constexpr ::fast_io::parse_result<char_type const *>
 scan_context_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
-					::fast_io::details::scan_floating_context<char_type> &state, char_type const *begin,
+					::fast_io::details::scan_decfloat_context<char_type> &state, char_type const *begin,
 					char_type const *end,
 					::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
 {
-	if (!state.size)
-	{
-		begin = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(begin, end);
-		if (begin == end)
-		{
-			return {end, ::fast_io::parse_code::partial};
-		}
-	}
-	auto const old_size{state.size};
-	auto const append_result{::fast_io::details::scan_floating_context_append(state, begin, end)};
-	if (append_result.code != ::fast_io::parse_code::partial)
-	{
-		return append_result;
-	}
-	T parsed_value{};
-	auto const *buffer_begin{state.buffer.data()};
-	auto const *buffer_end{buffer_begin + state.size};
-	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
-		buffer_begin, buffer_end, parsed_value)};
-	if (parse_result.code == ::fast_io::parse_code::ok)
-	{
-		if (parse_result.iter == buffer_end)
-		{
-			return {end, ::fast_io::parse_code::partial};
-		}
-		value.reference = parsed_value;
-		return {::fast_io::details::scan_floating_context_map_iter(
-					state, old_size, begin, end, parse_result.iter),
-				::fast_io::parse_code::ok};
-	}
-	if (parse_result.iter == buffer_end)
-	{
-		return {end, ::fast_io::parse_code::partial};
-	}
-	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
-		parse_result.code == ::fast_io::parse_code::partial)
-	{
-		return {end, ::fast_io::parse_code::partial};
-	}
-	return {::fast_io::details::scan_floating_context_map_iter(state, old_size, begin, end, parse_result.iter),
-			parse_result.code};
+	return ::fast_io::details::scan_decfloat_context_numeric_define<char_type, flags, T, false>(
+		state, begin, end, value.reference, 0);
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -1508,23 +2071,10 @@ template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags
 	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
 inline constexpr ::fast_io::parse_code
 scan_context_eof_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
-						::fast_io::details::scan_floating_context<char_type> &state,
+						::fast_io::details::scan_decfloat_context<char_type> &state,
 						::fast_io::manipulators::scalar_manip_t<flags, T &> value) noexcept
 {
-	if (!state.size)
-	{
-		return ::fast_io::parse_code::end_of_file;
-	}
-	T parsed_value{};
-	auto const *buffer_begin{state.buffer.data()};
-	auto const *buffer_end{buffer_begin + state.size};
-	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags>(
-		buffer_begin, buffer_end, parsed_value)};
-	if (parse_result.code == ::fast_io::parse_code::ok)
-	{
-		value.reference = parsed_value;
-	}
-	return parse_result.code;
+	return ::fast_io::details::scan_decfloat_context_eof<char_type, flags, T, false>(state, value.reference);
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -1534,7 +2084,7 @@ inline constexpr auto
 scan_context_type(io_reserve_type_t<char_type,
 									::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>) noexcept
 {
-	return io_type_t<::fast_io::details::scan_floating_context<char_type>>{};
+	return io_type_t<::fast_io::details::scan_decfloat_context<char_type>>{};
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -1543,51 +2093,12 @@ template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags
 inline constexpr ::fast_io::parse_result<char_type const *>
 scan_context_define(io_reserve_type_t<char_type,
 									  ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
-					::fast_io::details::scan_floating_context<char_type> &state, char_type const *begin,
+					::fast_io::details::scan_decfloat_context<char_type> &state, char_type const *begin,
 					char_type const *end,
 					::fast_io::manipulators::scalar_manip_precision_t<flags, T &> value) noexcept
 {
-	if (!state.size)
-	{
-		begin = ::fast_io::details::scan_floating_context_skip_space<char_type, flags.noskipws>(begin, end);
-		if (begin == end)
-		{
-			return {end, ::fast_io::parse_code::partial};
-		}
-	}
-	auto const old_size{state.size};
-	auto const append_result{::fast_io::details::scan_floating_context_append(state, begin, end)};
-	if (append_result.code != ::fast_io::parse_code::partial)
-	{
-		return append_result;
-	}
-	T parsed_value{};
-	auto const *buffer_begin{state.buffer.data()};
-	auto const *buffer_end{buffer_begin + state.size};
-	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
-		buffer_begin, buffer_end, parsed_value, value.precision)};
-	if (parse_result.code == ::fast_io::parse_code::ok)
-	{
-		if (parse_result.iter == buffer_end)
-		{
-			return {end, ::fast_io::parse_code::partial};
-		}
-		value.reference = parsed_value;
-		return {::fast_io::details::scan_floating_context_map_iter(
-					state, old_size, begin, end, parse_result.iter),
-				::fast_io::parse_code::ok};
-	}
-	if (parse_result.iter == buffer_end)
-	{
-		return {end, ::fast_io::parse_code::partial};
-	}
-	if (parse_result.code == ::fast_io::parse_code::end_of_file ||
-		parse_result.code == ::fast_io::parse_code::partial)
-	{
-		return {end, ::fast_io::parse_code::partial};
-	}
-	return {::fast_io::details::scan_floating_context_map_iter(state, old_size, begin, end, parse_result.iter),
-			parse_result.code};
+	return ::fast_io::details::scan_decfloat_context_numeric_define<char_type, flags, T, true>(
+		state, begin, end, value.reference, value.precision);
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
@@ -1596,23 +2107,11 @@ template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags
 inline constexpr ::fast_io::parse_code
 scan_context_eof_define(io_reserve_type_t<char_type,
 										  ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
-						::fast_io::details::scan_floating_context<char_type> &state,
+						::fast_io::details::scan_decfloat_context<char_type> &state,
 						::fast_io::manipulators::scalar_manip_precision_t<flags, T &> value) noexcept
 {
-	if (!state.size)
-	{
-		return ::fast_io::parse_code::end_of_file;
-	}
-	T parsed_value{};
-	auto const *buffer_begin{state.buffer.data()};
-	auto const *buffer_end{buffer_begin + state.size};
-	auto parse_result{::fast_io::details::scan_decfloat_contiguous_define<char_type, flags, T, true>(
-		buffer_begin, buffer_end, parsed_value, value.precision)};
-	if (parse_result.code == ::fast_io::parse_code::ok)
-	{
-		value.reference = parsed_value;
-	}
-	return parse_result.code;
+	return ::fast_io::details::scan_decfloat_context_eof<char_type, flags, T, true>(
+		state, value.reference, value.precision);
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, details::my_floating_point T>

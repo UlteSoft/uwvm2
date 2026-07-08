@@ -501,12 +501,16 @@ inline constexpr bool fp_nan_is_signaling(mantissa_type mantissa) noexcept
 	return mantissa != 0 && (mantissa & fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()) == 0;
 }
 
-#ifdef __SIZEOF_FLOAT80__
+#if defined(__SIZEOF_FLOAT80__) ||                                                                            \
+	(defined(__LDBL_MANT_DIG__) && defined(__LDBL_MAX_EXP__) && __LDBL_MANT_DIG__ == 64 &&                    \
+	 __LDBL_MAX_EXP__ == 16384)
 template <typename flt>
 inline constexpr bool fp_floating_point_is_float80{
+#ifdef __SIZEOF_FLOAT80__
 	::std::same_as<::std::remove_cv_t<flt>, __float80> ||
+#endif
 	(::std::same_as<::std::remove_cv_t<flt>, long double> &&
-	 sizeof(long double) == sizeof(__float80) && ::std::numeric_limits<long double>::digits == 64 &&
+	 ::std::numeric_limits<long double>::digits == 64 &&
 	 ::std::numeric_limits<long double>::max_exponent == 16384)};
 
 template <typename flt>

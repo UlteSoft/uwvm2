@@ -1431,9 +1431,20 @@ sc_int_ctx_prefix_phase(::std::uint_least8_t &sz, char_type const *first, char_t
 	}
 	if constexpr (base == 8 && !oct_c2y)
 	{
+		if (sz != 0)
+		{
+			sz = 0;
+			return {first, ongoing_parse_code};
+		}
 		if (*first != char_literal_v<u8'0', char_type>) [[unlikely]]
 		{
 			return {first, parse_code::invalid};
+		}
+		++first;
+		if (first == last)
+		{
+			sz = 1;
+			return {first, parse_code::partial};
 		}
 	}
 	else
@@ -1720,31 +1731,34 @@ inline constexpr parse_result<char_type const *> scan_context_define_parse_impl(
 	case scan_integral_context_phase::zero:
 	case scan_integral_context_phase::zero_skip:
 	{
-		auto phase_ret = sc_int_ctx_zero_phase<base, skipzero>(st.integer_phase, first, last);
-		if (phase_ret.code != ongoing_parse_code)
+		if constexpr (!(shbase && base != 10))
 		{
-			if constexpr (skipzero)
+			auto phase_ret = sc_int_ctx_zero_phase<base, skipzero>(st.integer_phase, first, last);
+			if (phase_ret.code != ongoing_parse_code)
 			{
-				if (phase_ret.code == parse_code::ok)
+				if constexpr (skipzero)
 				{
-					t = {};
+					if (phase_ret.code == parse_code::ok)
+					{
+						t = {};
+					}
+					else if (phase_ret.code == parse_code::invalid && phase == scan_integral_context_phase::zero_skip)
+					{
+						t = {};
+						phase_ret.code = parse_code::ok;
+					}
 				}
-				else if (phase_ret.code == parse_code::invalid && phase == scan_integral_context_phase::zero_skip)
+				else
 				{
-					t = {};
-					phase_ret.code = parse_code::ok;
+					if (phase_ret.code == parse_code::ok)
+					{
+						t = {};
+					}
 				}
+				return phase_ret;
 			}
-			else
-			{
-				if (phase_ret.code == parse_code::ok)
-				{
-					t = {};
-				}
-			}
-			return phase_ret;
+			first = phase_ret.iter;
 		}
-		first = phase_ret.iter;
 		[[fallthrough]];
 	}
 	case scan_integral_context_phase::digit:
@@ -1766,6 +1780,11 @@ inline constexpr parse_result<char_type const *> scan_context_define_parse_impl(
 			}
 			return phase_ret;
 		}
+	}
+	case scan_integral_context_phase::overflow:
+	{
+		first = skip_digits<base>(first, last);
+		return {first, (first == last) ? parse_code::partial : parse_code::overflow};
 	}
 	default:
 	{
