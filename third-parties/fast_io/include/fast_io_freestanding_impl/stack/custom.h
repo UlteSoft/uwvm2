@@ -24,7 +24,7 @@ different compile-time constants, which is an ODR/IFNDR trap.
 This customization point is intentionally a template value consumed by
 stack/impl.h to form:
 
-    default_print_stack_policy = print_stack_policy<value>
+	default_print_stack_policy = print_stack_policy<value>
 
 The selected byte count is therefore encoded into the policy type and into the
 template specializations that depend on it.  When the value is changed for a
@@ -41,7 +41,7 @@ The tradeoff is possible code-size growth from separate template instantiations.
 template <typename = void>
 struct print_stack_buffer_default_max_bytes
 {
-	static inline constexpr ::std::size_t value{
+	static inline constexpr ::std::size_t default_value{
 #if defined(__KERNEL__) || defined(_KERNEL) || defined(_KERNEL_MODE)
 		256u
 #elif defined(__EMSCRIPTEN__) || defined(__wasm32__) || defined(__wasm64__) || defined(__wasm__)
@@ -62,6 +62,9 @@ struct print_stack_buffer_default_max_bytes
 		16u * 1024u
 #endif
 	};
+
+	// Users and downstream vendors may manually replace `value` below to tune the default maximum number of bytes that stack-based print materialization may use.
+	static inline constexpr ::std::size_t value{default_value};
 };
 
 } // namespace fast_io::custom
