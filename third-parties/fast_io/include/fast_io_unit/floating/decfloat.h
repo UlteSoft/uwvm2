@@ -2274,6 +2274,13 @@ scan_decfloat_exponent(char_type const *first, char_type const *last, ::std::int
 	return ::fast_io::details::scan_hexfloat_exponent(first, last, exponent);
 }
 
+template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool scan_decfloat_special_start_char(char_type ch) noexcept
+{
+	return ::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(ch) ||
+		   ::fast_io::details::scan_hexfloat_caseless_equal<u8'n', u8'N'>(ch);
+}
+
 template <typename T>
 [[nodiscard]] inline constexpr ::fast_io::parse_code
 scan_decfloat_assign_adjusted(T &value, bool negative, ::std::uint_least64_t significand,
@@ -2796,12 +2803,16 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		}
 	}
 
-	auto const special_result{
-		::fast_io::details::scan_hexfloat_special_value<flags.nan_parse_sign, flags.nan_payload_scan>(
-			first, end, negative, value)};
-	if (special_result.matched)
+	if (!numeric_candidate && first != end &&
+		::fast_io::details::scan_decfloat_special_start_char(*first))
 	{
-		return {special_result.iter, special_result.code};
+		auto const special_result{
+			::fast_io::details::scan_hexfloat_special_value<flags.nan_parse_sign, flags.nan_payload_scan>(
+				first, end, negative, value)};
+		if (special_result.matched)
+		{
+			return {special_result.iter, special_result.code};
+		}
 	}
 
 	::fast_io::details::scan_decfloat_significand_state significand_state;
@@ -3223,9 +3234,13 @@ scan_decfloat_context_numeric_define(::fast_io::details::scan_decfloat_context<c
 			if (first == before_digits && !state.significand_state.has_digit &&
 				!::fast_io::details::scan_decfloat_decimal_digit(*first, digit))
 			{
-				state.phase = ::fast_io::details::scan_decfloat_context_phase::special;
-				return ::fast_io::details::scan_decfloat_context_special_define<char_type, flags, T, use_precision>(
-					state, first, end, value, precision);
+				if (::fast_io::details::scan_decfloat_special_start_char(*first))
+				{
+					state.phase = ::fast_io::details::scan_decfloat_context_phase::special;
+					return ::fast_io::details::scan_decfloat_context_special_define<char_type, flags, T, use_precision>(
+						state, first, end, value, precision);
+				}
+				return {first, ::fast_io::parse_code::invalid};
 			}
 			if (first != end && *first == dot)
 			{
@@ -3427,6 +3442,21 @@ scan_context_eof_define(io_reserve_type_t<char_type, ::fast_io::manipulators::sc
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
 		  details::scan_decfloat_supported_floating_point T>
 	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::std::size_t
+scan_context_eof_rewind_size(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
+							 ::fast_io::details::scan_decfloat_context<char_type> &state,
+							 ::fast_io::manipulators::scalar_manip_t<flags, T &>) noexcept
+{
+	if (state.phase == ::fast_io::details::scan_decfloat_context_phase::special)
+	{
+		return state.special_buffer.size;
+	}
+	return 0u;
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
 inline constexpr auto
 scan_context_type(io_reserve_type_t<char_type,
 									::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>) noexcept
@@ -3459,6 +3489,22 @@ scan_context_eof_define(io_reserve_type_t<char_type,
 {
 	return ::fast_io::details::scan_decfloat_context_eof<char_type, flags, T, true>(
 		state, value.reference, value.precision);
+}
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
+		  details::scan_decfloat_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
+inline constexpr ::std::size_t
+scan_context_eof_rewind_size(io_reserve_type_t<char_type,
+											   ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>>,
+							 ::fast_io::details::scan_decfloat_context<char_type> &state,
+							 ::fast_io::manipulators::scalar_manip_precision_t<flags, T &>) noexcept
+{
+	if (state.phase == ::fast_io::details::scan_decfloat_context_phase::special)
+	{
+		return state.special_buffer.size;
+	}
+	return 0u;
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, details::my_floating_point T>

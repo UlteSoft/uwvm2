@@ -55,6 +55,9 @@ concept contiguous_scannable = requires(char_type const *begin, char_type const 
 /// @param    your_context_type&                            the context object
 /// @param    T                                             the object to be scanned, can be any passing style
 /// @return   ::fast_io::parse_code                         a parse code indicating parsing state
+/// @note     If EOF makes a partial prefix invalid, a context scanner may have
+///           already consumed that prefix. Scanners that can rewind within the
+///           current buffer may additionally provide scan_context_eof_rewind_size.
 template <typename char_type, typename T>
 concept context_scannable = requires(char_type const *begin, char_type const *end, T t) {
 	requires requires(
