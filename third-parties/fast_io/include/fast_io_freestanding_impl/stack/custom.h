@@ -8,10 +8,13 @@ namespace fast_io::custom
 /*
 This is the user-editable default stack-buffer budget for fast_io print paths.
 
-Users and downstream vendors may manually change `value` below to tune the
+Users and downstream vendors may manually replace `value` below to tune the
 default maximum number of bytes that stack-based print materialization may use.
-The shipped default is 128 KiB.  A value of 0 disables the default stack budget
-for paths that query this customization point.
+The shipped default is selected from the target environment: tiny freestanding
+and kernel-like builds get 256 bytes, wasm and non-GNU Linux get 4 KiB, Darwin
+and unknown hosted Unix get 16 KiB, Windows gets 32 KiB, and GNU/Linux gets
+64 KiB.  A value of 0 disables the default stack budget for paths that query
+this customization point.
 
 ODR note:
 Do not implement this knob as a per-translation-unit macro.  Macro-controlled
@@ -38,7 +41,27 @@ The tradeoff is possible code-size growth from separate template instantiations.
 template <typename = void>
 struct print_stack_buffer_default_max_bytes
 {
-	static inline constexpr ::std::size_t value{128u * 1024u};
+	static inline constexpr ::std::size_t value{
+#if defined(__KERNEL__) || defined(_KERNEL) || defined(_KERNEL_MODE)
+		256u
+#elif defined(__EMSCRIPTEN__) || defined(__wasm32__) || defined(__wasm64__) || defined(__wasm__)
+		4u * 1024u
+#elif !defined(__STDC_HOSTED__) || (__STDC_HOSTED__ == 0)
+		256u
+#elif defined(_WIN32) || defined(__CYGWIN__)
+		32u * 1024u
+#elif defined(__APPLE__) && defined(__MACH__)
+		16u * 1024u
+#elif defined(__linux__) && defined(__gnu_linux__)
+		64u * 1024u
+#elif defined(__linux__)
+		4u * 1024u
+#elif defined(__unix__) || defined(__unix) || defined(unix)
+		16u * 1024u
+#else
+		16u * 1024u
+#endif
+	};
 };
 
 } // namespace fast_io::custom
