@@ -141,6 +141,9 @@ concept my_integral =
 #endif
 	;
 
+// Character code-unit types are a special case: they satisfy ::std::integral,
+// but fast_io also treats them as characters. Keep them split from ordinary
+// numeric integrals so default printing does not accidentally format 'x' as 120.
 template <typename T>
 concept character_integral =
 	::std::same_as<::std::remove_cvref_t<T>, char> || ::std::same_as<::std::remove_cvref_t<T>, wchar_t> ||

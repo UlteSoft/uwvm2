@@ -1062,6 +1062,9 @@ inline constexpr auto uhexupperfull(scalar_type t) noexcept
 		static_cast<::fast_io::details::my_make_unsigned_t<::std::remove_cvref_t<scalar_type>>>(t));
 }
 
+// Character code units are deliberately separated from the default numeric
+// print path even though they satisfy ::std::integral. Use chvw for a character
+// view and cintegral when the numeric value of a character code unit is intended.
 template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::scalar_integrals<scalar_type>)
 inline constexpr auto dec(scalar_type t) noexcept
@@ -1072,7 +1075,7 @@ inline constexpr auto dec(scalar_type t) noexcept
 
 template <bool shbase = false, bool full = false, typename scalar_type>
 	requires(::fast_io::details::character_integral<scalar_type>)
-inline constexpr auto cintegral(scalar_type t) noexcept
+inline constexpr auto char_as_integer(scalar_type t) noexcept
 {
 	return dec<shbase, full>(t);
 }

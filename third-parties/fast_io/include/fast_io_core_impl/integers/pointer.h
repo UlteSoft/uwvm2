@@ -47,6 +47,8 @@ struct static_scatter_t
 template <::std::integral T>
 inline constexpr chvw_t<T> chvw(T ch) noexcept
 {
+	// Explicit single-character view. This marker avoids the ambiguous path where
+	// character code units are both ::std::integral values and printable text.
 	return {ch};
 }
 
