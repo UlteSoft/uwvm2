@@ -43,7 +43,9 @@ struct iec559_traits<__float16>
 };
 #endif
 
-#ifdef __SIZEOF_FLOAT80__
+#if defined(__SIZEOF_FLOAT80__) &&                                                                                \
+	(!defined(__LDBL_MANT_DIG__) || !defined(__LDBL_MAX_EXP__) || !defined(__SIZEOF_LONG_DOUBLE__) ||             \
+	 __LDBL_MANT_DIG__ != 64 || __LDBL_MAX_EXP__ != 16384 || __SIZEOF_LONG_DOUBLE__ != __SIZEOF_FLOAT80__)
 template <>
 struct iec559_traits<__float80>
 {
