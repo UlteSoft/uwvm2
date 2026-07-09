@@ -139,19 +139,69 @@ inline constexpr ::std::size_t calculate_scatter_total_size(basic_io_scatter_t<c
 	return total_size;
 }
 
+template <typename ch_type>
+inline constexpr ch_type *concat_small_scatter_copy_n(ch_type const *first, ::std::size_t count,
+													  ch_type *result) noexcept
+{
+	if (count <= 16u)
+	{
+		for (::std::size_t i{}; i != count; ++i)
+		{
+			result[i] = first[i];
+		}
+		return result + count;
+	}
+	return non_overlapped_copy_n(first, count, result);
+}
+
 template <::std::integral ch_type>
 inline constexpr ch_type *copy_scatter_chain_to_buffer(ch_type *iter, basic_io_scatter_t<ch_type> const *first,
 													   basic_io_scatter_t<ch_type> const *last)
 {
 	for (; first != last; ++first)
 	{
-		iter = non_overlapped_copy_n(first->base, first->len, iter);
+		iter = concat_small_scatter_copy_n(first->base, first->len, iter);
 	}
 	return iter;
 }
 
+template <::std::integral ch_type, typename T>
+inline constexpr bool direct_scatter_view_printable =
+	::std::same_as<::std::remove_cvref_t<T>, basic_io_scatter_t<ch_type>>;
+
 template <bool line, ::std::integral ch_type, typename T, typename... Args>
-inline constexpr void basic_general_concat_decay_ref_impl_all_scatter(T &str, Args... args)
+inline constexpr void basic_general_concat_decay_ref_impl_all_scatter_direct(T &str, Args... args)
+{
+	::std::size_t total_size{};
+	((total_size = ::fast_io::details::intrinsics::add_or_overflow_die(total_size, args.len)), ...);
+	if constexpr (line)
+	{
+		total_size = ::fast_io::details::intrinsics::add_or_overflow_die(total_size, static_cast<::std::size_t>(1u));
+	}
+	if constexpr (sso_buffer_strlike<ch_type, T>)
+	{
+		constexpr ::std::size_t local_cap{strlike_sso_size(io_strlike_type<ch_type, T>)};
+		if (local_cap < total_size)
+		{
+			strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
+		}
+	}
+	else
+	{
+		strlike_reserve(io_strlike_type<ch_type, T>, str, total_size);
+	}
+	auto ptr{strlike_begin(io_strlike_type<ch_type, T>, str)};
+	((ptr = concat_small_scatter_copy_n(args.base, args.len, ptr)), ...);
+	if constexpr (line)
+	{
+		*ptr = char_literal_v<u8'\n', ch_type>;
+		++ptr;
+	}
+	strlike_set_curr(io_strlike_type<ch_type, T>, str, ptr);
+}
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr void basic_general_concat_decay_ref_impl_all_scatter_generic(T &str, Args... args)
 {
 	basic_io_scatter_t<ch_type> scatters[]{
 		print_scatter_define(io_reserve_type<ch_type, ::std::remove_cvref_t<Args>>, args)...};
@@ -180,6 +230,19 @@ inline constexpr void basic_general_concat_decay_ref_impl_all_scatter(T &str, Ar
 		++ptr;
 	}
 	strlike_set_curr(io_strlike_type<ch_type, T>, str, ptr);
+}
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr void basic_general_concat_decay_ref_impl_all_scatter(T &str, Args... args)
+{
+	if constexpr ((direct_scatter_view_printable<ch_type, Args> && ...))
+	{
+		basic_general_concat_decay_ref_impl_all_scatter_direct<line, ch_type>(str, args...);
+	}
+	else
+	{
+		basic_general_concat_decay_ref_impl_all_scatter_generic<line, ch_type>(str, args...);
+	}
 }
 
 template <bool line, ::std::integral ch_type, typename T, typename Arg>

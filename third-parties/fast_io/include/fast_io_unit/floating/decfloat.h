@@ -2731,6 +2731,25 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 			::std::uint_least64_t digit_count{};
 			::std::uint_least64_t fractional_digits{};
 			char8_t digit{};
+			for (; digit_count + 8u <= digit_limit &&
+				   static_cast<::std::size_t>(end - first) >= sizeof(::std::uint_least64_t);)
+			{
+				::std::uint_least64_t val;
+				::fast_io::freestanding::my_memcpy(__builtin_addressof(val), first, sizeof(::std::uint_least64_t));
+				if constexpr (::std::endian::little != ::std::endian::native)
+				{
+					val = ::fast_io::little_endian(val);
+				}
+				if (!::fast_io::details::scan_decfloat_ascii8_is_digits(val))
+				{
+					break;
+				}
+				significand = significand * 100000000u +
+							  static_cast<::std::uint_least64_t>(
+								  ::fast_io::details::scan_decfloat_ascii8_parse(val));
+				digit_count += 8u;
+				first += sizeof(::std::uint_least64_t);
+			}
 			for (; first != end && ::fast_io::details::scan_decfloat_decimal_digit(*first, digit); ++first)
 			{
 				if (digit_count == digit_limit)

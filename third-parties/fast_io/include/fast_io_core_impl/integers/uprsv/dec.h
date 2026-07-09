@@ -232,7 +232,7 @@ inline constexpr char_type *uprsv128_impl(char_type *iter, __uint128_t value) no
 		return uprsv64_impl(iter, low);
 	}
 
-	constexpr ::std::uint_least64_t onee18{UINT64_C(1000000000000000000)};
+	constexpr ::std::uint_least64_t onee18{static_cast<::std::uint_least64_t>(1000000000000000000)};
 
 	constexpr __uint128_t onee36{static_cast<__uint128_t>(onee18) * static_cast<__uint128_t>(onee18)};
 
