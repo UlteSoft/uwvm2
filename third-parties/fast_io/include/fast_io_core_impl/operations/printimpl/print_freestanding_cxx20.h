@@ -5338,6 +5338,33 @@ inline consteval ::std::size_t print_semantic_static_precise_total_size() noexce
 	}
 }
 
+/// @brief    Computes the total static upper bound for a semantic print run.
+/// @details  The value is available when every argument has a compile-time maximum semantic size.
+/// @tparam   line      true when a trailing newline is part of the run
+/// @tparam   char_type the character type of the output run
+/// @tparam   Args      the argument types in the run
+/// @return   ::std::size_t the static total upper bound, or SIZE_MAX when any argument is not statically bounded
+template <bool line, ::std::integral char_type, typename... Args>
+inline consteval ::std::size_t print_semantic_static_bounded_total_size() noexcept
+{
+	if constexpr ((::fast_io::details::decay::print_semantic_static_bounded_size<char_type, Args>::available && ...))
+	{
+		::std::size_t total{};
+		((total = ::fast_io::details::intrinsics::add_or_overflow_die(
+			  total, ::fast_io::details::decay::print_semantic_static_bounded_size<char_type, Args>::size)),
+		 ...);
+		if constexpr (line)
+		{
+			total = ::fast_io::details::intrinsics::add_or_overflow_die(total, static_cast<::std::size_t>(1u));
+		}
+		return total;
+	}
+	else
+	{
+		return SIZE_MAX;
+	}
+}
+
 /// @brief    Computes the run-time precise size for a semantic print run.
 /// @details  This is used by checked coalescing paths before allocating or reserving contiguous output space.
 /// @tparam   line      true when a trailing newline is part of the run
@@ -5570,15 +5597,36 @@ inline constexpr bool print_semantic_try_bounded_coalesce(outputstmtype optstm, 
 			::fast_io::details::decay::print_full_output_coalesce_threshold<char_type, outputstmtype>()};
 		if constexpr (threshold_chars != 0)
 		{
-			// Unbuffered streams use a stack buffer when the upper bound is below their full-output threshold.
-			if (required <= threshold_chars)
+			constexpr ::std::size_t static_bound{
+				::fast_io::operations::decay::print_semantic_static_bounded_total_size<
+					line, char_type,
+					::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>...>()};
+			if constexpr (static_bound != SIZE_MAX && static_bound <= threshold_chars)
 			{
-				char_type buffer[threshold_chars];
-				char_type *const iter{
-					::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
-						buffer, ::std::forward<Args>(args)...)};
-				::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
-				return true;
+				// Statically bounded runs use the proven maximum instead of the stream threshold as frame size.
+				if (required <= static_bound)
+				{
+					constexpr ::std::size_t buffer_size{static_bound == 0 ? 1u : static_bound};
+					char_type buffer[buffer_size];
+					char_type *const iter{
+						::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+							buffer, ::std::forward<Args>(args)...)};
+					::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+					return true;
+				}
+			}
+			else
+			{
+				// Runs without a static upper bound preserve the historical threshold-sized stack buffer.
+				if (required <= threshold_chars)
+				{
+					char_type buffer[threshold_chars];
+					char_type *const iter{
+						::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+							buffer, ::std::forward<Args>(args)...)};
+					::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+					return true;
+				}
 			}
 			constexpr ::std::size_t materialize_limit{
 				::fast_io::details::decay::print_stack_buffer_max_size<char_type>()};
@@ -5664,10 +5712,27 @@ inline constexpr bool print_semantic_try_precise_coalesce(outputstmtype optstm, 
 			}
 			else
 			{
-				// Non-static precise runs can still coalesce when the measured size fits the stack threshold.
-				if (required <= threshold_chars)
+				constexpr ::std::size_t static_bound{
+					::fast_io::operations::decay::print_semantic_static_bounded_total_size<
+						line, char_type,
+						::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>...>()};
+				if constexpr (static_bound != SIZE_MAX && static_bound <= threshold_chars)
 				{
-					// A run-time bounded run uses the threshold-sized stack buffer and one write operation.
+					// Unequal static alternatives are not precise as a type, but their maximum still bounds the frame.
+					if (required <= static_bound)
+					{
+						constexpr ::std::size_t buffer_size{static_bound == 0 ? 1u : static_bound};
+						char_type buffer[buffer_size];
+						char_type *const iter{
+							::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(
+								buffer, ::std::forward<Args>(args)...)};
+						::fast_io::operations::decay::write_all_decay(optstm, buffer, iter);
+						return true;
+					}
+				}
+				else if (required <= threshold_chars)
+				{
+					// Non-static precise runs can still coalesce when the measured size fits the stack threshold.
 					char_type buffer[threshold_chars];
 					char_type *const iter{
 						::fast_io::operations::decay::print_semantic_emit_unchecked_run<line, char_type>(

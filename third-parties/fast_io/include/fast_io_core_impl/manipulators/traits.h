@@ -181,6 +181,110 @@ struct print_semantic_static_precise_size_impl<char_type, ::fast_io::manipulator
 };
 
 template <::std::integral char_type, typename T>
+struct print_semantic_static_bounded_size_impl
+{
+	inline static constexpr bool available =
+		::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t> ||
+		(!::fast_io::details::decay::print_semantic_parameter_object_v<T> &&
+		 (::fast_io::static_precise_reserve_printable<char_type, T> ||
+		  ::fast_io::reserve_printable<char_type, T>));
+
+	inline static consteval ::std::size_t static_size() noexcept
+	{
+		if constexpr (::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t>)
+		{
+			return 0u;
+		}
+		else if constexpr (!::fast_io::details::decay::print_semantic_parameter_object_v<T> &&
+						   ::fast_io::static_precise_reserve_printable<char_type, T>)
+		{
+			return print_reserve_static_precise_size(::fast_io::io_reserve_type<char_type, T>);
+		}
+		else if constexpr (!::fast_io::details::decay::print_semantic_parameter_object_v<T> &&
+						   ::fast_io::reserve_printable<char_type, T>)
+		{
+			return print_reserve_size(::fast_io::io_reserve_type<char_type, T>);
+		}
+		else
+		{
+			return SIZE_MAX;
+		}
+	}
+
+	inline static constexpr ::std::size_t size{static_size()};
+};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_static_bounded_size
+	: ::fast_io::details::decay::print_semantic_static_bounded_size_impl<char_type, ::std::remove_cvref_t<T>>
+{};
+
+template <::std::integral char_type, typename T>
+struct print_semantic_static_bounded_size_impl<char_type, ::fast_io::parameter<T>>
+	: ::fast_io::details::decay::print_semantic_static_bounded_size<char_type, T>
+{};
+
+template <::std::integral char_type, typename... Args>
+struct print_semantic_static_bounded_size_impl<char_type, ::fast_io::manipulators::pack_t<Args...>>
+{
+	inline static constexpr bool available =
+		(::fast_io::details::decay::print_semantic_static_bounded_size<
+			 char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>>::available &&
+		 ...);
+
+	inline static consteval ::std::size_t static_size() noexcept
+	{
+		if constexpr (available)
+		{
+			::std::size_t total{};
+			((total = ::fast_io::details::intrinsics::add_or_overflow_die(
+				  total, ::fast_io::details::decay::print_semantic_static_bounded_size<
+							 char_type,
+							 ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, Args>>::size)),
+			 ...);
+			return total;
+		}
+		else
+		{
+			return SIZE_MAX;
+		}
+	}
+
+	inline static constexpr ::std::size_t size{static_size()};
+};
+
+template <::std::integral char_type, typename T1, typename T2>
+struct print_semantic_static_bounded_size_impl<char_type, ::fast_io::manipulators::condition<T1, T2>>
+{
+	using first_size = ::fast_io::details::decay::print_semantic_static_bounded_size<
+		char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T1>>;
+	using second_size = ::fast_io::details::decay::print_semantic_static_bounded_size<
+		char_type, ::fast_io::details::decay::print_semantic_forwarded_arg_t<char_type, T2>>;
+	inline static constexpr bool available = first_size::available && second_size::available;
+
+	inline static consteval ::std::size_t static_size() noexcept
+	{
+		if constexpr (available)
+		{
+			if constexpr (first_size::size < second_size::size)
+			{
+				return second_size::size;
+			}
+			else
+			{
+				return first_size::size;
+			}
+		}
+		else
+		{
+			return SIZE_MAX;
+		}
+	}
+
+	inline static constexpr ::std::size_t size{static_size()};
+};
+
+template <::std::integral char_type, typename T>
 inline constexpr bool print_semantic_precise_leaf_size_ok_v =
 	::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t> ||
 	::fast_io::static_precise_reserve_printable<char_type, ::std::remove_cvref_t<T>> ||

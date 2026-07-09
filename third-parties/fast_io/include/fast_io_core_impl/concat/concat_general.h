@@ -396,6 +396,130 @@ inline constexpr bool basic_general_concat_semantic_precise_ok =
 	(::fast_io::details::decay::print_semantic_precise_size_ok<ch_type, ::std::remove_cvref_t<Args>>::value && ...);
 
 template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr void basic_general_concat_decay_ref_impl(T &str, Args... args);
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
+inline constexpr T basic_general_concat_phase1_decay_impl(Args... args);
+
+template <typename T>
+inline constexpr bool basic_general_concat_top_level_condition_v =
+	::fast_io::details::decay::print_semantic_node<T> &&
+	::fast_io::details::decay::print_semantic_condition_v<::std::remove_cvref_t<decltype(
+		::fast_io::details::decay::print_semantic_node_ref(::std::declval<T>()))>>;
+
+template <typename... Args>
+inline constexpr bool basic_general_concat_has_top_level_condition_v =
+	(false || ... || ::fast_io::details::decay::basic_general_concat_top_level_condition_v<Args>);
+
+template <typename continuation, typename T>
+struct basic_general_concat_condition_prefix_continuation
+{
+	::std::remove_reference_t<continuation> *contptr;
+	::std::remove_reference_t<T> *valueptr;
+
+	template <typename... TailArgs>
+	inline constexpr decltype(auto) operator()(TailArgs &&...tail_args) const
+	{
+		return (*contptr)(::std::forward<T>(*valueptr), ::std::forward<TailArgs>(tail_args)...);
+	}
+};
+
+template <::std::integral ch_type, typename continuation>
+inline constexpr decltype(auto) basic_general_concat_select_condition(continuation &&cont)
+{
+	return ::std::forward<continuation>(cont)();
+}
+
+template <::std::integral ch_type, typename continuation, typename T, typename... Args>
+inline constexpr decltype(auto) basic_general_concat_select_condition(continuation &&cont, T &&t, Args &&...args)
+{
+	if constexpr (::fast_io::details::decay::basic_general_concat_top_level_condition_v<T>)
+	{
+		auto &&node_ref{::fast_io::details::decay::print_semantic_node_ref(::std::forward<T>(t))};
+		if (node_ref.pred)
+		{
+			using branch_type = decltype(node_ref.t1);
+			if constexpr (::std::same_as<::std::remove_cvref_t<branch_type>, ::fast_io::io_null_t>)
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::std::forward<continuation>(cont), ::std::forward<Args>(args)...);
+			}
+			else if constexpr (::fast_io::details::decay::basic_general_concat_top_level_condition_v<branch_type>)
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::std::forward<continuation>(cont), node_ref.t1, ::std::forward<Args>(args)...);
+			}
+			else
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::fast_io::details::decay::basic_general_concat_condition_prefix_continuation<continuation,
+																								  branch_type>{
+						__builtin_addressof(cont), __builtin_addressof(node_ref.t1)},
+					::std::forward<Args>(args)...);
+			}
+		}
+		else
+		{
+			using branch_type = decltype(node_ref.t2);
+			if constexpr (::std::same_as<::std::remove_cvref_t<branch_type>, ::fast_io::io_null_t>)
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::std::forward<continuation>(cont), ::std::forward<Args>(args)...);
+			}
+			else if constexpr (::fast_io::details::decay::basic_general_concat_top_level_condition_v<branch_type>)
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::std::forward<continuation>(cont), node_ref.t2, ::std::forward<Args>(args)...);
+			}
+			else
+			{
+				return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+					::fast_io::details::decay::basic_general_concat_condition_prefix_continuation<continuation,
+																								  branch_type>{
+						__builtin_addressof(cont), __builtin_addressof(node_ref.t2)},
+					::std::forward<Args>(args)...);
+			}
+		}
+	}
+	else if constexpr (::std::same_as<::std::remove_cvref_t<T>, ::fast_io::io_null_t>)
+	{
+		return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+			::std::forward<continuation>(cont), ::std::forward<Args>(args)...);
+	}
+	else
+	{
+		return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+			::fast_io::details::decay::basic_general_concat_condition_prefix_continuation<continuation, T>{
+				__builtin_addressof(cont), __builtin_addressof(t)},
+			::std::forward<Args>(args)...);
+	}
+}
+
+template <bool line, ::std::integral ch_type, typename T>
+struct basic_general_concat_select_condition_ref_continuation
+{
+	T *strptr;
+
+	template <typename... Args>
+	inline constexpr void operator()(Args &&...args) const
+	{
+		::fast_io::details::decay::basic_general_concat_decay_ref_impl<line, ch_type>(
+			*strptr, ::std::forward<Args>(args)...);
+	}
+};
+
+template <bool line, ::std::integral ch_type, typename T>
+struct basic_general_concat_select_condition_phase1_continuation
+{
+	template <typename... Args>
+	inline constexpr T operator()(Args &&...args) const
+	{
+		return ::fast_io::details::decay::basic_general_concat_phase1_decay_impl<line, ch_type, T>(
+			::std::forward<Args>(args)...);
+	}
+};
+
+template <bool line, ::std::integral ch_type, typename T, typename... Args>
 inline constexpr void basic_general_concat_decay_ref_impl_semantic_precise(T &str, Args... args)
 {
 	::std::size_t const precise_size{
@@ -420,7 +544,14 @@ inline constexpr void basic_general_concat_decay_ref_impl_semantic_precise(T &st
 template <bool line, ::std::integral ch_type, typename T, typename... Args>
 inline constexpr void basic_general_concat_decay_ref_impl(T &str, Args... args)
 {
-	if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
+	if constexpr (basic_general_concat_has_top_level_condition_v<Args...>)
+	{
+		::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+			::fast_io::details::decay::basic_general_concat_select_condition_ref_continuation<line, ch_type, T>{
+				__builtin_addressof(str)},
+			args...);
+	}
+	else if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
 	{
 		basic_general_concat_decay_ref_impl_semantic_precise<line, ch_type>(str, args...);
 	}
@@ -514,7 +645,14 @@ inline constexpr T basic_general_concat_phase1_decay_impl(Args... args)
 	}
 	else
 	{
-		if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
+		if constexpr (basic_general_concat_has_top_level_condition_v<Args...>)
+		{
+			return ::fast_io::details::decay::basic_general_concat_select_condition<ch_type>(
+				::fast_io::details::decay::basic_general_concat_select_condition_phase1_continuation<line, ch_type,
+																									   T>{},
+				args...);
+		}
+		else if constexpr (basic_general_concat_semantic_precise_ok<ch_type, Args...>)
 		{
 			if constexpr (buffer_strlike<ch_type, T>)
 			{
