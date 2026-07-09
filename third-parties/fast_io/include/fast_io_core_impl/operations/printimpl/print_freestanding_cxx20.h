@@ -578,22 +578,33 @@ inline constexpr char_type *print_small_scatter_copy_n(char_type const *first, :
 	return ::fast_io::details::non_overlapped_copy_n(first, count, result);
 }
 
+/// @brief    Returns the per-segment size threshold used by small-scatter repacking.
+/// @details  Streams without the customization keep small-scatter repacking disabled.
+/// @tparam   char_type     the output character type
+/// @tparam   outputstmtype the decayed output stream reference type
+/// @return   ::std::size_t the maximum segment size in characters, or zero when disabled
 template <::std::integral char_type, typename outputstmtype>
 inline constexpr ::std::size_t print_small_scatter_repack_size() noexcept
 {
 	if constexpr (::fast_io::small_scatter_coalesce_threshold_stream<char_type, outputstmtype>)
 	{
+		// Stream-provided repack thresholds opt into copying small scatter segments.
 		return small_scatter_coalesce_threshold(
 			::fast_io::io_reserve_type<char_type, ::std::remove_cvref_t<outputstmtype>>);
 	}
 	else
 	{
+		// Streams without the customization keep native scatter descriptors untouched.
 		return 0u;
 	}
 }
 
+/// @brief    Minimum descriptor reduction required before small-scatter repacking is considered worthwhile.
 inline constexpr ::std::size_t print_scatter_repack_min_saved_scatters{8u};
 
+/// @brief    Caps temporary scatter descriptor storage used by the repack emitter.
+/// @tparam   scatter_type the scatter descriptor type being emitted
+/// @return   ::std::size_t the stack descriptor count, capped at 64 descriptors
 template <typename scatter_type>
 inline constexpr ::std::size_t print_scatter_repack_stack_scatter_count() noexcept
 {
@@ -601,14 +612,24 @@ inline constexpr ::std::size_t print_scatter_repack_stack_scatter_count() noexce
 		::fast_io::details::decay::print_stack_buffer_max_element_count<scatter_type>()};
 	if constexpr (stack_count < 64u)
 	{
+		// Very small stack policies use their exact descriptor capacity.
 		return stack_count;
 	}
 	else
 	{
+		// Larger stack policies are capped to keep the hot repack frame bounded.
 		return 64u;
 	}
 }
 
+/// @brief    Tries to repack small byte scatter segments before byte scatter output.
+/// @details  The first pass plans descriptor reduction and buffer needs; the second pass emits either preserved
+///           descriptors or copied coalesced chunks. Repacking is skipped unless enough descriptors are saved.
+/// @tparam   outputstmtype the decayed output stream reference type
+/// @param    outstm        the output stream reference
+/// @param    scatters      the first byte scatter descriptor
+/// @param    n             the number of descriptors
+/// @return   bool true when this function emitted the output through the repacked descriptor list
 template <typename outputstmtype>
 inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 	outputstmtype outstm, ::fast_io::io_scatter_t const *scatters, ::std::size_t n)
@@ -621,6 +642,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 	if constexpr (threshold_chars == 0 || small_chars == 0 ||
 				  !::fast_io::details::decay::print_has_direct_scatter_write_bytes_operations<outputstmtype>)
 	{
+		// Repacking requires both stream opt-in and a native byte-scatter output path.
 		return false;
 	}
 	else
@@ -629,6 +651,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 		constexpr ::std::size_t small_bytes{small_chars * sizeof(char_type)};
 		if constexpr (chunk_bytes == 0)
 		{
+			// A zero-capacity chunk cannot hold any repacked byte payload.
 			return false;
 		}
 		else
@@ -642,19 +665,23 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 			auto flush_plan = [&]() constexpr {
 				if (current_count == 0)
 				{
+					// No pending small descriptors are available for the current planned chunk.
 					return;
 				}
 				++output_count;
 				if (1u < current_count)
 				{
+					// Multiple small descriptors in one chunk mean the final output descriptor count can shrink.
 					has_coalesced_chunk = true;
 					if (stack_chunk_used)
 					{
+						// The first copied chunk uses stack storage; later copied chunks need dynamic storage.
 						dynamic_buffer_size =
 							::fast_io::details::intrinsics::add_or_overflow_die(dynamic_buffer_size, current_size);
 					}
 					else
 					{
+						// Reserve the first copied chunk for the fixed stack buffer.
 						stack_chunk_used = true;
 					}
 				}
@@ -663,19 +690,23 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 			};
 			for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
 			{
+				// The planning pass preserves large segments and groups adjacent small segments into chunks.
 				::std::size_t const len{iter->len};
 				if (len == 0)
 				{
+					// Empty descriptors do not affect output or descriptor pressure.
 					continue;
 				}
 				if (small_bytes < len)
 				{
+					// Large byte segments remain native scatter descriptors.
 					flush_plan();
 					++output_count;
 					continue;
 				}
 				if (chunk_bytes - current_size < len)
 				{
+					// The current copied chunk is full enough; start a new planned chunk.
 					flush_plan();
 				}
 				current_size += len;
@@ -685,6 +716,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 			if (!has_coalesced_chunk || output_count > n ||
 				n - output_count < print_scatter_repack_min_saved_scatters)
 			{
+				// Avoid extra copying unless the plan actually reduces enough scatter descriptors.
 				return false;
 			}
 
@@ -692,10 +724,12 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 			::fast_io::details::local_operator_new_array_ptr<::std::byte> dynamic_buffer;
 			if (dynamic_buffer_size != 0)
 			{
+				// Additional copied chunks beyond the first stack chunk use one dynamic byte buffer.
 				dynamic_buffer.allocate_new(dynamic_buffer_size);
 			}
 
 			auto emit_repacked = [&](::fast_io::io_scatter_t *out_scatters) constexpr {
+				// The emit pass repeats the plan while producing the final descriptor chain.
 				auto out_curr{out_scatters};
 				::std::byte *dynamic_curr{dynamic_buffer.ptr};
 				::std::byte *chunk_begin{};
@@ -708,6 +742,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 				auto begin_chunk = [&]() constexpr {
 					if (!stack_used)
 					{
+						// The first copied chunk uses the fixed stack buffer.
 						chunk_begin = stack_buffer;
 						chunk_curr = stack_buffer;
 						chunk_is_stack = true;
@@ -715,6 +750,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 					}
 					else
 					{
+						// Later copied chunks append into the pre-sized dynamic buffer.
 						chunk_begin = dynamic_curr;
 						chunk_curr = dynamic_curr;
 						chunk_is_stack = false;
@@ -723,19 +759,23 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 				auto flush_chunk = [&]() constexpr {
 					if (chunk_count == 0)
 					{
+						// No pending chunk exists, so the output descriptor cursor is unchanged.
 						return;
 					}
 					if (chunk_count == 1)
 					{
+						// A single small descriptor was not copied; preserve it as-is.
 						*out_curr = pending;
 						++out_curr;
 					}
 					else
 					{
+						// Multiple small descriptors were copied into one contiguous output chunk.
 						*out_curr = {chunk_begin, chunk_size};
 						++out_curr;
 						if (!chunk_is_stack)
 						{
+							// Commit the dynamic-buffer cursor only after a dynamic chunk is emitted.
 							dynamic_curr = chunk_curr;
 						}
 					}
@@ -747,13 +787,16 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 				};
 				for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
 				{
+					// Rebuild the planned descriptor chain while copying only coalesced small chunks.
 					::std::size_t const len{iter->len};
 					if (len == 0)
 					{
+						// Empty descriptors are skipped in the emitted chain.
 						continue;
 					}
 					if (small_bytes < len)
 					{
+						// Large byte segments flush pending small chunks and remain direct scatter entries.
 						flush_chunk();
 						*out_curr = *iter;
 						++out_curr;
@@ -761,10 +804,12 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 					}
 					if (chunk_bytes - chunk_size < len)
 					{
+						// The pending copied chunk cannot fit this segment.
 						flush_chunk();
 					}
 					if (chunk_count == 0)
 					{
+						// The first small descriptor is kept pending until a second one proves copying is useful.
 						pending = *iter;
 						chunk_size = len;
 						chunk_count = 1;
@@ -772,6 +817,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 					}
 					if (chunk_count == 1)
 					{
+						// The second small descriptor starts an actual copied chunk.
 						begin_chunk();
 						auto const first{static_cast<::std::byte const *>(pending.base)};
 						chunk_curr = ::fast_io::details::decay::print_small_scatter_copy_n(first, pending.len,
@@ -788,6 +834,7 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 				{
 					if (repacked_count == 1)
 					{
+						// A single repacked byte range can bypass scatter output entirely.
 						auto first{static_cast<::std::byte const *>(out_scatters->base)};
 						::fast_io::operations::decay::write_all_bytes_decay(outstm, first,
 																			first + out_scatters->len);
@@ -803,11 +850,13 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 			{
 				if (output_count <= stack_scatter_count)
 				{
+					// The final descriptor chain fits in bounded stack storage.
 					::fast_io::io_scatter_t out_scatters[stack_scatter_count];
 					emit_repacked(out_scatters);
 					return true;
 				}
 			}
+			// Large repacked descriptor chains allocate descriptor storage before emission.
 			::fast_io::details::local_operator_new_array_ptr<::fast_io::io_scatter_t> out_scatters(output_count);
 			emit_repacked(out_scatters.ptr);
 			return true;
@@ -815,6 +864,13 @@ inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
 	}
 }
 
+/// @brief    Tries to repack small character scatter segments before character scatter output.
+/// @details  This mirrors the byte-scatter repack path, but sizes chunks and descriptors in char_type units.
+/// @tparam   outputstmtype the decayed output stream reference type
+/// @param    outstm        the output stream reference
+/// @param    scatters      the first character scatter descriptor
+/// @param    n             the number of descriptors
+/// @return   bool true when this function emitted the output through the repacked descriptor list
 template <typename outputstmtype>
 inline constexpr bool print_scatter_write_all_try_repack_small(
 	outputstmtype outstm,
@@ -828,6 +884,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 	if constexpr (threshold_chars == 0 || small_chars == 0 ||
 				  !::fast_io::details::decay::print_has_direct_scatter_write_operations<outputstmtype>)
 	{
+		// Repacking requires both stream opt-in and a native character-scatter output path.
 		return false;
 	}
 	else
@@ -835,6 +892,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 		constexpr ::std::size_t chunk_chars{threshold_chars - 1u};
 		if constexpr (chunk_chars == 0)
 		{
+			// A zero-capacity chunk cannot hold any repacked character payload.
 			return false;
 		}
 		else
@@ -849,19 +907,23 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 			auto flush_plan = [&]() constexpr {
 				if (current_count == 0)
 				{
+					// No pending small descriptors are available for the current planned chunk.
 					return;
 				}
 				++output_count;
 				if (1u < current_count)
 				{
+					// Multiple small descriptors in one chunk mean the final output descriptor count can shrink.
 					has_coalesced_chunk = true;
 					if (stack_chunk_used)
 					{
+						// The first copied chunk uses stack storage; later copied chunks need dynamic storage.
 						dynamic_buffer_size =
 							::fast_io::details::intrinsics::add_or_overflow_die(dynamic_buffer_size, current_size);
 					}
 					else
 					{
+						// Reserve the first copied chunk for the fixed stack buffer.
 						stack_chunk_used = true;
 					}
 				}
@@ -870,19 +932,23 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 			};
 			for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
 			{
+				// The planning pass preserves large segments and groups adjacent small segments into chunks.
 				::std::size_t const len{iter->len};
 				if (len == 0)
 				{
+					// Empty descriptors do not affect output or descriptor pressure.
 					continue;
 				}
 				if (small_chars < len)
 				{
+					// Large character segments remain native scatter descriptors.
 					flush_plan();
 					++output_count;
 					continue;
 				}
 				if (chunk_chars - current_size < len)
 				{
+					// The current copied chunk is full enough; start a new planned chunk.
 					flush_plan();
 				}
 				current_size += len;
@@ -892,6 +958,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 			if (!has_coalesced_chunk || output_count > n ||
 				n - output_count < print_scatter_repack_min_saved_scatters)
 			{
+				// Avoid extra copying unless the plan actually reduces enough scatter descriptors.
 				return false;
 			}
 
@@ -899,10 +966,12 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 			::fast_io::details::local_operator_new_array_ptr<char_type> dynamic_buffer;
 			if (dynamic_buffer_size != 0)
 			{
+				// Additional copied chunks beyond the first stack chunk use one dynamic character buffer.
 				dynamic_buffer.allocate_new(dynamic_buffer_size);
 			}
 
 			auto emit_repacked = [&](scatter_type *out_scatters) constexpr {
+				// The emit pass repeats the plan while producing the final descriptor chain.
 				auto out_curr{out_scatters};
 				char_type *dynamic_curr{dynamic_buffer.ptr};
 				char_type *chunk_begin{};
@@ -915,6 +984,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 				auto begin_chunk = [&]() constexpr {
 					if (!stack_used)
 					{
+						// The first copied chunk uses the fixed stack buffer.
 						chunk_begin = stack_buffer;
 						chunk_curr = stack_buffer;
 						chunk_is_stack = true;
@@ -922,6 +992,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 					}
 					else
 					{
+						// Later copied chunks append into the pre-sized dynamic buffer.
 						chunk_begin = dynamic_curr;
 						chunk_curr = dynamic_curr;
 						chunk_is_stack = false;
@@ -930,19 +1001,23 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 				auto flush_chunk = [&]() constexpr {
 					if (chunk_count == 0)
 					{
+						// No pending chunk exists, so the output descriptor cursor is unchanged.
 						return;
 					}
 					if (chunk_count == 1)
 					{
+						// A single small descriptor was not copied; preserve it as-is.
 						*out_curr = pending;
 						++out_curr;
 					}
 					else
 					{
+						// Multiple small descriptors were copied into one contiguous output chunk.
 						*out_curr = {chunk_begin, chunk_size};
 						++out_curr;
 						if (!chunk_is_stack)
 						{
+							// Commit the dynamic-buffer cursor only after a dynamic chunk is emitted.
 							dynamic_curr = chunk_curr;
 						}
 					}
@@ -954,13 +1029,16 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 				};
 				for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
 				{
+					// Rebuild the planned descriptor chain while copying only coalesced small chunks.
 					::std::size_t const len{iter->len};
 					if (len == 0)
 					{
+						// Empty descriptors are skipped in the emitted chain.
 						continue;
 					}
 					if (small_chars < len)
 					{
+						// Large character segments flush pending small chunks and remain direct scatter entries.
 						flush_chunk();
 						*out_curr = *iter;
 						++out_curr;
@@ -968,10 +1046,12 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 					}
 					if (chunk_chars - chunk_size < len)
 					{
+						// The pending copied chunk cannot fit this segment.
 						flush_chunk();
 					}
 					if (chunk_count == 0)
 					{
+						// The first small descriptor is kept pending until a second one proves copying is useful.
 						pending = *iter;
 						chunk_size = len;
 						chunk_count = 1;
@@ -979,6 +1059,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 					}
 					if (chunk_count == 1)
 					{
+						// The second small descriptor starts an actual copied chunk.
 						begin_chunk();
 						chunk_curr = ::fast_io::details::decay::print_small_scatter_copy_n(
 							pending.base, pending.len, chunk_curr);
@@ -994,6 +1075,7 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 				{
 					if (repacked_count == 1)
 					{
+						// A single repacked character range can bypass scatter output entirely.
 						auto [base, len] = *out_scatters;
 						::fast_io::operations::decay::write_all_decay(outstm, base, base + len);
 						return;
@@ -1008,11 +1090,13 @@ inline constexpr bool print_scatter_write_all_try_repack_small(
 			{
 				if (output_count <= stack_scatter_count)
 				{
+					// The final descriptor chain fits in bounded stack storage.
 					scatter_type out_scatters[stack_scatter_count];
 					emit_repacked(out_scatters);
 					return true;
 				}
 			}
+			// Large repacked descriptor chains allocate descriptor storage before emission.
 			::fast_io::details::local_operator_new_array_ptr<scatter_type> out_scatters(output_count);
 			emit_repacked(out_scatters.ptr);
 			return true;
@@ -2485,22 +2569,27 @@ inline constexpr ::std::size_t print_n_scatter_total_size(
 {
 	if constexpr (n == 0)
 	{
+		// An empty scatter prefix contributes no characters.
 		return 0;
 	}
 	else
 	{
+		// A non-empty scatter prefix accumulates the current descriptor length and the tail length.
 		using nocvreft = ::std::remove_cvref_t<T>;
 		::std::size_t current{};
 		if constexpr (!::std::same_as<nocvreft, ::fast_io::io_null_t>)
 		{
+			// Non-null scatter-printable arguments expose their character length through print_scatter_define.
 			current = print_scatter_define(::fast_io::io_reserve_type<char_type, nocvreft>, t).len;
 		}
 		if constexpr (n == 1)
 		{
+			// The current argument is the final consumed scatter position.
 			return current;
 		}
 		else
 		{
+			// More scatter positions remain, so add the tail length with overflow checking.
 			return ::fast_io::details::intrinsics::add_or_overflow_die(
 				current, ::fast_io::details::decay::print_n_scatter_total_size<n - 1, char_type>(args...));
 		}
@@ -2534,22 +2623,27 @@ inline constexpr char_type *print_n_scatter_materialize(char_type *ptr,
 {
 	if constexpr (n == 0)
 	{
+		// An empty scatter prefix leaves the materialization cursor unchanged.
 		return ptr;
 	}
 	else
 	{
+		// A non-empty scatter prefix copies the current range when it is not null output.
 		using nocvreft = ::std::remove_cvref_t<T>;
 		if constexpr (!::std::same_as<nocvreft, ::fast_io::io_null_t>)
 		{
+			// Scatter-printable arguments expose a contiguous range that can be copied into the output buffer.
 			auto scatter{print_scatter_define(::fast_io::io_reserve_type<char_type, nocvreft>, t)};
 			ptr = ::fast_io::details::decay::print_small_scatter_copy_n(scatter.base, scatter.len, ptr);
 		}
 		if constexpr (n == 1)
 		{
+			// The current argument is the final consumed scatter position.
 			return ptr;
 		}
 		else
 		{
+			// More scatter positions remain, so continue from the advanced cursor.
 			return ::fast_io::details::decay::print_n_scatter_materialize<n - 1, char_type>(ptr, args...);
 		}
 	}
@@ -2572,31 +2666,63 @@ inline constexpr bool print_controls_scatters_try_materialize(outputstmtype opts
 {
 	constexpr ::std::size_t threshold_chars{
 		::fast_io::details::decay::print_full_output_coalesce_threshold<char_type, outputstmtype>()};
-	if constexpr (threshold_chars != 0 &&
-				  ::fast_io::details::decay::print_has_direct_write_operations<outputstmtype> &&
-				  ::fast_io::details::decay::print_stack_buffer_size_within_limit<threshold_chars, char_type>)
+	if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<outputstmtype> ||
+				  (threshold_chars != 0 &&
+				   ::fast_io::details::decay::print_has_direct_write_operations<outputstmtype> &&
+				   ::fast_io::details::decay::print_stack_buffer_size_within_limit<threshold_chars, char_type>))
 	{
+		// A coalescing-capable stream measures the complete scatter prefix before choosing storage.
 		::std::size_t const total_size{::fast_io::details::intrinsics::add_or_overflow_die(
 			::fast_io::details::decay::print_n_scatter_total_size<position, char_type>(t, args...),
 			static_cast<::std::size_t>(needprintlf))};
 		if (total_size == 0)
 		{
+			// A zero-sized scatter prefix completes without touching the output stream.
 			return true;
 		}
-		if (total_size <= threshold_chars)
+		if constexpr (::fast_io::operations::decay::defines::has_obuffer_basic_operations<outputstmtype>)
 		{
-			char_type buffer[threshold_chars];
-			char_type *ptr{
-				::fast_io::details::decay::print_n_scatter_materialize<position, char_type>(buffer, t, args...)};
-			if constexpr (needprintlf)
+			// Buffered streams prefer direct materialization into the current put area.
+			char_type *const curr{obuffer_curr(optstm)};
+			char_type *const end{obuffer_end(optstm)};
+			if (static_cast<::std::size_t>(end - curr) >= total_size)
 			{
-				*ptr = ::fast_io::char_literal_v<u8'\n', char_type>;
-				++ptr;
+				// The put area can hold the full scatter prefix, so no temporary stack buffer is needed.
+				char_type *ptr{
+					::fast_io::details::decay::print_n_scatter_materialize<position, char_type>(curr, t, args...)};
+				if constexpr (needprintlf)
+				{
+					// The line variant appends the trailing newline inside the same output-buffer commit.
+					*ptr = ::fast_io::char_literal_v<u8'\n', char_type>;
+					++ptr;
+				}
+				obuffer_set_curr(optstm, ptr);
+				return true;
 			}
-			::fast_io::operations::decay::write_all_decay(optstm, buffer, ptr);
-			return true;
+		}
+		if constexpr (threshold_chars != 0 &&
+					  ::fast_io::details::decay::print_has_direct_write_operations<outputstmtype> &&
+					  ::fast_io::details::decay::print_stack_buffer_size_within_limit<threshold_chars, char_type>)
+		{
+			// Unbuffered streams can still coalesce into a bounded stack buffer.
+			if (total_size <= threshold_chars)
+			{
+				// The full scatter prefix fits the stream's whole-output coalescing threshold.
+				char_type buffer[threshold_chars];
+				char_type *ptr{
+					::fast_io::details::decay::print_n_scatter_materialize<position, char_type>(buffer, t, args...)};
+				if constexpr (needprintlf)
+				{
+					// The line variant appends the trailing newline before the stack buffer is written.
+					*ptr = ::fast_io::char_literal_v<u8'\n', char_type>;
+					++ptr;
+				}
+				::fast_io::operations::decay::write_all_decay(optstm, buffer, ptr);
+				return true;
+			}
 		}
 	}
+	// The scatter prefix could not be coalesced by this helper; callers should use the normal scatter path.
 	return false;
 }
 
@@ -3962,6 +4088,11 @@ struct print_semantic_lvalue_prefix_continuation
 	}
 };
 
+/// @brief    Builds a tuple of pointers used to preserve expanded semantic pack element lifetimes.
+/// @details  The helper centralizes the clang missing-braces suppression needed by fast_io's tuple aggregate form.
+/// @tparam   Args the pointer argument types stored in the tuple
+/// @param    args the pointers to store
+/// @return   ::fast_io::containers::tuple<Args...> containing the supplied pointers
 template <typename... Args>
 [[nodiscard]] inline constexpr ::fast_io::containers::tuple<Args...>
 print_semantic_pack_pointer_tuple(Args... args) noexcept
@@ -5951,6 +6082,7 @@ inline constexpr void print_semantic_emit_width(outputstmtype optstm, T &&t)
 }
 
 /// @brief    Emits one semantic node to an output stream.
+/// @brief    Emits one semantic node through the checked stream path.
 /// @details  The checked node dispatcher handles packs, conditions, and width nodes before returning control to the
 ///           flattened semantic emitter.
 /// @tparam   line          true when this node is responsible for the caller's trailing newline
@@ -6271,11 +6403,17 @@ inline constexpr decltype(auto) print_freestanding_decay_cold(outputstmtype opts
 namespace decay::defines
 {
 
+/// @brief    Validates already-forwarded freestanding print parameters for one character type.
+/// @tparam   char_type the output character type
+/// @tparam   Args      the already-forwarded argument types
 template <typename char_type, typename... Args>
 concept print_freestanding_params_okay =
 	::std::integral<char_type> &&
 	(::fast_io::details::decay::print_freestanding_decay_param_okay_single<char_type, Args>::value && ...);
 
+/// @brief    Validates already-decayed freestanding print arguments for one output stream reference.
+/// @tparam   output the decayed output stream reference type
+/// @tparam   Args   the already-forwarded argument types
 template <typename output, typename... Args>
 concept print_freestanding_okay =
 	::fast_io::operations::decay::defines::print_freestanding_params_okay<typename output::output_char_type, Args...>;
@@ -6285,10 +6423,16 @@ concept print_freestanding_okay =
 namespace defines
 {
 
+/// @brief    Validates public freestanding print parameters after aliasing and print forwarding.
+/// @tparam   char_type the output character type
+/// @tparam   Args      the original public argument types
 template <typename char_type, typename... Args>
 concept print_freestanding_params_okay = ::fast_io::operations::decay::defines::print_freestanding_params_okay<char_type,
 																											   decltype(::fast_io::io_print_forward<char_type>(::fast_io::io_print_alias(::std::declval<Args>())))...>;
 
+/// @brief    Validates public freestanding print arguments for an output stream object.
+/// @tparam   output the public output stream object type
+/// @tparam   Args   the original public argument types
 template <typename output, typename... Args>
 concept print_freestanding_okay = ::fast_io::operations::decay::defines::print_freestanding_okay<
 	decltype(::fast_io::operations::output_stream_ref(::std::declval<output>())),
