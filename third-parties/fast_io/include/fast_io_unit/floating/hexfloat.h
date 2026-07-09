@@ -1416,7 +1416,10 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 		::std::size_t total_precision{precision};
 		if constexpr (fractional_precision)
 		{
-			++total_precision;
+			if (total_precision != static_cast<::std::size_t>(-1))
+			{
+				++total_precision;
+			}
 		}
 		else if (!total_precision)
 		{
@@ -1494,7 +1497,7 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 				if (exponent != 0 && digits[0] == 2u)
 				{
 					digits[0] = 1u;
-					for (::std::size_t index{1u}; index != retained_digits; ++index)
+					for (::std::size_t index{1u}; index < retained_digits; ++index)
 					{
 						digits[index] = 0u;
 					}
@@ -1519,7 +1522,7 @@ inline constexpr char_type *print_rsvhexfloat_precision_define_impl(char_type *i
 			*iter = char_literal_v<(comma ? u8',' : u8'.'), char_type>;
 			++iter;
 			auto const digit_limit{digits_to_print < retained_digits ? digits_to_print : retained_digits};
-			for (::std::size_t index{1u}; index != digit_limit; ++index)
+			for (::std::size_t index{1u}; index < digit_limit; ++index)
 			{
 				iter = print_rsvhexfloat_digit_impl<uppercase>(iter, digits[index]);
 			}

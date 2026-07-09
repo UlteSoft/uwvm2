@@ -2353,6 +2353,24 @@ scan_decfloat_exponent(char_type const *first, char_type const *last, ::std::int
 }
 
 template <::std::integral char_type>
+[[nodiscard]] inline constexpr bool scan_decfloat_exponent_prefix_may_extend(char_type const *first,
+																			 char_type const *last) noexcept
+{
+	constexpr auto plus{::fast_io::char_literal_v<u8'+', char_type>};
+	constexpr auto minus{::fast_io::char_literal_v<u8'-', char_type>};
+	++first;
+	if (first == last)
+	{
+		return true;
+	}
+	if ((*first == plus || *first == minus) && first + 1 == last)
+	{
+		return true;
+	}
+	return false;
+}
+
+template <::std::integral char_type>
 [[nodiscard]] inline constexpr bool scan_decfloat_special_start_char(char_type ch) noexcept
 {
 	return ::fast_io::details::scan_hexfloat_caseless_equal<u8'i', u8'I'>(ch) ||
@@ -2815,6 +2833,10 @@ scan_decfloat_contiguous_short_define_impl(char_type const *begin, char_type con
 				{
 					first = exponent_result.iter;
 				}
+				else if (::fast_io::details::scan_decfloat_exponent_prefix_may_extend(exponent_begin, end))
+				{
+					return {end, ::fast_io::parse_code::partial, true};
+				}
 				else if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
 				{
 					return {exponent_result.iter, exponent_result.code, true};
@@ -2939,6 +2961,10 @@ scan_decfloat_contiguous_define_impl(char_type const *begin, char_type const *en
 		if (exponent_result.code == ::fast_io::parse_code::ok)
 		{
 			first = exponent_result.iter;
+		}
+		else if (::fast_io::details::scan_decfloat_exponent_prefix_may_extend(exponent_begin, end))
+		{
+			return {end, ::fast_io::parse_code::partial};
 		}
 		else if constexpr (flags.floating == ::fast_io::manipulators::floating_format::scientific)
 		{

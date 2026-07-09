@@ -2037,7 +2037,7 @@ inline constexpr void print_reserve_integral_main_impl(char_type *iter, T t, ::s
 		{
 			constexpr ::std::size_t sizetdigitsm1{sizetdigits - 1};
 			constexpr ::std::size_t remain_digits{basetdigits - sizetdigitsm1 * 2};
-			constexpr T maxhighdigits{compile_pow10<T, (sizetdigitsm1 * 2)>};
+			constexpr T maxhighdigits{compile_pow_n<T, base, (sizetdigitsm1 * 2)>};
 			if constexpr (!ryu_mode && remain_digits != 0)
 			{
 				static_assert(remain_digits < 3);
@@ -2047,7 +2047,16 @@ inline constexpr void print_reserve_integral_main_impl(char_type *iter, T t, ::s
 					{
 						T high{t / maxhighdigits};
 						t = t % maxhighdigits;
-						*(iter - basetdigits) = ::fast_io::char_literal_add<char_type>(high);
+						if constexpr (base <= 10)
+						{
+							*(iter - basetdigits) = ::fast_io::char_literal_add<char_type>(high);
+						}
+						else
+						{
+							constexpr auto tb{::fast_io::details::digits_table<char_type, base, uppercase>};
+							*(iter - basetdigits) =
+								static_cast<char_type>(tb[(static_cast<::std::size_t>(high) << 1u) + 1u]);
+						}
 						--len;
 					}
 				}
@@ -2058,7 +2067,7 @@ inline constexpr void print_reserve_integral_main_impl(char_type *iter, T t, ::s
 					{
 						T high{t / maxhighdigits};
 						t = t % maxhighdigits;
-						::std::uint_least8_t rem{static_cast<::std::uint_least8_t>(high)};
+						::std::size_t rem{static_cast<::std::size_t>(high)};
 						if (len == basetdigits)
 						{
 							constexpr auto tb{::fast_io::details::digits_table<char_type, base, uppercase>};
@@ -2067,7 +2076,16 @@ inline constexpr void print_reserve_integral_main_impl(char_type *iter, T t, ::s
 						}
 						else
 						{
-							*(iter + 1 - basetdigits) = ::fast_io::char_literal_add<char_type>(high);
+							if constexpr (base <= 10)
+							{
+								*(iter + 1 - basetdigits) = ::fast_io::char_literal_add<char_type>(high);
+							}
+							else
+							{
+								constexpr auto tb{::fast_io::details::digits_table<char_type, base, uppercase>};
+								*(iter + 1 - basetdigits) =
+									static_cast<char_type>(tb[(static_cast<::std::size_t>(high) << 1u) + 1u]);
+							}
 							--len;
 						}
 					}
@@ -2076,7 +2094,7 @@ inline constexpr void print_reserve_integral_main_impl(char_type *iter, T t, ::s
 			optimal_print_unsigned_type low;
 			if (len > sizetdigitsm1)
 			{
-				constexpr T halfdigits{compile_pow10<T, sizetdigitsm1>};
+				constexpr T halfdigits{compile_pow_n<T, base, sizetdigitsm1>};
 				optimal_print_unsigned_type high{static_cast<optimal_print_unsigned_type>(t / halfdigits)};
 				low = static_cast<optimal_print_unsigned_type>(t % halfdigits);
 				print_reserve_integral_main_impl<base, false, false>(iter - sizetdigitsm1, high, len - sizetdigitsm1);

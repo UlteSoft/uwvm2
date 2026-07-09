@@ -517,7 +517,9 @@ inline constexpr void jeaiii_main_len(char_type *iter, U n, ::std::uint_least32_
 		::std::uint_least64_t alow{static_cast<::std::uint_least64_t>(a)};
 		if constexpr (ryu_mode)
 		{
-			iter = jeaiii_main_len(iter, static_cast<::std::uint_least64_t>(alow), len - full_length);
+			::std::uint_least32_t len_sub{len - full_length};
+			jeaiii_main_len(iter, static_cast<::std::uint_least64_t>(alow), len_sub);
+			iter += len_sub;
 		}
 		else
 		{
