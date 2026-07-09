@@ -243,6 +243,24 @@ concept full_output_coalesce_threshold_stream =
 		} -> ::std::same_as<::std::size_t>;
 	};
 
+/// @brief      small_scatter_coalesce_threshold_stream
+/// @details    Opts a stream into small-scatter repacking and customizes the
+///             maximum individual scatter size, in char_type units, that may be
+///             copied into temporary coalescing storage. Returning 0 disables
+///             this path. Streams should only opt in when reducing writev/iovec
+///             pressure is known to beat the extra memcpy work.
+/// @fn         small_scatter_coalesce_threshold
+/// @brief      Returns the small-scatter element threshold, in char_type units.
+template <typename char_type, typename T>
+concept small_scatter_coalesce_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			small_scatter_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			small_scatter_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
+	};
+
 /// @brief      printable_internal_shift
 /// @details    Defines the behaviour when printed with ::fast_io::mnp::width<::fast_io::mnp::scalar_placement::internal>
 /// @fn         print_define_internal_shift

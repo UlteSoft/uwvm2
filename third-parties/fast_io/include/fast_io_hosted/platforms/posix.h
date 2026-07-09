@@ -565,6 +565,22 @@ inline constexpr ::std::size_t full_output_coalesce_threshold(
 	return static_cast<::std::size_t>(2048u / sizeof(char_type) + 1u);
 }
 
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t small_scatter_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// Only POSIX opts into the secondary small-scatter repack path. Keep the per-element copy budget tiny so
+	// larger scatter payloads continue to flow through writev without an extra memcpy.
+	if constexpr (16u < sizeof(char_type))
+	{
+		return 1u;
+	}
+	else
+	{
+		return static_cast<::std::size_t>(16u / sizeof(char_type));
+	}
+}
+
 #if defined(__CYGWIN__)
 
 // https://github.com/cygwin/cygwin/blob/c43ec5f5951c7f4b882a0f8e619601a45ae70a91/newlib/libc/include/sys/_default_fcntl.h#L168

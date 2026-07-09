@@ -578,6 +578,448 @@ inline constexpr char_type *print_small_scatter_copy_n(char_type const *first, :
 	return ::fast_io::details::non_overlapped_copy_n(first, count, result);
 }
 
+template <::std::integral char_type, typename outputstmtype>
+inline constexpr ::std::size_t print_small_scatter_repack_size() noexcept
+{
+	if constexpr (::fast_io::small_scatter_coalesce_threshold_stream<char_type, outputstmtype>)
+	{
+		return small_scatter_coalesce_threshold(
+			::fast_io::io_reserve_type<char_type, ::std::remove_cvref_t<outputstmtype>>);
+	}
+	else
+	{
+		return 0u;
+	}
+}
+
+inline constexpr ::std::size_t print_scatter_repack_min_saved_scatters{8u};
+
+template <typename scatter_type>
+inline constexpr ::std::size_t print_scatter_repack_stack_scatter_count() noexcept
+{
+	constexpr ::std::size_t stack_count{
+		::fast_io::details::decay::print_stack_buffer_max_element_count<scatter_type>()};
+	if constexpr (stack_count < 64u)
+	{
+		return stack_count;
+	}
+	else
+	{
+		return 64u;
+	}
+}
+
+template <typename outputstmtype>
+inline constexpr bool print_scatter_write_all_bytes_try_repack_small(
+	outputstmtype outstm, ::fast_io::io_scatter_t const *scatters, ::std::size_t n)
+{
+	using char_type = typename outputstmtype::output_char_type;
+	constexpr ::std::size_t threshold_chars{
+		::fast_io::details::decay::print_scatter_full_output_threshold<char_type, outputstmtype>()};
+	constexpr ::std::size_t small_chars{
+		::fast_io::details::decay::print_small_scatter_repack_size<char_type, outputstmtype>()};
+	if constexpr (threshold_chars == 0 || small_chars == 0 ||
+				  !::fast_io::details::decay::print_has_direct_scatter_write_bytes_operations<outputstmtype>)
+	{
+		return false;
+	}
+	else
+	{
+		constexpr ::std::size_t chunk_bytes{threshold_chars * sizeof(char_type) - 1u};
+		constexpr ::std::size_t small_bytes{small_chars * sizeof(char_type)};
+		if constexpr (chunk_bytes == 0)
+		{
+			return false;
+		}
+		else
+		{
+			::std::size_t output_count{};
+			::std::size_t dynamic_buffer_size{};
+			::std::size_t current_size{};
+			::std::size_t current_count{};
+			bool stack_chunk_used{};
+			bool has_coalesced_chunk{};
+			auto flush_plan = [&]() constexpr {
+				if (current_count == 0)
+				{
+					return;
+				}
+				++output_count;
+				if (1u < current_count)
+				{
+					has_coalesced_chunk = true;
+					if (stack_chunk_used)
+					{
+						dynamic_buffer_size =
+							::fast_io::details::intrinsics::add_or_overflow_die(dynamic_buffer_size, current_size);
+					}
+					else
+					{
+						stack_chunk_used = true;
+					}
+				}
+				current_size = 0;
+				current_count = 0;
+			};
+			for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
+			{
+				::std::size_t const len{iter->len};
+				if (len == 0)
+				{
+					continue;
+				}
+				if (small_bytes < len)
+				{
+					flush_plan();
+					++output_count;
+					continue;
+				}
+				if (chunk_bytes - current_size < len)
+				{
+					flush_plan();
+				}
+				current_size += len;
+				++current_count;
+			}
+			flush_plan();
+			if (!has_coalesced_chunk || output_count > n ||
+				n - output_count < print_scatter_repack_min_saved_scatters)
+			{
+				return false;
+			}
+
+			::std::byte stack_buffer[chunk_bytes];
+			::fast_io::details::local_operator_new_array_ptr<::std::byte> dynamic_buffer;
+			if (dynamic_buffer_size != 0)
+			{
+				dynamic_buffer.allocate_new(dynamic_buffer_size);
+			}
+
+			auto emit_repacked = [&](::fast_io::io_scatter_t *out_scatters) constexpr {
+				auto out_curr{out_scatters};
+				::std::byte *dynamic_curr{dynamic_buffer.ptr};
+				::std::byte *chunk_begin{};
+				::std::byte *chunk_curr{};
+				::std::size_t chunk_size{};
+				::std::size_t chunk_count{};
+				bool chunk_is_stack{};
+				bool stack_used{};
+				::fast_io::io_scatter_t pending{};
+				auto begin_chunk = [&]() constexpr {
+					if (!stack_used)
+					{
+						chunk_begin = stack_buffer;
+						chunk_curr = stack_buffer;
+						chunk_is_stack = true;
+						stack_used = true;
+					}
+					else
+					{
+						chunk_begin = dynamic_curr;
+						chunk_curr = dynamic_curr;
+						chunk_is_stack = false;
+					}
+				};
+				auto flush_chunk = [&]() constexpr {
+					if (chunk_count == 0)
+					{
+						return;
+					}
+					if (chunk_count == 1)
+					{
+						*out_curr = pending;
+						++out_curr;
+					}
+					else
+					{
+						*out_curr = {chunk_begin, chunk_size};
+						++out_curr;
+						if (!chunk_is_stack)
+						{
+							dynamic_curr = chunk_curr;
+						}
+					}
+					chunk_begin = {};
+					chunk_curr = {};
+					chunk_size = 0;
+					chunk_count = 0;
+					chunk_is_stack = false;
+				};
+				for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
+				{
+					::std::size_t const len{iter->len};
+					if (len == 0)
+					{
+						continue;
+					}
+					if (small_bytes < len)
+					{
+						flush_chunk();
+						*out_curr = *iter;
+						++out_curr;
+						continue;
+					}
+					if (chunk_bytes - chunk_size < len)
+					{
+						flush_chunk();
+					}
+					if (chunk_count == 0)
+					{
+						pending = *iter;
+						chunk_size = len;
+						chunk_count = 1;
+						continue;
+					}
+					if (chunk_count == 1)
+					{
+						begin_chunk();
+						auto const first{static_cast<::std::byte const *>(pending.base)};
+						chunk_curr = ::fast_io::details::decay::print_small_scatter_copy_n(first, pending.len,
+																						   chunk_curr);
+					}
+					auto const first{static_cast<::std::byte const *>(iter->base)};
+					chunk_curr = ::fast_io::details::decay::print_small_scatter_copy_n(first, len, chunk_curr);
+					chunk_size += len;
+					++chunk_count;
+				}
+				flush_chunk();
+				::std::size_t const repacked_count{static_cast<::std::size_t>(out_curr - out_scatters)};
+				if constexpr (::fast_io::details::decay::print_has_direct_write_bytes_operations<outputstmtype>)
+				{
+					if (repacked_count == 1)
+					{
+						auto first{static_cast<::std::byte const *>(out_scatters->base)};
+						::fast_io::operations::decay::write_all_bytes_decay(outstm, first,
+																			first + out_scatters->len);
+						return;
+					}
+				}
+				::fast_io::operations::decay::scatter_write_all_bytes_decay(outstm, out_scatters, repacked_count);
+			};
+
+			constexpr ::std::size_t stack_scatter_count{
+				::fast_io::details::decay::print_scatter_repack_stack_scatter_count<::fast_io::io_scatter_t>()};
+			if constexpr (stack_scatter_count != 0)
+			{
+				if (output_count <= stack_scatter_count)
+				{
+					::fast_io::io_scatter_t out_scatters[stack_scatter_count];
+					emit_repacked(out_scatters);
+					return true;
+				}
+			}
+			::fast_io::details::local_operator_new_array_ptr<::fast_io::io_scatter_t> out_scatters(output_count);
+			emit_repacked(out_scatters.ptr);
+			return true;
+		}
+	}
+}
+
+template <typename outputstmtype>
+inline constexpr bool print_scatter_write_all_try_repack_small(
+	outputstmtype outstm,
+	::fast_io::basic_io_scatter_t<typename outputstmtype::output_char_type> const *scatters, ::std::size_t n)
+{
+	using char_type = typename outputstmtype::output_char_type;
+	constexpr ::std::size_t threshold_chars{
+		::fast_io::details::decay::print_scatter_full_output_threshold<char_type, outputstmtype>()};
+	constexpr ::std::size_t small_chars{
+		::fast_io::details::decay::print_small_scatter_repack_size<char_type, outputstmtype>()};
+	if constexpr (threshold_chars == 0 || small_chars == 0 ||
+				  !::fast_io::details::decay::print_has_direct_scatter_write_operations<outputstmtype>)
+	{
+		return false;
+	}
+	else
+	{
+		constexpr ::std::size_t chunk_chars{threshold_chars - 1u};
+		if constexpr (chunk_chars == 0)
+		{
+			return false;
+		}
+		else
+		{
+			using scatter_type = ::fast_io::basic_io_scatter_t<char_type>;
+			::std::size_t output_count{};
+			::std::size_t dynamic_buffer_size{};
+			::std::size_t current_size{};
+			::std::size_t current_count{};
+			bool stack_chunk_used{};
+			bool has_coalesced_chunk{};
+			auto flush_plan = [&]() constexpr {
+				if (current_count == 0)
+				{
+					return;
+				}
+				++output_count;
+				if (1u < current_count)
+				{
+					has_coalesced_chunk = true;
+					if (stack_chunk_used)
+					{
+						dynamic_buffer_size =
+							::fast_io::details::intrinsics::add_or_overflow_die(dynamic_buffer_size, current_size);
+					}
+					else
+					{
+						stack_chunk_used = true;
+					}
+				}
+				current_size = 0;
+				current_count = 0;
+			};
+			for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
+			{
+				::std::size_t const len{iter->len};
+				if (len == 0)
+				{
+					continue;
+				}
+				if (small_chars < len)
+				{
+					flush_plan();
+					++output_count;
+					continue;
+				}
+				if (chunk_chars - current_size < len)
+				{
+					flush_plan();
+				}
+				current_size += len;
+				++current_count;
+			}
+			flush_plan();
+			if (!has_coalesced_chunk || output_count > n ||
+				n - output_count < print_scatter_repack_min_saved_scatters)
+			{
+				return false;
+			}
+
+			char_type stack_buffer[chunk_chars];
+			::fast_io::details::local_operator_new_array_ptr<char_type> dynamic_buffer;
+			if (dynamic_buffer_size != 0)
+			{
+				dynamic_buffer.allocate_new(dynamic_buffer_size);
+			}
+
+			auto emit_repacked = [&](scatter_type *out_scatters) constexpr {
+				auto out_curr{out_scatters};
+				char_type *dynamic_curr{dynamic_buffer.ptr};
+				char_type *chunk_begin{};
+				char_type *chunk_curr{};
+				::std::size_t chunk_size{};
+				::std::size_t chunk_count{};
+				bool chunk_is_stack{};
+				bool stack_used{};
+				scatter_type pending{};
+				auto begin_chunk = [&]() constexpr {
+					if (!stack_used)
+					{
+						chunk_begin = stack_buffer;
+						chunk_curr = stack_buffer;
+						chunk_is_stack = true;
+						stack_used = true;
+					}
+					else
+					{
+						chunk_begin = dynamic_curr;
+						chunk_curr = dynamic_curr;
+						chunk_is_stack = false;
+					}
+				};
+				auto flush_chunk = [&]() constexpr {
+					if (chunk_count == 0)
+					{
+						return;
+					}
+					if (chunk_count == 1)
+					{
+						*out_curr = pending;
+						++out_curr;
+					}
+					else
+					{
+						*out_curr = {chunk_begin, chunk_size};
+						++out_curr;
+						if (!chunk_is_stack)
+						{
+							dynamic_curr = chunk_curr;
+						}
+					}
+					chunk_begin = {};
+					chunk_curr = {};
+					chunk_size = 0;
+					chunk_count = 0;
+					chunk_is_stack = false;
+				};
+				for (auto iter{scatters}, last{scatters + n}; iter != last; ++iter)
+				{
+					::std::size_t const len{iter->len};
+					if (len == 0)
+					{
+						continue;
+					}
+					if (small_chars < len)
+					{
+						flush_chunk();
+						*out_curr = *iter;
+						++out_curr;
+						continue;
+					}
+					if (chunk_chars - chunk_size < len)
+					{
+						flush_chunk();
+					}
+					if (chunk_count == 0)
+					{
+						pending = *iter;
+						chunk_size = len;
+						chunk_count = 1;
+						continue;
+					}
+					if (chunk_count == 1)
+					{
+						begin_chunk();
+						chunk_curr = ::fast_io::details::decay::print_small_scatter_copy_n(
+							pending.base, pending.len, chunk_curr);
+					}
+					chunk_curr =
+						::fast_io::details::decay::print_small_scatter_copy_n(iter->base, len, chunk_curr);
+					chunk_size += len;
+					++chunk_count;
+				}
+				flush_chunk();
+				::std::size_t const repacked_count{static_cast<::std::size_t>(out_curr - out_scatters)};
+				if constexpr (::fast_io::details::decay::print_has_direct_write_operations<outputstmtype>)
+				{
+					if (repacked_count == 1)
+					{
+						auto [base, len] = *out_scatters;
+						::fast_io::operations::decay::write_all_decay(outstm, base, base + len);
+						return;
+					}
+				}
+				::fast_io::operations::decay::scatter_write_all_decay(outstm, out_scatters, repacked_count);
+			};
+
+			constexpr ::std::size_t stack_scatter_count{
+				::fast_io::details::decay::print_scatter_repack_stack_scatter_count<scatter_type>()};
+			if constexpr (stack_scatter_count != 0)
+			{
+				if (output_count <= stack_scatter_count)
+				{
+					scatter_type out_scatters[stack_scatter_count];
+					emit_repacked(out_scatters);
+					return true;
+				}
+			}
+			::fast_io::details::local_operator_new_array_ptr<scatter_type> out_scatters(output_count);
+			emit_repacked(out_scatters.ptr);
+			return true;
+		}
+	}
+}
+
 /// @brief    Writes byte scatter descriptors, optionally coalescing small scatter runs first.
 /// @details  Empty and single-scatter runs are handled directly. Multi-scatter runs are copied into a bounded stack
 ///           buffer only when the stream supports both direct byte writes and direct byte scatter writes.
@@ -625,6 +1067,10 @@ inline constexpr void print_scatter_write_all_bytes_maybe_coalesce(outputstmtype
 			if (remaining < len)
 			{
 				// The byte run exceeds the coalescing threshold, so preserve scatter output directly.
+				if (::fast_io::details::decay::print_scatter_write_all_bytes_try_repack_small(outstm, scatters, n))
+				{
+					return;
+				}
 				::fast_io::operations::decay::scatter_write_all_bytes_decay(outstm, scatters, n);
 				return;
 			}
@@ -644,6 +1090,10 @@ inline constexpr void print_scatter_write_all_bytes_maybe_coalesce(outputstmtype
 		return;
 	}
 	// Streams that cannot coalesce this path emit the original byte scatter descriptors directly.
+	if (::fast_io::details::decay::print_scatter_write_all_bytes_try_repack_small(outstm, scatters, n))
+	{
+		return;
+	}
 	::fast_io::operations::decay::scatter_write_all_bytes_decay(outstm, scatters, n);
 }
 
@@ -691,6 +1141,10 @@ inline constexpr void print_scatter_write_all_maybe_coalesce(
 			if (remaining < len)
 			{
 				// The character run exceeds the coalescing threshold, so preserve scatter output directly.
+				if (::fast_io::details::decay::print_scatter_write_all_try_repack_small(outstm, scatters, n))
+				{
+					return;
+				}
 				::fast_io::operations::decay::scatter_write_all_decay(outstm, scatters, n);
 				return;
 			}
@@ -709,6 +1163,10 @@ inline constexpr void print_scatter_write_all_maybe_coalesce(
 		return;
 	}
 	// Streams that cannot coalesce this path emit the original character scatter descriptors directly.
+	if (::fast_io::details::decay::print_scatter_write_all_try_repack_small(outstm, scatters, n))
+	{
+		return;
+	}
 	::fast_io::operations::decay::scatter_write_all_decay(outstm, scatters, n);
 }
 
