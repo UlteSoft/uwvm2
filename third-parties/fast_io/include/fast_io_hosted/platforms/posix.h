@@ -545,41 +545,34 @@ io_bytes_stream_ref_define(basic_posix_family_io_observer<family, ch_type> other
 	return {other.fd};
 }
 
+#if 0
 template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	// Keep scatter fallback conservative: this path first builds scatter descriptors, then copies the payload
-	// into a stack buffer only to avoid writev overhead for very small runs. POSIX write/writev measurements
-	// put the useful crossover around a 256-byte payload budget.
-	return static_cast<::std::size_t>(256u / sizeof(char_type) + 1u);
+	// POSIX has native writev. /dev/null measurements show that copying scatter payloads into temporary
+	// contiguous storage loses to writing the original iovec chain, even for tiny scatter runs.
+	return 0u;
 }
 
 template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t full_output_coalesce_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	// Full-output coalescing happens before scatter descriptors are materialized, so it avoids both descriptor
-	// setup and writev for tiny multi-part prints. Benchmarks showed wins through roughly 2 KiB, while larger
-	// stack buffers brought little extra benefit and more stack pressure.
-	return static_cast<::std::size_t>(2048u / sizeof(char_type) + 1u);
+	// Scatter-only public print paths are faster when they build descriptors and call writev directly. Full
+	// materialization can still be useful for streams without native scatter output, but POSIX does not opt in.
+	return 0u;
 }
 
 template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t small_scatter_coalesce_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	// Only POSIX opts into the secondary small-scatter repack path. Keep the per-element copy budget tiny so
-	// larger scatter payloads continue to flow through writev without an extra memcpy.
-	if constexpr (16u < sizeof(char_type))
-	{
-		return 1u;
-	}
-	else
-	{
-		return static_cast<::std::size_t>(16u / sizeof(char_type));
-	}
+	// Repacking small scatter elements is a memcpy tradeoff. POSIX defaults to direct writev, so this remains
+	// disabled unless a more specialized stream type opts in with its own measured threshold.
+	return 0u;
 }
+#endif
 
 #if defined(__CYGWIN__)
 
