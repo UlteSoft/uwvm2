@@ -1,106 +1,8 @@
 #include <cfloat>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-
-#if !defined(__SIZEOF_FLOAT80__) && LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
-#define UWVM2_FAST_IO_FLOAT80_SIMULATED 1
-#define __SIZEOF_FLOAT80__ 16
-struct __float80
-{
-    unsigned char bytes[16]{};
-
-    constexpr __float80() = default;
-    constexpr explicit __float80(double) noexcept : bytes{} {}
-};
-
-[[nodiscard]] constexpr __float80 operator-(__float80 value) noexcept
-{
-    value.bytes[9] = static_cast<unsigned char>(value.bytes[9] ^ 0x80u);
-    return value;
-}
-
-[[nodiscard]] constexpr __float80 uwvm2_make_simulated_float80(::std::uint_least64_t mantissa,
-                                                               ::std::uint_least16_t exponent) noexcept
-{
-    __float80 value{};
-    for(::std::size_t index{}; index != sizeof(::std::uint_least64_t); ++index)
-    {
-        value.bytes[index] = static_cast<unsigned char>(mantissa >> (index * 8u));
-    }
-    value.bytes[8] = static_cast<unsigned char>(exponent);
-    value.bytes[9] = static_cast<unsigned char>(exponent >> 8u);
-    return value;
-}
-
-namespace std
-{
-
-template <>
-class numeric_limits<__float80>
-{
-public:
-    static constexpr bool is_specialized = true;
-    static constexpr bool is_signed = true;
-    static constexpr bool is_integer = false;
-    static constexpr bool is_exact = false;
-    static constexpr bool has_infinity = true;
-    static constexpr bool has_quiet_NaN = true;
-    static constexpr bool has_signaling_NaN = true;
-    static constexpr bool is_iec559 = true;
-    static constexpr bool is_bounded = true;
-    static constexpr bool is_modulo = false;
-    static constexpr int digits = 64;
-    static constexpr int digits10 = 18;
-    static constexpr int max_digits10 = 21;
-    static constexpr int radix = 2;
-    static constexpr int min_exponent = -16381;
-    static constexpr int min_exponent10 = -4931;
-    static constexpr int max_exponent = 16384;
-    static constexpr int max_exponent10 = 4932;
-    static constexpr float_denorm_style has_denorm = denorm_present;
-    static constexpr bool has_denorm_loss = false;
-    static constexpr float_round_style round_style = round_to_nearest;
-    static constexpr bool tinyness_before = false;
-    static constexpr bool traps = false;
-
-    [[nodiscard]] static constexpr __float80 min() noexcept
-    {
-        return uwvm2_make_simulated_float80(::std::uint_least64_t{1} << 63u, 1u);
-    }
-
-    [[nodiscard]] static constexpr __float80 denorm_min() noexcept
-    {
-        return uwvm2_make_simulated_float80(1u, 0u);
-    }
-
-    [[nodiscard]] static constexpr __float80 max() noexcept
-    {
-        return uwvm2_make_simulated_float80(~::std::uint_least64_t{}, 0x7ffeu);
-    }
-
-    [[nodiscard]] static constexpr __float80 lowest() noexcept { return -max(); }
-
-    [[nodiscard]] static constexpr __float80 infinity() noexcept
-    {
-        return uwvm2_make_simulated_float80(::std::uint_least64_t{1} << 63u, 0x7fffu);
-    }
-
-    [[nodiscard]] static constexpr __float80 quiet_NaN() noexcept
-    {
-        return uwvm2_make_simulated_float80((::std::uint_least64_t{1} << 63u) |
-                                                (::std::uint_least64_t{1} << 62u),
-                                            0x7fffu);
-    }
-
-    [[nodiscard]] static constexpr __float80 signaling_NaN() noexcept
-    {
-        return uwvm2_make_simulated_float80((::std::uint_least64_t{1} << 63u) | 1u, 0x7fffu);
-    }
-};
-
-} // namespace std
-#endif
 
 #include <array>
 #include <bit>
@@ -590,6 +492,7 @@ void run_hex_scan_template_matrix(T expected)
 template <typename T>
 void exercise_parsed_token(::std::string_view text, T parsed)
 {
+    static_cast<void>(text);
 #if defined(__SIZEOF_FLOAT80__)
     if constexpr(::std::same_as<T, __float80>) { expect_strtold_float80_oracle(text, parsed); }
 #endif
