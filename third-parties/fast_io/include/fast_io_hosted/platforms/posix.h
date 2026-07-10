@@ -545,6 +545,38 @@ io_bytes_stream_ref_define(basic_posix_family_io_observer<family, ch_type> other
 	return {other.fd};
 }
 
+#if 0
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// POSIX has native writev. Measurements show that scatter-fallback copying is not a good default once
+	// whole-run materialization is available for compact output.
+	return 0u;
+}
+#endif
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t full_output_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// Compact whole-output runs are copied into one contiguous buffer before a single write. This improves real
+	// file/log output patterns on measured POSIX kernels; syscall-shell sinks such as /dev/null-like streams should
+	// opt out with a zero threshold in their own stream policy.
+	return 2048u;
+}
+
+#if 0
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t small_scatter_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// Repacking small scatter elements is a memcpy tradeoff. POSIX defaults to direct writev, so this remains
+	// disabled unless a more specialized stream type opts in with its own measured threshold.
+	return 0u;
+}
+#endif
+
 #if defined(__CYGWIN__)
 
 // https://github.com/cygwin/cygwin/blob/c43ec5f5951c7f4b882a0f8e619601a45ae70a91/newlib/libc/include/sys/_default_fcntl.h#L168

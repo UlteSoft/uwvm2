@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "forward.h"
+
 namespace fast_io
 {
 
@@ -176,7 +178,7 @@ inline constexpr auto left(T &&t, ::std::size_t n, char_type ch) noexcept
 	}
 	else
 	{
-		return width_ch_t<scalar_placement::left, noref const &, char_type>{t, n};
+		return width_ch_t<scalar_placement::left, noref const &, char_type>{t, n, ch};
 	}
 }
 
@@ -257,6 +259,7 @@ inline constexpr auto internal(T &&t, ::std::size_t n, char_type ch) noexcept
 
 } // namespace manipulators
 
+#if 0
 namespace details
 {
 
@@ -687,4 +690,5 @@ print_reserve_define(io_reserve_type_t<char_type, ::fast_io::manipulators::width
 	}
 }
 
+#endif
 } // namespace fast_io

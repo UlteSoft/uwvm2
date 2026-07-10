@@ -200,6 +200,39 @@ inline constexpr ::fast_io::basic_io_scatter_t<char_type> print_alias_define(::f
 }
 
 template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_size(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>,
+				   ::fast_io::containers::basic_cstring_view<char_type> str) noexcept
+{
+	return str.n;
+}
+
+template <::std::integral char_type>
+inline constexpr char_type *
+print_reserve_define(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>,
+					 char_type *iter, ::fast_io::containers::basic_cstring_view<char_type> str) noexcept
+{
+	return ::fast_io::details::non_overlapped_copy_n(str.ptr, str.n, iter);
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::size_t
+print_reserve_precise_size(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>,
+						   ::fast_io::containers::basic_cstring_view<char_type> str) noexcept
+{
+	return str.n;
+}
+
+template <::std::integral char_type>
+inline constexpr char_type *
+print_reserve_precise_define(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>,
+							 char_type *iter, ::std::size_t,
+							 ::fast_io::containers::basic_cstring_view<char_type> str) noexcept
+{
+	return ::fast_io::details::non_overlapped_copy_n(str.ptr, str.n, iter);
+}
+
+template <::std::integral char_type>
 inline constexpr bool operator==(::fast_io::containers::basic_cstring_view<char_type> a, ::fast_io::containers::basic_cstring_view<char_type> b) noexcept
 {
 	return ::std::equal(a.ptr, a.ptr + a.n, b.ptr, b.ptr + b.n);

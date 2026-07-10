@@ -9,6 +9,143 @@
 namespace fast_io
 {
 
+namespace details
+{
+
+template <typename T>
+inline constexpr bool raw_character_scalar_print_arg{
+	::fast_io::details::character_integral<::std::remove_cvref_t<T>>};
+
+template <typename T>
+using raw_character_pointer_pointee_t =
+	::std::remove_cv_t<::std::remove_pointer_t<::std::remove_cvref_t<T>>>;
+
+template <typename T>
+inline constexpr bool raw_character_pointer_print_arg{
+	::std::is_pointer_v<::std::remove_cvref_t<T>> &&
+	::fast_io::details::character_integral<raw_character_pointer_pointee_t<T>>};
+
+template <typename T>
+inline constexpr bool raw_function_pointer_print_arg{
+	::std::is_pointer_v<::std::remove_cvref_t<T>> &&
+	::std::is_function_v<raw_character_pointer_pointee_t<T>>};
+
+template <typename T>
+inline constexpr bool raw_non_character_pointer_print_arg{
+	::std::is_pointer_v<::std::remove_cvref_t<T>> && (!raw_character_pointer_print_arg<T>) &&
+	(!raw_function_pointer_print_arg<T>)};
+
+template <typename T>
+inline constexpr bool raw_member_object_pointer_print_arg{
+	::std::is_member_object_pointer_v<::std::remove_cvref_t<T>>};
+
+template <typename T>
+inline constexpr bool raw_member_function_pointer_print_arg{
+	::std::is_member_function_pointer_v<::std::remove_cvref_t<T>>};
+
+template <typename... Args>
+inline constexpr bool has_raw_character_scalar_print_arg{(... || raw_character_scalar_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_character_pointer_print_arg{(... || raw_character_pointer_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_function_pointer_print_arg{(... || raw_function_pointer_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_non_character_pointer_print_arg{(... || raw_non_character_pointer_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_member_object_pointer_print_arg{(... || raw_member_object_pointer_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_member_function_pointer_print_arg{(... || raw_member_function_pointer_print_arg<Args>)};
+
+template <typename... Args>
+inline constexpr bool has_raw_print_arg{has_raw_character_scalar_print_arg<Args...> ||
+										has_raw_character_pointer_print_arg<Args...> ||
+										has_raw_function_pointer_print_arg<Args...> ||
+										has_raw_non_character_pointer_print_arg<Args...> ||
+										has_raw_member_object_pointer_print_arg<Args...> ||
+										has_raw_member_function_pointer_print_arg<Args...>};
+
+template <bool has_raw_character_scalar>
+inline constexpr void print_raw_character_scalar_static_assert() noexcept
+{
+	static_assert(!has_raw_character_scalar,
+				  "fast_io: raw character scalar is ambiguous. Use mnp::chvw(ch) for character text or "
+				  "mnp::dec(ch) for its code value.");
+}
+
+template <bool has_raw_character_pointer>
+inline constexpr void print_raw_character_pointer_static_assert() noexcept
+{
+	static_assert(!has_raw_character_pointer,
+				  "fast_io: raw character pointer is ambiguous. Use mnp::pointervw(ptr) for pointer value or "
+				  "mnp::os_c_str(ptr) for OS/C string text.");
+}
+
+template <bool has_raw_non_character_pointer>
+inline constexpr void print_raw_non_character_pointer_static_assert() noexcept
+{
+	static_assert(!has_raw_non_character_pointer,
+				  "fast_io: raw pointer is not printable directly. Use mnp::pointervw(ptr) for pointer value.");
+}
+
+template <bool has_raw_function_pointer>
+inline constexpr void print_raw_function_pointer_static_assert() noexcept
+{
+	static_assert(!has_raw_function_pointer,
+				  "fast_io: raw function pointer is not printable directly. Use mnp::funcvw(fn) for function address.");
+}
+
+template <bool has_raw_member_object_pointer>
+inline constexpr void print_raw_member_object_pointer_static_assert() noexcept
+{
+	static_assert(!has_raw_member_object_pointer,
+				  "fast_io: raw member object pointer is not printable directly. Use mnp::fieldptrvw(ptr) for its "
+				  "member-pointer representation.");
+}
+
+template <bool has_raw_member_function_pointer>
+inline constexpr void print_raw_member_function_pointer_static_assert() noexcept
+{
+	static_assert(!has_raw_member_function_pointer,
+				  "fast_io: raw member function pointer is not printable directly. Use mnp::methodvw(ptr) for its "
+				  "member-pointer representation.");
+}
+
+template <typename... Args>
+inline constexpr void print_raw_static_assert() noexcept
+{
+	if constexpr (has_raw_character_scalar_print_arg<Args...>)
+	{
+		print_raw_character_scalar_static_assert<has_raw_character_scalar_print_arg<Args...>>();
+	}
+	else if constexpr (has_raw_character_pointer_print_arg<Args...>)
+	{
+		print_raw_character_pointer_static_assert<has_raw_character_pointer_print_arg<Args...>>();
+	}
+	else if constexpr (has_raw_function_pointer_print_arg<Args...>)
+	{
+		print_raw_function_pointer_static_assert<has_raw_function_pointer_print_arg<Args...>>();
+	}
+	else if constexpr (has_raw_non_character_pointer_print_arg<Args...>)
+	{
+		print_raw_non_character_pointer_static_assert<has_raw_non_character_pointer_print_arg<Args...>>();
+	}
+	else if constexpr (has_raw_member_object_pointer_print_arg<Args...>)
+	{
+		print_raw_member_object_pointer_static_assert<has_raw_member_object_pointer_print_arg<Args...>>();
+	}
+	else if constexpr (has_raw_member_function_pointer_print_arg<Args...>)
+	{
+		print_raw_member_function_pointer_static_assert<has_raw_member_function_pointer_print_arg<Args...>>();
+	}
+}
+
+} // namespace details
+
 inline namespace io
 {
 
@@ -34,18 +171,41 @@ inline constexpr void print(T &&t, Args &&...args)
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES)) &&                                     \
 	__has_include(<stdio.h>)
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			::fast_io::details::print_after_io_print_forward<false>(
-				::fast_io::io_print_forward<char>(::fast_io::io_print_alias(t)),
-				::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for print on the provided output stream");
+			}
 		}
 		else
 		{
-			// clang-format off
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				::fast_io::details::print_after_io_print_forward<false>(
+					::fast_io::io_print_forward<char>(::fast_io::io_print_alias(t)),
+					::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+				// clang-format off
 static_assert(type_ok, "some types are not printable for print on default C's stdout");
-			// clang-format on
+				// clang-format on
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
@@ -79,16 +239,39 @@ inline constexpr void println(T &&t, Args &&...args)
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES)) &&                                     \
 	__has_include(<stdio.h>)
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			::fast_io::details::print_after_io_print_forward<true>(
-				::fast_io::io_print_forward<char>(::fast_io::io_print_alias(t)),
-				::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for println on the provided output stream");
+			}
 		}
 		else
 		{
-			static_assert(type_ok, "some types are not printable for print on default C's stdout");
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				::fast_io::details::print_after_io_print_forward<true>(
+					::fast_io::io_print_forward<char>(::fast_io::io_print_alias(t)),
+					::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+					static_assert(type_ok, "some types are not printable for print on default C's stdout");
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
@@ -116,18 +299,41 @@ inline constexpr void perr(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING) && \
 	  !defined(__AVR__)) ||                                                                                            \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			::fast_io::details::perr_after_io_print_forward<false>(
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for perr on the provided output stream");
+			}
 		}
 		else
 		{
-			// clang-format off
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				::fast_io::details::perr_after_io_print_forward<false>(
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+				// clang-format off
 static_assert(type_ok, "some types are not printable for perr on native err");
-			// clang-format on
+				// clang-format on
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
@@ -155,18 +361,41 @@ inline constexpr void perrln(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING) && \
 	  !defined(__AVR__)) ||                                                                                            \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			::fast_io::details::perr_after_io_print_forward<true>(
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for perrln on the provided output stream");
+			}
 		}
 		else
 		{
-			// clang-format off
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				::fast_io::details::perr_after_io_print_forward<true>(
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+				// clang-format off
 static_assert(type_ok, "some types are not printable for perrln on native err");
-			// clang-format on
+				// clang-format on
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
@@ -235,18 +464,41 @@ inline constexpr void debug_print(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && \
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			fast_io::details::debug_print_after_io_print_forward<false>(
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for debug_print on the provided output stream");
+			}
 		}
 		else
 		{
-			// clang-format off
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				fast_io::details::debug_print_after_io_print_forward<false>(
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+				// clang-format off
 static_assert(type_ok, "some types are not printable for debug_print on native out");
-			// clang-format on
+				// clang-format on
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
@@ -274,18 +526,41 @@ inline constexpr void debug_println(T &&t, Args &&...args)
 #if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && \
 	  !defined(_LIBCPP_FREESTANDING)) ||                                             \
 	 defined(FAST_IO_ENABLE_HOSTED_FEATURES))
-		constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
-		if constexpr (type_ok)
+		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};
+		if constexpr (device_ok)
 		{
-			fast_io::details::debug_print_after_io_print_forward<true>(
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
-				fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			if constexpr (::fast_io::details::has_raw_print_arg<Args...>)
+			{
+				::fast_io::details::print_raw_static_assert<Args...>();
+			}
+			else
+			{
+				static_assert(device_and_type_ok,
+							  "some types are not printable for debug_println on the provided output stream");
+			}
 		}
 		else
 		{
-			// clang-format off
+			constexpr bool type_ok{::fast_io::operations::defines::print_freestanding_params_okay<char, T, Args...>};
+			if constexpr (type_ok)
+			{
+				fast_io::details::debug_print_after_io_print_forward<true>(
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(t)),
+					fast_io::io_print_forward<char>(fast_io::io_print_alias(args))...);
+			}
+			else
+			{
+				if constexpr (::fast_io::details::has_raw_print_arg<T, Args...>)
+				{
+					::fast_io::details::print_raw_static_assert<T, Args...>();
+				}
+				else
+				{
+				// clang-format off
 static_assert(type_ok, "some types are not printable for debug_println on native out");
-			// clang-format on
+				// clang-format on
+				}
+			}
 		}
 #else
 		constexpr bool device_ok{::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>};

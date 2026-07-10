@@ -35,7 +35,7 @@ struct iec559_traits<__float16>
 	using mantissa_type = ::std::uint_least16_t;
 	inline static constexpr ::std::size_t mbits{10};
 	inline static constexpr ::std::size_t ebits{5};
-	inline static constexpr ::std::uint_least32_t m10digits{4};
+	inline static constexpr ::std::uint_least32_t m10digits{5};
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
@@ -43,7 +43,9 @@ struct iec559_traits<__float16>
 };
 #endif
 
-#ifdef __SIZEOF_FLOAT80__
+#if defined(__SIZEOF_FLOAT80__) &&                                                                                \
+	(!defined(__LDBL_MANT_DIG__) || !defined(__LDBL_MAX_EXP__) || !defined(__SIZEOF_LONG_DOUBLE__) ||             \
+	 __LDBL_MANT_DIG__ != 64 || __LDBL_MAX_EXP__ != 16384 || __SIZEOF_LONG_DOUBLE__ != __SIZEOF_FLOAT80__)
 template <>
 struct iec559_traits<__float80>
 {
@@ -137,7 +139,7 @@ struct iec559_traits<_Float16>
 	using mantissa_type = ::std::uint_least16_t;
 	inline static constexpr ::std::size_t mbits{10};
 	inline static constexpr ::std::size_t ebits{5};
-	inline static constexpr ::std::uint_least32_t m10digits{4};
+	inline static constexpr ::std::uint_least32_t m10digits{5};
 	inline static constexpr ::std::uint_least32_t m2hexdigits{3};
 	inline static constexpr ::std::uint_least32_t e10digits{2};
 	inline static constexpr ::std::uint_least32_t e2hexdigits{2};
@@ -499,12 +501,16 @@ inline constexpr bool fp_nan_is_signaling(mantissa_type mantissa) noexcept
 	return mantissa != 0 && (mantissa & fp_quiet_nan_mantissa_mask<mantissa_type, mbits>()) == 0;
 }
 
-#ifdef __SIZEOF_FLOAT80__
+#if defined(__SIZEOF_FLOAT80__) ||                                                                            \
+	(defined(__LDBL_MANT_DIG__) && defined(__LDBL_MAX_EXP__) && __LDBL_MANT_DIG__ == 64 &&                    \
+	 __LDBL_MAX_EXP__ == 16384)
 template <typename flt>
 inline constexpr bool fp_floating_point_is_float80{
+#ifdef __SIZEOF_FLOAT80__
 	::std::same_as<::std::remove_cv_t<flt>, __float80> ||
+#endif
 	(::std::same_as<::std::remove_cv_t<flt>, long double> &&
-	 sizeof(long double) == sizeof(__float80) && ::std::numeric_limits<long double>::digits == 64 &&
+	 ::std::numeric_limits<long double>::digits == 64 &&
 	 ::std::numeric_limits<long double>::max_exponent == 16384)};
 
 template <typename flt>

@@ -5,6 +5,32 @@ namespace fast_io
 
 namespace details
 {
+
+template <typename char_type, typename P, typename state_type>
+concept scan_context_eof_rewindable = requires(state_type &state, P arg) {
+	{
+		scan_context_eof_rewind_size(io_reserve_type<char_type, P>, state, arg)
+	} -> ::std::convertible_to<::std::size_t>;
+};
+
+template <typename input, typename P, typename state_type, typename iter_type>
+inline constexpr void scan_context_eof_rewind_if_available(input in, state_type &state, P arg,
+														   iter_type chunk_begin, iter_type chunk_end)
+{
+	using char_type = typename input::input_char_type;
+	if constexpr (::fast_io::details::scan_context_eof_rewindable<char_type, P, state_type>)
+	{
+		auto const rewind{static_cast<::std::size_t>(
+			scan_context_eof_rewind_size(io_reserve_type<char_type, P>, state, arg))};
+		if (rewind)
+		{
+			auto const chunk_size{static_cast<::std::size_t>(chunk_end - chunk_begin)};
+			auto const rewinded{rewind < chunk_size ? chunk_end - rewind : chunk_begin};
+			ibuffer_set_curr(in, rewinded);
+		}
+	}
+}
+
 #if 0
 template<typename input,typename T,typename P>
 #if __has_cpp_attribute(__gnu__::__cold__)
@@ -72,6 +98,7 @@ inline constexpr bool scan_context_status_impl(input in, P arg)
 			{
 				break;
 			}
+			::fast_io::details::scan_context_eof_rewind_if_available(in, state, arg, curr, end);
 			throw_parse_code(ec);
 		}
 	}
@@ -256,11 +283,7 @@ template <typename input, typename T>
 			auto curr{ibuffer_curr(in)};
 			auto end{ibuffer_end(in)};
 			auto [it, ec] = scan_contiguous_define(io_reserve_type<char_type, T>, curr, end, arg);
-			if (it == end)
-			{
-				return scan_context_status_impl(in, arg);
-			}
-			else
+			if (ec == parse_code::ok && it != end)
 			{
 				if constexpr (::std::same_as<decltype(curr), decltype(it)>)
 				{
@@ -270,12 +293,9 @@ template <typename input, typename T>
 				{
 					ibuffer_set_curr(in, it - curr + curr);
 				}
-				if (ec != parse_code::ok)
-				{
-					throw_parse_code(ec);
-				}
+				return true;
 			}
-			return true;
+			return scan_context_status_impl(in, arg);
 		}
 		else if constexpr (context_scannable<char_type, T>)
 		{
@@ -311,6 +331,7 @@ template <typename input, typename T>
 					{
 						break;
 					}
+					::fast_io::details::scan_context_eof_rewind_if_available(in, state, arg, curr, end);
 					throw_parse_code(ec);
 				}
 			}

@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "forward.h"
+
 namespace fast_io
 {
 
@@ -19,15 +21,33 @@ concept cond_value_transferable = ::std::is_trivially_copyable_v<::std::remove_c
 namespace manipulators
 {
 
+struct condition_manip_tag_t
+{};
+
 template <typename T1, typename T2>
 struct condition
 {
 	using manip_tag = manip_tag_t;
+	using semantic_tag = condition_manip_tag_t;
 	using alias_type1 = T1;
 	using alias_type2 = T2;
-	alias_type1 t1;
-	alias_type2 t2;
 	bool pred;
+#ifndef __INTELLISENSE__
+#if __has_cpp_attribute(msvc::no_unique_address)
+	[[msvc::no_unique_address]]
+#elif __has_cpp_attribute(no_unique_address)
+	[[no_unique_address]]
+#endif
+#endif
+	alias_type1 t1;
+#ifndef __INTELLISENSE__
+#if __has_cpp_attribute(msvc::no_unique_address)
+	[[msvc::no_unique_address]]
+#elif __has_cpp_attribute(no_unique_address)
+	[[no_unique_address]]
+#endif
+#endif
+	alias_type2 t2;
 };
 
 template <typename T1, typename T2>
@@ -44,30 +64,22 @@ inline constexpr auto cond(bool pred, T1 &&t1, T2 &&t2) noexcept
 												  ::std::remove_cvref_t<T2>, ::std::remove_cvref_t<T2> const &>,
 							 ::std::remove_cvref_t<decltype(fast_io::io_print_alias(::std::forward<T2>(t2)))>>;
 
-	constexpr bool type_match{::std::same_as<t1aliastype, t2aliastype>};
-	if constexpr (type_match)
+	if constexpr (::std::same_as<t1aliastype, ::fast_io::io_null_t> &&
+				  ::std::same_as<t2aliastype, ::fast_io::io_null_t>)
 	{
-		if (pred)
-		{
-			return ::fast_io::io_print_alias(::std::forward<T1>(t1));
-		}
-		else
-		{
-			return ::fast_io::io_print_alias(::std::forward<T2>(t2));
-		}
+		return ::fast_io::io_null;
+	}
+	else if constexpr (sizeof(t1aliastype) < sizeof(t2aliastype))
+	{
+		return condition<t2aliastype, t1aliastype>{!pred,
+												   ::fast_io::io_print_alias(::std::forward<T2>(t2)),
+												   ::fast_io::io_print_alias(::std::forward<T1>(t1))};
 	}
 	else
 	{
-		if constexpr (sizeof(t1aliastype) < sizeof(t2aliastype))
-		{
-			return condition<t2aliastype, t1aliastype>{::fast_io::io_print_alias(::std::forward<T2>(t2)),
-													   ::fast_io::io_print_alias(::std::forward<T1>(t1)), !pred};
-		}
-		else
-		{
-			return condition<t1aliastype, t2aliastype>{::fast_io::io_print_alias(::std::forward<T1>(t1)),
-													   ::fast_io::io_print_alias(::std::forward<T2>(t2)), pred};
-		}
+		return condition<t1aliastype, t2aliastype>{pred,
+												   ::fast_io::io_print_alias(::std::forward<T1>(t1)),
+												   ::fast_io::io_print_alias(::std::forward<T2>(t2))};
 	}
 }
 
@@ -87,15 +99,16 @@ inline constexpr auto cond(bool pred, T1 &&t1) noexcept
 	}
 	else
 	{
-		return condition<t1aliastype, ::fast_io::io_null_t>{::fast_io::io_print_alias(::std::forward<T1>(t1)),
-															::fast_io::io_null, pred};
+		return condition<t1aliastype, ::fast_io::io_null_t>{
+			pred, ::fast_io::io_print_alias(::std::forward<T1>(t1)), ::fast_io::io_null};
 	}
 }
 
-} // namespace manipulators
-
-namespace details
-{
+	} // namespace manipulators
+	
+#if 0
+	namespace details
+	{
 
 template <typename T1, typename T2>
 concept cond_transferable_value = ::std::is_trivially_copyable_v<::fast_io::manipulators::condition<T1, T2>> &&
@@ -795,5 +808,6 @@ inline constexpr void print_define(io_reserve_type_t<char_type, ::fast_io::manip
 	{
 		::fast_io::operations::print_freestanding<false>(b, c.t2);
 	}
-}
-} // namespace fast_io
+	}
+#endif
+	} // namespace fast_io

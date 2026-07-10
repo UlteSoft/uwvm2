@@ -55,6 +55,9 @@ concept contiguous_scannable = requires(char_type const *begin, char_type const 
 /// @param    your_context_type&                            the context object
 /// @param    T                                             the object to be scanned, can be any passing style
 /// @return   ::fast_io::parse_code                         a parse code indicating parsing state
+/// @note     If EOF makes a partial prefix invalid, a context scanner may have
+///           already consumed that prefix. Scanners that can rewind within the
+///           current buffer may additionally provide scan_context_eof_rewind_size.
 template <typename char_type, typename T>
 concept context_scannable = requires(char_type const *begin, char_type const *end, T t) {
 	requires requires(
@@ -125,11 +128,15 @@ template <::std::size_t>
 struct reserve_static_stack_size_constant
 {};
 
-template <::std::integral char_type>
+template <::std::integral char_type, typename stack_policy = ::fast_io::details::default_print_stack_policy>
 inline constexpr ::std::size_t dynamic_reserve_default_static_stack_size() noexcept
 {
-	constexpr ::std::size_t bytes{4096u};
-	if constexpr (sizeof(char_type) < bytes)
+	constexpr ::std::size_t bytes{::fast_io::details::print_stack_buffer_max_bytes<stack_policy>()};
+	if constexpr (bytes == 0)
+	{
+		return 0u;
+	}
+	else if constexpr (sizeof(char_type) < bytes)
 	{
 		return bytes / sizeof(char_type);
 	}
@@ -200,6 +207,60 @@ concept context_printable_with_static_buffer_size =
 		requires(print_context_static_buffer_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
 	};
 
+/// @brief      scatter_fallback_full_output_threshold_stream
+/// @details    Customizes the maximum full-output size, in char_type units,
+///             for coalescing scatter output into a contiguous buffer before
+///             writing it once. The value must be a compile-time std::size_t.
+///             Returning 0 disables this coalescing path for the stream.
+///             The print layer may cap large values before allocating stack storage.
+/// @fn         scatter_fallback_full_output_threshold
+/// @brief      Returns the scatter coalescing threshold, in char_type units.
+template <typename char_type, typename T>
+concept scatter_fallback_full_output_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			scatter_fallback_full_output_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			scatter_fallback_full_output_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
+	};
+
+/// @brief      full_output_coalesce_threshold_stream
+/// @details    Customizes the maximum full semantic output size, in char_type
+///             units, for materializing a precise print run into contiguous
+///             storage before writing it once. This is independent of scatter
+///             writev fallback policy; streams may choose different thresholds.
+///             Returning 0 disables this coalescing path for the stream.
+/// @fn         full_output_coalesce_threshold
+/// @brief      Returns the whole-output coalescing threshold, in char_type units.
+template <typename char_type, typename T>
+concept full_output_coalesce_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			full_output_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			full_output_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
+	};
+
+/// @brief      small_scatter_coalesce_threshold_stream
+/// @details    Opts a stream into small-scatter repacking and customizes the
+///             maximum individual scatter size, in char_type units, that may be
+///             copied into temporary coalescing storage. Returning 0 disables
+///             this path. Streams should only opt in when reducing writev/iovec
+///             pressure is known to beat the extra memcpy work.
+/// @fn         small_scatter_coalesce_threshold
+/// @brief      Returns the small-scatter element threshold, in char_type units.
+template <typename char_type, typename T>
+concept small_scatter_coalesce_threshold_stream =
+	::std::integral<char_type> && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<
+			small_scatter_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		{
+			small_scatter_coalesce_threshold(io_reserve_type<char_type, ::std::remove_cvref_t<T>>)
+		} -> ::std::same_as<::std::size_t>;
+	};
+
 /// @brief      printable_internal_shift
 /// @details    Defines the behaviour when printed with ::fast_io::mnp::width<::fast_io::mnp::scalar_placement::internal>
 /// @fn         print_define_internal_shift
@@ -241,6 +302,24 @@ concept precise_reserve_printable =
 			print_reserve_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>, t)
 		} -> ::std::convertible_to<::std::size_t>;
 		print_reserve_precise_define(io_reserve_type<char_type, ::std::remove_cvref_t<T>>, ptr, n, t);
+	};
+
+/// @brief      static_precise_reserve_printable
+/// @details    That a type is static precise reserve printable
+///             is that its precise printing size is known as a compile-time
+///             constant without inspecting an object.
+/// @fn         print_reserve_static_precise_size
+/// @brief      Returns the precise size of the printed object as a constant expression.
+/// @tparam     <auto-inferred>
+/// @param      ::fast_io::io_reserve_type_t<char_type, ::std::remove_cvref_t<T>> tag-invoke
+/// @return     ::std::size_t                               the precise size of the output
+template <typename char_type, typename T>
+concept static_precise_reserve_printable =
+	::std::integral<char_type> &&
+	(reserve_printable<char_type, T> || dynamic_reserve_printable<char_type, T>) && requires {
+		typename ::fast_io::details::reserve_static_stack_size_constant<print_reserve_static_precise_size(
+			io_reserve_type<char_type, ::std::remove_cvref_t<T>>)>;
+		requires(print_reserve_static_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<T>>) != SIZE_MAX);
 	};
 
 /// @brief      reserve_scatters_printable
@@ -442,6 +521,14 @@ inline constexpr ::std::size_t print_reserve_precise_size(io_reserve_type_t<char
 												   parameter<value_type> para)
 {
 	return print_reserve_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>, para.reference);
+}
+
+template <::std::integral char_type, typename value_type>
+	requires static_precise_reserve_printable<char_type, ::std::remove_cvref_t<value_type>>
+inline constexpr ::std::size_t
+print_reserve_static_precise_size(io_reserve_type_t<char_type, parameter<value_type>>) noexcept
+{
+	return print_reserve_static_precise_size(io_reserve_type<char_type, ::std::remove_cvref_t<value_type>>);
 }
 
 template <::std::integral char_type, typename value_type, typename Iter>
