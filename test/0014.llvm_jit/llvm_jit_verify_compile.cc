@@ -50,10 +50,10 @@ namespace
         0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
     inline constexpr ::std::string_view wasm1p1_scalar_runtime_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-enable-sign-extension --wasm-feature-enable-nontrapping-float-to-int"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
 
     inline constexpr ::std::string_view wasm1p1_all_runtime_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-1p1"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
 
     // WebAssembly 1.1 scalar edge fixture.  This covers every sign-extension
     // opcode and every saturating float-to-int opcode at clamp/NaN boundaries.
@@ -140,7 +140,7 @@ namespace
         0x10u, 0x00u, 0x6au, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
     inline constexpr ::std::string_view wasm1p1_multivalue_runtime_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-enable-multi-value"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
 
     // Generated from:
     // (module

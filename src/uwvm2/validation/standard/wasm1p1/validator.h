@@ -562,7 +562,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                     }
 
                                                     auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type)};
-                                                    return vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128 && wasm1p1_para.enable_simd;
+                                                    return vt == ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128 && !wasm1p1_para.disable_simd;
                                                 }};
 
         auto const push_value_types{[&](block_result_type<Fs...> types) constexpr
@@ -739,7 +739,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                 if(blocktype >= 0)
                 {
-                    if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+                    if(wasm1p1_para.disable_multi_value) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -2458,7 +2458,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [safe   ] unsafe (could be the section_end)
                     //           ^^ code_curr
 
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -2494,7 +2494,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [safe   ] unsafe (could be the section_end)
                     //           ^^ code_curr
 
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -4288,7 +4288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
                 case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
                 {
-                    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                     {
                         details::fail_feature_required(code_curr,
                                                        err,
@@ -4301,7 +4301,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
                 case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
                 {
-                    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                     {
                         details::fail_feature_required(code_curr,
                                                        err,
@@ -4314,7 +4314,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
                 case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
                 {
-                    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                     {
                         details::fail_feature_required(code_curr,
                                                        err,
@@ -4327,7 +4327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
                 case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
                 {
-                    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                     {
                         details::fail_feature_required(code_curr,
                                                        err,
@@ -4340,7 +4340,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
                 case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
                 {
-                    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                     {
                         details::fail_feature_required(code_curr,
                                                        err,
@@ -4364,7 +4364,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [  safe ] unsafe (could be the section_end)
                     //          ^^ code_curr
 
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -4402,7 +4402,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [  safe   ] unsafe (could be the section_end)
                     //            ^^ code_curr
 
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -4439,7 +4439,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [  safe ] unsafe (could be the section_end)
                     //          ^^ code_curr
 
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -4475,7 +4475,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     {
                         case wasm1p1_numeric_code::i32_trunc_sat_f32_s:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4491,7 +4491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f32_u:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4507,7 +4507,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f64_s:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4523,7 +4523,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i32_trunc_sat_f64_u:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4539,7 +4539,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f32_s:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4555,7 +4555,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f32_u:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4571,7 +4571,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4587,7 +4587,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
                         {
-                            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4603,7 +4603,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::memory_init:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4624,7 +4624,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::data_drop:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4642,7 +4642,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::memory_copy:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4659,7 +4659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::memory_fill:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4674,7 +4674,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::table_init:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4714,7 +4714,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::elem_drop:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4732,7 +4732,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::table_copy:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4770,7 +4770,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::table_grow:
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4818,7 +4818,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                         case wasm1p1_numeric_code::table_size:
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 details::fail_feature_required(op_begin,
                                                                err,
@@ -4837,7 +4837,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             }
                             case wasm1p1_numeric_code::table_fill:
                             {
-                                if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                 {
                                     details::fail_feature_required(op_begin,
                                                                    err,
@@ -4917,7 +4917,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     // [safe] unsafe (could be the section_end)
                     //        ^^ code_curr
 
-                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    if(wasm1p1_para.disable_simd) [[unlikely]]
                     {
                         details::fail_feature_required(op_begin,
                                                        err,
@@ -5567,12 +5567,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         if constexpr((::std::same_as<::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1, Fs> || ...))
         {
             auto& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-            para.enable_multi_value = true;
-            para.enable_reference_types = true;
-            para.enable_bulk_memory = true;
-            para.enable_sign_extension = true;
-            para.enable_nontrapping_float_to_int = true;
-            para.enable_simd = true;
+            para.disable_multi_value = false;
+            para.disable_reference_types = false;
+            para.disable_bulk_memory = false;
+            para.disable_sign_extension = false;
+            para.disable_nontrapping_float_to_int = false;
+            para.disable_simd = false;
         }
 
         ::uwvm2::validation::standard::wasm1p1::validate_code(code_version, module_storage, function_index, code_begin, code_end, err, fs_para);

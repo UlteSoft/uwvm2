@@ -68,34 +68,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::return_m1_imme;
         }
 
-        /// @brief Return whether any independent wasm1.1 subfeature was explicitly selected.
-        inline constexpr bool any_subfeature_was_explicitly_enabled(auto const& para) noexcept
+        /// @brief Disable the complete wasm1.1 feature collection and restore MVP runtime guards.
+        inline constexpr void apply_mvp_feature_set(auto& para) noexcept
         {
-            return para.explicit_enable_multi_value || para.explicit_enable_reference_types || para.explicit_enable_bulk_memory ||
-                   para.explicit_enable_sign_extension || para.explicit_enable_nontrapping_float_to_int || para.explicit_enable_simd;
+            para.disable_multi_value = true;
+            para.disable_reference_types = true;
+            para.disable_bulk_memory = true;
+            para.disable_sign_extension = true;
+            para.disable_nontrapping_float_to_int = true;
+            para.disable_simd = true;
+            para.controllable_allow_multi_result_vector = true;
+            para.controllable_allow_multi_table = true;
         }
 
-        /// @brief Return the first explicitly selected subfeature name for conflict diagnostics.
-        inline constexpr ::uwvm2::utils::container::u8string_view first_explicit_subfeature_name(auto const& para) noexcept
+        /// @brief Enable the complete wasm1.1 feature collection and relax MVP runtime guards.
+        inline constexpr void apply_wasm1p1_feature_set(auto& para) noexcept
         {
-            if(para.explicit_enable_multi_value) { return u8"--wasm-feature-enable-multi-value"; }
-            if(para.explicit_enable_reference_types) { return u8"--wasm-feature-enable-reference-types"; }
-            if(para.explicit_enable_bulk_memory) { return u8"--wasm-feature-enable-bulk-memory"; }
-            if(para.explicit_enable_sign_extension) { return u8"--wasm-feature-enable-sign-extension"; }
-            if(para.explicit_enable_nontrapping_float_to_int) { return u8"--wasm-feature-enable-nontrapping-float-to-int"; }
-            if(para.explicit_enable_simd) { return u8"--wasm-feature-enable-simd"; }
-            return {};
-        }
-
-        /// @brief Enable the complete wasm1.1 feature collection and relax its runtime MVP guards.
-        inline constexpr void enable_1p1_feature_set(auto& para) noexcept
-        {
-            para.enable_multi_value = true;
-            para.enable_reference_types = true;
-            para.enable_bulk_memory = true;
-            para.enable_sign_extension = true;
-            para.enable_nontrapping_float_to_int = true;
-            para.enable_simd = true;
+            para.disable_multi_value = false;
+            para.disable_reference_types = false;
+            para.disable_bulk_memory = false;
+            para.disable_sign_extension = false;
+            para.disable_nontrapping_float_to_int = false;
+            para.disable_simd = false;
             para.controllable_allow_multi_result_vector = false;
             para.controllable_allow_multi_table = false;
         }
@@ -106,40 +100,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-1p1 and reject already-selected subfeatures.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_1p1_callback(
+        /// @brief Handle --wasm-feature-mvp.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_mvp_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        if(wasm_feature_details::any_subfeature_was_explicitly_enabled(para)) [[unlikely]]
-        {
-            return wasm_feature_details::print_conflict(para_curr->str, wasm_feature_details::first_explicit_subfeature_name(para));
-        }
+        if(para.explicit_feature_mvp) [[unlikely]] { return wasm_feature_details::print_conflict(para_curr->str, u8"--wasm-feature-mvp"); }
 
-        para.explicit_feature_1p1 = true;
-        wasm_feature_details::enable_1p1_feature_set(para);
+        para.explicit_feature_mvp = true;
+        wasm_feature_details::apply_mvp_feature_set(para);
         return wasm_feature_details::parameter_return_type::def;
     }
 
-    /// @brief Enable one independent wasm feature and reject collection/subfeature conflicts.
-    inline constexpr ::uwvm2::utils::cmdline::parameter_return_type enable_single_wasm_feature(::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-                                                                                               ::uwvm2::utils::container::u8string_view feature_name,
-                                                                                               bool& explicit_flag,
-                                                                                               bool& enable_flag,
-                                                                                               bool disable_multi_result_check,
-                                                                                               bool disable_multi_table_check) noexcept
+#if defined(UWVM_MODULE)
+    extern "C++" UWVM_GNU_COLD
+#else
+    UWVM_GNU_COLD inline constexpr
+#endif
+        /// @brief Handle --wasm-feature-wasm1.1.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_wasm1p1_callback(
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        if(para.explicit_feature_1p1) [[unlikely]] { return wasm_feature_details::print_conflict(para_curr->str, u8"--wasm-feature-1p1"); }
+        wasm_feature_details::apply_wasm1p1_feature_set(para);
+        return wasm_feature_details::parameter_return_type::def;
+    }
 
+    /// @brief Disable one independent wasm feature.
+    inline constexpr ::uwvm2::utils::cmdline::parameter_return_type disable_single_wasm_feature(::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                                ::uwvm2::utils::container::u8string_view feature_name,
+                                                                                                bool& explicit_flag,
+                                                                                                bool& disable_flag,
+                                                                                                bool enable_multi_result_check,
+                                                                                                bool enable_multi_table_check) noexcept
+    {
+        auto& para{wasm_feature_details::wasm1p1_parameter()};
         if(explicit_flag) [[unlikely]] { return wasm_feature_details::print_conflict(para_curr->str, feature_name); }
 
         explicit_flag = true;
-        enable_flag = true;
-        if(disable_multi_result_check) { para.controllable_allow_multi_result_vector = false; }
-        if(disable_multi_table_check) { para.controllable_allow_multi_table = false; }
+        disable_flag = true;
+        if(enable_multi_result_check) { para.controllable_allow_multi_result_vector = true; }
+        if(enable_multi_table_check) { para.controllable_allow_multi_table = true; }
         return wasm_feature_details::parameter_return_type::def;
     }
 
@@ -148,19 +153,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-multi-value.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_multi_value_callback(
+        /// @brief Handle --wasm-feature-disable-multi-value.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_multi_value_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr,
-                                          u8"--wasm-feature-enable-multi-value",
-                                          para.explicit_enable_multi_value,
-                                          para.enable_multi_value,
-                                          true,
-                                          false);
+        return disable_single_wasm_feature(para_curr,
+                                           u8"--wasm-feature-disable-multi-value",
+                                           para.explicit_disable_multi_value,
+                                           para.disable_multi_value,
+                                           true,
+                                           false);
     }
 
 #if defined(UWVM_MODULE)
@@ -168,19 +173,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-reference-types.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_reference_types_callback(
+        /// @brief Handle --wasm-feature-disable-reference-types.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_reference_types_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr,
-                                          u8"--wasm-feature-enable-reference-types",
-                                          para.explicit_enable_reference_types,
-                                          para.enable_reference_types,
-                                          false,
-                                          true);
+        return disable_single_wasm_feature(para_curr,
+                                           u8"--wasm-feature-disable-reference-types",
+                                           para.explicit_disable_reference_types,
+                                           para.disable_reference_types,
+                                           false,
+                                           true);
     }
 
 #if defined(UWVM_MODULE)
@@ -188,19 +193,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-bulk-memory.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_bulk_memory_callback(
+        /// @brief Handle --wasm-feature-disable-bulk-memory.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_bulk_memory_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr,
-                                          u8"--wasm-feature-enable-bulk-memory",
-                                          para.explicit_enable_bulk_memory,
-                                          para.enable_bulk_memory,
-                                          false,
-                                          false);
+        return disable_single_wasm_feature(para_curr,
+                                           u8"--wasm-feature-disable-bulk-memory",
+                                           para.explicit_disable_bulk_memory,
+                                           para.disable_bulk_memory,
+                                           false,
+                                           false);
     }
 
 #if defined(UWVM_MODULE)
@@ -208,19 +213,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-sign-extension.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_sign_extension_callback(
+        /// @brief Handle --wasm-feature-disable-sign-extension.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_sign_extension_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr,
-                                          u8"--wasm-feature-enable-sign-extension",
-                                          para.explicit_enable_sign_extension,
-                                          para.enable_sign_extension,
-                                          false,
-                                          false);
+        return disable_single_wasm_feature(para_curr,
+                                           u8"--wasm-feature-disable-sign-extension",
+                                           para.explicit_disable_sign_extension,
+                                           para.disable_sign_extension,
+                                           false,
+                                           false);
     }
 
 #if defined(UWVM_MODULE)
@@ -228,19 +233,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-nontrapping-float-to-int.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_nontrapping_float_to_int_callback(
+        /// @brief Handle --wasm-feature-disable-nontrapping-float-to-int.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_nontrapping_float_to_int_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr,
-                                          u8"--wasm-feature-enable-nontrapping-float-to-int",
-                                          para.explicit_enable_nontrapping_float_to_int,
-                                          para.enable_nontrapping_float_to_int,
-                                          false,
-                                          false);
+        return disable_single_wasm_feature(para_curr,
+                                           u8"--wasm-feature-disable-nontrapping-float-to-int",
+                                           para.explicit_disable_nontrapping_float_to_int,
+                                           para.disable_nontrapping_float_to_int,
+                                           false,
+                                           false);
     }
 
 #if defined(UWVM_MODULE)
@@ -248,14 +253,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        /// @brief Handle --wasm-feature-enable-simd.
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_enable_simd_callback(
+        /// @brief Handle --wasm-feature-disable-simd.
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_feature_disable_simd_callback(
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto& para{wasm_feature_details::wasm1p1_parameter()};
-        return enable_single_wasm_feature(para_curr, u8"--wasm-feature-enable-simd", para.explicit_enable_simd, para.enable_simd, false, false);
+        return disable_single_wasm_feature(para_curr, u8"--wasm-feature-disable-simd", para.explicit_disable_simd, para.disable_simd, false, false);
     }
 }
 

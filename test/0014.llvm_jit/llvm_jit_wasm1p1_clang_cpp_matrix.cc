@@ -64,11 +64,11 @@ int main()
 )cpp"};
 
     inline constexpr ::std::string_view wasm1p1_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-1p1"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
 
     inline constexpr ::std::string_view wasm1p1_explicit_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-enable-bulk-memory --wasm-feature-enable-sign-extension "
-        "--wasm-feature-enable-nontrapping-float-to-int"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1 "
+        "--wasm-feature-wasm1.1"};
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
@@ -458,7 +458,7 @@ int main()
             return false;
         }
 
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir) + " --wasm-feature-1p1"};
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir) + " --wasm-feature-wasm1.1"};
         for(auto const& mode: {::std::pair{::std::string_view{"cached-full"}, ::std::string_view{"-Rcm full -Rcc jit"}},
                                ::std::pair{::std::string_view{"cached-lazy-verification"}, ::std::string_view{"-Rcm lazy+verification -Rcc jit"}},
                                ::std::pair{::std::string_view{"cached-tiered"}, ::std::string_view{"-Rtiered"}}})

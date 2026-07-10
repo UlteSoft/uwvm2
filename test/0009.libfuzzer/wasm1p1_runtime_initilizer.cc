@@ -47,26 +47,26 @@ namespace
 
         if((mode & 0x40u) != 0u)
         {
-            para.enable_multi_value = true;
-            para.enable_reference_types = true;
-            para.enable_bulk_memory = true;
-            para.enable_sign_extension = true;
-            para.enable_nontrapping_float_to_int = true;
-            para.enable_simd = true;
+            para.disable_multi_value = false;
+            para.disable_reference_types = false;
+            para.disable_bulk_memory = false;
+            para.disable_sign_extension = false;
+            para.disable_nontrapping_float_to_int = false;
+            para.disable_simd = false;
             para.controllable_allow_multi_result_vector = false;
             para.controllable_allow_multi_table = false;
             return;
         }
 
-        para.enable_multi_value = (mode & 0x01u) != 0u;
-        para.enable_reference_types = (mode & 0x02u) != 0u;
-        para.enable_bulk_memory = (mode & 0x04u) != 0u;
-        para.enable_sign_extension = (mode & 0x08u) != 0u;
-        para.enable_nontrapping_float_to_int = (mode & 0x10u) != 0u;
-        para.enable_simd = (mode & 0x20u) != 0u;
+        para.disable_multi_value = (mode & 0x01u) == 0u;
+        para.disable_reference_types = (mode & 0x02u) == 0u;
+        para.disable_bulk_memory = (mode & 0x04u) == 0u;
+        para.disable_sign_extension = (mode & 0x08u) == 0u;
+        para.disable_nontrapping_float_to_int = (mode & 0x10u) == 0u;
+        para.disable_simd = (mode & 0x20u) == 0u;
 
-        if(para.enable_multi_value) { para.controllable_allow_multi_result_vector = false; }
-        if(para.enable_reference_types) { para.controllable_allow_multi_table = false; }
+        para.controllable_allow_multi_result_vector = para.disable_multi_value;
+        para.controllable_allow_multi_table = para.disable_reference_types;
     }
 
     [[nodiscard]] inline constexpr bool check_resource_limits(auto const& module_storage) noexcept

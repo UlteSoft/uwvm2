@@ -39,9 +39,11 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_multi_value = multi_value;
-        para.enable_reference_types = reference_types;
-        para.enable_bulk_memory = bulk_memory;
+        para.disable_multi_value = !multi_value;
+        para.disable_reference_types = !reference_types;
+        para.disable_bulk_memory = !bulk_memory;
+        para.controllable_allow_multi_result_vector = para.disable_multi_value;
+        para.controllable_allow_multi_table = para.disable_reference_types;
         return out;
     }
 

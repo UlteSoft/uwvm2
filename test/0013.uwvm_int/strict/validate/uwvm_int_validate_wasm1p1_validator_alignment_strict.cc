@@ -33,9 +33,11 @@ namespace
         auto out = make_wasm1p1_feature_parameter();
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out);
-        para.enable_multi_value = multi_value;
-        para.enable_reference_types = reference_types;
-        para.enable_bulk_memory = bulk_memory;
+        para.disable_multi_value = !multi_value;
+        para.disable_reference_types = !reference_types;
+        para.disable_bulk_memory = !bulk_memory;
+        para.controllable_allow_multi_result_vector = para.disable_multi_value;
+        para.controllable_allow_multi_table = para.disable_reference_types;
         return out;
     }
 
@@ -411,11 +413,11 @@ namespace
         auto& nontrapping_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(nontrapping_disabled_features);
         auto& simd_para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(simd_disabled_features);
 
-        ref_para.enable_reference_types = false;
-        sign_para.enable_sign_extension = false;
-        bulk_para.enable_bulk_memory = false;
-        nontrapping_para.enable_nontrapping_float_to_int = false;
-        simd_para.enable_simd = false;
+        ref_para.disable_reference_types = true;
+        sign_para.disable_sign_extension = true;
+        bulk_para.disable_bulk_memory = true;
+        nontrapping_para.disable_nontrapping_float_to_int = true;
+        simd_para.disable_simd = true;
 
         UWVM2TEST_REQUIRE(compile_expect_error_with_features<Opt>(full::build_invalid_ref_feature_module(),
                                                                   u8"uwvm2test_strict_full_ref_feature",

@@ -457,7 +457,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 }
                 case -5:
                 {
-                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    if(wasm1p1_para.disable_simd) [[unlikely]]
                     {
                         fail_lazy_feature_required(op_begin,
                                                    err,
@@ -471,7 +471,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 case -16:
                 case -17:
                 {
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         auto const vt{blocktype == -16 ? ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref
                                                        : ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref};
@@ -491,7 +491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             if(blocktype >= 0)
             {
-                if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+                if(wasm1p1_para.disable_multi_value) [[unlikely]]
                 {
                     fail_lazy_feature_required(op_begin,
                                                err,
@@ -850,7 +850,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         case static_cast<wasm_byte>(wasm1p1_code::table_get):
                         case static_cast<wasm_byte>(wasm1p1_code::table_set):
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -867,7 +867,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
                         case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
                         {
-                            if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+                            if(wasm1p1_para.disable_sign_extension) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -879,7 +879,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_null):
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -907,7 +907,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -919,7 +919,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_func):
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -950,7 +950,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
                                 case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
                                 {
-                                    if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                                    if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -962,7 +962,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_init:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -976,7 +976,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::data_drop:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -989,7 +989,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_copy:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1003,7 +1003,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_fill:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1016,7 +1016,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::table_init:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1034,7 +1034,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::elem_drop:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1051,7 +1051,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::table_copy:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1066,7 +1066,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 case wasm1p1_numeric_code::table_grow:
                                 case wasm1p1_numeric_code::table_size:
                                 {
-                                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1079,7 +1079,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::table_fill:
                                 {
-                                    if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1101,7 +1101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
                         {
-                            if(!wasm1p1_para.enable_simd) [[unlikely]]
+                            if(wasm1p1_para.disable_simd) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,

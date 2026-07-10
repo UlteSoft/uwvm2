@@ -275,12 +275,12 @@ namespace test
     inline void enable_all_wasm1p1_features(Para& fs_para) noexcept
     {
         auto& p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-        p1_para.enable_multi_value = true;
-        p1_para.enable_reference_types = true;
-        p1_para.enable_bulk_memory = true;
-        p1_para.enable_sign_extension = true;
-        p1_para.enable_nontrapping_float_to_int = true;
-        p1_para.enable_simd = true;
+        p1_para.disable_multi_value = false;
+        p1_para.disable_reference_types = false;
+        p1_para.disable_bulk_memory = false;
+        p1_para.disable_sign_extension = false;
+        p1_para.disable_nontrapping_float_to_int = false;
+        p1_para.disable_simd = false;
         p1_para.controllable_allow_multi_result_vector = false;
         p1_para.controllable_allow_multi_table = false;
     }
@@ -331,7 +331,7 @@ namespace test
         }
     }
 
-    inline void test_default_mvp_feature_rejections()
+    inline void test_mvp_feature_rejections()
     {
         using wasm1 = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
@@ -340,34 +340,50 @@ namespace test
 
         auto multi_result_module{build_multi_result_type_module()};
         feature_para_t default_multi_para{};
+        expect_parse_success<wasm1, wasm1p1>(multi_result_module, default_multi_para, "default wasm1p1 parser rejected multi-result type");
+
+        feature_para_t mvp_multi_para{};
+        auto& mvp_multi_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(mvp_multi_para)};
+        mvp_multi_p1.disable_multi_value = true;
+        mvp_multi_p1.controllable_allow_multi_result_vector = true;
         expect_parse_error<wasm1, wasm1p1>(
-            multi_result_module, default_multi_para, error_code::wasm1_not_allow_multi_value, "default parser accepted multi-result type");
+            multi_result_module, mvp_multi_para, error_code::wasm1_not_allow_multi_value, "mvp parser accepted multi-result type");
 
         feature_para_t multi_value_para{};
         auto& multi_value_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(multi_value_para)};
-        multi_value_p1.enable_multi_value = true;
+        multi_value_p1.disable_multi_value = false;
         multi_value_p1.controllable_allow_multi_result_vector = false;
         expect_parse_success<wasm1, wasm1p1>(multi_result_module, multi_value_para, "multi-value parser switch did not allow multi-result type");
 
         auto two_table_module{build_two_table_module()};
         feature_para_t default_table_para{};
-        expect_parse_error<wasm1, wasm1p1>(
-            two_table_module, default_table_para, error_code::wasm1_not_allow_multi_table, "default parser accepted multiple tables");
+        expect_parse_success<wasm1, wasm1p1>(two_table_module, default_table_para, "default wasm1p1 parser rejected multiple tables");
+
+        feature_para_t mvp_table_para{};
+        auto& mvp_table_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(mvp_table_para)};
+        mvp_table_p1.disable_reference_types = true;
+        mvp_table_p1.controllable_allow_multi_table = true;
+        expect_parse_error<wasm1, wasm1p1>(two_table_module, mvp_table_para, error_code::wasm1_not_allow_multi_table, "mvp parser accepted multiple tables");
 
         feature_para_t reference_types_para{};
         auto& reference_types_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(reference_types_para)};
-        reference_types_p1.enable_reference_types = true;
+        reference_types_p1.disable_reference_types = false;
         reference_types_p1.controllable_allow_multi_table = false;
         expect_parse_success<wasm1, wasm1p1>(two_table_module, reference_types_para, "reference-types parser switch did not allow multiple tables");
 
         auto data_count_module{build_data_count_zero_module()};
         feature_para_t default_bulk_para{};
+        expect_parse_success<wasm1, wasm1p1>(data_count_module, default_bulk_para, "default wasm1p1 parser rejected data-count section");
+
+        feature_para_t mvp_bulk_para{};
+        auto& mvp_bulk_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(mvp_bulk_para)};
+        mvp_bulk_p1.disable_bulk_memory = true;
         expect_parse_error<wasm1, wasm1p1>(
-            data_count_module, default_bulk_para, error_code::wasm1p1_feature_required, "default parser accepted data-count section");
+            data_count_module, mvp_bulk_para, error_code::wasm1p1_feature_required, "mvp parser accepted data-count section");
 
         feature_para_t bulk_memory_para{};
         auto& bulk_memory_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(bulk_memory_para)};
-        bulk_memory_p1.enable_bulk_memory = true;
+        bulk_memory_p1.disable_bulk_memory = false;
         expect_parse_success<wasm1, wasm1p1>(data_count_module, bulk_memory_para, "bulk-memory parser switch did not allow data-count section");
     }
 #endif
@@ -440,7 +456,7 @@ int main()
     test::assert_printable_all_chars(section_details(datasec, module_storage.sections));
 
 #ifdef UWVM_CPP_EXCEPTIONS
-    test::test_default_mvp_feature_rejections();
+    test::test_mvp_feature_rejections();
 
     {
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<wasm1, wasm1p1> limited_para{};

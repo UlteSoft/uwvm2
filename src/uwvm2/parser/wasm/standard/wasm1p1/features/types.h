@@ -608,7 +608,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD0u):
                 {
                     auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-                    if(!para.enable_reference_types) [[unlikely]]
+                    if(para.disable_reference_types) [[unlikely]]
                     {
                         err.err_curr = section_curr;
                         err.err_selectable.wasm1p1_feature_required.value = 0xD0u;
@@ -675,7 +675,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD2u):
                 {
                     auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-                    if(!para.enable_reference_types) [[unlikely]]
+                    if(para.disable_reference_types) [[unlikely]]
                     {
                         err.err_curr = section_curr;
                         err.err_selectable.wasm1p1_feature_required.value = 0xD2u;
@@ -744,7 +744,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xFDu):
                 {
                     auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-                    if(!para.enable_simd) [[unlikely]]
+                    if(para.disable_simd) [[unlikely]]
                     {
                         err.err_curr = section_curr;
                         err.err_selectable.wasm1p1_feature_required.value = 0xFDu;

@@ -54,7 +54,7 @@ auto const is_untyped_select_value_type{[&](curr_operand_stack_value_type type) 
                                             {
                                                 return true;
                                             }
-                                            return type == curr_operand_stack_value_type::v128 && wasm1p1_para.enable_simd;
+                                            return type == curr_operand_stack_value_type::v128 && !wasm1p1_para.disable_simd;
                                         }};
 
 auto const fail_wasm1p1_feature_required{
@@ -226,7 +226,7 @@ auto const parse_block_type{
 
         if(blocktype >= 0)
         {
-            if(!wasm1p1_para.enable_multi_value) [[unlikely]]
+            if(wasm1p1_para.disable_multi_value) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               static_cast<wasm_u32>(blocktype),

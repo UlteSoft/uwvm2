@@ -251,14 +251,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 auto const opcode{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode)};
                 if(opcode == 0xD0u || opcode == 0xD2u)
                 {
-                    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
                     {
                         fatal_wasm1p1_initializer_feature_required(::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types, subject, opcode);
                     }
                 }
                 else if(opcode == 0xFDu)
                 {
-                    if(!wasm1p1_para.enable_simd) [[unlikely]]
+                    if(wasm1p1_para.disable_simd) [[unlikely]]
                     {
                         fatal_wasm1p1_initializer_feature_required(::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd, subject, opcode);
                     }
@@ -345,7 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     check_wasm1p1_initializer_const_expr(global.expr, fs_para, u8"local global initializer");
                 }
 
-                if(datacountsec.present && !wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                if(datacountsec.present && wasm1p1_para.disable_bulk_memory) [[unlikely]]
                 {
                     fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
                                                                u8"data count section",
@@ -355,7 +355,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 for(auto const& data: datasec.datas)
                 {
-                    if((data.type == data_type::passive || data.type == data_type::active_explicit) && !wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                    if((data.type == data_type::passive || data.type == data_type::active_explicit) && wasm1p1_para.disable_bulk_memory) [[unlikely]]
                     {
                         fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
                                                                    u8"data segment",
@@ -371,7 +371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         case element_type::passive_funcidx: [[fallthrough]];
                         case element_type::declarative_funcidx:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
                                                                            u8"element segment",
@@ -383,7 +383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         case element_type::active_implicit_expr: [[fallthrough]];
                         case element_type::active_explicit_expr:
                         {
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fatal_wasm1p1_initializer_feature_required(feature_kind::reference_types,
                                                                            u8"element segment",
@@ -394,13 +394,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         case element_type::passive_expr: [[fallthrough]];
                         case element_type::declarative_expr:
                         {
-                            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+                            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
                             {
                                 fatal_wasm1p1_initializer_feature_required(feature_kind::bulk_memory,
                                                                            u8"element segment",
                                                                            static_cast<wasm_u32>(elem.type));
                             }
-                            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
                             {
                                 fatal_wasm1p1_initializer_feature_required(feature_kind::reference_types,
                                                                            u8"element segment",

@@ -969,7 +969,7 @@ namespace
 
         auto const scalar_cache_dir{artifact_dir / "cache-wasm1p1-feature-smoke"};
         constexpr ::std::string_view wasm1p1_feature_args{
-            "-Rjit --wasm-feature-enable-sign-extension --wasm-feature-enable-nontrapping-float-to-int"};
+            "-Rjit --wasm-feature-wasm1.1"};
         if(!run_cached_mode_twice(uwvm_path,
                                   artifact_dir,
                                   scalar_wasm_path,
@@ -984,7 +984,7 @@ namespace
         if(!write_fixture(multivalue_wasm_path, wasm1p1_multivalue_start_wasm.data(), wasm1p1_multivalue_start_wasm.size())) { return false; }
 
         auto const multivalue_cache_dir{artifact_dir / "cache-wasm1p1-multivalue-smoke"};
-        constexpr ::std::string_view wasm1p1_multivalue_feature_args{"-Rjit --wasm-feature-enable-multi-value"};
+        constexpr ::std::string_view wasm1p1_multivalue_feature_args{"-Rjit --wasm-feature-wasm1.1"};
         return run_cached_mode_twice(uwvm_path,
                                      artifact_dir,
                                      multivalue_wasm_path,
