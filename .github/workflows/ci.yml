@@ -386,6 +386,7 @@ jobs:
     env:
       version: "14.3"
       freebsd_vm_memory: "8G"
+      freebsd_swapfile_mb: "4096"
     strategy:
       matrix:
         compiler: ["CLANG"]
@@ -443,6 +444,21 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; dmesg | tail -n 80 || true; exit \$rc; }"
+            bash <<'FREEBSD_CI_SWAP'
+            set -eux
+            swapfile=/usr/swap0
+            sudo dd if=/dev/zero of="${swapfile}" bs=1m count=${{ env.freebsd_swapfile_mb }}
+            sudo chmod 0600 "${swapfile}"
+            swapdev="$(sudo mdconfig -a -t vnode -f "${swapfile}")"
+            case "${swapdev}" in
+              /dev/*) ;;
+              md*) swapdev="/dev/${swapdev}" ;;
+              *) swapdev="/dev/md${swapdev}" ;;
+            esac
+            sudo swapon "${swapdev}"
+            swapinfo
+            df -h / /usr || true
+            FREEBSD_CI_SWAP
+            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; df -h / /usr || true; dmesg | tail -n 80 || true; exit \$rc; }"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v -j1"
