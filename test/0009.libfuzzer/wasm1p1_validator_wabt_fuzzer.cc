@@ -109,15 +109,15 @@ namespace
     inline constexpr void configure_uwvm_wasm1p1_features(fs_para_t& fs_para, feature_config_t const config) noexcept
     {
         auto& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-        para.enable_multi_value = config.multi_value;
-        para.enable_reference_types = config.reference_types;
-        para.enable_bulk_memory = config.bulk_memory;
-        para.enable_sign_extension = config.sign_extension;
-        para.enable_nontrapping_float_to_int = config.nontrapping_float_to_int;
-        para.enable_simd = config.simd;
+        para.disable_multi_value = !config.multi_value;
+        para.disable_reference_types = !config.reference_types;
+        para.disable_bulk_memory = !config.bulk_memory;
+        para.disable_sign_extension = !config.sign_extension;
+        para.disable_nontrapping_float_to_int = !config.nontrapping_float_to_int;
+        para.disable_simd = !config.simd;
 
-        if(config.multi_value) { para.controllable_allow_multi_result_vector = false; }
-        if(config.reference_types) { para.controllable_allow_multi_table = false; }
+        para.controllable_allow_multi_result_vector = para.disable_multi_value;
+        para.controllable_allow_multi_table = para.disable_reference_types;
     }
 
     [[nodiscard]] static validation_result_t validate_with_uwvm(::std::uint8_t const* data, ::std::size_t size, feature_config_t const config)

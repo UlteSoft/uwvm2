@@ -196,7 +196,7 @@ def binary_path(root: Path) -> Path:
 def command(binary: Path, case: Case) -> list[str]:
     args = [str(binary)]
     if case.feature_1p1:
-        args.append("--wasm-feature-1p1")
+        args.append("--wasm-feature-wasm1.1")
     args.extend(["--mode", "section-details", str(case.path)])
     return args
 

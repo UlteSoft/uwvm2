@@ -19,7 +19,8 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_reference_types = enabled;
+        para.disable_reference_types = !enabled;
+        para.controllable_allow_multi_table = para.disable_reference_types;
         return out;
     }
 
@@ -28,7 +29,7 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_sign_extension = enabled;
+        para.disable_sign_extension = !enabled;
         return out;
     }
 
@@ -37,7 +38,7 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_bulk_memory = enabled;
+        para.disable_bulk_memory = !enabled;
         return out;
     }
 
@@ -46,7 +47,7 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_nontrapping_float_to_int = enabled;
+        para.disable_nontrapping_float_to_int = !enabled;
         return out;
     }
 
@@ -55,7 +56,7 @@ namespace
         auto out{strict::make_wasm1p1_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
-        para.enable_simd = enabled;
+        para.disable_simd = !enabled;
         return out;
     }
 

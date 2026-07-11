@@ -21,7 +21,7 @@ case static_cast<wasm1_code>(wasm1p1_code::select_t):
 
                                                 return static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type) ==
                                                            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128 &&
-                                                       wasm1p1_para.enable_simd;
+                                                       !wasm1p1_para.disable_simd;
                                             }};
 
     auto const validate_select_condition{[&](concrete_operand_t cond) constexpr UWVM_THROWS
@@ -142,7 +142,7 @@ case static_cast<wasm1_code>(wasm1p1_code::select_t):
 case static_cast<wasm1_code>(wasm1p1_code::i32_extend8_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_byte(wasm1p1_code::i32_extend8_s),
@@ -176,7 +176,7 @@ case static_cast<wasm1_code>(wasm1p1_code::i32_extend8_s):
 case static_cast<wasm1_code>(wasm1p1_code::i32_extend16_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_byte(wasm1p1_code::i32_extend16_s),
@@ -210,7 +210,7 @@ case static_cast<wasm1_code>(wasm1p1_code::i32_extend16_s):
 case static_cast<wasm1_code>(wasm1p1_code::i64_extend8_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_byte(wasm1p1_code::i64_extend8_s),
@@ -244,7 +244,7 @@ case static_cast<wasm1_code>(wasm1p1_code::i64_extend8_s):
 case static_cast<wasm1_code>(wasm1p1_code::i64_extend16_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_byte(wasm1p1_code::i64_extend16_s),
@@ -278,7 +278,7 @@ case static_cast<wasm1_code>(wasm1p1_code::i64_extend16_s):
 case static_cast<wasm1_code>(wasm1p1_code::i64_extend32_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_byte(wasm1p1_code::i64_extend32_s),
@@ -323,7 +323,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
             curr_operand_stack_value_type operand_type,
             curr_operand_stack_value_type result_type) constexpr UWVM_THROWS
         {
-            if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+            if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -507,7 +507,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
             break;
         case wasm1p1_numeric_code::memory_copy:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -524,7 +524,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::memory_fill:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,

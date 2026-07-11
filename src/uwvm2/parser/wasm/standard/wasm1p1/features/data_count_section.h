@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         ::std::byte const* const sec_id_module_ptr) UWVM_THROWS
     {
         auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-        if(!para.enable_bulk_memory) [[unlikely]]
+        if(para.disable_bulk_memory) [[unlikely]]
         {
             err.err_curr = sec_id_module_ptr;
             err.err_selectable.wasm1p1_feature_required.value =

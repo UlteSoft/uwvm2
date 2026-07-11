@@ -772,7 +772,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         auto const require_bulk_memory = [&]() UWVM_THROWS
         {
-            if(!para.enable_bulk_memory) [[unlikely]]
+            if(para.disable_bulk_memory) [[unlikely]]
             {
                 err.err_curr = section_curr;
                 err.err_selectable.wasm1p1_feature_required.value = static_cast<wasm_u32>(fet_type);
@@ -785,7 +785,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         auto const require_reference_types = [&]() UWVM_THROWS
         {
-            if(!para.enable_reference_types) [[unlikely]]
+            if(para.disable_reference_types) [[unlikely]]
             {
                 err.err_curr = section_curr;
                 err.err_selectable.wasm1p1_feature_required.value = static_cast<wasm_u32>(fet_type);

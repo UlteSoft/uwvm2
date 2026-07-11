@@ -6,7 +6,7 @@ case static_cast<wasm_byte>(wasm1p1_code::table_get):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::table_get),
@@ -34,7 +34,7 @@ case static_cast<wasm_byte>(wasm1p1_code::table_set):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::table_set),
@@ -231,7 +231,7 @@ case static_cast<wasm_byte>(wasm1p1_code::select_t):
 case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::i32_extend8_s),
@@ -247,7 +247,7 @@ case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
 case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::i32_extend16_s),
@@ -263,7 +263,7 @@ case static_cast<wasm_byte>(wasm1p1_code::i32_extend16_s):
 case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::i64_extend8_s),
@@ -279,7 +279,7 @@ case static_cast<wasm_byte>(wasm1p1_code::i64_extend8_s):
 case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::i64_extend16_s),
@@ -295,7 +295,7 @@ case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
 case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
 {
     auto const op_begin{code_curr};
-    if(!wasm1p1_para.enable_sign_extension) [[unlikely]]
+    if(wasm1p1_para.disable_sign_extension) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::i64_extend32_s),
@@ -313,7 +313,7 @@ case static_cast<wasm_byte>(wasm1p1_code::ref_null):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::ref_null),
@@ -355,7 +355,7 @@ case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::ref_is_null),
@@ -397,7 +397,7 @@ case static_cast<wasm_byte>(wasm1p1_code::ref_func):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::ref_func),
@@ -423,7 +423,7 @@ case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(!wasm1p1_para.enable_simd) [[unlikely]]
+    if(wasm1p1_para.disable_simd) [[unlikely]]
     {
         fail_wasm1p1_feature_required(op_begin,
                                       opcode_u32(wasm1p1_code::simd_prefix),
@@ -2224,7 +2224,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                   curr_operand_stack_value_type out_type,
                                   auto fptr) constexpr UWVM_THROWS
                               {
-                                  if(!wasm1p1_para.enable_nontrapping_float_to_int) [[unlikely]]
+                                  if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
                                   {
                                       fail_wasm1p1_feature_required(op_begin,
                                                                     subopcode,
@@ -2308,7 +2308,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
             break;
         case wasm1p1_numeric_code::memory_init:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2332,7 +2332,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::data_drop:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2349,7 +2349,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::memory_copy:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2370,7 +2370,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::memory_fill:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2389,7 +2389,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_init:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2428,7 +2428,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::elem_drop:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2445,7 +2445,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_copy:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2480,7 +2480,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_grow:
         {
-            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+            if(wasm1p1_para.disable_reference_types) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2526,7 +2526,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_size:
         {
-            if(!wasm1p1_para.enable_reference_types) [[unlikely]]
+            if(wasm1p1_para.disable_reference_types) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,
@@ -2545,7 +2545,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_fill:
         {
-            if(!wasm1p1_para.enable_bulk_memory) [[unlikely]]
+            if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
             {
                 fail_wasm1p1_feature_required(op_begin,
                                               subopcode,

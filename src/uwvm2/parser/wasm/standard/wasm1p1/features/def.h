@@ -49,30 +49,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     struct wasm1p1;
 
     /// @brief Runtime switches for independent WebAssembly 1.1 feature groups.
+    /// @details The disable_* fields are false by default, so WebAssembly 1.1 features are enabled unless the user explicitly disables them.
     /// @details The explicit_* fields record CLI ownership so the feature collection and its subfeatures can report conflicts deterministically.
     /// @warning Extension point: every new wasm1.1 subfeature flag needs CLI ownership, feature conflict handling, parser gating, and ECO output.
     struct wasm_binfmt1p1_feature_parameter
     {
-        bool enable_multi_value{};
-        bool enable_reference_types{};
-        bool enable_bulk_memory{};
-        bool enable_sign_extension{};
-        bool enable_nontrapping_float_to_int{};
-        bool enable_simd{};
+        bool disable_multi_value{};
+        bool disable_reference_types{};
+        bool disable_bulk_memory{};
+        bool disable_sign_extension{};
+        bool disable_nontrapping_float_to_int{};
+        bool disable_simd{};
 
-        bool explicit_feature_1p1{};
-        bool explicit_enable_multi_value{};
-        bool explicit_enable_reference_types{};
-        bool explicit_enable_bulk_memory{};
-        bool explicit_enable_sign_extension{};
-        bool explicit_enable_nontrapping_float_to_int{};
-        bool explicit_enable_simd{};
+        bool explicit_feature_mvp{};
+        bool explicit_disable_multi_value{};
+        bool explicit_disable_reference_types{};
+        bool explicit_disable_bulk_memory{};
+        bool explicit_disable_sign_extension{};
+        bool explicit_disable_nontrapping_float_to_int{};
+        bool explicit_disable_simd{};
 
         wasm1p1_parser_limit_t parser_limit{};
 
-        /// @brief Preserve wasm1 validation when wasm1p1 is compiled in but the runtime flags are still disabled.
-        bool controllable_allow_multi_result_vector{true};
-        bool controllable_allow_multi_table{true};
+        /// @brief Re-enable wasm1 validation when a wasm1p1 feature that relaxes MVP syntax is explicitly disabled.
+        bool controllable_allow_multi_result_vector{};
+        bool controllable_allow_multi_table{};
     };
 
     /// @brief Get the const wasm1.1 feature parameter from a parser feature-parameter tuple.
@@ -105,9 +106,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i64: [[fallthrough]];
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::f32: [[fallthrough]];
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::f64: return true;
-            case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128: return para.enable_simd;
+            case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128: return !para.disable_simd;
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref: [[fallthrough]];
-            case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref: return para.enable_reference_types;
+            case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref: return !para.disable_reference_types;
             default: return false;
         }
     }
@@ -126,7 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                 // funcref remains the MVP table element type. Reference-typed locals/globals are gated by value_type_enabled instead.
                 return true;
             }
-            case ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::externref: return para.enable_reference_types;
+            case ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::externref: return !para.disable_reference_types;
             default: return false;
         }
     }

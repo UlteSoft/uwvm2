@@ -417,7 +417,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
             case ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_data_type_t::passive:
             {
-                if(!para.enable_bulk_memory) [[unlikely]]
+                if(para.disable_bulk_memory) [[unlikely]]
                 {
                     err.err_curr = section_curr;
                     err.err_selectable.wasm1p1_feature_required.value = static_cast<wasm_u32>(fdt_type);
@@ -432,7 +432,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
             case ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_data_type_t::active_explicit:
             {
-                if(!para.enable_bulk_memory) [[unlikely]]
+                if(para.disable_bulk_memory) [[unlikely]]
                 {
                     err.err_curr = section_curr;
                     err.err_selectable.wasm1p1_feature_required.value = static_cast<wasm_u32>(fdt_type);

@@ -41,12 +41,12 @@ namespace
     inline constexpr void enable_all_wasm1p1_features(fs_para_t& fs_para) noexcept
     {
         auto& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-        para.enable_multi_value = true;
-        para.enable_reference_types = true;
-        para.enable_bulk_memory = true;
-        para.enable_sign_extension = true;
-        para.enable_nontrapping_float_to_int = true;
-        para.enable_simd = true;
+        para.disable_multi_value = false;
+        para.disable_reference_types = false;
+        para.disable_bulk_memory = false;
+        para.disable_sign_extension = false;
+        para.disable_nontrapping_float_to_int = false;
+        para.disable_simd = false;
         para.controllable_allow_multi_result_vector = false;
         para.controllable_allow_multi_table = false;
     }

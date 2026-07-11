@@ -386,6 +386,7 @@ jobs:
     env:
       version: "14.3"
       freebsd_vm_memory: "8G"
+      freebsd_swapfile_mb: "2048"
     strategy:
       matrix:
         compiler: ["CLANG"]
@@ -420,10 +421,11 @@ jobs:
           memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y llvm21 gmake unzip libunwind"
+            bash -c "sudo pkg clean -ay"
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none --includedirs=/usr/local/include --linkdirs=/usr/local/lib --syslinks=unwind"
+            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none --strip=symbol --cxflags=-g1 --includedirs=/usr/local/include --linkdirs=/usr/local/lib --syslinks=unwind"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
@@ -433,9 +435,10 @@ jobs:
           memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y gcc16-devel gmake unzip"
+            bash -c "sudo pkg clean -ay"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --march=none --static=none"
+            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --march=none --static=none --strip=symbol --cxflags=-g1"
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
         with:
@@ -443,6 +446,24 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; dmesg | tail -n 80 || true; exit \$rc; }"
+            bash <<'FREEBSD_CI_SWAP'
+            set -eux
+            swapfile=/usr/swap0
+            sudo dd if=/dev/zero of="${swapfile}" bs=1m count=${{ env.freebsd_swapfile_mb }}
+            sudo chmod 0600 "${swapfile}"
+            swapdev="$(sudo mdconfig -a -t vnode -f "${swapfile}")"
+            case "${swapdev}" in
+              /dev/*) ;;
+              md*) swapdev="/dev/${swapdev}" ;;
+              *) swapdev="/dev/md${swapdev}" ;;
+            esac
+            sudo swapon "${swapdev}"
+            swapinfo
+            df -h / /usr || true
+            FREEBSD_CI_SWAP
+            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; df -h / /usr || true; dmesg | tail -n 80 || true; exit \$rc; }"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
+            bash -c "source ~/.xmake/profile && xmake clean -y uwvm || true"
+            bash -c "source ~/.xmake/profile && xmake clean -y uwvm_runtime || true"
+            bash -c "df -h / /usr || true"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v -j1"

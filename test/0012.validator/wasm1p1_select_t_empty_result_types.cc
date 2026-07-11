@@ -27,9 +27,9 @@ namespace
     inline constexpr void configure_features(fs_para_t& fs_para) noexcept
     {
         auto& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
-        para.enable_multi_value = true;
-        para.enable_reference_types = true;
-        para.enable_bulk_memory = true;
+        para.disable_multi_value = false;
+        para.disable_reference_types = false;
+        para.disable_bulk_memory = false;
         para.controllable_allow_multi_result_vector = false;
         para.controllable_allow_multi_table = false;
     }
