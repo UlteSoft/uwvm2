@@ -2141,28 +2141,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
         type...[0] += sizeof(call_function);
 
-        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
-        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
-
-        ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
-        ::std::byte* scratch_top{scratch.data() + param_bytes};
-
-        // Write params in canonical memory order (param0 .. paramN-1).
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
-
-        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
-
-        if constexpr(!::std::is_void_v<RetT>)
+        // GCC's musttail lifetime rules require every automatic whose address reaches the synchronous bridge to leave
+        // scope before dispatching the next opfunc.
         {
-            RetT out;  // no init
-            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
+            constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
 
-            // Pop ParamCount + push 1 => currpos advances ParamCount times then retreats once:
-            // ring_prev(ring_next^ParamCount(curr)) == ring_next^(ParamCount-1)(curr).
-            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount - 1uz, begin, end>()};
-            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+            ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+            // Write params in canonical memory order (param0 .. paramN-1).
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
+
+            (void)details::call(curr_module_id, call_function, scratch_top);
+
+            if constexpr(!::std::is_void_v<RetT>)
+            {
+                RetT out;  // no init
+                ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+                // Pop ParamCount + push 1 => currpos advances ParamCount times then retreats once:
+                // ring_prev(ring_next^ParamCount(curr)) == ring_next^(ParamCount-1)(curr).
+                constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount - 1uz, begin, end>()};
+                details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            }
         }
 
         // Next opfunc.
@@ -2204,13 +2208,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
         type...[0] += sizeof(call_function);
 
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        ::uwvm2::utils::container::array<::std::byte, param_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
-        ::std::byte* scratch_top{scratch.data() + param_bytes};
+        {
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            ::uwvm2::utils::container::array<::std::byte, param_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
+            ::std::byte* scratch_top{scratch.data() + param_bytes};
 
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
 
-        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+            (void)details::call(curr_module_id, call_function, scratch_top);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -2253,17 +2259,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        ::uwvm2::utils::container::array<::std::byte, param_bytes> scratch;
-        ::std::byte* scratch_top{scratch.data() + param_bytes};
+        {
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            ::uwvm2::utils::container::array<::std::byte, param_bytes> scratch;
+            ::std::byte* scratch_top{scratch.data() + param_bytes};
 
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
 
-        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+            (void)details::call(curr_module_id, call_function, scratch_top);
 
-        wasm_i32 out;  // no init
-        ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
-        conbine_details::store_local(type...[2u], local_off, out);
+            wasm_i32 out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            conbine_details::store_local(type...[2u], local_off, out);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -2317,34 +2325,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
         type...[0] += sizeof(table_index);
 
-        // Scratch operand stack for the call_indirect bridge: [params..., selector].
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
-        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
-
-        constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
-        constexpr ::std::size_t scratch_bytes{arg_bytes >= result_bytes ? arg_bytes : result_bytes};
-
-        ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
-        ::std::byte* scratch_top{scratch.data() + arg_bytes};
-
-        // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
-
-        // Selector index (i32) is on the stack-top.
-        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
-
-        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
-
-        if constexpr(!::std::is_void_v<RetT>)
         {
-            RetT out;  // no init
-            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            // Scratch operand stack for the call_indirect bridge: [params..., selector].
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+            constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
 
-            // Pop (ParamCount + selector) and push 1 => result lands in the old param0 slot.
-            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount, begin, end>()};
-            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
+            constexpr ::std::size_t scratch_bytes{arg_bytes >= result_bytes ? arg_bytes : result_bytes};
+
+            ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+            ::std::byte* scratch_top{scratch.data() + arg_bytes};
+
+            // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
+
+            // Selector index (i32) is on the stack-top.
+            wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+            ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+
+            (void)details::call_indirect(curr_module_id, type_index, table_index, scratch_top);
+
+            if constexpr(!::std::is_void_v<RetT>)
+            {
+                RetT out;  // no init
+                ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+                // Pop (ParamCount + selector) and push 1 => result lands in the old param0 slot.
+                constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount, begin, end>()};
+                details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            }
         }
 
         // Next opfunc.
@@ -2389,21 +2399,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
         type...[0] += sizeof(table_index);
 
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
-        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
+        {
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+            constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
 
-        ::uwvm2::utils::container::array<::std::byte, arg_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
-        ::std::byte* scratch_top{scratch.data() + arg_bytes};
+            ::uwvm2::utils::container::array<::std::byte, arg_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
+            ::std::byte* scratch_top{scratch.data() + arg_bytes};
 
-        // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
+            // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
 
-        // Selector index (i32) is on the stack-top.
-        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+            // Selector index (i32) is on the stack-top.
+            wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+            ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
 
-        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
+            (void)details::call_indirect(curr_module_id, type_index, table_index, scratch_top);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -2449,23 +2461,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
-        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
-        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
+        {
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+            constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+            constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
 
-        ::uwvm2::utils::container::array<::std::byte, arg_bytes> scratch;
-        ::std::byte* scratch_top{scratch.data() + arg_bytes};
+            ::uwvm2::utils::container::array<::std::byte, arg_bytes> scratch;
+            ::std::byte* scratch_top{scratch.data() + arg_bytes};
 
-        conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
+            conbine_details::copy_stacktop_params_to_scratch<wasm_i32, CompileOption, curr_i32_stack_top, ParamCount, begin, end, true>(scratch.data(), type...);
 
-        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+            wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+            ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
 
-        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
+            (void)details::call_indirect(curr_module_id, type_index, table_index, scratch_top);
 
-        wasm_i32 out;  // no init
-        ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
-        conbine_details::store_local(type...[2u], local_off, out);
+            wasm_i32 out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            conbine_details::store_local(type...[2u], local_off, out);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -2521,26 +2535,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
         type...[0] += sizeof(call_function);
 
-        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f32)};
-        constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
-        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
-
-        ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
-        ::std::byte* scratch_top{scratch.data() + param_bytes};
-
-        // Write params in canonical memory order (param0 .. paramN-1).
-        conbine_details::copy_stacktop_params_to_scratch<wasm_f32, CompileOption, curr_f32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
-
-        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
-
-        if constexpr(!::std::is_void_v<RetT>)
         {
-            RetT out;  // no init
-            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f32)};
+            constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
+            constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
 
-            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f32_stack_top, ParamCount - 1uz, begin, end>()};
-            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+            ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+            // Write params in canonical memory order (param0 .. paramN-1).
+            conbine_details::copy_stacktop_params_to_scratch<wasm_f32, CompileOption, curr_f32_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
+
+            (void)details::call(curr_module_id, call_function, scratch_top);
+
+            if constexpr(!::std::is_void_v<RetT>)
+            {
+                RetT out;  // no init
+                ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+                constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f32_stack_top, ParamCount - 1uz, begin, end>()};
+                details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            }
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2597,26 +2613,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
         type...[0] += sizeof(call_function);
 
-        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
-        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f64)};
-        constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
-        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
-
-        ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
-        ::std::byte* scratch_top{scratch.data() + param_bytes};
-
-        // Write params in canonical memory order (param0 .. paramN-1).
-        conbine_details::copy_stacktop_params_to_scratch<wasm_f64, CompileOption, curr_f64_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
-
-        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
-
-        if constexpr(!::std::is_void_v<RetT>)
         {
-            RetT out;  // no init
-            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+            // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+            constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f64)};
+            constexpr ::std::size_t result_bytes{conbine_details::call_result_bytes<RetT>()};
+            constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
 
-            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f64_stack_top, ParamCount - 1uz, begin, end>()};
-            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            ::uwvm2::utils::container::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+            ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+            // Write params in canonical memory order (param0 .. paramN-1).
+            conbine_details::copy_stacktop_params_to_scratch<wasm_f64, CompileOption, curr_f64_stack_top, ParamCount, begin, end, false>(scratch.data(), type...);
+
+            (void)details::call(curr_module_id, call_function, scratch_top);
+
+            if constexpr(!::std::is_void_v<RetT>)
+            {
+                RetT out;  // no init
+                ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+                constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f64_stack_top, ParamCount - 1uz, begin, end>()};
+                details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+            }
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2646,7 +2664,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
         type...[0] += sizeof(call_function);
 
-        details::call(curr_module_id, call_function, ::std::addressof(type...[1]));
+        type...[1] = details::call(curr_module_id, call_function, type...[1]);
         if constexpr(!::std::is_void_v<RetT>) { type...[1u] -= sizeof(RetT); }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2679,7 +2697,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
-        details::call(curr_module_id, call_function, ::std::addressof(type...[1]));
+        type...[1] = details::call(curr_module_id, call_function, type...[1]);
 
         if constexpr(!::std::is_void_v<RetT>)
         {
@@ -2719,7 +2737,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
-        details::call(curr_module_id, call_function, ::std::addressof(type...[1]));
+        type...[1] = details::call(curr_module_id, call_function, type...[1]);
 
         if constexpr(!::std::is_void_v<RetT>)
         {
@@ -2760,7 +2778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(call_function), typeref...[0], sizeof(call_function));
         typeref...[0] += sizeof(call_function);
 
-        details::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
+        typeref...[1] = details::call(curr_module_id, call_function, typeref...[1]);
         if constexpr(!::std::is_void_v<RetT>) { typeref...[1u] -= sizeof(RetT); }
     }
 
@@ -2794,7 +2812,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
-        details::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
+        typeref...[1] = details::call(curr_module_id, call_function, typeref...[1]);
 
         if constexpr(!::std::is_void_v<RetT>)
         {
@@ -2835,7 +2853,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
-        details::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
+        typeref...[1] = details::call(curr_module_id, call_function, typeref...[1]);
 
         if constexpr(!::std::is_void_v<RetT>)
         {

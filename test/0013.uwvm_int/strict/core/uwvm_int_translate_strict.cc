@@ -121,7 +121,8 @@ namespace
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_WASM_ABI unexpected_call(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte**) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_WASM_ABI
+        unexpected_call(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte*) UWVM_THROWS
     {
         ::std::fprintf(stderr,
                        "uwvm2test TRAP: call mode=%s func=%zu wasm_module_id=%zu call_func_index=%zu\n",
@@ -133,10 +134,10 @@ namespace
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_WASM_ABI unexpected_call_indirect(::std::size_t wasm_module_id,
-                                                                            ::std::size_t type_index,
-                                                                            ::std::size_t table_index,
-                                                                            ::std::byte**) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_WASM_ABI unexpected_call_indirect(::std::size_t wasm_module_id,
+                                                                    ::std::size_t type_index,
+                                                                    ::std::size_t table_index,
+                                                                    ::std::byte*) UWVM_THROWS
     {
         ::std::fprintf(stderr,
                        "uwvm2test TRAP: call_indirect mode=%s func=%zu wasm_module_id=%zu type_index=%zu table_index=%zu\n",

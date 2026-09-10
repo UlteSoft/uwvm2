@@ -34,27 +34,28 @@ namespace
     }
 
     // Minimal trivial-call bridge (same encoding contract as translate.h local-defined call fast path).
-    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const* const info = reinterpret_cast<info_t const*>(call_function);
         if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(info->trivial_kind == kind_t::none) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         auto const top_addr = reinterpret_cast<::std::uintptr_t>(top);
         if(top_addr < info->param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::std::byte* const base = reinterpret_cast<::std::byte*>(top_addr - info->param_bytes);
 
         ::std::uint_least32_t const imm_u32{::std::bit_cast<::std::uint_least32_t>(info->trivial_imm)};
 
-        auto finish_void = [&]() noexcept { *stack_top_ptr = base; };
+        auto finish_void = [&]() noexcept { stack_top = base; };
         auto finish_i32 = [&](::std::uint32_t v) noexcept
         {
             store_u32(base, v);
-            *stack_top_ptr = base + 4;
+            stack_top = base + 4;
         };
 
         switch(info->trivial_kind)
@@ -84,13 +85,14 @@ namespace
             [[unlikely]] default:
                 ::fast_io::fast_terminate();
         }
+        return stack_top;
     }
 
     // Minimal call_indirect bridge for tests: resolves local-defined table element and dispatches via `call_bridge`.
-    static void UWVM2TEST_WASM_ABI call_indirect_bridge(::std::size_t /*wasm_module_id*/,
-                                                        ::std::size_t type_index,
-                                                        ::std::size_t table_index,
-                                                        ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI call_indirect_bridge(::std::size_t /*wasm_module_id*/,
+                                                               ::std::size_t type_index,
+                                                               ::std::size_t table_index,
+                                                               ::std::byte* stack_top) UWVM_THROWS
     {
         auto die = [&](char const* msg) noexcept
         {
@@ -99,12 +101,12 @@ namespace
         };
 
         if(g_rt == nullptr || g_cm == nullptr) [[unlikely]] { die("g_rt/g_cm is null"); }
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { die("stack_top_ptr is null"); }
+        if(stack_top == nullptr) [[unlikely]] { die("stack_top is null"); }
 
         // Pop selector index (i32) - Wasm stack layout: [args..., idx]
         wasm_i32 selector_i32{};  // init
-        *stack_top_ptr -= sizeof(selector_i32);
-        ::std::memcpy(::std::addressof(selector_i32), *stack_top_ptr, sizeof(selector_i32));
+        stack_top -= sizeof(selector_i32);
+        ::std::memcpy(::std::addressof(selector_i32), stack_top, sizeof(selector_i32));
         auto const selector_u32{::std::bit_cast<::std::uint_least32_t>(selector_i32)};
         trace_ci("[ci] type=", type_index, " table=", table_index, " selector=", selector_u32);
 
@@ -152,7 +154,7 @@ namespace
         if(local_idx >= g_cm->local_defined_call_info.size()) [[unlikely]] { die("local_idx out of bounds for compiled call_info"); }
         auto const* const info_ptr{::std::addressof(g_cm->local_defined_call_info.index_unchecked(local_idx))};
 
-        call_bridge(SIZE_MAX, reinterpret_cast<::std::size_t>(info_ptr), stack_top_ptr);
+        return call_bridge(SIZE_MAX, reinterpret_cast<::std::size_t>(info_ptr), stack_top);
     }
 
     // The strict-test harness only decays module storage and does not apply active element segments into tables.

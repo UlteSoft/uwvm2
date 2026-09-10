@@ -21,12 +21,13 @@ namespace
     // Minimal local-call bridge for tests:
     // - compiler encodes local-defined calls as (module_id=SIZE_MAX, call_function=ptr_to_compiled_defined_call_info)
     // - we only implement the "trivial defined call" fast paths used by the compiler matcher
-    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
         using kind_t = optable::trivial_defined_call_kind;
         using info_t = optable::compiled_defined_call_info;
 
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]]
+        if(stack_top == nullptr) [[unlikely]]
         {
             ::fast_io::fast_terminate();
         }
@@ -48,7 +49,7 @@ namespace
             ::fast_io::fast_terminate();
         }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         auto const top_addr = reinterpret_cast<::std::uintptr_t>(top);
         if(top_addr < info->param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::std::byte* const base = reinterpret_cast<::std::byte*>(top_addr - info->param_bytes);
@@ -58,13 +59,13 @@ namespace
 
         auto finish_void = [&]() noexcept
         {
-            *stack_top_ptr = base;
+            stack_top = base;
         };
 
         auto finish_i32 = [&](::std::uint32_t v) noexcept
         {
             store_u32(base, v);
-            *stack_top_ptr = base + 4;
+            stack_top = base + 4;
         };
 
         switch(info->trivial_kind)
@@ -162,6 +163,7 @@ namespace
                 ::fast_io::fast_terminate();
             }
         }
+        return stack_top;
     }
 
     [[nodiscard]] byte_vec build_call_module()

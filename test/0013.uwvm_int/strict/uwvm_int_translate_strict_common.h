@@ -87,12 +87,13 @@ namespace uwvm2test::uwvm_int_strict
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_WASM_ABI strict_terminate_call(::std::size_t, ::std::size_t, ::std::byte**) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_WASM_ABI strict_terminate_call(::std::size_t, ::std::size_t, ::std::byte*) UWVM_THROWS
     {
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_WASM_ABI strict_terminate_call_indirect(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_WASM_ABI
+        strict_terminate_call_indirect(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte*) UWVM_THROWS
     {
         ::fast_io::fast_terminate();
     }

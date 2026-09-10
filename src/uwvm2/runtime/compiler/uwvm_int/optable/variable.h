@@ -622,20 +622,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         local_imported_t* local_imported_module{variable_details::read_imm<local_imported_t*>(type...[0])};
         ::std::size_t const global_index{variable_details::read_imm<::std::size_t>(type...[0])};
 
-        GlobalT v;  // no init
-        if constexpr(variable_details::stacktop_enabled_for<CompileOption, GlobalT>())
+        // The provider callback is synchronous and must not retain the value pointer.  End the value's address-taken
+        // lifetime in a nested scope before musttail dispatch, as required by GCC's musttail lifetime analysis.
         {
-            constexpr ::std::size_t range_begin{variable_details::range_begin<CompileOption, GlobalT>()};
-            constexpr ::std::size_t range_end{variable_details::range_end<CompileOption, GlobalT>()};
-            static_assert(range_begin <= curr_stack_top && curr_stack_top < range_end);
-            v = get_curr_val_from_operand_stack_top<CompileOption, GlobalT, curr_stack_top>(type...);
-        }
-        else
-        {
-            v = get_curr_val_from_operand_stack_cache<GlobalT>(type...);
-        }
+            GlobalT v;  // no init
+            if constexpr(variable_details::stacktop_enabled_for<CompileOption, GlobalT>())
+            {
+                constexpr ::std::size_t range_begin{variable_details::range_begin<CompileOption, GlobalT>()};
+                constexpr ::std::size_t range_end{variable_details::range_end<CompileOption, GlobalT>()};
+                static_assert(range_begin <= curr_stack_top && curr_stack_top < range_end);
+                v = get_curr_val_from_operand_stack_top<CompileOption, GlobalT, curr_stack_top>(type...);
+            }
+            else
+            {
+                v = get_curr_val_from_operand_stack_cache<GlobalT>(type...);
+            }
 
-        variable_details::store_local_imported_global(local_imported_module, global_index, v);
+            variable_details::store_local_imported_global(local_imported_module, global_index, v);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));

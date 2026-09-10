@@ -386,15 +386,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     using memory_out_of_bounds_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
 
-    /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
-    ///          the arguments and writes the return result back onto the operand stack.
+    /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack.  It removes the arguments,
+    ///          writes the return result back onto the operand stack, and returns the updated stack top.  Passing and returning the pointer by value keeps
+    ///          tail-dispatch opfuncs from exposing the address of one of their parameters across a `musttail` boundary.
+    /// @note `stack_top` and every pointer derived from it are borrowed only for the synchronous callback invocation and must not be retained.
     using interpreter_call_func_t =
-        void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
+        ::std::byte*(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS;
 
     /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
     ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
-    using interpreter_call_indirect_func_t = void(
-        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr)
+    /// @note `stack_top` has the same synchronous, non-retaining borrowed-pointer contract as `interpreter_call_func_t`.
+    using interpreter_call_indirect_func_t = ::std::byte*(
+        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top)
         UWVM_THROWS;
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
