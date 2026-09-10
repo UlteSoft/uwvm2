@@ -32,6 +32,7 @@ import fast_io;
 import uwvm2.utils.container;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard;
+import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
