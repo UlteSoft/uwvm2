@@ -628,16 +628,16 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_deps("uwvm")
 		end
 
-		if is_0013_uwvm_int_lazy then
-			add_deps("uwvm_runtime")
-			add_deps("uwvm")
-		end
-
 		-- In a combined interpreter/LLVM build, interpreter optables route local-imported provider access through
 		-- backend-neutral guarded entry points implemented by uwvm_runtime. Even header-driven interpreter tests must
 		-- link that object target once those templates are instantiated.
 		if uwvm_uses_llvm_jit and is_0013_uwvm_int then
 			add_deps("uwvm_runtime")
+		end
+
+		if is_0013_uwvm_int_lazy then
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
 		end
 
 		-- uwvm uses precise floating-point model to ensure determinism.

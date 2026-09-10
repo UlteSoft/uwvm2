@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -44,13 +45,6 @@ namespace
     };
 
     inline constexpr ::std::array comparison_policies{"unwind", "unwind-uncheck", "auto"};
-
-#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) &&                                  \
-    (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
-    inline constexpr bool native_unwind_can_replace_logical_frames{true};
-#else
-    inline constexpr bool native_unwind_can_replace_logical_frames{false};
-#endif
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
@@ -344,13 +338,9 @@ namespace
                                           log.find("unwind_backend=win64-seh") != ::std::string::npos;
         if(log.find("call_stack=unwind") != ::std::string::npos)
         {
-            auto const authoritative_win64{
-                native_unwind_can_replace_logical_frames && log.find("unwind_check=live") != ::std::string::npos &&
-                log.find("unwind_backend=win64-seh") != ::std::string::npos && log.find("unwind_replace_frames=yes") != ::std::string::npos &&
-                log.find("call_stack_frames=omit") != ::std::string::npos};
-            if(!authoritative_win64)
+            if(!::uwvm2test::native_unwind::matches_policy(log, "unwind") || log.find("unwind_check=live") == ::std::string::npos)
             {
-                ::std::cerr << "auto selected native frame replacement without an authoritative Win64 SEH caller context:\n" << log << '\n';
+                ::std::cerr << "auto selected native frame replacement without a successful live probe and omitted JIT logical frames:\n" << log << '\n';
                 return false;
             }
             if(log.find("call_stack=instruction") != ::std::string::npos)
@@ -364,10 +354,7 @@ namespace
         if(log.find("call_stack=instruction") != ::std::string::npos)
         {
             auto const plain_output{strip_ansi_codes(output)};
-            auto const posix_claims_frame_replacement{
-                !native_unwind_can_replace_logical_frames && log.find("unwind_replace_frames=yes") != ::std::string::npos};
-            if(log.find("call_stack_frames=emit") == ::std::string::npos || log.find("call_stack=none") != ::std::string::npos ||
-               posix_claims_frame_replacement || plain_output.find(" func_idx=") == ::std::string::npos)
+            if(!::uwvm2test::native_unwind::matches_policy(log, "instruction") || plain_output.find(" func_idx=") == ::std::string::npos)
             {
                 ::std::cerr << "auto call-stack policy did not preserve authoritative logical instruction frames:\n"
                             << log << "\noutput:\n"
@@ -429,35 +416,13 @@ namespace
         auto const policy_view{::std::string_view{policy}};
         if(policy_view == "instruction") { return true; }
 
-        if(!native_unwind_can_replace_logical_frames && log.find("unwind_replace_frames=yes") != ::std::string::npos)
+        // Require policy/emission agreement whenever this lazy/OSR path emits a full-module policy record.
+        // The exact activation chain and real OSR/demand evidence above remain mandatory even without that record.
+        if(log.find("call_stack=") == ::std::string::npos) { return true; }
+        auto const expected{policy_view == "auto" ? (auto_uses_authoritative_unwind ? "unwind" : "instruction") : policy};
+        if(!::uwvm2test::native_unwind::matches_policy(log, expected))
         {
-            ::std::cerr << "non-Win64 native unwind claimed authority over logical frames in " << label << '/' << mode << '/' << policy << " log:\n"
-                        << log << '\n';
-            return false;
-        }
-        if(log.find("unwind_replace_frames=yes") != ::std::string::npos && log.find("unwind_backend=win64-seh") == ::std::string::npos)
-        {
-            ::std::cerr << "native frame replacement was not backed by Win64 SEH in " << label << '/' << mode << '/' << policy << " log:\n"
-                        << log << '\n';
-            return false;
-        }
-
-        if(policy_view == "auto")
-        {
-            auto const contradictory_mode{auto_uses_authoritative_unwind ? log.find("call_stack=instruction") != ::std::string::npos
-                                                                         : log.find("call_stack=unwind ") != ::std::string::npos};
-            auto const suppresses_posix_logical_frames{!auto_uses_authoritative_unwind && log.find("call_stack_frames=omit") != ::std::string::npos};
-            if(!contradictory_mode && !suppresses_posix_logical_frames) { return true; }
-
-            ::std::cerr << "auto call-stack policy contradicted the probed native-unwind authority in " << label << '/' << mode << " log:\n"
-                        << log << '\n';
-            return false;
-        }
-
-        if(policy_view == "unwind-uncheck" && !native_unwind_can_replace_logical_frames &&
-           log.find("call_stack_frames=omit") != ::std::string::npos)
-        {
-            ::std::cerr << "POSIX auxiliary unwind suppressed logical frames in " << label << '/' << mode << " log:\n" << log << '\n';
+            ::std::cerr << "native/instruction emission policy mismatch in " << label << '/' << mode << '/' << policy << " log:\n" << log << '\n';
             return false;
         }
 
@@ -522,7 +487,7 @@ namespace
             call_stack_capability_probed = true;
             if(!auto_uses_authoritative_unwind)
             {
-                ::std::cout << "[tiered-osr-wat] native unwind is non-authoritative or unavailable; auto retains logical instruction frames\n";
+                ::std::cout << "[tiered-osr-wat] checked native unwind is unavailable; auto retains logical instruction frames\n";
             }
         }
 

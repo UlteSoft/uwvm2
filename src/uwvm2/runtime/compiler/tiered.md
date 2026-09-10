@@ -127,26 +127,26 @@ Pure modes do not request or observe the Tier 2 scheduler unit:
 
 Tiered execution uses the same runtime call-stack policy as the LLVM JIT modes.
 The default `-Rllvm-call-stack auto` policy selects native replacement only when
-the target supplies an authoritative generated-caller context and its checked
-path succeeds. Otherwise it resolves to `instruction`, so generated JIT frames
-remain represented by logical TLS push/pop operations. At present only the
-explicit Win64 SEH caller-context path is authoritative. A normal POSIX
-`_Unwind_Backtrace` starts in the runtime helper and is auxiliary; it never
-replaces logical Wasm frames.
+the target supplies a supported native unwinder and its checked live-runtime
+probe succeeds. Otherwise it resolves to `instruction`, so generated JIT frames
+remain represented by logical TLS push/pop operations. Allow-listed POSIX
+targets use an ordinary `_Unwind_Backtrace` through registered JIT CFI; Win64
+uses the explicit generated-caller SEH context. Both native backends replace
+logical Wasm frames when selected.
 
-Unwind reporting does not require release uwvm host code to be built with
-unwind tables. Generated Wasm functions carry registered asynchronous unwind
-metadata and are permanently marked LLVM `NoInline`, including under max/O3;
-function-local optimization remains enabled. Fixed frame pointers and explicit
-generated frame/stack context are limited to the Win64 SEH bridge. The POSIX
-path does not seed a cursor from JIT registers, scan frame-pointer chains, scan
-raw stack words, or reconstruct synthetic inline frames.
+Generated Wasm functions and the relevant uwvm host-runtime translation units
+carry asynchronous unwind metadata and are permanently marked LLVM `NoInline`,
+including under max/O3; function-local optimization remains enabled. Fixed
+frame pointers and explicit generated frame/stack context are limited to the
+Win64 SEH bridge. The POSIX path does not seed a cursor from JIT registers, scan
+frame-pointer chains, scan raw stack words, or reconstruct synthetic inline
+frames.
 
 Explicit `instruction` always selects logical tracking. Explicit checked
-`unwind` is exposed only for an authoritative replacement path; an unsupported
-programmatic selection fails closed. `unwind-uncheck` may append resolved POSIX
-JIT addresses after the authoritative logical stack, while `none`
-intentionally omits generated body frames.
+`unwind` is exposed only for a supported replacement path whose live probe
+succeeds; an unsupported programmatic selection fails closed. `unwind-uncheck`
+selects the same native replacement without the live probe. `none` intentionally
+omits generated body frames.
 
 ## Scheduling Policy
 

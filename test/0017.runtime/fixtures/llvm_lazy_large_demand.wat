@@ -2,11 +2,11 @@
   (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
   (memory (export "memory") 1)
 
-  ;; Exactly 4096 one-byte nops plus i32.const 0, call 0 and end: a 4101-byte
-  ;; primary function CU. This crosses the LLVM-lazy urgent-lane threshold
-  ;; before LLVM optimization removes the nops. Function index is 1.
-  ;; Make the entry itself large so direct-callee group warming cannot compile
-  ;; it as a side effect of an earlier, smaller demand request.
+  ;; Exactly 4100 one-byte nops plus end: a 4101-byte primary function CU.
+  ;; This crosses the LLVM-lazy urgent-lane threshold before LLVM optimization
+  ;; removes the nops. The unused import keeps the function index at 1. Return
+  ;; normally so the runtime can stop its schedulers and emit the statistics
+  ;; that prove -Rct 0 performed the demand compile on the caller thread.
   (func $large (export "_start")
     nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop
     nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop
@@ -136,5 +136,4 @@
     nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop
     nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop
     nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop nop
-    i32.const 0
-    call $proc_exit))
+    nop nop nop nop))

@@ -3790,7 +3790,8 @@ inline constexpr void llvm_jit_simd_local_imported_memory_load_bridge(::std::uin
     if(effective_offset.offset_65_bit) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
     constexpr auto access_size{llvm_jit_simd_details::simd_memory_access_size<Op>()};
     ::std::byte bytes[16]{};
-    if(!local_imported_module->memory_read_from_index(memory_index, effective_offset.offset, bytes, access_size)) [[unlikely]]
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_read(
+           local_imported_module, memory_index, effective_offset.offset, bytes, access_size)) [[unlikely]]
     {
         llvm_jit_memory_bridge_trap();
     }
@@ -3842,7 +3843,8 @@ inline constexpr void llvm_jit_simd_local_imported_memory_store_bridge(::std::ui
     constexpr auto access_size{llvm_jit_simd_details::simd_memory_access_size<Op>()};
     ::std::byte bytes[16]{};
     llvm_jit_simd_details::eval_memory_store<Op>(bytes, value, static_cast<llvm_jit_simd_details::u8>(lane));
-    if(!local_imported_module->memory_write_to_index(memory_index, effective_offset.offset, bytes, access_size)) [[unlikely]]
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+           local_imported_module, memory_index, effective_offset.offset, bytes, access_size)) [[unlikely]]
     {
         llvm_jit_memory_bridge_trap();
     }
@@ -4230,7 +4232,9 @@ inline constexpr void llvm_jit_local_imported_memory_init_bridge(::std::uintptr_
     }
     if(len == 0uz) { return; }
 
-    if(data_begin == nullptr || !local_imported_module->memory_write_to_index(memory_index, dst, data_begin + src, len)) [[unlikely]]
+    if(data_begin == nullptr ||
+       !::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+           local_imported_module, memory_index, dst, data_begin + src, len)) [[unlikely]]
     {
         llvm_jit_memory_bridge_trap();
         return;
@@ -6865,7 +6869,7 @@ template <typename EmitBridgeCallFromBuffers>
                                                       ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
 
-            // Generated code is already covered by the outer LLVM-Wasm FP scope and native-unwind execution gate.
+            // Generated code is already covered by the outer bridge token, LLVM-Wasm FP scope, and native-unwind execution gate.
             // Calling the public host/re-entry API here would redundantly reset FP state and recursively lock the gate
             // for every imported call.
             return emit_runtime_local_func_llvm_jit_runtime_bridge_call<::uwvm2::runtime::lib::details::llvm_jit_call_raw_from_generated_wasm_abi_bridge>(
@@ -7420,6 +7424,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
 
         auto loaded_value{ir_builder.CreateLoad(llvm_global_type, global_pointer, get_llvm_string_ref(u8"global.get"))};
         if(loaded_value == nullptr) [[unlikely]] { return false; }
+        loaded_value->setAlignment(get_llvm_global_storage_alignment());
 
         state.operand_stack.push_back({.type = global_access_info.value_type, .value = loaded_value});
         return true;
@@ -7444,7 +7449,6 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     }
 
     if(!state.control_stack.back().is_reachable) { return true; }
-        loaded_value->setAlignment(get_llvm_global_storage_alignment());
     if(state.operand_stack.empty()) [[unlikely]] { return false; }
 
     auto runtime_module_ptr{state.local_func_storage_ptr->runtime_module_ptr};
@@ -9032,33 +9036,33 @@ template <llvm_jit_simd_code Op,
             llvm_jit_memory_snapshot_values_t result{};
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return result; }
 
+            static_assert(sizeof(::std::size_t) == sizeof(::std::uintptr_t),
+                          "local-imported snapshot ABI represents size_t operands with LLVM intptr");
+            static_assert(::std::numeric_limits<::std::size_t>::digits == ::std::numeric_limits<::std::uintptr_t>::digits,
+                          "local-imported snapshot ABI requires size_t and uintptr_t to have the same value width");
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             // The provider writes snapshot outputs through host bridge pointer arguments.  Entry-block allocas give LLVM
             // stable addresses for those out-parameters and make the following loads explicit in IR.
-            auto memory_begin_slot{
-                create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.begin.addr.slot"))};
             auto byte_length_slot{
                 create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.byte_length.slot"))};
-            if(memory_begin_slot == nullptr || byte_length_slot == nullptr) [[unlikely]] { return result; }
+            if(byte_length_slot == nullptr) [[unlikely]] { return result; }
             auto bridge_function_type{::llvm::FunctionType::get(
-                ::llvm::Type::getInt1Ty(llvm_context),
-                {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type), get_llvm_pointer_type(llvm_intptr_type)},
+                llvm_intptr_type,
+                {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type)},
                 false)};
             auto module_address{emit_local_imported_memory_module_address()};
             if(module_address == nullptr) [[unlikely]] { return result; }
-            auto snapshot_ok{emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_snapshot_bridge>(
+            auto snapshot_status{emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_snapshot_bridge>(
                 bridge_function_type,
                 {module_address,
                  ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
-                 memory_begin_slot,
                  byte_length_slot})};
-            if(snapshot_ok == nullptr) [[unlikely]] { return result; }
+            if(snapshot_status == nullptr) [[unlikely]] { return result; }
 
             emit_llvm_conditional_trap(*llvm_module,
                                        ir_builder,
-                                       ir_builder.CreateNot(snapshot_ok),
+                                       ir_builder.CreateICmpEQ(snapshot_status, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
                                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
-            result.memory_begin_address = ir_builder.CreateLoad(llvm_intptr_type, memory_begin_slot, get_llvm_string_ref(u8"local_imported.memory.begin.addr"));
             result.byte_length = ir_builder.CreateLoad(llvm_intptr_type, byte_length_slot, get_llvm_string_ref(u8"local_imported.memory.byte_length"));
             return result;
         }};

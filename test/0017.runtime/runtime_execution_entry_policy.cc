@@ -15,11 +15,11 @@ int main()
     bool outer_scratch_state{true};
     ::std::size_t cleanup_count{};
 
-    // This models either the full interpreter entry or the full LLVM entry. Both use the same reject policy.
+    // This models either an interpreter or LLVM full/lazy entry. Every ordinary entry uses the same reject policy.
     if(!execution::runtime_execution_entry_enter(depth) || depth != 1u) { return 1; }
     if(execution::runtime_execution_entry_reset_allowed(depth)) { return 2; }
 
-    // A nested full entry uses `reject` too; it must fail without changing ownership of the outer state.
+    // Nested full and lazy entries both use `reject`; failure must not change ownership of the outer state.
     if(execution::runtime_execution_entry_enter(depth, runtime_execution_entry_reentry::reject) || depth != 1u) { return 3; }
 
     // The public LLVM raw API is the only supported callback re-entry. Its exit is nested and therefore cannot clean

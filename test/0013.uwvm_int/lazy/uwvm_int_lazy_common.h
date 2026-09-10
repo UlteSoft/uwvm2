@@ -72,18 +72,17 @@ namespace uwvm2test::uwvm_int_lazy
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_INTERPRETER_ABI terminate_call_callback(::std::size_t, ::std::size_t, ::std::byte**) noexcept
+    inline ::std::byte* UWVM2TEST_INTERPRETER_ABI terminate_call_callback(::std::size_t, ::std::size_t, ::std::byte*) noexcept
     {
         ::fast_io::fast_terminate();
     }
 
-    inline void UWVM2TEST_INTERPRETER_ABI
-        terminate_call_indirect_callback(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) noexcept
+    inline ::std::byte* UWVM2TEST_INTERPRETER_ABI
+        terminate_call_indirect_callback(::std::size_t, ::std::size_t, ::std::size_t, ::std::byte*) noexcept
     {
         ::fast_io::fast_terminate();
     }
 
-# undef UWVM2TEST_INTERPRETER_ABI
 #endif
 
     inline void configure_unexpected_traps() noexcept
@@ -195,10 +194,11 @@ namespace uwvm2test::uwvm_int_lazy
 
 #if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
     template <optable::uwvm_interpreter_translate_option_t Opt>
-    inline void runner_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_INTERPRETER_ABI
+        runner_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
-        if(g_lazy_call_lazy_module == nullptr || stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]]
+        if(g_lazy_call_lazy_module == nullptr || stack_top == nullptr) [[unlikely]]
         {
             ::fast_io::fast_terminate();
         }
@@ -217,10 +217,10 @@ namespace uwvm2test::uwvm_int_lazy
 
         auto const param_bytes{info->param_bytes};
         auto const result_bytes{info->result_bytes};
-        auto const top_addr{reinterpret_cast<::std::uintptr_t>(*stack_top_ptr)};
+        auto const top_addr{reinterpret_cast<::std::uintptr_t>(stack_top)};
         if(top_addr < param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const param_base{*stack_top_ptr - param_bytes};
+        auto* const param_base{stack_top - param_bytes};
         byte_vec packed_params(param_bytes);
         if(param_bytes != 0uz) { ::std::memcpy(packed_params.data(), param_base, param_bytes); }
 
@@ -232,20 +232,20 @@ namespace uwvm2test::uwvm_int_lazy
                             nullptr)};
         if(rr.results.size() != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(result_bytes != 0uz) { ::std::memcpy(param_base, rr.results.data(), result_bytes); }
-        *stack_top_ptr = param_base + result_bytes;
+        return param_base + result_bytes;
     }
 #endif
 
 #if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
     template <optable::uwvm_interpreter_translate_option_t Opt>
-    inline void runner_call_indirect_bridge(::std::size_t wasm_module_id,
-                                            ::std::size_t type_index,
-                                            ::std::size_t table_index,
-                                            ::std::byte** stack_top_ptr) UWVM_THROWS
+    inline ::std::byte* UWVM2TEST_INTERPRETER_ABI runner_call_indirect_bridge(::std::size_t wasm_module_id,
+                                                                             ::std::size_t type_index,
+                                                                             ::std::size_t table_index,
+                                                                             ::std::byte* stack_top) UWVM_THROWS
     {
         if(g_call_indirect_runtime_module == nullptr || g_call_indirect_lazy_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != g_call_indirect_module_id) [[unlikely]] { ::fast_io::fast_terminate(); }
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using table_elem_type_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
@@ -256,8 +256,8 @@ namespace uwvm2test::uwvm_int_lazy
         if(local_table_index >= g_call_indirect_runtime_module->local_defined_table_vec_storage.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         wasm_i32 selector_i32{};
-        *stack_top_ptr -= sizeof(selector_i32);
-        ::std::memcpy(::std::addressof(selector_i32), *stack_top_ptr, sizeof(selector_i32));
+        stack_top -= sizeof(selector_i32);
+        ::std::memcpy(::std::addressof(selector_i32), stack_top, sizeof(selector_i32));
         auto const selector_u32{::std::bit_cast<::std::uint_least32_t>(selector_i32)};
 
         auto const type_begin{g_call_indirect_runtime_module->type_section_storage.type_section_begin};
@@ -283,10 +283,10 @@ namespace uwvm2test::uwvm_int_lazy
 
         auto const param_bytes{strict::abi_total_bytes(def_ptr->function_type_ptr->parameter.begin, def_ptr->function_type_ptr->parameter.end)};
         auto const result_bytes{strict::abi_total_bytes(def_ptr->function_type_ptr->result.begin, def_ptr->function_type_ptr->result.end)};
-        auto const top_addr{reinterpret_cast<::std::uintptr_t>(*stack_top_ptr)};
+        auto const top_addr{reinterpret_cast<::std::uintptr_t>(stack_top)};
         if(top_addr < param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const param_base{*stack_top_ptr - param_bytes};
+        auto* const param_base{stack_top - param_bytes};
         byte_vec packed_params(param_bytes);
         if(param_bytes != 0uz) { ::std::memcpy(packed_params.data(), param_base, param_bytes); }
         if(g_lazy_call_runtime_module != nullptr && g_lazy_call_lazy_module != nullptr && g_lazy_call_options != nullptr)
@@ -302,8 +302,9 @@ namespace uwvm2test::uwvm_int_lazy
                             nullptr)};
         if(rr.results.size() != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(result_bytes != 0uz) { ::std::memcpy(param_base, rr.results.data(), result_bytes); }
-        *stack_top_ptr = param_base + result_bytes;
+        return param_base + result_bytes;
     }
+# undef UWVM2TEST_INTERPRETER_ABI
 #endif
 
     template <optable::uwvm_interpreter_translate_option_t Opt>

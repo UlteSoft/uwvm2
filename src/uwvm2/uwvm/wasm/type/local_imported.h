@@ -1102,6 +1102,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             if constexpr(::uwvm2::uwvm::wasm::type::has_page_size<Mem>) { return Mem::page_size; }
             else
             {
+                static_assert(!::uwvm2::uwvm::wasm::type::declares_page_size<Mem>,
+                              "an explicitly declared local-imported memory page_size must be a representable power-of-two uint_least64_t");
                 return static_cast<::std::uint_least64_t>(64u * 1024u);
             }
         }

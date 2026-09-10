@@ -39,8 +39,12 @@ grep -Fq 'runtime_execution_entry_leave(depth)' "$runtime_source" || fail 'entry
 grep -Fq 'runtime_execution_entry_leave_result::outermost' "$runtime_source" || fail 'outermost-only cleanup is missing'
 grep -Fq 'erase_current_thread_runtime_state();' "$runtime_source" || fail 'complete call-stack plus scratch cleanup is missing'
 
+ordinary_expected=1
+if grep -Fq 'void lazy_compile_and_run_main_module' "$runtime_source"; then
+    ordinary_expected=2
+fi
 ordinary_actual="$(grep -Fc 'runtime_execution_entry_scope execution_entry_scope{};' "$runtime_source")"
-[[ "$ordinary_actual" == 1 ]] || fail "expected one non-reentrant full execution scope, found $ordinary_actual"
+[[ "$ordinary_actual" == "$ordinary_expected" ]] || fail "expected $ordinary_expected non-reentrant full/lazy scopes, found $ordinary_actual"
 
 [[ "$(grep -Fc 'runtime_execution_entry_reentry::allow_public_llvm_raw' "$runtime_source")" == 1 ]] ||
     fail 'public LLVM raw must be the sole re-entry-enabled execution API'
@@ -69,7 +73,7 @@ reset_guard_end_line="$(grep -n -m1 'Release current-thread publication ownershi
 raw_body="$(sed -n '/extern "C++" void llvm_jit_call_raw_host_api(/,/^    }/p' "$runtime_source")"
 raw_metadata_gate_line="$(grep -n -m1 'runtime_compilation_metadata_callback_access_allowed' <<<"$raw_body" | cut -d: -f1)"
 raw_gate_line="$(grep -n -m1 'runtime_state_publication_access_allowed' <<<"$raw_body" | cut -d: -f1)"
-raw_compile_line="$(grep -n -m1 'compile_all_modules_if_needed' <<<"$raw_body" | cut -d: -f1)"
+raw_compile_line="$(grep -n -m1 'ensure_llvm_jit_raw_call_runtime_ready' <<<"$raw_body" | cut -d: -f1)"
 [[ -n "$raw_gate_line" && -n "$raw_compile_line" && "$raw_gate_line" -lt "$raw_compile_line" ]] ||
     fail 'public raw publication-depth gate is not before publication/compilation lock acquisition'
 [[ -n "$raw_metadata_gate_line" && -n "$raw_gate_line" && "$raw_metadata_gate_line" -lt "$raw_gate_line" ]] ||

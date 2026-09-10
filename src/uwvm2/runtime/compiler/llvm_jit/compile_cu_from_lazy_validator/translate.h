@@ -326,6 +326,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Raw ABI entry point used by the runtime bridge and tiered dispatcher.
         ::std::uintptr_t raw_entry_address{};
 
+        // The internal Tiered body is the Wasm activation; public/raw/OSR entries only adapt its ABI. Publish its
+        // concrete address with the other entries so native backtraces never infer body identity from a nearby wrapper.
+        ::std::uintptr_t tiered_core_entry_address{};
+
         // Reentry descriptors and their raw native entry addresses, kept in matching index order.
         ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
         ::uwvm2::utils::container::vector<::std::uintptr_t> tiered_loop_reentry_raw_entry_addresses{};
@@ -1516,6 +1520,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
+            materialized.tiered_core_entry_address = 0u;
             materialized.tiered_loop_reentries.clear();
             materialized.tiered_loop_reentry_raw_entry_addresses.clear();
             materialized.llvm_jit_engine.reset();
@@ -1587,22 +1592,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
-            llvm_jit_cache_context.cache_key_is_complete = true;
+            // The source-level lazy key intentionally stays compact, but it does not encode imported globals,
+            // memories/tables, proposal metadata, or every declaration copied into this compilation unit. Let the
+            // ObjectCache append the complete emitted-module bitcode hash before accepting a persistent object.
+            llvm_jit_cache_context.cache_key_is_complete = false;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
                                                                                           lazy_llvm_jit_object_cache_policy()};
 
+            auto memory_manager{
+                ::uwvm2::utils::container::make_delete_owned<
+                    ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()};
+            auto const memory_manager_observer{memory_manager.get()};
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                            .release()})
-                    .create(target_machine.get())};
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                    .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
-            static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
 
@@ -1613,6 +1622,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            if(memory_manager_observer->has_finalization_failure()) [[unlikely]]
+            {
+                engine->setObjectCache(nullptr);
+                return false;
+            }
             engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -1644,8 +1658,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
             }
 
+            ::std::uintptr_t core_address{};
+            if(typed_entry_required && options.compile_options.emit_tiered_loop_reentry_entries)
+            {
+                auto const core_name{all_details::get_llvm_wasm_tiered_core_function_name(curr_module, function_index_u32)};
+                core_address = resolve_llvm_function_address(*engine, core_name);
+                if(core_address == 0u) [[unlikely]] { return false; }
+            }
             materialized.entry_address = entry_address;
             materialized.raw_entry_address = raw_entry_address;
+            materialized.tiered_core_entry_address = core_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
             materialized.llvm_jit_engine = ::std::move(engine);
             // Publish the fully resolved single-function record.  Acquire readers can now safely consume the addresses
@@ -1675,6 +1697,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
+                materialized.tiered_core_entry_address = 0u;
                 materialized.tiered_loop_reentries.clear();
                 materialized.tiered_loop_reentry_raw_entry_addresses.clear();
                 materialized.llvm_jit_engine.reset();
@@ -1775,22 +1798,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
-            llvm_jit_cache_context.cache_key_is_complete = true;
+            // Keep the coroutine materialization path identical to the synchronous path: the surrounding key is only
+            // a namespace hint, while the ObjectCache's bitcode hash is the authoritative native-code identity.
+            llvm_jit_cache_context.cache_key_is_complete = false;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
                                                                                           lazy_llvm_jit_object_cache_policy()};
 
+            auto memory_manager{
+                ::uwvm2::utils::container::make_delete_owned<
+                    ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()};
+            auto const memory_manager_observer{memory_manager.get()};
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                            .release()})
-                    .create(target_machine.get())};
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                    .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
-            static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
 
@@ -1801,6 +1827,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            if(memory_manager_observer->has_finalization_failure()) [[unlikely]]
+            {
+                engine->setObjectCache(nullptr);
+                return false;
+            }
             engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -1832,8 +1863,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     if(reentry_address == 0u) [[unlikely]] { return false; }
                     materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
                 }
+                ::std::uintptr_t core_address{};
+                if(typed_entry_required && options.compile_options.emit_tiered_loop_reentry_entries)
+                {
+                    auto const core_name{all_details::get_llvm_wasm_tiered_core_function_name(curr_module, function_index_u32)};
+                    core_address = resolve_llvm_function_address(*engine, core_name);
+                    if(core_address == 0u) [[unlikely]] { return false; }
+                }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
+                materialized.tiered_core_entry_address = core_address;
             }
 
             // Store the shared LLVM owners on one record before publishing any member as ready.  Other records contain

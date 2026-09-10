@@ -37,6 +37,9 @@ if rg -n 'memerr\.platform_context' "$runtime_impl"; then
 fi
 rg -q 'set_mmap_memory_out_of_bounds_with_context_handler' "$runtime_impl" ||
     fail 'runtime does not install the ABI-preserving native-context callback'
+if rg -n 'get_llvm_jit_trap_frame_context|llvm_jit_frame_pointer_link_plausible' "$runtime_impl"; then
+    fail 'runtime retains the obsolete frame-pointer-chain trap reconstruction path'
+fi
 
 python3 - "$runtime_impl" <<'PY' || fail 'Win64 ARM64 leaf unwind does not use only the fault-time LR'
 import sys

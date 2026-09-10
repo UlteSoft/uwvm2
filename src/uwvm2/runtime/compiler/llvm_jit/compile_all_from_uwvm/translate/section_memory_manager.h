@@ -532,7 +532,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
 
             // COFF x64 encodes .pdata RVAs relative to RuntimeDyld's synthetic __ImageBase.  LLVM computes that base as
             // the lowest loaded section address; RtlAddFunctionTable must receive the same value or Windows unwinding
-            // will not be able to resolve JIT PCs back to their UNWIND_INFO when code-layout changes move the active PC
+            // will not be able to resolve JIT PCs back to their UNWIND_INFO when code layout changes move the active PC
             // away from the public entry symbol.
             auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr) : static_cast<::std::uintptr_t>(load_addr)};
             auto const image_base{get_win64_image_base(fallback_base)};

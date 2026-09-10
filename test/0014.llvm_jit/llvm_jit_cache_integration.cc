@@ -71,13 +71,6 @@ namespace
         0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u,
         0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
-    inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
-        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
-        0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
-        0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x01u,
-        0x0au, 0x15u, 0x02u, 0x06u, 0x00u, 0x41u, 0x0au, 0x41u, 0x20u, 0x0bu, 0x0cu, 0x00u,
-        0x10u, 0x00u, 0x6au, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
-
     // These modules intentionally have the same path, function type, and function body. Only the
     // declared memory maximum differs, which changes the generated memory.grow implementation.
     // A complete persistent-cache key must therefore cover the authoritative generated LLVM IR,
@@ -93,6 +86,13 @@ namespace
         0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x02u,
         0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
         0x1au, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
+        0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
+        0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x01u,
+        0x0au, 0x15u, 0x02u, 0x06u, 0x00u, 0x41u, 0x0au, 0x41u, 0x20u, 0x0bu, 0x0cu, 0x00u,
+        0x10u, 0x00u, 0x6au, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
     struct wasm_fixture_def
     {
@@ -533,33 +533,44 @@ namespace
                                                                ::std::filesystem::path const& artifact_dir,
                                                                ::std::filesystem::path const& wasm_path)
     {
-        auto const cache_dir{artifact_dir / "cache-untrusted-source-fail-closed"};
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
-
         // An explicit path must not override the build-identity guard. Running twice proves that the first run neither
         // publishes an object nor leaves anything that the second run can reuse. Zero extra compile workers keeps this
-        // focused check on the ordinary MCJIT ObjectCache path on every supported host.
-        constexpr ::std::array labels{::std::string_view{"untrusted_source_cache_first"}, ::std::string_view{"untrusted_source_cache_second"}};
-        for(auto const label: labels)
+        // focused check on the ordinary MCJIT ObjectCache path for both Full materialization strategies.
+        struct untrusted_cache_mode
         {
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rct 0 -Rclog out", cache_args, label)) { return false; }
-            if(output_contains(artifact_dir, label, "object-cache-hit"))
+            ::std::string_view label;
+            ::std::string_view runtime_args;
+        };
+        constexpr ::std::array modes{untrusted_cache_mode{"aot", "-Raot -Rct 0 -Rclog out"},
+                                     untrusted_cache_mode{"lazy", "-Rjit -Rct 0 -Rclog out"}};
+        for(auto const& mode: modes)
+        {
+            auto const cache_dir{artifact_dir / (::std::string{"cache-untrusted-source-fail-closed-"} + ::std::string{mode.label})};
+            ::std::filesystem::remove_all(cache_dir);
+            ::std::filesystem::create_directories(cache_dir);
+            auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+
+            for(auto const ordinal: {::std::string_view{"first"}, ::std::string_view{"second"}})
             {
-                ::std::cerr << "untrusted-source build unexpectedly reused a persistent native object\n";
+                auto const label{::std::string{"untrusted_source_cache_"} + ::std::string{mode.label} + "_" + ::std::string{ordinal}};
+                if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, mode.runtime_args, cache_args, label)) { return false; }
+                if(output_contains(artifact_dir, label, "object-cache-hit"))
+                {
+                    ::std::cerr << "untrusted-source build unexpectedly reused a persistent native object in " << mode.label << " mode\n";
+                    return false;
+                }
+                if(!output_contains(artifact_dir, label, "status=disabled"))
+                {
+                    ::std::cerr << "untrusted-source cache decision was not reported as disabled in " << mode.label << " mode\n";
+                    return false;
+                }
+            }
+            if(!snapshot_cache(cache_dir).empty())
+            {
+                ::std::cerr << "untrusted-source build wrote a persistent native object in " << mode.label
+                            << " mode despite the fail-closed policy\n";
                 return false;
             }
-            if(!output_contains(artifact_dir, label, "status=disabled"))
-            {
-                ::std::cerr << "untrusted-source cache decision was not reported as disabled\n";
-                return false;
-            }
-        }
-        if(!snapshot_cache(cache_dir).empty())
-        {
-            ::std::cerr << "untrusted-source build wrote a persistent native object despite the fail-closed policy\n";
-            return false;
         }
         return true;
     }
@@ -694,11 +705,11 @@ namespace
             ::std::cerr << "signed cache integrity setup produced no cache file\n";
             return false;
         }
-        if(!first_cache_context_contains(cache_dir, "uwvm2-runtime-abi-v7") ||
+        if(!first_cache_context_contains(cache_dir, "uwvm2-runtime-abi-v") ||
            !first_cache_context_contains(cache_dir, "llvm-wasm-typed-result-abi") ||
            !first_cache_context_contains(cache_dir, "void-scalar-tuple-struct-v1"))
         {
-            ::std::cerr << "cache context is missing the v7 native-only typed multi-result ABI fingerprint\n";
+            ::std::cerr << "cache context is missing the native-only typed multi-result ABI fingerprint\n";
             return false;
         }
         if(!expect_clean_cache_hit(uwvm_path, artifact_dir, wasm_path, cache_args, "signed_integrity_clean_hit")) { return false; }
@@ -1048,59 +1059,69 @@ namespace
                                                                   ::std::filesystem::path const& artifact_dir)
     {
         auto const wasm_path{artifact_dir / "cache-ir-shape-same-path.wasm"};
-        auto const cache_dir{artifact_dir / "cache-aot-ir-shape"};
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
-        // One explicit extra worker exercises the full parallel-object key without inheriting an unbounded
-        // host-dependent compile-thread policy.
-        constexpr ::std::string_view runtime_args{"-Raot -Rct 1 -Rclog out"};
+        constexpr ::std::array modes{
+            // One explicit extra worker exercises lazy grouped materialization and the full parallel-object key without
+            // allowing this focused regression to inherit an unbounded host-dependent thread policy.
+            cache_runtime_mode{"lazy_ir_shape", "-Rjit -Rct 1"},
+            cache_runtime_mode{"full_ir_shape", "-Raot -Rct 1"}};
 
-        if(!write_fixture(wasm_path, memory_max_one_wasm.data(), memory_max_one_wasm.size()) ||
-           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_one"))
+        for(auto const& mode: modes)
         {
-            return false;
-        }
-        auto const first{snapshot_cache(cache_dir)};
-        if(first.empty())
-        {
-            ::std::cerr << "memory-max cache setup produced no object for AOT\n";
-            return false;
-        }
+            auto const cache_dir{artifact_dir / (::std::string{"cache-"} + ::std::string{mode.label})};
+            ::std::filesystem::remove_all(cache_dir);
+            ::std::filesystem::create_directories(cache_dir);
+            auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+            auto const runtime_args{::std::string{mode.args} + " -Rclog out"};
 
-        if(!write_fixture(wasm_path, memory_max_two_wasm.data(), memory_max_two_wasm.size()) ||
-           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_two"))
-        {
-            return false;
-        }
-        if(output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-hit"))
-        {
-            ::std::cerr << "changed memory limits incorrectly reused stale generated AOT code\n";
-            return false;
-        }
-        if(!output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-store"))
-        {
-            ::std::cerr << "changed memory limits did not store a distinct AOT cache object\n";
-            return false;
-        }
-        auto const second{snapshot_cache(cache_dir)};
-        if(second.size() <= first.size())
-        {
-            ::std::cerr << "generated-IR cache identity did not grow after the memory-limit change; before=" << first.size()
-                        << " after=" << second.size() << '\n';
-            return false;
-        }
+            if(!write_fixture(wasm_path, memory_max_one_wasm.data(), memory_max_one_wasm.size()) ||
+               !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args,
+                         ::std::string{mode.label} + "_max_one"))
+            {
+                return false;
+            }
+            auto const first{snapshot_cache(cache_dir)};
+            if(first.empty())
+            {
+                ::std::cerr << "memory-max cache setup produced no object for " << mode.label << '\n';
+                return false;
+            }
 
-        if(!run_uwvm(uwvm_path,
-                     artifact_dir,
-                     wasm_path,
-                     runtime_args,
-                     cache_args,
-                     "aot_ir_shape_max_two_reuse") ||
-           !output_contains(artifact_dir, "aot_ir_shape_max_two_reuse", "object-cache-hit"))
-        {
-            ::std::cerr << "new memory-limit AOT cache object was not reusable\n";
-            return false;
+            if(!write_fixture(wasm_path, memory_max_two_wasm.data(), memory_max_two_wasm.size()) ||
+               !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args,
+                         ::std::string{mode.label} + "_max_two"))
+            {
+                return false;
+            }
+            auto const second_label{::std::string{mode.label} + "_max_two"};
+            if(output_contains(artifact_dir, second_label, "object-cache-hit"))
+            {
+                ::std::cerr << "changed memory limits incorrectly reused stale generated code for " << mode.label << '\n';
+                return false;
+            }
+            if(!output_contains(artifact_dir, second_label, "object-cache-store"))
+            {
+                ::std::cerr << "changed memory limits did not store a distinct cache object for " << mode.label << '\n';
+                return false;
+            }
+            auto const second{snapshot_cache(cache_dir)};
+            if(second.size() <= first.size())
+            {
+                ::std::cerr << "generated-IR cache identity did not grow after the memory-limit change for " << mode.label
+                            << "; before=" << first.size() << " after=" << second.size() << '\n';
+                return false;
+            }
+
+            if(!run_uwvm(uwvm_path,
+                         artifact_dir,
+                         wasm_path,
+                         runtime_args,
+                         cache_args,
+                         ::std::string{mode.label} + "_max_two_reuse") ||
+               !output_contains(artifact_dir, ::std::string{mode.label} + "_max_two_reuse", "object-cache-hit"))
+            {
+                ::std::cerr << "new memory-limit cache object was not reusable for " << mode.label << '\n';
+                return false;
+            }
         }
 
         return true;
