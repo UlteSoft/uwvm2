@@ -4606,6 +4606,13 @@ namespace uwvm2::runtime::lib
             if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]] { g_runtime.lazy_runtime_compiled_hit_count.fetch_add(1uz, ::std::memory_order_relaxed); }
         }
 
+            // Result capacity is a postcondition of normal return, not a condition for entering the function.
+            // WebAssembly's `unreachable` is stack-polymorphic (already in Core 1.0): a valid result-typed function
+            // may trap without ever producing those values, so its actual operand-stack peak can be zero.
+            // https://webassembly.github.io/spec/core/valid/instructions.html#valid-unreachable
+            // Keep the exact allocation and fail closed before copying any normal-return results.
+            if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+
         inline constexpr void record_tiered_lazy_miss() noexcept
         {
             // Misses include both entry-demand compilation and loop-OSR requests, giving one aggregate view of tier pressure.
@@ -7685,8 +7692,6 @@ namespace uwvm2::runtime::lib
             // may trap without ever producing those values, so its actual operand-stack peak can be zero.
             // https://webassembly.github.io/spec/core/valid/instructions.html#valid-unreachable
             // Keep the exact allocation and fail closed before copying any normal-return results.
-            if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
-
             // Append results back to caller stack.
             copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
