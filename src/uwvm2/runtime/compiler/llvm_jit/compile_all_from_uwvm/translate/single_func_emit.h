@@ -2376,7 +2376,8 @@ template <typename ValueType>
     if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
     ValueType value{};
-    local_imported_module->global_get_from_index(global_index, reinterpret_cast<::std::byte*>(::std::addressof(value)));
+    ::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_get(
+        local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(value)));
     return value;
 }
 
@@ -2389,7 +2390,8 @@ inline constexpr void
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-    if(!local_imported_module->global_set_from_index(global_index, reinterpret_cast<::std::byte const*>(::std::addressof(value)))) [[unlikely]]
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_set(
+           local_imported_module, global_index, reinterpret_cast<::std::byte const*>(::std::addressof(value)))) [[unlikely]]
     {
         ::fast_io::fast_terminate();
     }
@@ -2892,7 +2894,12 @@ inline constexpr void populate_runtime_memory_access_info_mmap_fields(runtime_me
                     result.local_imported_module_ptr = curr->target.local_imported.module_ptr;
                     result.local_imported_memory_index = curr->target.local_imported.index;
                     if(result.local_imported_module_ptr == nullptr) [[unlikely]] { return {}; }
-                    result.local_imported_page_size_bytes = result.local_imported_module_ptr->memory_page_size_from_index(result.local_imported_memory_index);
+                    // Resolving a provider's compile-time page size is still an extensible virtual call. Keep it behind
+                    // the same callback boundary used by generated accesses so compilation cannot inherit a live raw-
+                    // bridge capability or leak provider FP-control changes into the active Wasm entry.
+                    result.local_imported_page_size_bytes =
+                        ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size_for_compilation(
+                            result.local_imported_module_ptr, result.local_imported_memory_index);
                     return result;
                 }
                 [[unlikely]] default:
@@ -3296,7 +3303,8 @@ template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
     if(effective_offset.offset_65_bit) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
 
     ::std::byte load_buffer[LoadBytes]{};
-    if(!local_imported_module->memory_read_from_index(memory_index, effective_offset.offset, load_buffer, LoadBytes)) [[unlikely]]
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_read(
+           local_imported_module, memory_index, effective_offset.offset, load_buffer, LoadBytes)) [[unlikely]]
     {
         llvm_jit_memory_bridge_trap();
     }
@@ -3489,7 +3497,8 @@ inline constexpr void llvm_jit_local_imported_memory_store_bridge(::std::uintptr
         llvm_jit_store_little_endian_integer(store_ptr, ::std::bit_cast<::std::uint_least64_t>(value));
     }
 
-    if(!local_imported_module->memory_write_to_index(memory_index, effective_offset.offset, store_buffer, StoreBytes)) [[unlikely]]
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+           local_imported_module, memory_index, effective_offset.offset, store_buffer, StoreBytes)) [[unlikely]]
     {
         llvm_jit_memory_bridge_trap();
     }
@@ -3776,10 +3785,14 @@ template <typename MemoryT, typename Fn>
 {
     if(local_imported_module == nullptr) [[unlikely]] { return false; }
 
-    ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t snapshot{};
-    if(!local_imported_module->memory_access_snapshot_from_index(memory_index, snapshot)) [[unlikely]] { return false; }
+    ::uwvm2::runtime::lib::details::local_imported_provider_memory_snapshot_t snapshot{};
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_access_snapshot(local_imported_module, memory_index, snapshot)) [[unlikely]]
+    {
+        return false;
+    }
 
-    auto const page_size_bytes_u64{local_imported_module->memory_page_size_from_index(memory_index)};
+    auto const page_size_bytes_u64{
+        ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size(local_imported_module, memory_index)};
     if(page_size_bytes_u64 == 0u) [[unlikely]] { return false; }
     if constexpr(::std::numeric_limits<::std::size_t>::digits < ::std::numeric_limits<::std::uint_least64_t>::digits)
     {
@@ -3925,8 +3938,10 @@ inline constexpr void llvm_jit_local_imported_memory_copy_bridge(::std::uintptr_
         {
             auto const chunk_size{remaining < staging_capacity ? remaining : staging_capacity};
             auto const chunk_offset{remaining - chunk_size};
-            if(!local_imported_module->memory_read_from_index(memory_index, src + chunk_offset, staging, chunk_size) ||
-               !local_imported_module->memory_write_to_index(memory_index, dst + chunk_offset, staging, chunk_size)) [[unlikely]]
+            if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_read(
+                   local_imported_module, memory_index, src + chunk_offset, staging, chunk_size) ||
+               !::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+                   local_imported_module, memory_index, dst + chunk_offset, staging, chunk_size)) [[unlikely]]
             {
                 llvm_jit_memory_bridge_trap();
                 return;
@@ -3942,8 +3957,10 @@ inline constexpr void llvm_jit_local_imported_memory_copy_bridge(::std::uintptr_
     {
         auto const remaining{len - copied};
         auto const chunk_size{remaining < staging_capacity ? remaining : staging_capacity};
-        if(!local_imported_module->memory_read_from_index(memory_index, src + copied, staging, chunk_size) ||
-           !local_imported_module->memory_write_to_index(memory_index, dst + copied, staging, chunk_size)) [[unlikely]]
+        if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_read(
+               local_imported_module, memory_index, src + copied, staging, chunk_size) ||
+           !::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+               local_imported_module, memory_index, dst + copied, staging, chunk_size)) [[unlikely]]
         {
             llvm_jit_memory_bridge_trap();
             return;
@@ -3982,7 +3999,8 @@ inline constexpr void llvm_jit_local_imported_memory_fill_bridge(::std::uintptr_
     {
         auto const remaining{len - filled};
         auto const chunk_size{remaining < staging_capacity ? remaining : staging_capacity};
-        if(!local_imported_module->memory_write_to_index(memory_index, dst + filled, staging, chunk_size)) [[unlikely]]
+        if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+               local_imported_module, memory_index, dst + filled, staging, chunk_size)) [[unlikely]]
         {
             llvm_jit_memory_bridge_trap();
             return;
@@ -4598,10 +4616,14 @@ inline constexpr void llvm_jit_table_fill_bridge(::std::uintptr_t runtime_module
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
     if(local_imported_module == nullptr) [[unlikely]] { return false; }
 
-    ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t snapshot{};
-    if(!local_imported_module->memory_access_snapshot_from_index(memory_index, snapshot)) [[unlikely]] { return false; }
+    ::uwvm2::runtime::lib::details::local_imported_provider_memory_snapshot_t snapshot{};
+    if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_access_snapshot(local_imported_module, memory_index, snapshot)) [[unlikely]]
+    {
+        return false;
+    }
 
-    auto const page_size_bytes{local_imported_module->memory_page_size_from_index(memory_index)};
+    auto const page_size_bytes{
+        ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size(local_imported_module, memory_index)};
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
     if(!::std::has_single_bit(page_size_bytes)) [[unlikely]]
@@ -4687,7 +4709,8 @@ inline constexpr void llvm_jit_table_fill_bridge(::std::uintptr_t runtime_module
 
     auto const delta_pages{static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(delta_i32))};
     ::std::uint_least64_t old_pages{};
-    return local_imported_module->memory_try_grow_from_index(memory_index, delta_pages, max_limit_memory_length, ::std::addressof(old_pages))
+    return ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_try_grow(
+               local_imported_module, memory_index, delta_pages, max_limit_memory_length, ::std::addressof(old_pages))
                ? static_cast<runtime_wasm_i32>(old_pages)
                : static_cast<runtime_wasm_i32>(-1);
 }

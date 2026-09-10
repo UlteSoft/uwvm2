@@ -73,6 +73,7 @@
 # include "uwvm_runtime_generation.h"
 # include "uwvm_runtime_execution_entry.h"
 # include "uwvm_runtime_imported_function_lookup.h"
+# include "uwvm_runtime_local_imported_provider_callbacks.h"
 # include "uwvm_runtime_state_signature.h"
 # include "uwvm_runtime_wasip1_memory_bindings.h"
 # if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -2947,6 +2948,27 @@ namespace uwvm2::runtime::lib
             valtype_vec_view results{};
         };
 
+        struct local_imported_func_sig_snapshot
+        {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            // LLVM compilation may invoke an extensible provider while locks/tokens are suspended. Own the normalized
+            // type bytes so no provider pointer survives that callback boundary.
+            ::uwvm2::runtime::lib::details::local_imported_provider_function_signature_t owned{};
+
+            [[nodiscard]] inline constexpr func_sig_view view() const noexcept
+            {
+                return {{valtype_kind::raw_u8, owned.parameter_types.data(), owned.parameter_types.size()},
+                        {valtype_kind::raw_u8, owned.result_types.data(),    owned.result_types.size()   }};
+            }
+#else
+            // In a pure interpreter build the header-only type-erasure adapter returns its own constexpr signature
+            // cache directly; there is no extensible LLVM metadata callback boundary to cross.
+            func_sig_view borrowed{};
+
+            [[nodiscard]] inline constexpr func_sig_view view() const noexcept { return borrowed; }
+#endif
+        };
+
         // Precomputed import dispatch table for O(1) imported calls.
         // This is built once before execution (after uwvm runtime initialization + compilation).
         struct cached_import_target
@@ -5645,17 +5667,28 @@ namespace uwvm2::runtime::lib
             };
         }
 
-        [[nodiscard]] inline constexpr func_sig_view func_sig_from_local_imported(local_imported_t const* m, ::std::size_t idx) noexcept
+        [[nodiscard]] inline constexpr local_imported_func_sig_snapshot
+            func_sig_from_local_imported(local_imported_t const* m, ::std::size_t idx) noexcept
         {
             // Local-imported modules expose signature metadata through their import adapter rather than wasm runtime storage.
+            local_imported_func_sig_snapshot result{};
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_function_signature(m, idx, result.owned)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+#else
+            // No generated bridge token or LLVM-Wasm FP environment exists in a pure interpreter build.
             auto const info{m->get_function_information_from_index(idx)};
             if(!info.successed) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             auto const& ft{info.function_type};
-            return {
+            result.borrowed = {
                 {valtype_kind::wasm_enum, ft.parameter.begin, static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)},
                 {valtype_kind::wasm_enum, ft.result.begin,    static_cast<::std::size_t>(ft.result.end - ft.result.begin)      }
             };
+#endif
+            return result;
         }
 
         [[nodiscard]] inline constexpr func_sig_view func_sig_from_capi(capi_function_t const* f) noexcept
@@ -6616,8 +6649,17 @@ namespace uwvm2::runtime::lib
             // Local-imported memories are owned by native modules. Query their snapshot API instead of assuming UWVM native memory layout.
             if(local_imported == nullptr) [[unlikely]] { return false; }
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::uwvm2::runtime::lib::details::local_imported_provider_memory_snapshot_t snapshot{};
+            if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_access_snapshot(
+                   local_imported, local_imported_index, snapshot)) [[unlikely]]
+            {
+                return false;
+            }
+#else
             ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t snapshot{};
             if(!local_imported->memory_access_snapshot_from_index(local_imported_index, snapshot)) [[unlikely]] { return false; }
+#endif
 
             resolved.kind = resolved_preload_memory_t::target_kind::local_imported;
             resolved.native_memory = nullptr;
@@ -6625,7 +6667,12 @@ namespace uwvm2::runtime::lib
             resolved.local_imported_index = local_imported_index;
             resolved.memory_begin = snapshot.memory_begin;
             resolved.page_count = snapshot.page_count;
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            resolved.page_size_bytes =
+                ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size(local_imported, local_imported_index);
+#else
             resolved.page_size_bytes = local_imported->memory_page_size_from_index(local_imported_index);
+#endif
             resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_local_imported;
             resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
             resolved.partial_protection_limit_bytes = 0u;
@@ -6844,7 +6891,12 @@ namespace uwvm2::runtime::lib
                 {
                     auto const local_imported{resolved.local_imported};
                     if(local_imported == nullptr) [[unlikely]] { return false; }
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    return ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_read(
+                        local_imported, resolved.local_imported_index, offset, destination, size);
+#else
                     return local_imported->memory_read_from_index(resolved.local_imported_index, offset, destination, size);
+#endif
                 }
                 default:
                 {
@@ -6889,7 +6941,12 @@ namespace uwvm2::runtime::lib
                 {
                     auto const local_imported{resolved.local_imported};
                     if(local_imported == nullptr) [[unlikely]] { return false; }
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    return ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_write(
+                        local_imported, resolved.local_imported_index, offset, source, size);
+#else
                     return local_imported->memory_write_to_index(resolved.local_imported_index, offset, source, size);
+#endif
                 }
                 default:
                 {
@@ -13502,6 +13559,198 @@ namespace uwvm2::runtime::lib
     }  // namespace
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    namespace details
+    {
+        // Local-imported metadata, global, and memory operations are extensible native-provider calls. LLVM compilation
+        // and generated Wasm both use these entry points; the common host-callback scope suspends any live generated-
+        // bridge depth token for the complete virtual call and restores an active LLVM-Wasm FP environment. Combined
+        // LLVM/interpreter builds use the same boundary for interpreter global access, while interpreter-only builds
+        // retain their direct virtual-call path.
+        extern "C++" void invoke_local_imported_provider_global_get(void* opaque_module,
+                                                                     ::std::size_t global_index,
+                                                                     ::std::byte* out) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr || out == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept { module->global_get_from_index(global_index, out); });
+        }
+
+        extern "C++" bool invoke_local_imported_provider_global_set(void* opaque_module,
+                                                                     ::std::size_t global_index,
+                                                                     ::std::byte const* in) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr || in == nullptr) [[unlikely]] { return false; }
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept { result = module->global_set_from_index(global_index, in); });
+            return result;
+        }
+
+        extern "C++" bool invoke_local_imported_provider_function_signature(
+            void const* opaque_module,
+            ::std::size_t function_index,
+            local_imported_provider_function_signature_t& out) noexcept
+        {
+            auto module{static_cast<local_imported_t const*>(opaque_module)};
+            if(module == nullptr) [[unlikely]] { return false; }
+
+            runtime_compilation_metadata_callback_scope metadata_callback_scope{};
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment(
+                [&]() noexcept
+                {
+                    auto const info{module->get_function_information_from_index(function_index)};
+                    if(!info.successed) [[unlikely]] { return; }
+
+                    auto const& function_type{info.function_type};
+                    auto const copy_range{
+                        [](auto const& values, ::std::vector<::std::uint_least8_t>& types_out) noexcept
+                        {
+                            if(values.begin == nullptr || values.end == nullptr)
+                            {
+                                if(values.begin != values.end) [[unlikely]] { return false; }
+                                types_out.clear();
+                                return true;
+                            }
+
+                            // A provider is outside the runtime's allocation domain. Relational comparison or subtraction
+                            // of unrelated pointers is undefined in C++; validate the representation as integer addresses
+                            // first, including element alignment, and copy each value while the callback remains guarded.
+                            using element_type = ::std::remove_cv_t<::std::remove_pointer_t<decltype(values.begin)>>;
+                            auto const begin_address{reinterpret_cast<::std::uintptr_t>(values.begin)};
+                            auto const end_address{reinterpret_cast<::std::uintptr_t>(values.end)};
+                            if(end_address < begin_address) [[unlikely]] { return false; }
+                            auto const byte_count{end_address - begin_address};
+                            if(begin_address % alignof(element_type) != 0uz || byte_count % sizeof(element_type) != 0uz) [[unlikely]] { return false; }
+                            auto const element_count{byte_count / sizeof(element_type)};
+                            if constexpr(sizeof(::std::uintptr_t) > sizeof(::std::size_t))
+                            {
+                                if(element_count > static_cast<::std::uintptr_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return false; }
+                            }
+                            auto const count{static_cast<::std::size_t>(element_count)};
+                            types_out.resize(count);
+                            for(::std::size_t i{}; i != count; ++i)
+                            {
+                                types_out[i] = static_cast<::std::uint_least8_t>(values.begin[i]);
+                            }
+                            return true;
+                        }};
+
+                    local_imported_provider_function_signature_t snapshot{};
+                    if(!copy_range(function_type.parameter, snapshot.parameter_types) ||
+                       !copy_range(function_type.result, snapshot.result_types)) [[unlikely]]
+                    {
+                        return;
+                    }
+
+                    // Commit both vectors together only after the complete provider result has validated. Runtime caches
+                    // may keep this owned snapshot without depending on provider object or callback-local lifetimes.
+                    out = ::std::move(snapshot);
+                    result = true;
+                });
+            return result;
+        }
+
+        extern "C++" ::std::uint_least8_t
+            invoke_local_imported_provider_function_wasm_fp_control_policy(void const* opaque_module,
+                                                                           ::std::size_t function_index) noexcept
+        {
+            auto module{static_cast<local_imported_t const*>(opaque_module)};
+            using policy_type = ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t;
+            if(module == nullptr) [[unlikely]] { return static_cast<::std::uint_least8_t>(policy_type::may_modify); }
+            runtime_compilation_metadata_callback_scope metadata_callback_scope{};
+            policy_type result{policy_type::may_modify};
+            invoke_host_preserving_llvm_wasm_fp_environment(
+                [&]() noexcept { result = module->function_wasm_fp_control_policy_from_index(function_index); });
+            return static_cast<::std::uint_least8_t>(result);
+        }
+
+        extern "C++" ::std::uint_least64_t
+            invoke_local_imported_provider_memory_page_size(void const* opaque_module, ::std::size_t memory_index) noexcept
+        {
+            auto module{static_cast<local_imported_t const*>(opaque_module)};
+            if(module == nullptr) [[unlikely]] { return 0u; }
+            ::std::uint_least64_t result{};
+            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept { result = module->memory_page_size_from_index(memory_index); });
+            return result;
+        }
+
+        extern "C++" ::std::uint_least64_t
+            invoke_local_imported_provider_memory_page_size_for_compilation(void const* opaque_module,
+                                                                            ::std::size_t memory_index) noexcept
+        {
+            // Unlike generated memory.size/load/store helpers, lazy single-CU translation may query this provider
+            // without publication-lock ownership. Mark only that metadata path so ordinary execution callbacks keep
+            // their supported public-raw re-entry surface.
+            runtime_compilation_metadata_callback_scope metadata_callback_scope{};
+            return invoke_local_imported_provider_memory_page_size(opaque_module, memory_index);
+        }
+
+        extern "C++" bool invoke_local_imported_provider_memory_access_snapshot(
+            void* opaque_module,
+            ::std::size_t memory_index,
+            local_imported_provider_memory_snapshot_t& out) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr) [[unlikely]] { return false; }
+            ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t provider_snapshot{};
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment(
+                [&]() noexcept { result = module->memory_access_snapshot_from_index(memory_index, provider_snapshot); });
+            if(result)
+            {
+                out.memory_begin = provider_snapshot.memory_begin;
+                out.page_count = provider_snapshot.page_count;
+            }
+            return result;
+        }
+
+        extern "C++" bool invoke_local_imported_provider_memory_read(void* opaque_module,
+                                                                      ::std::size_t memory_index,
+                                                                      ::std::uint_least64_t offset,
+                                                                      void* destination,
+                                                                      ::std::size_t size) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr) [[unlikely]] { return false; }
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment(
+                [&]() noexcept { result = module->memory_read_from_index(memory_index, offset, destination, size); });
+            return result;
+        }
+
+        extern "C++" bool invoke_local_imported_provider_memory_write(void* opaque_module,
+                                                                       ::std::size_t memory_index,
+                                                                       ::std::uint_least64_t offset,
+                                                                       void const* source,
+                                                                       ::std::size_t size) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr) [[unlikely]] { return false; }
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment(
+                [&]() noexcept { result = module->memory_write_to_index(memory_index, offset, source, size); });
+            return result;
+        }
+
+        extern "C++" bool invoke_local_imported_provider_memory_try_grow(void* opaque_module,
+                                                                          ::std::size_t memory_index,
+                                                                          ::std::uint_least64_t delta_pages,
+                                                                          ::std::size_t max_limit_memory_length,
+                                                                          ::std::uint_least64_t* old_page_size_out) noexcept
+        {
+            auto module{static_cast<local_imported_t*>(opaque_module)};
+            if(module == nullptr || old_page_size_out == nullptr) [[unlikely]] { return false; }
+            bool result{};
+            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept
+                                                            {
+                                                                result = module->memory_try_grow_from_index(
+                                                                    memory_index, delta_pages, max_limit_memory_length, old_page_size_out);
+                                                            });
+            return result;
+        }
+    }  // namespace details
+
     // =========================================================================
     // LLVM-generated trap and logical stack callbacks
     // -------------------------------------------------------------------------

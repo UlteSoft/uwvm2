@@ -50,6 +50,10 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifndef UWVM_MODULE
+# include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
+#endif
+
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 # if !(__cpp_pack_indexing >= 202311L)
 #  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
@@ -159,7 +163,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             GlobalT v{};
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_get(
+                local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
+#else
             local_imported_module->global_get_from_index(global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
+#endif
             return v;
         }
 
@@ -169,9 +178,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                               GlobalT const& v) noexcept
         {
             static_assert(::std::is_trivially_copyable_v<GlobalT>);
-            if(local_imported_module == nullptr ||
-               !local_imported_module->global_set_from_index(global_index,
-                                                              reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
+            if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_set(
+                   local_imported_module, global_index, reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
+#else
+            if(!local_imported_module->global_set_from_index(global_index,
+                                                             reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
+#endif
             {
                 ::fast_io::fast_terminate();
             }

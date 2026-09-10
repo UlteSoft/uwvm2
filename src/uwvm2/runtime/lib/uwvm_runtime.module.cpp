@@ -42,6 +42,7 @@
 #include "uwvm_runtime_generation.h"
 #include "uwvm_runtime_execution_entry.h"
 #include "uwvm_runtime_imported_function_lookup.h"
+#include "uwvm_runtime_local_imported_provider_callbacks.h"
 #include "uwvm_runtime_state_signature.h"
 #include "uwvm_runtime_wasip1_memory_bindings.h"
 #if defined(UWVM_RUNTIME_LLVM_JIT)
