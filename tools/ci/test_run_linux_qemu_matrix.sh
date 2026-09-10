@@ -133,17 +133,17 @@ if [[ ${1:-} == --version ]]; then
     printf 'WASM Memory Model: Memory Map\n'
     case $profile in
         full-product|full-product-no-wasm2) printf 'Runtime Compiler: UWVM2-Interpreter, LLVM-JIT\n' ;;
-        ros-product|ros-*-remnant)
+        ros-product|ros-unsupported-wasm2|ros-*-remnant)
             printf 'Runtime Compiler: UWVM2-Interpreter, LLVM-AOT\n'
             ;;
-        full-live|full-bad|full-aux-authority|full-tiered*|lazy-only) printf 'Runtime Compiler: LLVM-JIT\n' ;;
+        full-live|full-bad|full-posix-live|full-tiered*|lazy-only) printf 'Runtime Compiler: LLVM-JIT\n' ;;
         int-*) printf 'Runtime Compiler: UWVM2-Interpreter\n' ;;
         *) printf 'Runtime Compiler: LLVM-AOT\n' ;;
     esac
     case $profile in
-        full-tiered-native|full-live|full-bad|full-aux-authority) printf 'Call Stack Modes Support: instruction, unwind, unwind-uncheck\n' ;;
-        full-product|full-product-no-wasm2|ros-product|ros-*-remnant|ros-instruction|full-tiered*|lazy-only)
-            printf 'Call Stack Modes Support: instruction, unwind-uncheck (auxiliary)\n'
+        full-tiered-native|full-live|full-bad|full-posix-live) printf 'Call Stack Modes Support: instruction, unwind, unwind-uncheck\n' ;;
+        full-product|full-product-no-wasm2|ros-product|ros-unsupported-wasm2|ros-*-remnant|ros-instruction|full-tiered*|lazy-only)
+            printf 'Call Stack Modes Support: instruction, unwind-uncheck\n'
             ;;
         auto-none) printf 'Call Stack Modes Support: instruction\n' ;;
     esac
@@ -163,7 +163,7 @@ if [[ ${1:-} == --help && ${2:-} == runtime ]]; then
                 printf '%s\n' '--runtime-tiered-disable-uwvm-int-lazy-interpreter'
                 printf '%s\n' '--runtime-tiered-disable-llvm-full-jit'
                 ;;
-            ros-product)
+            ros-product|ros-unsupported-wasm2)
                 printf '%s\n' '--runtime-int' '--runtime-aot'
                 ;;
             ros-custom-mode-remnant)
@@ -186,7 +186,7 @@ if [[ ${1:-} == --help && ${2:-} == runtime ]]; then
             *)
                 printf '%s\n' '--runtime-aot'
                 if [[ $profile == full-tiered* ]]; then printf '%s\n' '--runtime-tiered'; fi
-                if [[ $profile == full-live || $profile == full-bad || $profile == full-aux-authority ]]; then
+                if [[ $profile == full-live || $profile == full-bad || $profile == full-posix-live ]]; then
                     printf '%s\n' '--runtime-custom-mode' '--runtime-custom-compiler'
                 fi
                 if [[ $profile == ros-instruction ]]; then
@@ -199,8 +199,8 @@ if [[ ${1:-} == --help && ${2:-} == runtime ]]; then
         esac
         printf '%s\n' '--runtime-llvm-jit-call-stack'
         case $profile in
-            full-tiered-native|full-live|full-bad|full-aux-authority) printf 'Usage: -Rllvm-call-stack [auto|instruction|none|unwind|unwind-uncheck]\n' ;;
-            full-product|full-product-no-wasm2|ros-product|ros-*-remnant|ros-instruction|full-tiered*|lazy-only)
+            full-tiered-native|full-live|full-bad|full-posix-live) printf 'Usage: -Rllvm-call-stack [auto|instruction|none|unwind|unwind-uncheck]\n' ;;
+            full-product|full-product-no-wasm2|ros-product|ros-unsupported-wasm2|ros-*-remnant|ros-instruction|full-tiered*|lazy-only)
                 printf 'Usage: -Rllvm-call-stack [auto|instruction|none|unwind-uncheck]\n'
                 ;;
             auto-none) printf 'Usage: -Rllvm-call-stack [auto|instruction|none]\n' ;;
@@ -209,7 +209,8 @@ if [[ ${1:-} == --help && ${2:-} == runtime ]]; then
     exit 0
 fi
 if [[ ${1:-} == --help && ${2:-} == wasm ]]; then
-    if [[ $profile == int-* || $profile == full-product || $profile == ros-product || $profile == ros-*-remnant || $profile == full-tiered* || \
+    if [[ $profile == int-* || $profile == full-product || $profile == ros-product || $profile == ros-unsupported-wasm2 || \
+          $profile == ros-*-remnant || $profile == full-tiered* || \
           $profile == lazy-only ]]; then
         printf '%s\n' '--wasm-feature-wasm2'
     else
@@ -277,6 +278,23 @@ while (($# != 0)); do
 done
 
 [[ -n $compiler_log ]]
+fixture=$(basename -- "$wasm")
+if [[ $profile == ros-unsupported-wasm2 && $compiler_backend == jit ]]; then
+    case $fixture in
+        wasm2_bulk_memory.wasm)
+            printf 'LLVM AOT capability preflight rejected module="mock": memory.init has no LLVM lowering\n' >&2
+            exit 1
+            ;;
+        wasm2_multivalue.wasm)
+            printf 'LLVM AOT capability preflight rejected module="mock": function signature has multiple results\n' >&2
+            exit 1
+            ;;
+        wasm2_table_oob.wasm)
+            printf 'LLVM AOT capability preflight rejected module="mock": table.copy has no LLVM lowering\n' >&2
+            exit 1
+            ;;
+    esac
+fi
 if [[ $profile == int-* ]]; then
     ((int_mode)) || {
         printf 'int-only mock did not receive -Rint\n' >&2
@@ -300,7 +318,7 @@ else
     effective=$policy
     if [[ $policy == auto ]]; then
         case $profile in
-            full-tiered-native|full-live|full-bad|full-aux-authority) effective=unwind ;;
+            full-tiered-native|full-live|full-bad|full-posix-live) effective=unwind ;;
             ros-instruction|full-tiered*) effective=instruction ;;
             auto-none) effective=none ;;
         esac
@@ -310,14 +328,14 @@ else
         instruction)
             backend=unwind.h
             check=off
-            replace=no
+            replace=yes
             frames=emit
             ;;
         unwind-uncheck)
             backend=unwind.h
-            check=static
-            replace=no
-            frames=emit
+            check=unchecked
+            replace=yes
+            frames=omit
             ;;
         unwind)
             if [[ $profile == full-bad ]]; then
@@ -325,7 +343,7 @@ else
                 check=static
                 replace=no
                 frames=emit
-            elif [[ $profile == full-aux-authority ]]; then
+            elif [[ $profile == full-posix-live ]]; then
                 backend=unwind.h
                 check=live
                 replace=yes
@@ -352,7 +370,6 @@ else
     fi
 fi
 
-fixture=$(basename -- "$wasm")
 trap_kind=
 stack=
 case $fixture in
@@ -648,7 +665,7 @@ assert_tsv_value "$int_output/metadata.tsv" compile_threads 0
 assert_tsv_value "$int_output/metadata.tsv" supported_policies logical
 assert_tsv_value "$int_output/metadata.tsv" policy_probe_mode unavailable
 assert_tsv_value "$int_output/metadata.tsv" auto_effective_policy unavailable
-assert_tsv_value "$int_output/metadata.tsv" unwind_uncheck_auxiliary_status unavailable
+assert_tsv_value "$int_output/metadata.tsv" unwind_uncheck_replacement_status unavailable
 grep -q $'\tint\tlogical\tlogical\tmvp_smoke\tnormal\tok\t0\tPASS\t' "$int_output/results.tsv" ||
     fail 'int-only MVP correctness row did not pass with logical stack policy'
 grep -q $'\tint\tlogical\tlogical\toob_load\ttrap\tmemory access out of bounds\t1\tPASS\t' "$int_output/results.tsv" ||
@@ -684,8 +701,8 @@ assert_no_fail_rows "$llvm_skip_output/results.tsv"
 
 lazy_probe_output=$(run_profile lazy-only unwind-uncheck 1 lazy 0)
 assert_tsv_columns "$lazy_probe_output/results.tsv"
-grep -q $'\tunwind-uncheck\tunavailable\tunwind-uncheck-auxiliary-probe\tcapability\tan advertised AOT/full policy-probe mode\t-\tFAIL\t' \
-    "$lazy_probe_output/results.tsv" || fail 'missing auxiliary probe did not produce an explicit failure'
+grep -q $'\tunwind-uncheck\tunavailable\tunwind-uncheck-replacement-probe\tcapability\tan advertised AOT/full policy-probe mode\t-\tFAIL\t' \
+    "$lazy_probe_output/results.tsv" || fail 'missing native replacement probe did not produce an explicit failure'
 
 tiered_serial_output=$(run_profile full-tiered instruction 0 tiered 0)
 assert_no_fail_rows "$tiered_serial_output/results.tsv"
@@ -725,12 +742,19 @@ fi
 ros_output=$(run_profile ros-instruction auto,unwind,unwind-uncheck 0)
 assert_tsv_value "$ros_output/metadata.tsv" selected_modes aot
 assert_tsv_value "$ros_output/metadata.tsv" auto_effective_policy instruction
-assert_tsv_value "$ros_output/metadata.tsv" unwind_uncheck_auxiliary_status verified
+assert_tsv_value "$ros_output/metadata.tsv" unwind_uncheck_replacement_status verified
 grep -q $'^capabilities\t.*unwind=0,unwind_uncheck=1' "$ros_output/metadata.tsv" ||
     fail 'unwind and unwind-uncheck capabilities were not separated'
 grep -q $'unwind\tunsupported\tunwind-availability\tcapability\trejected\t2\tPASS' "$ros_output/results.tsv" ||
     fail 'unsupported unwind was not rejection-probed'
 assert_no_fail_rows "$ros_output/results.tsv"
+
+ros_unsupported_output=$(run_profile ros-unsupported-wasm2 logical,instruction 0 auto 0 ros-unsupported-wasm2 0 ros)
+assert_no_fail_rows "$ros_unsupported_output/results.tsv"
+awk -F '\t' 'NR > 1 && $8 == "llvm-full" && $15 == "N-A" { count++ } END { exit count != 3 }' \
+    "$ros_unsupported_output/results.tsv" || fail 'ROS source-pruned LLVM capabilities were not recorded as three N-A rows'
+grep -q $'\tllvm-full\tinstruction\tinstruction\twasm2_bulk_memory\tnormal\tok\t1\tN-A\tROS LLVM-AOT source-pruned capability: memory.init has no lowering\t' \
+    "$ros_unsupported_output/results.tsv" || fail 'ROS memory.init preflight rejection was not classified precisely'
 
 live_output=$(run_profile full-live auto 0)
 assert_tsv_value "$live_output/metadata.tsv" selected_modes full
@@ -744,10 +768,11 @@ assert_tsv_value "$bad_output/metadata.tsv" auto_effective_policy invalid
 grep -q $'auto-live-probe\ttrap\tinstruction-or-checked-unwind\t1\tFAIL' "$bad_output/results.tsv" ||
     fail 'unchecked/non-replacing auto unwind was not rejected'
 
-aux_authority_output=$(run_profile full-aux-authority auto 1)
-assert_tsv_value "$aux_authority_output/metadata.tsv" auto_effective_policy invalid
-grep -q 'auto unwind lacks live checked native unwind with frame replacement' "$aux_authority_output/results.tsv" ||
-    fail 'auxiliary unwind.h backend was accepted as authoritative'
+posix_live_output=$(run_profile full-posix-live auto 0)
+assert_tsv_value "$posix_live_output/metadata.tsv" auto_effective_policy unwind
+grep -q 'auto=unwind;unwind_check=live;unwind_replace_frames=yes;call_stack_frames=omit' "$posix_live_output/results.tsv" ||
+    fail 'checked POSIX unwind.h replacement was not accepted'
+assert_no_fail_rows "$posix_live_output/results.tsv"
 
 none_output=$(run_profile auto-none auto 1)
 assert_tsv_value "$none_output/metadata.tsv" selected_modes aot

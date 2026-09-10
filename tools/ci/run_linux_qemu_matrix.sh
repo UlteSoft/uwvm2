@@ -1298,7 +1298,7 @@ policy_declarations_match()
                 if (value != "") backend = value
             }
             if (policy != expected_policy || check != expected_check ||
-                replace != expected_replace || frames != expected_frames ||
+                (expected_replace != "any" && replace != expected_replace) || frames != expected_frames ||
                 (expected_backend != "any" && backend != expected_backend)) bad = 1
         }
         END { exit !(found && !bad) }
@@ -1307,14 +1307,18 @@ policy_declarations_match()
 
 has_live_unwind_declaration()
 {
-    # The current runtime has exactly one authoritative native unwinder: an
-    # explicit Win64 SEH caller context.  POSIX unwind.h is diagnostic-only.
-    policy_declarations_match "$1" unwind live yes omit win64-seh
+    local compiler_log=$1
+    local backend
+    policy_declarations_match "$compiler_log" unwind live yes omit || return 1
+    backend=$(extract_optimize_field "$compiler_log" unwind_backend)
+    [[ $backend == unwind.h || $backend == win64-seh ]]
 }
 
 has_instruction_fallback_declaration()
 {
-    policy_declarations_match "$1" instruction off no emit
+    # unwind_replace_frames describes the compiled platform capability, not
+    # whether the instruction policy selected it. Frame emission is decisive.
+    policy_declarations_match "$1" instruction off any emit
 }
 
 has_none_declaration()
@@ -1324,13 +1328,13 @@ has_none_declaration()
         $(extract_optimize_field "$compiler_log" unwind_check) == off ]]
 }
 
-has_auxiliary_unwind_uncheck_declaration()
+has_unchecked_unwind_replacement_declaration()
 {
     local compiler_log=$1
     local backend
-    policy_declarations_match "$compiler_log" unwind-uncheck static no emit || return 1
+    policy_declarations_match "$compiler_log" unwind-uncheck unchecked yes omit || return 1
     backend=$(extract_optimize_field "$compiler_log" unwind_backend)
-    [[ $backend != unknown && $backend != inconsistent && $backend != unavailable ]]
+    [[ $backend == unwind.h || $backend == win64-seh ]]
 }
 
 has_expected_policy_declaration()
@@ -1340,7 +1344,7 @@ has_expected_policy_declaration()
     case $policy in
         instruction) has_instruction_fallback_declaration "$compiler_log" ;;
         unwind) has_live_unwind_declaration "$compiler_log" ;;
-        unwind-uncheck) has_auxiliary_unwind_uncheck_declaration "$compiler_log" ;;
+        unwind-uncheck) has_unchecked_unwind_replacement_declaration "$compiler_log" ;;
         none) has_none_declaration "$compiler_log" ;;
         *) return 1 ;;
     esac
@@ -1437,6 +1441,32 @@ extract_func_indices()
     printf '%s' "$indices"
 }
 
+source_pruned_llvm_capability_detail()
+{
+    local mode=$1
+    local fixture=$2
+    local output_log=$3
+    [[ $PROFILE_RESOLVED == ros && $mode == llvm-full ]] || return 1
+    case $fixture in
+        wasm2_bulk_memory)
+            grep -aFq 'LLVM AOT capability preflight rejected module=' "$output_log" &&
+                grep -aFq 'memory.init has no LLVM lowering' "$output_log" || return 1
+            printf '%s' 'ROS LLVM-AOT source-pruned capability: memory.init has no lowering'
+            ;;
+        wasm2_multivalue)
+            grep -aFq 'LLVM AOT capability preflight rejected module=' "$output_log" &&
+                grep -aFq 'function signature has multiple results' "$output_log" || return 1
+            printf '%s' 'ROS LLVM-AOT source-pruned capability: multiple results have no lowering'
+            ;;
+        wasm2_table_oob)
+            grep -aFq 'LLVM AOT capability preflight rejected module=' "$output_log" &&
+                grep -aFq 'table.copy has no LLVM lowering' "$output_log" || return 1
+            printf '%s' 'ROS LLVM-AOT source-pruned capability: table.copy has no lowering'
+            ;;
+        *) return 1 ;;
+    esac
+}
+
 POLICY_PROBE_MODE=
 if [[ $PROFILE_RESOLVED == full ]] && mode_supported llvm-full; then
     POLICY_PROBE_MODE=llvm-full
@@ -1520,12 +1550,12 @@ if ((HAS_SELECTED_LLVM_MODE && AUTO_REQUESTED && CAP_AUTO && CAP_CALL_STACK)) &&
 fi
 printf 'auto_effective_policy\t%s\n' "$AUTO_EFFECTIVE_POLICY" >>"$METADATA_TSV"
 
-UNWIND_UNCHECK_AUXILIARY_STATUS=unavailable
+UNWIND_UNCHECK_REPLACEMENT_STATUS=unavailable
 if ((HAS_SELECTED_LLVM_MODE && UNWIND_UNCHECK_REQUESTED && CAP_UNWIND_UNCHECK && CAP_CALL_STACK)) && [[ -n $POLICY_PROBE_MODE ]]; then
     allocate_id
     uncheck_probe_id=$ALLOCATED_ID
-    uncheck_probe_log="${LOG_DIR}/$(printf '%06d' "$uncheck_probe_id")-unwind-uncheck-auxiliary-probe.log"
-    uncheck_probe_compiler_log="${LOG_DIR}/$(printf '%06d' "$uncheck_probe_id")-unwind-uncheck-auxiliary-probe.compiler.log"
+    uncheck_probe_log="${LOG_DIR}/$(printf '%06d' "$uncheck_probe_id")-unwind-uncheck-replacement-probe.log"
+    uncheck_probe_compiler_log="${LOG_DIR}/$(printf '%06d' "$uncheck_probe_id")-unwind-uncheck-replacement-probe.compiler.log"
     : >"$uncheck_probe_compiler_log"
     set_mode_args "$POLICY_PROBE_MODE" || die "internal invalid policy probe mode: $POLICY_PROBE_MODE"
     run_limited "$uncheck_probe_log" \
@@ -1537,7 +1567,7 @@ if ((HAS_SELECTED_LLVM_MODE && UNWIND_UNCHECK_REQUESTED && CAP_UNWIND_UNCHECK &&
     uncheck_probe_stack=$(extract_func_indices "$uncheck_probe_log")
     uncheck_probe_trap=$(extract_trap_kind "$uncheck_probe_log")
     uncheck_probe_outcome=PASS
-    uncheck_probe_detail='unwind-uncheck is auxiliary;logical_frames=verified'
+    uncheck_probe_detail='unwind-uncheck=unchecked-native-replacement'
     if [[ $RUN_LIMIT_REASON != exit ]]; then
         uncheck_probe_outcome=FAIL
         uncheck_probe_detail="unwind-uncheck probe hit ${RUN_LIMIT_REASON}"
@@ -1547,34 +1577,34 @@ if ((HAS_SELECTED_LLVM_MODE && UNWIND_UNCHECK_REQUESTED && CAP_UNWIND_UNCHECK &&
     elif [[ $uncheck_probe_policy != unwind-uncheck ]]; then
         uncheck_probe_outcome=FAIL
         uncheck_probe_detail="unwind-uncheck effective policy mismatch: ${uncheck_probe_policy}"
-    elif ! has_auxiliary_unwind_uncheck_declaration "$uncheck_probe_compiler_log"; then
+    elif ! has_unchecked_unwind_replacement_declaration "$uncheck_probe_compiler_log"; then
         uncheck_probe_outcome=FAIL
-        uncheck_probe_detail='unwind-uncheck did not declare an available, non-replacing auxiliary backend'
+        uncheck_probe_detail='unwind-uncheck did not declare an available unchecked native replacement backend'
     elif [[ $uncheck_probe_stack != '0,1,2,3' ]]; then
         uncheck_probe_outcome=FAIL
-        uncheck_probe_detail="unwind-uncheck logical stack mismatch: ${uncheck_probe_stack:-missing}"
+        uncheck_probe_detail="unwind-uncheck native stack mismatch: ${uncheck_probe_stack:-missing}"
     fi
     write_result "$uncheck_probe_id" "$POLICY_PROBE_MODE" unwind-uncheck "$uncheck_probe_policy" \
-        unwind-uncheck-auxiliary-probe trap 'logical-stack-plus-auxiliary-native-unwind' "$RUN_RC" \
+        unwind-uncheck-replacement-probe trap 'unchecked-native-unwind-replacement' "$RUN_RC" \
         "$uncheck_probe_outcome" "$uncheck_probe_detail" "$RUN_PEAK_RSS_KIB" "$RUN_ELAPSED_MS" \
         "$uncheck_probe_log" "$uncheck_probe_compiler_log"
     if [[ $uncheck_probe_outcome == PASS ]]; then
-        UNWIND_UNCHECK_AUXILIARY_STATUS=verified
+        UNWIND_UNCHECK_REPLACEMENT_STATUS=verified
     else
-        UNWIND_UNCHECK_AUXILIARY_STATUS=invalid
+        UNWIND_UNCHECK_REPLACEMENT_STATUS=invalid
     fi
 elif ((HAS_SELECTED_LLVM_MODE && UNWIND_UNCHECK_REQUESTED && CAP_UNWIND_UNCHECK)); then
     # An advertised lazy-only target cannot satisfy this full/AOT probe.  Do
     # not silently produce an empty successful matrix when every selected
-    # policy needs an auxiliary-unwind verification we could not perform.
+    # policy needs a native replacement verification we could not perform.
     allocate_id
-    write_result "$ALLOCATED_ID" capability unwind-uncheck unavailable unwind-uncheck-auxiliary-probe capability \
+    write_result "$ALLOCATED_ID" capability unwind-uncheck unavailable unwind-uncheck-replacement-probe capability \
         'an advertised AOT/full policy-probe mode' - "$(unsupported_outcome)" \
-        'cannot verify auxiliary unwind without an advertised AOT/full mode and call-stack option' 0 0 - -
+        'cannot verify unchecked native unwind replacement without an advertised AOT/full mode and call-stack option' 0 0 - -
 elif ((UNWIND_UNCHECK_REQUESTED == 0)); then
-    UNWIND_UNCHECK_AUXILIARY_STATUS=not-requested
+    UNWIND_UNCHECK_REPLACEMENT_STATUS=not-requested
 fi
-printf 'unwind_uncheck_auxiliary_status\t%s\n' "$UNWIND_UNCHECK_AUXILIARY_STATUS" >>"$METADATA_TSV"
+printf 'unwind_uncheck_replacement_status\t%s\n' "$UNWIND_UNCHECK_REPLACEMENT_STATUS" >>"$METADATA_TSV"
 
 TIER2_WITNESS_POLICY=
 # Native unwind intentionally disables background T2 in the current runtime.
@@ -1606,7 +1636,7 @@ run_matrix_case()
     local wasm=${FIXTURE_WASMS[$fixture_index]}
     local stem
     local output_log compiler_log trap_kind func_indices observed_policy actual_policy call_stack_frames outcome detail
-    local expected_effective_policy expect_stack=1 case_compile_threads=$COMPILE_THREADS
+    local expected_effective_policy expect_stack=1 case_compile_threads=$COMPILE_THREADS capability_na_detail=
     local mode_args=()
     local command=()
 
@@ -1651,6 +1681,9 @@ run_matrix_case()
     run_limited "$output_log" "${command[@]}"
     trap_kind=$(extract_trap_kind "$output_log")
     func_indices=$(extract_func_indices "$output_log")
+    if ((RUN_RC != 0)); then
+        capability_na_detail=$(source_pruned_llvm_capability_detail "$mode" "$fixture" "$output_log" || true)
+    fi
     if mode_uses_interpreter "$mode"; then
         observed_policy=unknown
         actual_policy=logical
@@ -1681,6 +1714,9 @@ run_matrix_case()
     elif [[ $RUN_LIMIT_REASON == rss-limit ]]; then
         outcome=FAIL
         detail=rss-limit
+    elif [[ -n $capability_na_detail ]]; then
+        outcome=N-A
+        detail=$capability_na_detail
     elif regular_case_requires_llvm_log "$mode" "$fixture" && ! has_expected_llvm_log "$mode" "$compiler_log" "$fixture"; then
         outcome=FAIL
         if [[ $fixture == tiered_full_ready_oob ]]; then
@@ -1828,7 +1864,7 @@ for mode in "${MODE_NAMES[@]+"${MODE_NAMES[@]}"}"; do
         if ! policy_applicable_to_mode "$mode" "$policy"; then continue; fi
         if ! policy_supported "$policy"; then continue; fi
         if [[ $policy == auto && $AUTO_EFFECTIVE_POLICY == invalid ]]; then continue; fi
-        if [[ $policy == unwind-uncheck && $UNWIND_UNCHECK_AUXILIARY_STATUS != verified ]]; then continue; fi
+        if [[ $policy == unwind-uncheck && $UNWIND_UNCHECK_REPLACEMENT_STATUS != verified ]]; then continue; fi
         for fixture_index in "${!FIXTURE_NAMES[@]}"; do
             if [[ ${FIXTURE_FEATURES[$fixture_index]} == wasm2 && $CAP_WASM2 == 0 ]]; then continue; fi
             if ! fixture_applicable_to_mode "$fixture_index" "$mode"; then continue; fi
