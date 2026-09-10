@@ -2693,6 +2693,19 @@ struct runtime_memory_access_info_t
     bool mmap_covers_wasm32_effective_domain{};
 };
 
+[[nodiscard]] inline constexpr bool runtime_local_imported_page_size_is_representable(::std::uint_least64_t page_size_bytes) noexcept
+{
+    // The generated memory.size/grow paths use a shift and store the byte size in size_t. Reject a provider contract
+    // that cannot be represented exactly instead of truncating it on 32-bit hosts or treating a non-power-of-two size
+    // as 2^countr_zero(size).
+    if(!::std::has_single_bit(page_size_bytes)) [[unlikely]] { return false; }
+    if constexpr(::std::numeric_limits<::std::size_t>::digits < ::std::numeric_limits<::std::uint_least64_t>::digits)
+    {
+        if(page_size_bytes > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return false; }
+    }
+    return true;
+}
+
 // Return the largest byte length that the concrete memory backend can safely expose for direct addressing.  This is
 // stricter than the Wasm declared max when mmap guard/protection strategy imposes a smaller usable range.
 template <typename Memory>
@@ -2899,9 +2912,11 @@ inline constexpr void populate_runtime_memory_access_info_mmap_fields(runtime_me
                     // Resolving a provider's compile-time page size is still an extensible virtual call. Keep it behind
                     // the same callback boundary used by generated accesses so compilation cannot inherit a live raw-
                     // bridge capability or leak provider FP-control changes into the active Wasm entry.
-                    result.local_imported_page_size_bytes =
+                    auto const page_size_bytes{
                         ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size_for_compilation(
-                            result.local_imported_module_ptr, result.local_imported_memory_index);
+                            result.local_imported_module_ptr, result.local_imported_memory_index)};
+                    if(!runtime_local_imported_page_size_is_representable(page_size_bytes)) [[unlikely]] { return {}; }
+                    result.local_imported_page_size_bytes = page_size_bytes;
                     return result;
                 }
                 [[unlikely]] default:
@@ -3795,11 +3810,7 @@ template <typename MemoryT, typename Fn>
 
     auto const page_size_bytes_u64{
         ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size(local_imported_module, memory_index)};
-    if(page_size_bytes_u64 == 0u) [[unlikely]] { return false; }
-    if constexpr(::std::numeric_limits<::std::size_t>::digits < ::std::numeric_limits<::std::uint_least64_t>::digits)
-    {
-        if(page_size_bytes_u64 > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return false; }
-    }
+    if(!runtime_local_imported_page_size_is_representable(page_size_bytes_u64)) [[unlikely]] { return false; }
 
     auto const page_size_bytes{static_cast<::std::size_t>(page_size_bytes_u64)};
     auto const max_page_count{(::std::numeric_limits<::std::size_t>::max)() / page_size_bytes};

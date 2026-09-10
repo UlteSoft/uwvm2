@@ -450,8 +450,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_memory_name =
         requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::memory_name)>, ::uwvm2::utils::container::u8string_view>; };
 
-    /// @brief   check has page size
-    /// @note    If the concept is unsatisfied, the default assumption is 64Kib.
+    /// @brief   check whether a page-size member is explicitly declared
+    /// @note    This deliberately detects malformed declarations too; an invalid explicit contract must not silently
+    ///          fall back to the default 64KiB page size.
+    template <typename SingleMemory>
+    concept declares_page_size = requires { &::std::remove_cvref_t<SingleMemory>::page_size; };
+
+    /// @brief   check has a valid page size
+    /// @note    If no page-size member is declared, the default assumption is 64Kib. An explicitly declared but invalid
+    ///          member makes the provider invalid instead of selecting that default.
     /// @note    The page size is 2 raised to the power of n.
     /// @details
     /// ```cpp
@@ -464,6 +471,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_page_size = requires {
         requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::page_size)>, ::std::uint_least64_t>;
         requires ::std::has_single_bit(SingleMemory::page_size);
+        requires(::std::numeric_limits<::std::size_t>::digits >= ::std::numeric_limits<::std::uint_least64_t>::digits ||
+                 SingleMemory::page_size <= static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)()));
     };
 
     template <typename SingleMemory>
@@ -484,10 +493,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 
     /// @brief   check if the type is a local imported memory
-    /// @details equivalent to `has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>`
-    /// @note    Non-mandatory has_page_size
+    /// @details Requires a valid name and memory access operations. Omitting `page_size` selects the WebAssembly default
+    ///          of 64KiB; once declared, `page_size` must be a constant `uint_least64_t`, a non-zero power of two, and
+    ///          representable by `size_t` on the target host.
     template <typename SingleMemory>
-    concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>;
+    concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory> &&
+                                       (!declares_page_size<SingleMemory> || has_page_size<SingleMemory>);
 
     namespace details
     {
