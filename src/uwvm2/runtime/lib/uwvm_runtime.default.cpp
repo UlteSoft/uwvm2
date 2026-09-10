@@ -4575,8 +4575,6 @@ namespace uwvm2::runtime::lib
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 # endif
-            if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
-
             ::std::byte* operand_base{};
             ::std::byte operand_dummy{};
             if(stack_cap_raw == 0uz) [[unlikely]] { operand_base = ::std::addressof(operand_dummy); }
@@ -4614,6 +4612,13 @@ namespace uwvm2::runtime::lib
                 auto const actual_result_bytes{static_cast<::std::size_t>(stack_top - operand_base)};
                 if(actual_result_bytes != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
             }
+
+            // Result capacity is a postcondition of normal return, not a condition for entering the function.
+            // WebAssembly's `unreachable` is stack-polymorphic (already in Core 1.0): a valid result-typed function
+            // may trap without ever producing those values, so its actual operand-stack peak can be zero.
+            // https://webassembly.github.io/spec/core/valid/instructions.html#valid-unreachable
+            // Keep the exact allocation and fail closed before copying any normal-return results.
+            if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             // Append results back to caller stack.
             copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
