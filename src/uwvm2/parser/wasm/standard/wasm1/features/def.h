@@ -328,6 +328,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
+    // The context-print protocol intentionally uses fast_io implementation details that are not
+    // exported by the fast_io named module.  Keep this optional optimization in header mode;
+    // the public print_define overload above remains the module-safe formatting path.
     namespace details::function_type_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -537,6 +541,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 
     /// @brief      has type prefie
     /// @details
@@ -917,6 +922,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
+    // See function_type_print above: imported modules may use only fast_io's exported protocol.
     namespace details::final_import_type_section_details_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -1084,6 +1091,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 
     /// @brief      Prohibited use of strings with a length of 0
     /// @details    The WASM specification does not prohibit zero strings; this is a reserved concept.
@@ -1752,6 +1760,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
+    // See function_type_print above: imported modules may use only fast_io's exported protocol.
     namespace details::final_export_type_section_details_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -1922,6 +1932,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 
     //////////////////////////////
     //      Element Section     //
