@@ -54,6 +54,14 @@ WebAssembly is a mixed-typed stack machine. u2 caches the hot segment of the ope
 
 The cache is modeled as per-type rings (i32/i64/f32/f64, optionally v128 carriers), and ranges may be merged to reduce register pressure.
 
+Runtime `call` and `call_indirect` bridges receive the current operand-stack top as a
+`std::byte*` value and return the updated top as a `std::byte*`. Ordinary call opfuncs
+must write that returned value back to tuple slot 1. A fused opfunc may explicitly
+discard it only when it uses an isolated scratch stack and consumes the result from
+the scratch base according to the statically known signature. This register
+input/output ABI avoids extending the lifetime of an opfunc parameter address across
+the subsequent musttail dispatch.
+
 ### 3.2 Spill/fill and transforms
 When the cache cannot satisfy an operand or must materialize state, the translator emits spill/fill opfuncs:
 - **spill**: cache → operand stack memory
