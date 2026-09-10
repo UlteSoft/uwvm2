@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -30,9 +31,6 @@ namespace
     struct base_mode_t
     {
         ::std::string_view name;
-        fixture_t{"oob_unsigned_sum_load64",          "oob_unsigned_sum_load64.wat"          },
-        fixture_t{"oob_unsigned_sum_store64",         "oob_unsigned_sum_store64.wat"         },
-        fixture_t{"oob_unaligned_cross_end64",        "oob_unaligned_cross_end64.wat"        },
         ::std::string_view args;
     };
 
@@ -54,6 +52,9 @@ namespace
 
     // OOM is deliberately absent: allocation failure is outside the Wasm trap model exercised by this matrix.
     inline constexpr ::std::array fixtures{
+        fixture_t{"oob_unsigned_sum_load64",          "oob_unsigned_sum_load64.wat",          "memory access out of bounds",               standard_stack,      4uz},
+        fixture_t{"oob_unsigned_sum_store64",         "oob_unsigned_sum_store64.wat",         "memory access out of bounds",               standard_stack,      4uz},
+        fixture_t{"oob_unaligned_cross_end64",        "oob_unaligned_cross_end64.wat",        "memory access out of bounds",               standard_stack,      4uz},
         fixture_t{"oob_load",                        "oob_load.wat",                        "memory access out of bounds",               standard_stack,      4uz},
         fixture_t{"oob_store",                       "oob_store.wat",                       "memory access out of bounds",               standard_stack,      4uz},
         fixture_t{"oob_load8_s",                     "oob_load8_s.wat",                     "memory access out of bounds",               standard_stack,      4uz},
@@ -459,21 +460,13 @@ namespace
 
         if(uses_unwind)
         {
-#ifdef _WIN32
-            auto const checked_authoritative_win64_context{
-                native_unwind_backend_available && log.find("unwind_check=live") != ::std::string::npos &&
-                log.find("unwind_replace_frames=yes") != ::std::string::npos && omits_instruction_frames && !emits_instruction_frames && !uses_none};
-            if(!checked_authoritative_win64_context)
+            if(!native_unwind_backend_available || !::uwvm2test::native_unwind::matches_policy(log, "unwind") || uses_none)
             {
-                ::std::cerr << "auto unwind did not use the checked authoritative Win64 caller context:\n" << log << '\n';
+                ::std::cerr << "auto unwind did not use checked native replacement with logical frames omitted:\n" << log << '\n';
                 return false;
             }
             authoritative_win64_unwind = true;
             return true;
-#else
-            ::std::cerr << "POSIX auto call-stack policy must retain authoritative logical instruction frames:\n" << log << '\n';
-            return false;
-#endif
         }
 
         ::std::cerr << "unable to determine default LLVM JIT call-stack policy from probe log"
@@ -526,24 +519,10 @@ namespace
                                  ::std::equal(func_indices.begin(), func_indices.end(), expected_func_begin)};
         auto const trap_matches{trap_kind == fixture.expected_trap_kind};
         bool policy_matches{true};
-#ifndef _WIN32
         if(mode_logs_full_call_stack_policy(mode))
         {
-            auto const policy_name{::std::string_view{policy}};
-            if(policy_name == "auto")
-            {
-                policy_matches = log.find("call_stack=instruction") != ::std::string::npos &&
-                                 log.find("unwind_replace_frames=no") != ::std::string::npos &&
-                                 log.find("call_stack_frames=emit") != ::std::string::npos;
-            }
-            else if(policy_name == "unwind-uncheck")
-            {
-                policy_matches = log.find("call_stack=unwind-uncheck") != ::std::string::npos &&
-                                 log.find("unwind_replace_frames=no") != ::std::string::npos &&
-                                 log.find("call_stack_frames=emit") != ::std::string::npos;
-            }
+            policy_matches = ::uwvm2test::native_unwind::matches_policy(log, policy);
         }
-#endif
         auto const valid{trap_matches && stack_matches && policy_matches};
         if(!valid)
         {
@@ -644,7 +623,7 @@ int main(int argc, char** argv)
     for(auto const& fixture: fixtures)
     {
         // A fixture shard retains every backend/policy combination and its own capability probe. Keep artifacts
-        // separate per shard; the default (no filter) remains the complete matrix.
+        // separate per shard; the default (no filter) remains the complete matrix, including seeded policies.
         if(fixture_filter != nullptr && *fixture_filter != '\0' && ::std::string_view{fixture.name} != fixture_filter) { continue; }
         ++selected_fixtures;
         auto const wat_path{wat_dir / fixture.wat_name};
@@ -659,13 +638,9 @@ int main(int argc, char** argv)
                 return 1;
             }
             call_stack_capability_probed = true;
-#ifdef _WIN32
             ::std::cout << (authoritative_win64_unwind
-                                ? "[trap-matrix] checked Win64 unwind owns generated Wasm frames\n"
-                                : "[trap-matrix] checked Win64 unwind unavailable; auto retains logical instruction frames\n");
-#else
-            ::std::cout << "[trap-matrix] POSIX native unwind is auxiliary; auto retains logical instruction frames\n";
-#endif
+                                ? "[trap-matrix] checked native unwind owns generated Wasm frames\n"
+                                : "[trap-matrix] native self-check unavailable; auto retains logical instruction frames\n");
         }
 
         for(::std::size_t mode_index{}; mode_index != modes.size(); ++mode_index)

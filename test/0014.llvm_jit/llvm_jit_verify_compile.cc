@@ -8,6 +8,8 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -223,8 +225,8 @@ namespace
     //
     // The out-of-bounds load traps at a real Wasm access site. Instruction
     // call-stack mode verifies the complete authoritative logical stack while
-    // every generated function remains NoInline. Native unwind is checked only
-    // as an auxiliary source unless the Win64 SEH caller context is authoritative.
+    // every generated function remains NoInline. Native unwind must recover
+    // the same complete ordered chain while generated logical frames are omitted.
     inline constexpr ::std::array<unsigned char, 75uz> noinline_unwind_trap_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x08u, 0x02u, 0x60u, 0x00u, 0x00u,
         0x60u, 0x01u, 0x7fu, 0x00u, 0x03u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x00u, 0x05u, 0x03u, 0x01u,
@@ -416,9 +418,9 @@ namespace
         return true;
     }
 
-    [[nodiscard]] ::std::array<bool, 4uz> collect_logical_call_stack_func_idx(::std::string_view output) noexcept
+    [[nodiscard]] ::std::vector<::std::size_t> collect_logical_call_stack_func_idx(::std::string_view output)
     {
-        ::std::array<bool, 4uz> seen{};
+        ::std::vector<::std::size_t> seen{};
         constexpr ::std::string_view prefix{" func_idx="};
         ::std::size_t pos{};
 
@@ -438,7 +440,7 @@ namespace
                 ++digit_pos;
             }
 
-            if(digit_pos != pos && value < seen.size()) { seen[value] = true; }
+            if(digit_pos != pos) { seen.push_back(value); }
             pos = digit_pos;
         }
     }
@@ -476,7 +478,7 @@ namespace
         auto const has_call_stack_header{plain_output.find("Call stack:") != ::std::string::npos};
         auto const has_module{plain_output.find(" module=") != ::std::string::npos};
         auto const seen{collect_logical_call_stack_func_idx(plain_output)};
-        if(has_call_stack_header && has_module && seen[0uz] && seen[1uz] && seen[2uz] && seen[3uz]) [[likely]] { return true; }
+        if(has_call_stack_header && has_module && seen == ::std::vector<::std::size_t>{0uz, 1uz, 2uz, 3uz}) [[likely]] { return true; }
 
         ::std::cerr << "missing expected LLVM JIT logical call-stack frame chain in " << label << " output:\n" << output << '\n';
         return false;
@@ -491,19 +493,16 @@ namespace
         auto const has_runtime_trap{plain_output.find("Runtime crash (") != ::std::string::npos};
         auto const has_unwind_header{plain_output.find("Call stack:") != ::std::string::npos};
         auto const has_module{plain_output.find(" module=") != ::std::string::npos};
-        auto const has_func_idx{plain_output.find(" func_idx=") != ::std::string::npos};
-        if(has_runtime_trap && has_unwind_header && has_module && has_func_idx) [[likely]] { return true; }
+        auto const frames{collect_logical_call_stack_func_idx(plain_output)};
+        if(has_runtime_trap && has_unwind_header && has_module && frames == ::std::vector<::std::size_t>{0uz, 1uz, 2uz, 3uz}) [[likely]] { return true; }
 
         ::std::cerr << "missing LLVM JIT unwind frame in " << label << " output:\n" << output << '\n';
         return false;
     }
 
-    [[nodiscard]] bool has_authoritative_win64_unwind_policy(::std::string_view log) noexcept
+    [[nodiscard]] bool has_checked_native_unwind_policy(::std::string_view log) noexcept
     {
-        return log.find("unwind_backend=win64-seh") != ::std::string_view::npos &&
-               log.find("unwind_check=live") != ::std::string_view::npos &&
-               log.find("unwind_replace_frames=yes") != ::std::string_view::npos &&
-               log.find("call_stack_frames=omit") != ::std::string_view::npos;
+        return ::uwvm2test::native_unwind::checked_native_policy(log);
     }
 
     enum class auto_call_stack_probe_result : unsigned char
@@ -572,9 +571,9 @@ namespace
 
         if(uses_unwind)
         {
-            if(!has_authoritative_win64_unwind_policy(log))
+            if(!has_checked_native_unwind_policy(log))
             {
-                ::std::cerr << label << " LLVM JIT auto unwind did not use the checked Win64 SEH caller context:\n"
+                ::std::cerr << label << " LLVM JIT auto unwind did not use the checked native replacement path:\n"
                             << log << '\n';
                 return false;
             }
@@ -619,14 +618,13 @@ namespace
                                            ::std::string log{};
                                            if(!read_text_file(log_path, log)) [[unlikely]] { return false; }
                                            auto const logs_call_stack_policy{log.find("call_stack=") != ::std::string::npos};
-                                           auto const logged_policy_is_checked_unwind{
-                                               log.find("call_stack=unwind") != ::std::string::npos &&
-                                               log.find("unwind_check=live") != ::std::string::npos &&
-                                               log.find("call_stack_frames=omit") != ::std::string::npos};
-                                           if(!has_authoritative_win64_unwind_policy(log) ||
-                                              (logs_call_stack_policy && !logged_policy_is_checked_unwind))
+                                           auto const logged_policy_is_checked_unwind{::uwvm2test::native_unwind::matches_policy(log, "unwind")};
+                                           // Full/AOT must report the emission policy. Lazy-only runs may omit that record;
+                                           // their exact native chain below still has to match all expected activations.
+                                           auto const requires_policy_record{mode_name == "full" || mode_name == "aot" || logs_call_stack_policy};
+                                           if(requires_policy_record && !logged_policy_is_checked_unwind)
                                            {
-                                               ::std::cerr << "checked LLVM JIT unwind did not use the Win64 SEH caller context in " << label << ":\n"
+                                               ::std::cerr << "checked LLVM JIT unwind did not confirm native replacement with omitted logical frames in " << label << ":\n"
                                                            << log << '\n';
                                                return false;
                                            }
@@ -672,7 +670,7 @@ namespace
         auto const authoritative_native_unwind{default_probe_result == auto_call_stack_probe_result::unwind};
         if(!authoritative_native_unwind)
         {
-            ::std::cout << "[llvm_jit] POSIX/native unwind is auxiliary; retaining authoritative logical frames\n";
+            ::std::cout << "[llvm_jit] native self-check unavailable; auto selected instruction tracking before code generation\n";
         }
         else
         {

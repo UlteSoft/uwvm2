@@ -679,14 +679,14 @@ inline constexpr void apply_llvm_jit_common_function_attrs(::llvm::Function& fun
 #endif
 }
 
-// Preserve native unwind metadata for auxiliary POSIX diagnostics and explicit Win64 SEH reconstruction.
+// Preserve native unwind metadata for the native call-stack mode, which omits generated logical push/pop calls.
 inline constexpr void apply_llvm_jit_unwind_call_stack_function_attrs(::llvm::Function& function) noexcept
 {
     // Emit asynchronous unwind tables, not only call-site unwind info.  Wasm traps can be reported from arbitrary
     // instruction PCs after bounds checks, helper calls, or target signals/SEH faults, so the runtime unwinder needs CFI
     // that remains valid between calls when reconstructing optimized JIT frames.  On Win64 this causes LLVM to emit
-    // .pdata/.xdata records; on DWARF targets it keeps CFI in .eh_frame only for an auxiliary ordinary walk. POSIX CFI
-    // never replaces the instruction-emitted logical Wasm stack.
+    // .pdata/.xdata records; on DWARF targets it keeps CFI in .eh_frame. The matching runtime/host bridges must also
+    // retain asynchronous CFI so a normal native walk can cross helpers and the OS signal trampoline back into Wasm.
     function.setUWTableKind(::llvm::UWTableKind::Async);
 }
 
@@ -1012,7 +1012,7 @@ inline constexpr ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::Call
     auto const register_metadata{::llvm::MDNode::get(llvm_context, {register_name})};
     return ir_builder.CreateIntrinsic(::llvm::Intrinsic::read_register, {llvm_intptr_type}, {::llvm::MetadataAsValue::get(llvm_context, register_metadata)});
 #else
-    // POSIX uses an ordinary <unwind.h> walk from the runtime helper and keeps logical Wasm frames authoritative.
+    // POSIX native mode uses an ordinary <unwind.h> walk from the runtime helper; no explicit frame-register seed is needed.
     static_cast<void>(ir_builder);
     return ::llvm::ConstantInt::get(llvm_intptr_type, 0u);
 #endif
