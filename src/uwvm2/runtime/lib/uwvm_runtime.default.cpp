@@ -6309,6 +6309,7 @@ namespace uwvm2::runtime::lib
                 pipeline_tuning_options.LoopVectorization = pipeline_speed_level > 1u;
                 pipeline_tuning_options.SLPVectorization = pipeline_speed_level > 1u;
                 ::llvm::PassBuilder pass_builder{::std::addressof(target_machine), pipeline_tuning_options};
+                details::register_runtime_llvm_jit_expanded_lane_unroll_policy(pass_builder);
 
                 pass_builder.registerModuleAnalyses(module_analysis_manager);
                 pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);

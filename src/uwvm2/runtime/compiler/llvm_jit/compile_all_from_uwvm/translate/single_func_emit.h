@@ -5870,9 +5870,13 @@ template <typename CreateValue>
                                                       reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
                                                       ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
-            auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{module_address, ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index)}
+            // ArrayRef is non-owning. Keep its backing array alive until the bridge call has consumed the arguments;
+            // constructing it from an initializer-list here would leave a dangling view at the following semicolon.
+            ::llvm::Value* bridge_arguments_array[]{
+                module_address,
+                ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
             };
+            auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
             return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
@@ -5902,11 +5906,13 @@ template <typename CreateValue>
                                                       reinterpret_cast<::std::uintptr_t>(global_access_info.local_imported_module_ptr),
                                                       ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
-            auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{module_address,
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
-                                                 value}
+            // ArrayRef does not extend an initializer-list backing array's lifetime.
+            ::llvm::Value* bridge_arguments_array[]{
+                module_address,
+                ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
+                value,
             };
+            auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
             return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
@@ -6132,33 +6138,33 @@ template <typename CreateValue>
             llvm_jit_memory_snapshot_values_t result{};
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return result; }
 
+            static_assert(sizeof(::std::size_t) == sizeof(::std::uintptr_t),
+                          "local-imported snapshot ABI represents size_t operands with LLVM intptr");
+            static_assert(::std::numeric_limits<::std::size_t>::digits == ::std::numeric_limits<::std::uintptr_t>::digits,
+                          "local-imported snapshot ABI requires size_t and uintptr_t to have the same value width");
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             // The provider writes snapshot outputs through host bridge pointer arguments.  Entry-block allocas give LLVM
             // stable addresses for those out-parameters and make the following loads explicit in IR.
-            auto memory_begin_slot{
-                create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.begin.addr.slot"))};
             auto byte_length_slot{
                 create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, get_llvm_string_ref(u8"local_imported.memory.byte_length.slot"))};
-            if(memory_begin_slot == nullptr || byte_length_slot == nullptr) [[unlikely]] { return result; }
+            if(byte_length_slot == nullptr) [[unlikely]] { return result; }
             auto bridge_function_type{::llvm::FunctionType::get(
-                ::llvm::Type::getInt1Ty(llvm_context),
-                {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type), get_llvm_pointer_type(llvm_intptr_type)},
+                llvm_intptr_type,
+                {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type)},
                 false)};
             auto module_address{emit_local_imported_memory_module_address()};
             if(module_address == nullptr) [[unlikely]] { return result; }
-            auto snapshot_ok{emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_snapshot_bridge>(
+            auto snapshot_status{emit_runtime_bridge_call.template operator()<llvm_jit_local_imported_memory_snapshot_bridge>(
                 bridge_function_type,
                 {module_address,
                  ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
-                 memory_begin_slot,
                  byte_length_slot})};
-            if(snapshot_ok == nullptr) [[unlikely]] { return result; }
+            if(snapshot_status == nullptr) [[unlikely]] { return result; }
 
             emit_llvm_conditional_trap(*llvm_module,
                                        ir_builder,
-                                       ir_builder.CreateNot(snapshot_ok),
+                                       ir_builder.CreateICmpEQ(snapshot_status, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
                                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
-            result.memory_begin_address = ir_builder.CreateLoad(llvm_intptr_type, memory_begin_slot, get_llvm_string_ref(u8"local_imported.memory.begin.addr"));
             result.byte_length = ir_builder.CreateLoad(llvm_intptr_type, byte_length_slot, get_llvm_string_ref(u8"local_imported.memory.byte_length"));
             return result;
         }};
