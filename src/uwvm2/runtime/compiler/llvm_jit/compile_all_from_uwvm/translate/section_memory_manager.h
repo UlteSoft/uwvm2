@@ -103,11 +103,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
             return static_cast<::std::size_t>(value);
         }
 
-        [[nodiscard]] inline static ::std::size_t align_to_page(::std::size_t value) noexcept
+        [[nodiscard]] inline static bool align_to_page(::std::size_t value, ::std::size_t& aligned) noexcept
         {
             auto const ps{page_size()};
             auto const mask{ps - 1uz};
-            return (value + mask) & ~mask;
+            if(value > (::std::numeric_limits<::std::size_t>::max)() - mask) [[unlikely]] { return false; }
+            aligned = (value + mask) & ~mask;
+            return true;
         }
 
         [[nodiscard]] inline static unsigned mmap_prot(unsigned flags) noexcept
@@ -123,6 +125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
         {
             auto const ps{static_cast<::std::uintptr_t>(page_size())};
             auto const mask{ps - 1u};
+            if(value > (::std::numeric_limits<::std::uintptr_t>::max)() - mask) [[unlikely]] { return 0u; }
             return (value + mask) & ~mask;
         }
 
@@ -146,14 +149,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
             constexpr ::std::uintptr_t low_end{0x70000000u};
             constexpr ::std::uintptr_t scan_stride{0x01000000u};
 
-            auto const size{align_to_page(num_bytes == 0uz ? page_size() : num_bytes)};
+            ::std::size_t size{};
+            if(!align_to_page(num_bytes == 0uz ? page_size() : num_bytes, size)) [[unlikely]]
+            {
+                ec = ::std::make_error_code(::std::errc::value_too_large);
+                return {};
+            }
             auto const prot{mmap_prot(flags)};
-            auto const map_flags{MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE};
+            auto const base_map_flags{MAP_PRIVATE | MAP_ANONYMOUS};
+            int cleanup_errno{};
 
             auto try_map{[&](::std::uintptr_t hint) noexcept -> void*
                          {
                              if(hint < low_begin || hint > low_end || static_cast<::std::uintptr_t>(size) > low_end - hint) { return MAP_FAILED; }
-                             return ::mmap(reinterpret_cast<void*>(hint), size, prot, map_flags, -1, 0);
+                             auto const requested{reinterpret_cast<void*>(hint)};
+                             auto mapped{::mmap(requested, size, prot, base_map_flags | MAP_FIXED_NOREPLACE, -1, 0)};
+                             if(mapped == requested) { return mapped; }
+                             if(mapped != MAP_FAILED)
+                             {
+                                 // Old kernels may ignore an unknown MAP_FIXED_NOREPLACE bit and treat `hint` as advisory.
+                                 // Never return that unrelated mapping to the low-address allocator.
+                                 if(::munmap(mapped, size) != 0)
+                                 {
+                                     cleanup_errno = errno == 0 ? EIO : errno;
+                                     return MAP_FAILED;
+                                 }
+                                 errno = EEXIST;
+                                 return MAP_FAILED;
+                             }
+                             if(errno != EINVAL) { return MAP_FAILED; }
+
+                             // MAP_FIXED_NOREPLACE was added after the original mmap ABI. On an EINVAL-only kernel, an
+                             // ordinary hint is safe only when the kernel returns the exact requested address.
+                             mapped = ::mmap(requested, size, prot, base_map_flags, -1, 0);
+                             if(mapped == requested) { return mapped; }
+                             if(mapped == MAP_FAILED) { return MAP_FAILED; }
+                             if(::munmap(mapped, size) != 0)
+                             {
+                                 cleanup_errno = errno == 0 ? EIO : errno;
+                                 return MAP_FAILED;
+                             }
+                             errno = EEXIST;
+                             return MAP_FAILED;
                          }};
 
             if(auto const hint{near_block_hint(near_block)}; hint != 0u)
@@ -164,6 +201,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
                     ec.clear();
                     return ::llvm::sys::MemoryBlock{mapped, size};
                 }
+                if(cleanup_errno != 0)
+                {
+                    ec = ::std::error_code(cleanup_errno, ::std::generic_category());
+                    return {};
+                }
             }
 
             for(::std::uintptr_t hint{low_begin}; hint <= low_end && static_cast<::std::uintptr_t>(size) <= low_end - hint; hint += scan_stride)
@@ -173,6 +215,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
                 {
                     ec.clear();
                     return ::llvm::sys::MemoryBlock{mapped, size};
+                }
+                if(cleanup_errno != 0)
+                {
+                    ec = ::std::error_code(cleanup_errno, ::std::generic_category());
+                    return {};
                 }
             }
 
