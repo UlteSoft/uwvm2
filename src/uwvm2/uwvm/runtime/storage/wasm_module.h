@@ -186,6 +186,17 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    // Runtime table-mutation bridges retain the concrete operation in their ABI while sharing one exact-range updater.
+    // The resolved local-defined table pointer, rather than a caller's table index, identifies cross-module import aliases.
+    enum class llvm_jit_call_indirect_table_mutation_kind : unsigned char
+    {
+        set,
+        init,
+        copy,
+        fill,
+        grow
+    };
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     struct llvm_jit_raw_call_target_t
     {

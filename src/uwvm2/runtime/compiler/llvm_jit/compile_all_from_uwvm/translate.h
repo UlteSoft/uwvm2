@@ -135,9 +135,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                               [[maybe_unused]] ::std::uintptr_t frame_address,
                                                               [[maybe_unused]] ::std::uintptr_t stack_pointer) noexcept;
 
-    // Table mutation instructions can invalidate the compact call_indirect target snapshots owned by the runtime.
-    // Rebuild them after a funcref-table write so generated call_indirect code observes the same table state as uwvm-int.
-    extern "C++" void llvm_jit_refresh_call_indirect_table_views() noexcept;
+    // A successful funcref-table mutation updates only compact views which alias the resolved destination table.
+    extern "C++" void llvm_jit_refresh_call_indirect_table_views(
+        ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*,
+        ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind,
+        ::std::size_t begin,
+        ::std::size_t count) noexcept;
 
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 

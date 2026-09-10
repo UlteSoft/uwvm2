@@ -63,7 +63,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     // Tiered execution installs this hook when compact LLVM call_indirect views are materialized.  Keeping the optional
     // notification as an inline hook preserves the header-only uwvm-int test/embedding boundary: interpreter-only or
     // standalone translator binaries do not acquire a hard link dependency on the full LLVM runtime object.
-    using llvm_jit_refresh_call_indirect_table_views_hook_t = void (*)() noexcept;
+    using llvm_jit_refresh_call_indirect_table_views_hook_t = void (*)(
+        ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*,
+        ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind,
+        ::std::size_t,
+        ::std::size_t) noexcept;
     inline llvm_jit_refresh_call_indirect_table_views_hook_t llvm_jit_refresh_call_indirect_table_views_hook{};
 }
 #endif
@@ -89,14 +93,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         using runtime_table_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t;
         using runtime_table_elem_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t;
         using runtime_table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
+        using runtime_table_mutation_kind = ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind;
         using runtime_data_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t;
         using runtime_element_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t;
         using runtime_module_storage_t = ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t;
 
-        UWVM_ALWAYS_INLINE inline constexpr void refresh_llvm_call_indirect_table_views_after_funcref_write() noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void refresh_llvm_call_indirect_table_views_after_funcref_write(
+            runtime_table_storage_t* table,
+            ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind kind,
+            ::std::size_t begin,
+            ::std::size_t count) noexcept
         {
 # if defined(UWVM_RUNTIME_LLVM_JIT)
-            if(auto const hook{::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views_hook}; hook != nullptr) { hook(); }
+            if(auto const hook{::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views_hook}; hook != nullptr)
+            {
+                hook(table, kind, begin, count);
+            }
+# else
+            static_cast<void>(table);
+            static_cast<void>(kind);
+            static_cast<void>(begin);
+            static_cast<void>(count);
 # endif
         }
 
@@ -1513,7 +1530,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(index >= table->elems.size()) [[unlikely]] { wasm1p1_details::table_oob_terminate(); }
 
         table->elems.index_unchecked(index) = wasm1p1_details::table_elem_from_funcref(module, value);
-        wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write();
+        wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+            table, wasm1p1_details::runtime_table_mutation_kind::set, index, 1uz);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -1534,7 +1552,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(index >= table->elems.size()) [[unlikely]] { wasm1p1_details::table_oob_terminate(); }
 
         table->elems.index_unchecked(index) = wasm1p1_details::table_elem_from_funcref(module, value);
-        wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write();
+        wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+            table, wasm1p1_details::runtime_table_mutation_kind::set, index, 1uz);
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -1872,7 +1891,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const dst{static_cast<::std::size_t>(wasm1p1_details::i32_to_u32(get_curr_val_from_operand_stack_cache<wasm1p1_details::wasm_i32>(type...)))};
 
         wasm1p1_details::copy_funcref_element_segment(*table, *element, module, dst, src, len);
-        if(len != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+        if(len != 0uz)
+        {
+            wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                table, wasm1p1_details::runtime_table_mutation_kind::init, dst, len);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -1894,7 +1917,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const dst{static_cast<::std::size_t>(wasm1p1_details::i32_to_u32(get_curr_val_from_operand_stack_cache<wasm1p1_details::wasm_i32>(typeref...)))};
 
         wasm1p1_details::copy_funcref_element_segment(*table, *element, module, dst, src, len);
-        if(len != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+        if(len != 0uz)
+        {
+            wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                table, wasm1p1_details::runtime_table_mutation_kind::init, dst, len);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -1982,7 +2009,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memmove(dst_table->elems.data() + dst, src_table->elems.data() + src, len * sizeof(wasm1p1_details::runtime_table_elem_storage_t));
             if(wasm1p1_details::runtime_table_is_funcref(*dst_table))
             {
-                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write();
+                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                    dst_table, wasm1p1_details::runtime_table_mutation_kind::copy, dst, len);
             }
         }
 
@@ -2010,7 +2038,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memmove(dst_table->elems.data() + dst, src_table->elems.data() + src, len * sizeof(wasm1p1_details::runtime_table_elem_storage_t));
             if(wasm1p1_details::runtime_table_is_funcref(*dst_table))
             {
-                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write();
+                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                    dst_table, wasm1p1_details::runtime_table_mutation_kind::copy, dst, len);
             }
         }
     }
@@ -2038,7 +2067,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             table->elems.resize(new_size);
             for(::std::size_t i{old_size}; i != new_size; ++i) { table->elems.index_unchecked(i) = elem; }
             out = wasm1p1_details::u32_to_i32(static_cast<::std::uint_least32_t>(old_size));
-            if(delta != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+            if(delta != 0uz)
+            {
+                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                    table, wasm1p1_details::runtime_table_mutation_kind::grow, old_size, delta);
+            }
         }
 
         ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
@@ -2072,7 +2105,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             table->elems.resize(new_size);
             for(::std::size_t i{old_size}; i != new_size; ++i) { table->elems.index_unchecked(i) = elem; }
             out = wasm1p1_details::u32_to_i32(static_cast<::std::uint_least32_t>(old_size));
-            if(delta != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+            if(delta != 0uz)
+            {
+                wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                    table, wasm1p1_details::runtime_table_mutation_kind::grow, old_size, delta);
+            }
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
@@ -2184,7 +2221,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const elem{wasm1p1_details::table_elem_from_funcref(module, value)};
         for(::std::size_t i{}; i != len; ++i) { table->elems.index_unchecked(index + i) = elem; }
-        if(len != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+        if(len != 0uz)
+        {
+            wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                table, wasm1p1_details::runtime_table_mutation_kind::fill, index, len);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -2207,7 +2248,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const elem{wasm1p1_details::table_elem_from_funcref(module, value)};
         for(::std::size_t i{}; i != len; ++i) { table->elems.index_unchecked(index + i) = elem; }
-        if(len != 0uz) { wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(); }
+        if(len != 0uz)
+        {
+            wasm1p1_details::refresh_llvm_call_indirect_table_views_after_funcref_write(
+                table, wasm1p1_details::runtime_table_mutation_kind::fill, index, len);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>

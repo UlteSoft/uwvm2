@@ -602,6 +602,10 @@ namespace uwvm2::runtime::lib
             ::uwvm2::utils::container::vector<defined_func_ptr_range> defined_func_ptr_ranges{};
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+            // Lazy publication and guest table mutations can touch the same compact target slots. Serialize only those writers
+            // (including vector growth); this is not a reader-side relocation protocol and does not broaden the embedding runtime's
+            // existing cross-host-execution/quiescence contract for concurrent table.grow.
+            ::std::atomic_flag llvm_jit_call_indirect_target_write_lock = ATOMIC_FLAG_INIT;
             // Native-unwind mode can materialize lazy code while caller-owned execution threads are active. Its gate serializes the
             // entire materialize/execute/reset lifetime, so trap readers cannot overlap mutations of these compact address tables.
             details::native_unwind_execution_gate llvm_jit_native_unwind_execution_gate{};
@@ -1289,6 +1293,24 @@ namespace uwvm2::runtime::lib
         };
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        class llvm_jit_call_indirect_target_write_guard
+        {
+        public:
+            inline llvm_jit_call_indirect_target_write_guard() noexcept
+            {
+                while(g_runtime.llvm_jit_call_indirect_target_write_lock.test_and_set(::std::memory_order_acquire))
+                {
+                    ::fast_io::this_thread::yield();
+                }
+            }
+
+            llvm_jit_call_indirect_target_write_guard(llvm_jit_call_indirect_target_write_guard const&) = delete;
+            llvm_jit_call_indirect_target_write_guard& operator= (llvm_jit_call_indirect_target_write_guard const&) = delete;
+
+            inline ~llvm_jit_call_indirect_target_write_guard() noexcept
+            { g_runtime.llvm_jit_call_indirect_target_write_lock.clear(::std::memory_order_release); }
+        };
+
         [[nodiscard]] inline constexpr bool& get_llvm_wasm_fp_environment_active_state() noexcept
         { return get_call_stack().llvm_wasm_fp_environment_active; }
 
@@ -3558,6 +3580,7 @@ namespace uwvm2::runtime::lib
             // ordering so readers never observe a partially installed generated entry.
             if(info == nullptr) { return; }
 
+            llvm_jit_call_indirect_target_write_guard write_guard{};
             auto const info_address{reinterpret_cast<::std::uintptr_t>(info)};
             for(auto& caller_rec: g_runtime.modules)
             {
@@ -8879,6 +8902,104 @@ namespace uwvm2::runtime::lib
 # endif
         }
 
+        [[nodiscard]] inline constexpr runtime_llvm_jit_raw_call_target_t make_llvm_jit_call_indirect_target(
+            compiled_module_record const& caller_rec,
+            runtime_table_elem_storage_t const& elem) noexcept
+        {
+            using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
+            runtime_llvm_jit_raw_call_target_t target{};
+
+            switch(elem.type)
+            {
+                case table_elem_type::func_ref_defined:
+                {
+                    auto const defined_func_ptr{elem.storage.defined_ptr};
+                    if(defined_func_ptr == nullptr) { break; }
+
+                    auto const defined_info{find_defined_func_info(defined_func_ptr)};
+                    if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    // Publish the most direct executable address available. Lazy/tiered placeholders keep indirect calls
+                    // valid before the target function has been materialized.
+                    ::std::uintptr_t raw_defined_entry_address{};
+                    if(try_get_runtime_llvm_jit_raw_defined_entry_address(defined_info->module_id,
+                                                                          defined_info->function_index,
+                                                                          raw_defined_entry_address))
+                    {
+                        target.entry_address = raw_defined_entry_address;
+                        ::std::uintptr_t typed_defined_entry_address{};
+                        if(try_get_runtime_llvm_jit_defined_entry_address(defined_info->module_id,
+                                                                          defined_info->function_index,
+                                                                          typed_defined_entry_address))
+                        {
+                            target.typed_entry_address = typed_defined_entry_address;
+                        }
+                    }
+                    else if(g_runtime.lazy_compile_active && ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                                                                 ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+                    {
+                        target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_lazy_raw_call_defined_entry);
+                        target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
+                    }
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                    else if(tiered_runtime_active() && tiered_uses_tiered_targets())
+                    {
+                        target.entry_address = reinterpret_cast<::std::uintptr_t>(tiered_raw_call_defined_entry);
+                        target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
+                    }
+                    else if(tiered_runtime_active())
+                    {
+                        target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_lazy_raw_call_defined_entry);
+                        target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
+                    }
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                    else
+                    {
+                        target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_defined_entry);
+                        target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info->compiled_call_info);
+                    }
+# else
+                    else
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+# endif
+                    target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, func_sig_from_defined(defined_info->runtime_func));
+                    break;
+                }
+                case table_elem_type::func_ref_imported:
+                {
+                    auto const imported_func_ptr{elem.storage.imported_ptr};
+                    if(imported_func_ptr == nullptr) { break; }
+                    auto const cached_target_ptr{find_cached_import_target(imported_func_ptr)};
+                    if(cached_target_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& cached_target{*cached_target_ptr};
+                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
+                    target.context_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(cached_target));
+                    target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, cached_target.signature());
+                    break;
+                }
+                [[unlikely]] default:
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+            return target;
+        }
+
+        inline constexpr void store_llvm_jit_call_indirect_target(
+            runtime_llvm_jit_raw_call_target_t& destination,
+            runtime_llvm_jit_raw_call_target_t const& source) noexcept
+        {
+            // Lazy materializers publish into the address cells. The target-writer guard serializes writers; matching atomic
+            // address stores remain compatible with the acquire loads already emitted for lazy/tiered call_indirect sites.
+            ::std::atomic_ref<::std::uintptr_t>{destination.context_address}.store(source.context_address, ::std::memory_order_relaxed);
+            destination.encoded_type_id = source.encoded_type_id;
+            ::std::atomic_ref<::std::uintptr_t>{destination.typed_entry_address}.store(source.typed_entry_address, ::std::memory_order_relaxed);
+            ::std::atomic_ref<::std::uintptr_t>{destination.entry_address}.store(source.entry_address, ::std::memory_order_release);
+        }
+
         inline constexpr void populate_llvm_jit_call_indirect_table_views() noexcept
         {
             // LLVM call_indirect lowers through compact table-view arrays. They are rebuilt after initialization/materialization so
@@ -8925,97 +9046,85 @@ namespace uwvm2::runtime::lib
                     {
                         auto& target{target_vec.index_unchecked(elem_index)};
                         auto const& elem{resolved_table->elems.index_unchecked(elem_index)};
-                        switch(elem.type)
-                        {
-                            case table_elem_type::func_ref_defined:
-                            {
-                                auto const defined_func_ptr{elem.storage.defined_ptr};
-                                if(defined_func_ptr == nullptr) { break; }
-
-                                auto const defined_info{find_defined_func_info(defined_func_ptr)};
-                                if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-                                // Publish the most direct executable address available. Lazy/tiered placeholders keep indirect calls
-                                // valid before the target function has been materialized.
-                                ::std::uintptr_t raw_defined_entry_address{};
-                                if(try_get_runtime_llvm_jit_raw_defined_entry_address(defined_info->module_id,
-                                                                                      defined_info->function_index,
-                                                                                      raw_defined_entry_address))
-                                {
-                                    target.entry_address = raw_defined_entry_address;
-                                    target.context_address = 0u;
-                                    ::std::uintptr_t typed_defined_entry_address{};
-                                    if(try_get_runtime_llvm_jit_defined_entry_address(defined_info->module_id,
-                                                                                      defined_info->function_index,
-                                                                                      typed_defined_entry_address))
-                                    {
-                                        target.typed_entry_address = typed_defined_entry_address;
-                                    }
-                                }
-                                else
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-                                    if(g_runtime.lazy_compile_active && ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                                                                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
-                                {
-                                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_lazy_raw_call_defined_entry);
-                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
-                                }
-                                else
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                                    if(tiered_runtime_active() && tiered_uses_tiered_targets())
-                                {
-                                    target.entry_address = reinterpret_cast<::std::uintptr_t>(tiered_raw_call_defined_entry);
-                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
-                                }
-                                else
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                                    if(tiered_runtime_active())
-                                {
-                                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_lazy_raw_call_defined_entry);
-                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
-                                }
-                                else
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                                {
-                                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_defined_entry);
-                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info->compiled_call_info);
-                                }
-# else
-                                {
-                                    ::fast_io::fast_terminate();
-                                }
-# endif
-                                target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, func_sig_from_defined(defined_info->runtime_func));
-                                break;
-                            }
-                            case table_elem_type::func_ref_imported:
-                            {
-                                auto const imported_func_ptr{elem.storage.imported_ptr};
-                                if(imported_func_ptr == nullptr) { break; }
-                                auto const cached_target_ptr{find_cached_import_target(imported_func_ptr)};
-                                if(cached_target_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                                auto const& cached_target{*cached_target_ptr};
-                                target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
-                                target.context_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(cached_target));
-                                target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, cached_target.signature());
-                                break;
-                            }
-                            [[unlikely]] default:
-                            {
-                                ::fast_io::fast_terminate();
-                            }
-                        }
+                        target = make_llvm_jit_call_indirect_target(caller_rec, elem);
                     }
 
                     table_view.data_address = reinterpret_cast<::std::uintptr_t>(target_vec.data());
                     table_view.size = target_vec.size();
                 }
             }
+        }
+
+        inline constexpr void update_llvm_jit_call_indirect_table_views(
+            runtime_table_storage_t* mutated_table,
+            ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind kind,
+            ::std::size_t begin,
+            ::std::size_t count) noexcept
+        {
+            using mutation_kind = ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind;
+            if(mutated_table == nullptr || mutated_table->table_type_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(mutated_table->table_type_ptr->reftype !=
+               ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            if(count == 0uz) { return; }
+
+            bool grow_mutation{};
+            switch(kind)
+            {
+                case mutation_kind::set: [[fallthrough]];
+                case mutation_kind::init: [[fallthrough]];
+                case mutation_kind::copy: [[fallthrough]];
+                case mutation_kind::fill: break;
+                case mutation_kind::grow: grow_mutation = true; break;
+                [[unlikely]] default: ::fast_io::fast_terminate();
+            }
+
+            auto const table_size{mutated_table->elems.size()};
+            if(begin > table_size || count > table_size - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(grow_mutation && count != table_size - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            llvm_jit_call_indirect_target_write_guard write_guard{};
+            auto const affected_view_count{details::for_each_borrowed_llvm_jit_call_indirect_table_view_alias(
+                g_runtime.modules,
+                mutated_table,
+                [](runtime_module_storage_t const& module, ::std::size_t table_index) constexpr noexcept
+                { return resolve_table(module, table_index); },
+                [&](compiled_module_record& caller_rec, runtime_module_storage_t& caller_module, ::std::size_t table_index) constexpr noexcept
+                {
+                    if(caller_rec.llvm_jit_call_indirect_targets.size() != caller_module.llvm_jit_call_indirect_table_views.size()) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto& target_vec{caller_rec.llvm_jit_call_indirect_targets.index_unchecked(table_index)};
+                    if(grow_mutation)
+                    {
+                        // A successful table.grow has already appended exactly [begin, table_size) to the resolved table.
+                        // Keep the old prefix and encode only the new suffix before publishing the relocated view once.
+                        if(target_vec.size() != begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+                        target_vec.resize(table_size);
+                    }
+                    else if(target_vec.size() != table_size) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+
+                    for(::std::size_t elem_index{begin}; elem_index != begin + count; ++elem_index)
+                    {
+                        auto const target{make_llvm_jit_call_indirect_target(
+                            caller_rec, mutated_table->elems.index_unchecked(elem_index))};
+                        store_llvm_jit_call_indirect_target(target_vec.index_unchecked(elem_index), target);
+                    }
+
+                    if(grow_mutation)
+                    {
+                        auto& table_view{caller_module.llvm_jit_call_indirect_table_views.index_unchecked(table_index)};
+                        table_view = {reinterpret_cast<::std::uintptr_t>(target_vec.data()), target_vec.size()};
+                    }
+                })};
+            if(affected_view_count == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
         }
 #endif
 
@@ -9184,8 +9293,6 @@ namespace uwvm2::runtime::lib
             /// @todo debug_llvm_jit
             // Reserve an explicit future slot in the dispatch switch below when a debug-llvm-jit compiler mode is added.
         };
-            using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
-
 
         // Scheduling is runtime-selected in combined builds, so keep its public
         // representation independent of whichever backend happened to be
@@ -9222,8 +9329,6 @@ namespace uwvm2::runtime::lib
                     .split_size = config.split_size,
                     .adjust_for_default_policy = config.adjust_for_default_policy};
         }
-                        target = {};
-
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -13848,11 +13953,15 @@ namespace uwvm2::runtime::lib
     // - Push/pop callbacks are used only when codegen emitted logical stack frames.
     // - Tail-call disabling keeps the C++ helper visible to platform unwinders.
     // =========================================================================
-    extern "C++" void llvm_jit_refresh_call_indirect_table_views() noexcept
+    extern "C++" void llvm_jit_refresh_call_indirect_table_views(
+        runtime_table_storage_t* mutated_table,
+        ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind kind,
+        ::std::size_t begin,
+        ::std::size_t count) noexcept
     {
-        // Table writes/growth can relocate the element vector or replace a target. Rebuild the compact LLVM snapshots
-        // before generated execution resumes so call_indirect never observes the initialization-time table image.
-        populate_llvm_jit_call_indirect_table_views();
+        // The bridge receives the already-resolved destination table, so imported aliases in every caller are updated while
+        // unrelated tables retain both their target allocation and contents.
+        update_llvm_jit_call_indirect_table_views(mutated_table, kind, begin, count);
     }
 
     extern "C++"

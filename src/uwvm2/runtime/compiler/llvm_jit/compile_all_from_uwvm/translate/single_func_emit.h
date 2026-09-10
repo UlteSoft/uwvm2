@@ -4477,7 +4477,11 @@ inline constexpr void llvm_jit_table_set_bridge(::std::uintptr_t runtime_module_
         runtime_wasm_funcref value{};
         ::std::memcpy(::std::addressof(value), value_ptr, sizeof(value));
         table->elems.index_unchecked(element_index) = llvm_jit_table_elem_from_funcref(*runtime_module, value);
-        ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views();
+        ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(
+            table,
+            ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::set,
+            element_index,
+            1uz);
     }
     else if(llvm_jit_runtime_table_is_externref(*table))
     {
@@ -4557,7 +4561,11 @@ inline constexpr void llvm_jit_table_init_bridge(::std::uintptr_t runtime_module
                                                             : llvm_jit_resolve_table_elem_from_func_index(*runtime_module, func_index);
             }
         }
-        if(len != 0uz) { ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(); }
+        if(len != 0uz)
+        {
+            ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(
+                table, ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::init, dst, len);
+        }
     }
     else if(llvm_jit_runtime_table_is_externref(*table))
     {
@@ -4612,7 +4620,11 @@ inline constexpr void llvm_jit_table_copy_bridge(::std::uintptr_t runtime_module
     if(len != 0uz)
     {
         ::std::memmove(dst_table->elems.data() + dst, src_table->elems.data() + src, len * sizeof(runtime_table_elem_storage_t));
-        if(llvm_jit_runtime_table_is_funcref(*dst_table)) { ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(); }
+        if(llvm_jit_runtime_table_is_funcref(*dst_table))
+        {
+            ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(
+                dst_table, ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::copy, dst, len);
+        }
     }
 }
 
@@ -4657,7 +4669,11 @@ inline constexpr void llvm_jit_table_copy_bridge(::std::uintptr_t runtime_module
         table->elems.resize(new_size);
         for(::std::size_t i{old_size}; i != new_size; ++i) { table->elems.index_unchecked(i) = fill_element; }
         result = llvm_jit_wasm_u32_bits_to_i32(static_cast<::std::uint_least32_t>(old_size));
-        if(funcref_table && delta != 0uz) { ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(); }
+        if(funcref_table && delta != 0uz)
+        {
+            ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(
+                table, ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::grow, old_size, delta);
+        }
     }
     return result;
 }
@@ -4709,7 +4725,11 @@ inline constexpr void llvm_jit_table_fill_bridge(::std::uintptr_t runtime_module
     }
 
     for(::std::size_t i{}; i != len; ++i) { table->elems.index_unchecked(dst + i) = fill_element; }
-    if(funcref_table && len != 0uz) { ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(); }
+    if(funcref_table && len != 0uz)
+    {
+        ::uwvm2::runtime::lib::llvm_jit_refresh_call_indirect_table_views(
+            table, ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::fill, dst, len);
+    }
 }
 
 // Acquire a validated length snapshot for a local-imported memory. This is used only for memory.size-style queries;
@@ -7742,6 +7762,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     typed_entry_address->setVolatile(true);
     entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     context_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
+    encoded_type_id->setAlignment(::llvm::Align{alignof(::std::uint_least32_t)});
     typed_entry_address->setAlignment(::llvm::Align{alignof(::std::uintptr_t)});
     if(state.lazy_defined_targets_are_atomic)
     {
