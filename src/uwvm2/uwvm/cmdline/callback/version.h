@@ -63,7 +63,6 @@
 # endif
 // imported
 # include <fast_io.h>
-# include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>

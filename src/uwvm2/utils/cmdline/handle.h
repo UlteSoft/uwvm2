@@ -36,7 +36,6 @@
 # include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 // import
 # include <fast_io.h>
-# include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/utils/debug/impl.h>

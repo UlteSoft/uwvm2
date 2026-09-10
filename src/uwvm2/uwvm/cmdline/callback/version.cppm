@@ -64,7 +64,6 @@ module;
 export module uwvm2.uwvm.cmdline.callback:version;
 
 import fast_io;
-import fast_io_crypto;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
