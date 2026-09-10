@@ -71,6 +71,22 @@ namespace
         0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u,
         0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
+    // These modules intentionally have the same path, function type, and function body. Only the
+    // declared memory maximum differs, which changes the generated memory.grow implementation.
+    // A complete persistent-cache key must therefore cover the authoritative generated LLVM IR,
+    // rather than assuming that a function-body-only/module-count fingerprint is complete.
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_one_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x01u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_two_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x02u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
+
     struct wasm_fixture_def
     {
         ::std::string_view label{};
@@ -363,11 +379,15 @@ namespace
 
     [[nodiscard]] bool flip_context_abi_byte(::std::vector<unsigned char>& bytes)
     {
-        auto const needle{::std::string_view{"uwvm2-runtime-abi-v5"}};
+        // Locate the versioned schema structurally so this corruption test keeps exercising context rejection after a
+        // deliberate runtime ABI bump instead of silently failing to mutate the cache blob.
+        auto const needle{::std::string_view{"uwvm2-runtime-abi-v"}};
         auto const iter{::std::search(bytes.begin(), bytes.end(), needle.begin(), needle.end())};
         if(iter == bytes.end()) { return false; }
         auto const offset{static_cast<::std::size_t>(iter - bytes.begin())};
-        bytes[offset + needle.size() - 1uz] ^= 0x01u;
+        auto const version_offset{offset + needle.size()};
+        if(version_offset >= bytes.size()) { return false; }
+        bytes[version_offset] ^= 0x01u;
         return true;
     }
 
@@ -911,6 +931,68 @@ namespace
         return true;
     }
 
+    [[nodiscard]] bool test_generated_ir_shape_cache_invalidation(::std::filesystem::path const& uwvm_path,
+                                                                  ::std::filesystem::path const& artifact_dir)
+    {
+        auto const wasm_path{artifact_dir / "cache-ir-shape-same-path.wasm"};
+        auto const cache_dir{artifact_dir / "cache-aot-ir-shape"};
+        ::std::filesystem::remove_all(cache_dir);
+        ::std::filesystem::create_directories(cache_dir);
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+        // One explicit extra worker exercises the full parallel-object key without inheriting an unbounded
+        // host-dependent compile-thread policy.
+        constexpr ::std::string_view runtime_args{"-Raot -Rct 1 -Rclog out"};
+
+        if(!write_fixture(wasm_path, memory_max_one_wasm.data(), memory_max_one_wasm.size()) ||
+           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_one"))
+        {
+            return false;
+        }
+        auto const first{snapshot_cache(cache_dir)};
+        if(first.empty())
+        {
+            ::std::cerr << "memory-max cache setup produced no object for AOT\n";
+            return false;
+        }
+
+        if(!write_fixture(wasm_path, memory_max_two_wasm.data(), memory_max_two_wasm.size()) ||
+           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_two"))
+        {
+            return false;
+        }
+        if(output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-hit"))
+        {
+            ::std::cerr << "changed memory limits incorrectly reused stale generated AOT code\n";
+            return false;
+        }
+        if(!output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-store"))
+        {
+            ::std::cerr << "changed memory limits did not store a distinct AOT cache object\n";
+            return false;
+        }
+        auto const second{snapshot_cache(cache_dir)};
+        if(second.size() <= first.size())
+        {
+            ::std::cerr << "generated-IR cache identity did not grow after the memory-limit change; before=" << first.size()
+                        << " after=" << second.size() << '\n';
+            return false;
+        }
+
+        if(!run_uwvm(uwvm_path,
+                     artifact_dir,
+                     wasm_path,
+                     runtime_args,
+                     cache_args,
+                     "aot_ir_shape_max_two_reuse") ||
+           !output_contains(artifact_dir, "aot_ir_shape_max_two_reuse", "object-cache-hit"))
+        {
+            ::std::cerr << "new memory-limit AOT cache object was not reusable\n";
+            return false;
+        }
+
+        return true;
+    }
+
     [[nodiscard]] bool test_wasm1p1_feature_cache_smoke(::std::filesystem::path const& uwvm_path,
                                                         ::std::filesystem::path const& artifact_dir)
     {
@@ -975,6 +1057,7 @@ int main(int argc, char** argv)
 
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }
+    if(!test_generated_ir_shape_cache_invalidation(uwvm_path, artifact_dir)) { return 1; }
     if(!test_wasm1p1_feature_cache_smoke(uwvm_path, artifact_dir)) { return 1; }
     if(!test_signed_cache_integrity(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_cache_fuzz_recovery(uwvm_path, artifact_dir, wasm_path)) { return 1; }
