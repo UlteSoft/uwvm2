@@ -148,6 +148,7 @@ else
       printf '%s\n' llvm_aot_noinline_policy
       printf '%s\n' llvm_aot_unaligned_memory
       printf '%s\n' llvm_jit_imported_bulk_memory
+      printf '%s\n' llvm_jit_local_imported_global_byte_bridge
       printf '%s\n' wasm2_feature_validator_parity
       if [[ "${UWVM_LLVM_JIT_TEST_PROFILE}" == "full" ]]; then
         printf '%s\n' llvm_jit_multivalue_typed
