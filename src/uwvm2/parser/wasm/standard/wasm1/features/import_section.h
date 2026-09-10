@@ -901,6 +901,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(import_section_storage), ::std::addressof(all_sections)}; }
 
+#ifndef UWVM_MODULE
+    // This optional context-print fast path depends on non-exported fast_io protocol internals.
     namespace details::import_section_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -1093,6 +1095,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         };
     }  // namespace details::import_section_print
+#endif
 
     /// @brief Print the import section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream
@@ -1192,6 +1195,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires details::import_section_print::context_body_supported<char_type, Fs...>
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, import_section_storage_section_details_wrapper_t<Fs...>>) noexcept
@@ -1205,6 +1209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 }
 
 /// @brief Define container optimization operations for use with fast_io
