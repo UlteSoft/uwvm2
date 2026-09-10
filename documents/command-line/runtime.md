@@ -100,6 +100,10 @@ LLVM JIT policy defaults:
 
 - Effective `full_compile + llvm_jit_only` execution, including `--runtime-aot` and `--runtime-custom-mode full --runtime-custom-compiler jit`, defaults to the full/tier-2 max policy when no explicit LLVM JIT policy is supplied.
 - Tiered execution keeps its existing default tier-2 policy unless an LLVM JIT policy is explicitly supplied.
+Persistent native-object caching requires a clean Git commit identity or a verified complete-source manifest ID. Source-archive packagers can pass `--build-source-id=sha256:<64 lowercase hex digits>`; the value must be regenerated whenever any packaged source input changes. Official release archives should carry the stable hash of a normalized, complete source manifest rather than a tag, version string, timestamp, path, or build artifact.
+
+Dirty Git worktrees and builds with neither identity fail closed even when an explicit cache path is requested. A Wasm-derived LLVM module hash does not cover host bridge/runtime/unwind semantics, and the cache signature provides integrity and context binding rather than source provenance. Developers may separately accept these risks with `UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE` or `UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE`; release builds must not define either macro.
+
 - Explicit `--runtime-llvm-jit-policy` or `--runtime-llvm-jit-full-policy` still takes precedence.
 
 Valid:

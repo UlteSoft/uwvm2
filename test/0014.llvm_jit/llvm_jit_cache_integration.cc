@@ -510,6 +510,44 @@ namespace
         return run_uwvm_from(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, label, {});
     }
 
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    [[nodiscard]] bool test_untrusted_source_cache_fail_closed(::std::filesystem::path const& uwvm_path,
+                                                               ::std::filesystem::path const& artifact_dir,
+                                                               ::std::filesystem::path const& wasm_path)
+    {
+        auto const cache_dir{artifact_dir / "cache-untrusted-source-fail-closed"};
+        ::std::filesystem::remove_all(cache_dir);
+        ::std::filesystem::create_directories(cache_dir);
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+
+        // An explicit path must not override the build-identity guard. Running twice proves that the first run neither
+        // publishes an object nor leaves anything that the second run can reuse. Zero extra compile workers keeps this
+        // focused check on the ordinary MCJIT ObjectCache path on every supported host.
+        constexpr ::std::array labels{::std::string_view{"untrusted_source_cache_first"}, ::std::string_view{"untrusted_source_cache_second"}};
+        for(auto const label: labels)
+        {
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rct 0 -Rclog out", cache_args, label)) { return false; }
+            if(output_contains(artifact_dir, label, "object-cache-hit"))
+            {
+                ::std::cerr << "untrusted-source build unexpectedly reused a persistent native object\n";
+                return false;
+            }
+            if(!output_contains(artifact_dir, label, "status=disabled"))
+            {
+                ::std::cerr << "untrusted-source cache decision was not reported as disabled\n";
+                return false;
+            }
+        }
+        if(!snapshot_cache(cache_dir).empty())
+        {
+            ::std::cerr << "untrusted-source build wrote a persistent native object despite the fail-closed policy\n";
+            return false;
+        }
+        return true;
+    }
+#endif
+
     [[nodiscard]] bool run_cached_mode_twice_with_cache_arg(::std::filesystem::path const& uwvm_path,
                                                             ::std::filesystem::path const& artifact_dir,
                                                             ::std::filesystem::path const& wasm_path,
@@ -1135,6 +1173,13 @@ int main(int argc, char** argv)
         return 1;
     }
     auto const& wasm_path{fixtures.front().path};
+
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    // The normal integration matrix deliberately requires cache stores and hits. Dirty or unidentified source builds
+    // forbid those operations, so validate the fail-closed contract directly instead of reporting false failures.
+    return test_untrusted_source_cache_fail_closed(uwvm_path, artifact_dir, wasm_path) ? 0 : 1;
+#endif
 
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }

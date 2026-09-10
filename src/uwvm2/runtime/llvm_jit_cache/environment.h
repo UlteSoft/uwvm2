@@ -55,6 +55,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#include "source_provenance_policy.h"
+
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
     namespace details
@@ -459,6 +461,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::append_cache_key_value(out, u8"git-commit", u8"unknown");
 #endif
+#if defined(UWVM2_BUILD_SOURCE_ID)
+        details::append_cache_key_value(out, u8"build-source-id", UWVM2_BUILD_SOURCE_ID);
+#else
+        details::append_cache_key_value(out, u8"build-source-id", u8"unknown");
+#endif
 #if defined(UWVM_GIT_COMMIT_DATA)
         details::append_cache_key_value(out, u8"git-commit-date", UWVM_GIT_COMMIT_DATA);
 #else
@@ -466,8 +473,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
 #if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
         details::append_cache_key_value(out, u8"git-dirty", u8"1");
-#else
+#elif defined(UWVM_GIT_COMMIT_ID)
         details::append_cache_key_value(out, u8"git-dirty", u8"0");
+#else
+        details::append_cache_key_value(out, u8"git-dirty", u8"unknown");
 #endif
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         details::append_cache_key_value(out, u8"runtime-jit", u8"uwvm-int-llvm-jit-tiered");
@@ -530,6 +539,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         policy.generate_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_sign;
         policy.verify_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_verify;
 #endif
+        constexpr source_provenance_policy_inputs provenance_policy{
+#if defined(UWVM_GIT_COMMIT_ID)
+            .has_git_commit = true,
+#endif
+#if defined(UWVM2_BUILD_SOURCE_ID)
+            .has_verified_build_source_id = true,
+#endif
+#if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
+            .git_worktree_is_dirty = true,
+#endif
+#if defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)
+            .allow_unsafe_dirty_cache = true,
+#endif
+#if defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE)
+            .allow_unsafe_unprovenanced_cache = true,
+#endif
+        };
+        // The generated module hash does not cover host bridge/runtime/unwind semantics. Likewise, a deterministic
+        // signature provides integrity and context binding, not source provenance. Therefore dirty or unidentified
+        // source builds cannot publish or reuse persistent native objects unless their distinct developer-only
+        // escape hatch was explicitly selected at build time.
+        if(!source_provenance_allows_persistent_cache(provenance_policy)) { policy.enable = false; }
         // If signing support is missing, disabling the whole cache is safer than silently accepting unsigned native code.
         if(policy.enable && (policy.generate_signature || policy.verify_signature) && !cache_ed25519_identity_signature_available) { policy.enable = false; }
         return policy;

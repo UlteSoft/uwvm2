@@ -172,6 +172,17 @@ option("use-cxx-module", function()
     set_default(false)
 end)
 
+option("build-source-id", function()
+    set_description
+    (
+        "Declare the verified identity of a source archive for persistent LLVM native-object caching.",
+        "Use sha256:<64 lowercase hexadecimal digits> from a normalized complete-source manifest.",
+        "Leave as none for Git builds or when source provenance cannot be verified.",
+        "default = none"
+    )
+    set_default("none")
+end)
+
 option("use-thread-local", function()
     set_description
     (
