@@ -124,6 +124,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 
     namespace wasm1p1_simd_details
     {
+        // Keep unhandled-opcode assertions dependent without using a self-comparison rejected by GCC's
+        // `-Wtautological-compare` under `-Werror`.
+        template <auto Value>
+        inline constexpr bool dependent_false_v{false};
+
         using wasm_i32 = wasm1p1_details::wasm_i32;
         using wasm_i64 = wasm1p1_details::wasm_i64;
         using wasm_f32 = wasm1p1_details::wasm_f32;
@@ -434,7 +439,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == v128_binop::xor_) { return vec_to_v128(l ^ r); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 bitwise binop");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 bitwise binop");
                 }
 # else
                 auto l{load_uint_lanes<::std::uint_least8_t, 16uz>(lhs)};
@@ -447,7 +452,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == v128_binop::xor_) { l.lane[i] = static_cast<::std::uint_least8_t>(l.lane[i] ^ r.lane[i]); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 bitwise binop");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 bitwise binop");
                     }
                 }
                 return store_uint_lanes<::std::uint_least8_t, 16uz>(l);
@@ -464,7 +469,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == v128_binop::i32x4_eq) { return vec_to_v128(::std::bit_cast<v128_u32x4>(l == r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 i32x4 binop");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 i32x4 binop");
                 }
 # else
                 auto l{load_uint_lanes<wasm_u32, 4uz>(lhs)};
@@ -477,7 +482,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == v128_binop::i32x4_eq) { l.lane[i] = l.lane[i] == r.lane[i] ? static_cast<wasm_u32>(0xFFFFFFFFu) : wasm_u32{}; }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 i32x4 binop");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 i32x4 binop");
                     }
                 }
                 return store_uint_lanes<wasm_u32, 4uz>(l);
@@ -494,7 +499,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == v128_binop::f32x4_eq) { return vec_to_v128(::std::bit_cast<v128_u32x4>(l == r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 f32x4 binop");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 f32x4 binop");
                 }
 # else
                 auto l{load_f32x4_lanes(lhs)};
@@ -512,7 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 f32x4 binop");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 f32x4 binop");
                     }
                 }
                 return store_f32x4_lanes(l);
@@ -520,7 +525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled v128 binop");
+                static_assert(dependent_false_v<Op>, "unhandled v128 binop");
             }
         }
 
@@ -539,7 +544,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == v128_unop::f32x4_convert_i32x4_u) { return vec_to_v128(__builtin_convertvector(lanes, v128_f32x4)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 unop");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 unop");
                 }
 # else
                 auto const lanes{load_uint_lanes<wasm_u32, 4uz>(v)};
@@ -550,7 +555,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == v128_unop::f32x4_convert_i32x4_u) { out.lane[i] = static_cast<wasm_f32>(lanes.lane[i]); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 unop");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 unop");
                     }
                 }
                 return store_f32x4_lanes(out);
@@ -558,7 +563,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled v128 unop");
+                static_assert(dependent_false_v<Op>, "unhandled v128 unop");
             }
         }
 
@@ -593,7 +598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled v128 testop");
+                static_assert(dependent_false_v<Op>, "unhandled v128 testop");
             }
         }
 
@@ -1001,7 +1006,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             else if constexpr(Op == simd_code::i32x4_splat) { return vec_to_v128(vec_splat<v128_u32x4>(bits)); }
             else
             {
-                static_assert(Op != Op, "unhandled i32 splat opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i32 splat opcode");
             }
 # else
             if constexpr(Op == simd_code::i8x16_splat)
@@ -1024,7 +1029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i32 splat opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i32 splat opcode");
             }
 # endif
         }
@@ -1045,7 +1050,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i64 splat opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i64 splat opcode");
             }
         }
 
@@ -1064,7 +1069,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f32 splat opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f32 splat opcode");
             }
         }
 
@@ -1083,7 +1088,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f64 splat opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f64 splat opcode");
             }
         }
 
@@ -1139,7 +1144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i32 extract-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i32 extract-lane opcode");
             }
         }
 
@@ -1157,7 +1162,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i64 extract-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i64 extract-lane opcode");
             }
         }
 
@@ -1174,7 +1179,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f32 extract-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f32 extract-lane opcode");
             }
         }
 
@@ -1191,7 +1196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f64 extract-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f64 extract-lane opcode");
             }
         }
 
@@ -1220,7 +1225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i32 replace-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i32 replace-lane opcode");
             }
 # else
             if constexpr(Op == simd_code::i8x16_replace_lane)
@@ -1243,7 +1248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i32 replace-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i32 replace-lane opcode");
             }
 # endif
         }
@@ -1265,7 +1270,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled i64 replace-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled i64 replace-lane opcode");
             }
         }
 
@@ -1286,7 +1291,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f32 replace-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f32 replace-lane opcode");
             }
         }
 
@@ -1307,7 +1312,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled f64 replace-lane opcode");
+                static_assert(dependent_false_v<Op>, "unhandled f64 replace-lane opcode");
             }
         }
 
@@ -1418,7 +1423,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i8x16_neg) { return vec_to_v128(static_cast<v128_u8x16>(v128_u8x16{} - in)); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i8x16 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i8x16 unary opcode");
                     }
 # endif
                 }
@@ -1430,7 +1435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i8x16_popcnt) { lane = static_cast<u8>(::std::popcount(static_cast<unsigned>(lane))); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i8x16 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i8x16 unary opcode");
                     }
                 }
                 return store_uint_lanes<u8, 16uz>(lanes);
@@ -1451,7 +1456,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i16x8_neg) { return vec_to_v128(static_cast<v128_u16x8>(v128_u16x8{} - in)); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i16x8 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i16x8 unary opcode");
                     }
 # else
                     auto lanes{load_uint_lanes<u16, 8uz>(v)};
@@ -1461,7 +1466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::i16x8_neg) { lane = neg_bits(lane); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i16x8 unary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i16x8 unary opcode");
                         }
                     }
                     return store_uint_lanes<u16, 8uz>(lanes);
@@ -1489,7 +1494,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                             }
                             else
                             {
-                                static_assert(Op != Op, "unhandled i16x8 extadd opcode");
+                                static_assert(dependent_false_v<Op>, "unhandled i16x8 extadd opcode");
                             }
                         }
                     }
@@ -1510,19 +1515,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                             }
                             else
                             {
-                                static_assert(Op != Op, "unhandled i16x8 extend opcode");
+                                static_assert(dependent_false_v<Op>, "unhandled i16x8 extend opcode");
                             }
                         }
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i16x8 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i16x8 unary opcode");
                     }
                     return store_uint_lanes<u16, 8uz>(out);
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i16x8 unary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i16x8 unary opcode");
                 }
             }
             else if constexpr(Op == simd_code::i32x4_abs || Op == simd_code::i32x4_neg || Op == simd_code::i32x4_extend_low_i16x8_s ||
@@ -1543,7 +1548,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i32x4_neg) { return vec_to_v128(static_cast<v128_u32x4>(v128_u32x4{} - in)); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i32x4 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i32x4 unary opcode");
                     }
 # else
                     auto lanes{load_uint_lanes<u32, 4uz>(v)};
@@ -1553,7 +1558,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::i32x4_neg) { lane = neg_bits(lane); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i32x4 unary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i32x4 unary opcode");
                         }
                     }
                     return store_uint_lanes<u32, 4uz>(lanes);
@@ -1603,7 +1608,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                             }
                             else
                             {
-                                static_assert(Op != Op, "unhandled i32x4 extadd opcode");
+                                static_assert(dependent_false_v<Op>, "unhandled i32x4 extadd opcode");
                             }
                         }
                     }
@@ -1624,19 +1629,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                             }
                             else
                             {
-                                static_assert(Op != Op, "unhandled i32x4 extend opcode");
+                                static_assert(dependent_false_v<Op>, "unhandled i32x4 extend opcode");
                             }
                         }
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i32x4 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i32x4 unary opcode");
                     }
                     return store_uint_lanes<u32, 4uz>(out);
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i32x4 unary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i32x4 unary opcode");
                 }
             }
             else if constexpr(Op == simd_code::i64x2_abs || Op == simd_code::i64x2_neg || Op == simd_code::i64x2_extend_low_i32x4_s ||
@@ -1651,7 +1656,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i64x2_neg) { return vec_to_v128(static_cast<v128_u64x2>(v128_u64x2{} - in)); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i64x2 unary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i64x2 unary opcode");
                     }
 # else
                     auto lanes{load_uint_lanes<u64, 2uz>(v)};
@@ -1661,7 +1666,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::i64x2_neg) { lane = neg_bits(lane); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i64x2 unary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i64x2 unary opcode");
                         }
                     }
                     return store_uint_lanes<u64, 2uz>(lanes);
@@ -1686,14 +1691,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i64x2 extend opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i64x2 extend opcode");
                         }
                     }
                     return store_uint_lanes<u64, 2uz>(out);
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i64x2 unary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i64x2 unary opcode");
                 }
             }
             else if constexpr(Op == simd_code::f32x4_abs || Op == simd_code::f32x4_neg || Op == simd_code::f32x4_sqrt || Op == simd_code::f32x4_ceil ||
@@ -1744,7 +1749,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f32x4_convert_i32x4_u) { out.lane[i] = static_cast<wasm_f32>(in.lane[i]); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f32x4 convert opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f32x4 convert opcode");
                         }
                     }
                 }
@@ -1769,13 +1774,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f32x4_nearest) { out.lane[i] = wasm_roundeven(in.lane[i]); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f32x4 unary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f32x4 unary opcode");
                         }
                     }
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled f32x4 unary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled f32x4 unary opcode");
                 }
                 return store_f32x4_lanes(out);
             }
@@ -1827,7 +1832,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f64x2_convert_low_i32x4_u) { out.lane[i] = static_cast<wasm_f64>(in.lane[i]); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f64x2 convert opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f64x2 convert opcode");
                         }
                     }
                 }
@@ -1846,19 +1851,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f64x2_nearest) { out.lane[i] = wasm_roundeven(in.lane[i]); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f64x2 unary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f64x2 unary opcode");
                         }
                     }
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled f64x2 unary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled f64x2 unary opcode");
                 }
                 return store_f64x2_lanes(out);
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD unary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD unary opcode");
             }
         }
 
@@ -1884,7 +1889,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i8x16_ge_u) { return vec_to_v128(::std::bit_cast<v128_u8x16>(l >= r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i8x16 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i8x16 compare opcode");
                 }
             }
             else if constexpr(::std::same_as<U, u16> && N == 8uz)
@@ -1905,7 +1910,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i16x8_ge_u) { return vec_to_v128(::std::bit_cast<v128_u16x8>(l >= r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i16x8 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i16x8 compare opcode");
                 }
             }
             else if constexpr(::std::same_as<U, u32> && N == 4uz)
@@ -1926,7 +1931,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i32x4_ge_u) { return vec_to_v128(::std::bit_cast<v128_u32x4>(l >= r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i32x4 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i32x4 compare opcode");
                 }
             }
             else if constexpr(::std::same_as<U, u64> && N == 2uz)
@@ -1943,7 +1948,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i64x2_ge_s) { return vec_to_v128(::std::bit_cast<v128_u64x2>(ls >= rs)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i64x2 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i64x2 compare opcode");
                 }
             }
 # endif
@@ -1983,7 +1988,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i8x16_ge_u || Op == simd_code::i16x8_ge_u || Op == simd_code::i32x4_ge_u) { b = l.lane[i] >= r.lane[i]; }
                 else
                 {
-                    static_assert(Op != Op, "unhandled integer SIMD compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled integer SIMD compare opcode");
                 }
                 out.lane[i] = lane_bool<U>(b);
             }
@@ -2006,7 +2011,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f32x4_ge) { return vec_to_v128(::std::bit_cast<v128_u32x4>(l >= r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled f32x4 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled f32x4 compare opcode");
                 }
             }
             else if constexpr(::std::same_as<FloatT, wasm_f64> && N == 2uz)
@@ -2021,7 +2026,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f64x2_ge) { return vec_to_v128(::std::bit_cast<v128_u64x2>(l >= r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled f64x2 compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled f64x2 compare opcode");
                 }
             }
 # endif
@@ -2055,7 +2060,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f32x4_ge || Op == simd_code::f64x2_ge) { b = l.lane[i] >= r.lane[i]; }
                 else
                 {
-                    static_assert(Op != Op, "unhandled float SIMD compare opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled float SIMD compare opcode");
                 }
                 out.lane[i] = lane_bool<MaskU>(b);
             }
@@ -2074,7 +2079,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::v128_xor) { return eval_v128_binop<v128_binop::xor_>(lhs, rhs); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 bitwise opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 bitwise opcode");
                 }
             }
             else if constexpr(Op >= simd_code::i8x16_eq && Op <= simd_code::i8x16_ge_u) { return eval_int_compare<u8, 16uz, Op>(lhs, rhs); }
@@ -2153,7 +2158,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i8x16_avgr_u) { return vec_to_v128(static_cast<v128_u8x16>((l | r) - ((l ^ r) >> 1u))); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i8x16 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i8x16 binary opcode");
                     }
                 }
 # endif
@@ -2177,7 +2182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i8x16 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i8x16 binary opcode");
                     }
                 }
                 return store_uint_lanes<u8, 16uz>(l);
@@ -2213,7 +2218,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i16x8_avgr_u) { return vec_to_v128(static_cast<v128_u16x8>((l | r) - ((l ^ r) >> 1u))); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i16x8 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i16x8 binary opcode");
                     }
                 }
 # endif
@@ -2239,7 +2244,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i16x8 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i16x8 binary opcode");
                     }
                 }
                 return store_uint_lanes<u16, 8uz>(l);
@@ -2282,7 +2287,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i32x4_max_u) { return vec_to_v128(vec_select(l, r, l > r)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i32x4 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i32x4 binary opcode");
                 }
 # else
                 auto l{load_uint_lanes<u32, 4uz>(lhs)};
@@ -2298,7 +2303,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i32x4_max_u) { l.lane[i] = l.lane[i] > r.lane[i] ? l.lane[i] : r.lane[i]; }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i32x4 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i32x4 binary opcode");
                     }
                 }
                 return store_uint_lanes<u32, 4uz>(l);
@@ -2354,7 +2359,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i64x2_mul) { return vec_to_v128(l * r); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i64x2 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i64x2 binary opcode");
                     }
 # else
                     auto l{load_uint_lanes<u64, 2uz>(lhs)};
@@ -2366,7 +2371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::i64x2_mul) { l.lane[i] = static_cast<u64>(l.lane[i] * r.lane[i]); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i64x2 binary opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i64x2 binary opcode");
                         }
                     }
                     return store_uint_lanes<u64, 2uz>(l);
@@ -2392,14 +2397,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         }
                         else
                         {
-                            static_assert(Op != Op, "unhandled i64x2 extmul opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled i64x2 extmul opcode");
                         }
                     }
                     return store_uint_lanes<u64, 2uz>(out);
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i64x2 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i64x2 binary opcode");
                 }
             }
             else if constexpr(Op == simd_code::f32x4_add || Op == simd_code::f32x4_sub || Op == simd_code::f32x4_mul || Op == simd_code::f32x4_div ||
@@ -2423,12 +2428,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f32x4_pmax) { return vec_to_v128(vec_select(rb, lb, l < r)); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f32x4 pseudo-minmax opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f32x4 pseudo-minmax opcode");
                         }
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled f32x4 vector binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled f32x4 vector binary opcode");
                     }
                 }
 # endif
@@ -2446,7 +2451,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::f32x4_pmax) { l.lane[i] = wasm_float_pmax(l.lane[i], r.lane[i]); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled f32x4 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled f32x4 binary opcode");
                     }
                 }
                 return store_f32x4_lanes(l);
@@ -2472,12 +2477,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                         else if constexpr(Op == simd_code::f64x2_pmax) { return vec_to_v128(vec_select(rb, lb, l < r)); }
                         else
                         {
-                            static_assert(Op != Op, "unhandled f64x2 pseudo-minmax opcode");
+                            static_assert(dependent_false_v<Op>, "unhandled f64x2 pseudo-minmax opcode");
                         }
                     }
                     else
                     {
-                        static_assert(Op != Op, "unhandled f64x2 vector binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled f64x2 vector binary opcode");
                     }
                 }
 # endif
@@ -2495,14 +2500,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::f64x2_pmax) { l.lane[i] = wasm_float_pmax(l.lane[i], r.lane[i]); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled f64x2 binary opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled f64x2 binary opcode");
                     }
                 }
                 return store_f64x2_lanes(l);
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD binary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD binary opcode");
             }
         }
 
@@ -2520,7 +2525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i8x16_shr_s) { return vec_to_v128(::std::bit_cast<v128_u8x16>(::std::bit_cast<v128_i8x16>(lanes) >> sh)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i8x16 shift opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i8x16 shift opcode");
                 }
 # else
                 auto lanes{load_uint_lanes<u8, 16uz>(lhs)};
@@ -2531,7 +2536,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i8x16_shr_u) { lane = shr_u_lane(lane, rhs); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i8x16 shift opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i8x16 shift opcode");
                     }
                 }
                 return store_uint_lanes<u8, 16uz>(lanes);
@@ -2548,7 +2553,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i16x8_shr_s) { return vec_to_v128(::std::bit_cast<v128_u16x8>(::std::bit_cast<v128_i16x8>(lanes) >> sh)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i16x8 shift opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i16x8 shift opcode");
                 }
 # else
                 auto lanes{load_uint_lanes<u16, 8uz>(lhs)};
@@ -2559,7 +2564,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i16x8_shr_u) { lane = shr_u_lane(lane, rhs); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i16x8 shift opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i16x8 shift opcode");
                     }
                 }
                 return store_uint_lanes<u16, 8uz>(lanes);
@@ -2576,7 +2581,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i32x4_shr_s) { return vec_to_v128(::std::bit_cast<v128_u32x4>(::std::bit_cast<v128_i32x4>(lanes) >> sh)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i32x4 shift opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i32x4 shift opcode");
                 }
 # else
                 auto lanes{load_uint_lanes<u32, 4uz>(lhs)};
@@ -2587,7 +2592,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i32x4_shr_u) { lane = shr_u_lane(lane, rhs); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i32x4 shift opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i32x4 shift opcode");
                     }
                 }
                 return store_uint_lanes<u32, 4uz>(lanes);
@@ -2604,7 +2609,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::i64x2_shr_s) { return vec_to_v128(::std::bit_cast<v128_u64x2>(::std::bit_cast<v128_i64x2>(lanes) >> sh)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled i64x2 shift opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled i64x2 shift opcode");
                 }
 # else
                 auto lanes{load_uint_lanes<u64, 2uz>(lhs)};
@@ -2615,7 +2620,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::i64x2_shr_u) { lane = shr_u_lane(lane, rhs); }
                     else
                     {
-                        static_assert(Op != Op, "unhandled i64x2 shift opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled i64x2 shift opcode");
                     }
                 }
                 return store_uint_lanes<u64, 2uz>(lanes);
@@ -2623,7 +2628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD shift opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD shift opcode");
             }
         }
 
@@ -2773,7 +2778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD test opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD test opcode");
             }
         }
 
@@ -2812,7 +2817,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             else if constexpr(Op == simd_code::v128_load8_splat || Op == simd_code::v128_load8_lane || Op == simd_code::v128_store8_lane) { return 1uz; }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD memory opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD memory opcode");
             }
         }
 
@@ -2837,7 +2842,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::v128_load8x8_u) { return vec_to_v128(__builtin_convertvector(in, v128_u16x8)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 load8x8 opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 load8x8 opcode");
                 }
 # else
                 lane_array<u16, 8uz> out{};  // init
@@ -2848,7 +2853,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::v128_load8x8_u) { out.lane[i] = x; }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 load8x8 opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 load8x8 opcode");
                     }
                 }
                 return store_uint_lanes<u16, 8uz>(out);
@@ -2866,7 +2871,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::v128_load16x4_u) { return vec_to_v128(__builtin_convertvector(in, v128_u32x4)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 load16x4 opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 load16x4 opcode");
                 }
 # else
                 lane_array<u32, 4uz> out{};  // init
@@ -2877,7 +2882,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::v128_load16x4_u) { out.lane[i] = x; }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 load16x4 opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 load16x4 opcode");
                     }
                 }
                 return store_uint_lanes<u32, 4uz>(out);
@@ -2895,7 +2900,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::v128_load32x2_u) { return vec_to_v128(__builtin_convertvector(in, v128_u64x2)); }
                 else
                 {
-                    static_assert(Op != Op, "unhandled v128 load32x2 opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled v128 load32x2 opcode");
                 }
 # else
                 lane_array<u64, 2uz> out{};  // init
@@ -2906,7 +2911,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     else if constexpr(Op == simd_code::v128_load32x2_u) { out.lane[i] = x; }
                     else
                     {
-                        static_assert(Op != Op, "unhandled v128 load32x2 opcode");
+                        static_assert(dependent_false_v<Op>, "unhandled v128 load32x2 opcode");
                     }
                 }
                 return store_uint_lanes<u64, 2uz>(out);
@@ -3030,7 +3035,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD memory load opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD memory load opcode");
             }
         }
 
@@ -3076,7 +3081,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else
             {
-                static_assert(Op != Op, "unhandled SIMD memory store opcode");
+                static_assert(dependent_false_v<Op>, "unhandled SIMD memory store opcode");
             }
         }
     }  // namespace wasm1p1_simd_details

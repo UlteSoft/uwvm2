@@ -240,7 +240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled integer unary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled integer unary opcode");
             }
         }
 
@@ -347,7 +347,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled integer binary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled integer binary opcode");
             }
         }
 
@@ -553,8 +553,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if UWVM_HAS_BUILTIN(__builtin_neon_vrndn_v)
                     return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(__builtin_neon_vrndn_v(::std::bit_cast<int8x8_t>(v), 10));
 #  elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevendf)
-                    return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(
-                        __builtin_aarch64_roundevendf(::std::bit_cast<float64x1_t>(v)));
+                    // GCC's `df` builtin operates on a scalar DF-mode value.  Do not pass the ACLE
+                    // `float64x1_t` vector wrapper; the vector builtin is named `roundevenv2df`.
+                    return __builtin_aarch64_roundevendf(v);
 #  else
                     // Implementation for msvc is not currently being considered; revert to the default implementation.
 #   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -633,7 +634,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled float unary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled float unary opcode");
             }
         }
 
@@ -692,7 +693,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled float binary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled float binary opcode");
             }
         }
 

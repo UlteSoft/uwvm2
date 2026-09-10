@@ -182,7 +182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i32 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
             }
@@ -228,7 +228,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i32 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
@@ -804,7 +804,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i64 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
             }
@@ -850,7 +850,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i64 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
