@@ -698,6 +698,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     }
 
     // Translate: opfunc signature tuple (ip, operand_stack_top_ptr, local_base_ptr, [stack-top cache...]).
+    // Call bridges take slot 1 by value and return its updated pointer; ordinary call opfuncs must store that return in slot 1.
     // Slot types are derived from `CompileOption` to drive ABI packing (GPR vs FP/SIMD regs) correctly.
     static constexpr ::std::size_t interpreter_tuple_size{details::interpreter_tuple_size<CompileOption>()};
     using interpreter_tuple_t = decltype(details::make_interpreter_tuple<CompileOption>(::std::make_index_sequence<interpreter_tuple_size>{}));

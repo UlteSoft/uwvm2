@@ -33,9 +33,10 @@ namespace
         return out;
     }
 
-    static void UWVM2TEST_WASM_ABI mixed_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        mixed_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         if(wasm_module_id == SIZE_MAX)
         {
@@ -48,24 +49,23 @@ namespace
             if(info->trivial_kind != kind_t::add_const_i32) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(info->param_bytes != 4uz || info->result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            auto* const top = *stack_top_ptr;
+            auto* const top = stack_top;
             ::std::byte* const base = top - info->param_bytes;
             auto const a = load_u32(base);
             auto const imm = static_cast<::std::uint32_t>(::std::bit_cast<::std::uint_least32_t>(info->trivial_imm));
             store_u32(base, static_cast<::std::uint32_t>(a + imm));
-            *stack_top_ptr = base + 4;
-            return;
+            return base + 4;
         }
 
         ++g_import_bridge_calls;
         if(wasm_module_id != g_expected_wasm_id) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(call_function != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         ::std::byte* const base = top - 4;
         auto const a = load_u32(base);
         store_u32(base, static_cast<::std::uint32_t>(a + 7u));
-        *stack_top_ptr = base + 4;
+        return base + 4;
     }
 
     [[nodiscard]] byte_vec build_cycle_relay_module()

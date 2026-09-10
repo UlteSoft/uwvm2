@@ -3708,7 +3708,7 @@ namespace uwvm2::runtime::lib
             // disabled because spills can cost more than byte-stack traffic.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || defined(UWVM_TARGET_POWERPC_FAMILY) || defined(__s390x__) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
 # endif
 
@@ -3802,8 +3802,9 @@ namespace uwvm2::runtime::lib
 #   endif
 #  endif
 # elif defined(__s390x__)
-            // s390x: SystemZ accepts Clang musttail syntax, but indirect opfunc dispatch in long loops has been observed to
-            // grow the target call stack under QEMU/Linux. Use the byref dispatcher so long interpreter loops remain stack-stable.
+            // s390x: GCC 15 can lower the indirect opfunc edge to a stack-stable sibling `br`, but Clang 22 rejects the
+            // equivalent `musttail` edge when the function pointer is loaded from the bytecode stream. Keep the portable
+            // byref dispatcher selected above so every supported compiler has a bounded interpreter-loop stack.
 # elif defined(__s390__) || defined(__SYSC_ZARCH__)
             // s390 (31-bit) / z/Architecture (non-s390x toolchains): i64/f64 passing is ABI-sensitive (often reg pairs).
             // Leave stack-top caching disabled by default.
@@ -6720,10 +6721,13 @@ namespace uwvm2::runtime::lib
             execute_defined_for_bridge(call_stack, info, stack_top_ptr);
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
-            call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte*
+            call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS
         {
-            call_bridge_impl(wasm_module_id, func_index, stack_top_ptr);
+            // The callback ABI returns the updated top in a register.  Only this non-tail bridge takes the address of its
+            // parameter while adapting to the runtime implementation's synchronous pointer-to-pointer interface.
+            call_bridge_impl(wasm_module_id, func_index, ::std::addressof(stack_top));
+            return stack_top;
         }
 
         inline constexpr void call_indirect_bridge_impl(::std::size_t wasm_module_id,
@@ -7011,10 +7015,11 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr void
-            call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte* call_indirect_bridge(
+            ::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top) UWVM_THROWS
         {
-            call_indirect_bridge_impl(wasm_module_id, type_index, table_index, stack_top_ptr);
+            call_indirect_bridge_impl(wasm_module_id, type_index, table_index, ::std::addressof(stack_top));
+            return stack_top;
         }
 
         inline constexpr void configure_interpreter_call_bridges_for_current_runtime() noexcept
@@ -8364,7 +8369,7 @@ namespace uwvm2::runtime::lib
 # endif
         {
             ::uwvm2::uwvm::global::record_total_wasm_time_start();
-            call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+            stack_top_ptr = call_bridge(main_id, cfg.entry_function_index, stack_top_ptr);
             ::uwvm2::uwvm::global::record_total_wasm_time_end();
         }
 # ifdef UWVM_CPP_EXCEPTIONS
