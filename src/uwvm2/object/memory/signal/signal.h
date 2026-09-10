@@ -186,7 +186,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         {
             if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::size_t>(seg.length_p->load(::std::memory_order_acquire)); }
 
-            return static_cast<::std::size_t>(seg.end - seg.begin);
+            // Registered VMAs are raw address-space intervals, not C++ array objects. Integer address arithmetic avoids
+            // imposing unrelated-object pointer subtraction semantics on platform-owned mappings.
+            return static_cast<::std::size_t>(reinterpret_cast<::std::uintptr_t>(seg.end) - reinterpret_cast<::std::uintptr_t>(seg.begin));
         }
 
         /// @brief      Build a user-facing mmap fault report from a segment and a raw fault address.
@@ -202,7 +204,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                                                                                     ::std::uintptr_t frame_address,
                                                                                                     ::std::uintptr_t stack_pointer) noexcept
         {
-            auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
+            auto const offset{static_cast<::std::size_t>(reinterpret_cast<::std::uintptr_t>(fault_addr) -
+                                                         reinterpret_cast<::std::uintptr_t>(seg.begin))};
             auto const memory_length{get_memory_length(seg)};
 
             return {.memory_idx = seg.memory_idx,
@@ -226,9 +229,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
 
+            auto const fault_address{reinterpret_cast<::std::uintptr_t>(fault_addr)};
             for(auto const& seg: segments)
             {
-                if(seg.begin <= fault_addr && fault_addr < seg.end)
+                auto const segment_begin{reinterpret_cast<::std::uintptr_t>(seg.begin)};
+                auto const segment_end{reinterpret_cast<::std::uintptr_t>(seg.end)};
+                if(segment_begin <= fault_address && fault_address < segment_end)
                 {
                     auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr, instruction_address, frame_address, stack_pointer)};
                     // Keep the public callback authoritative if direct internal slot manipulation leaves both hooks set.
@@ -694,7 +700,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                                      ::std::atomic_size_t const* length_p = nullptr,
                                                      ::std::size_t memory_idx = 0uz) noexcept
     {
-        if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]]
+        if(begin == nullptr || end == nullptr || reinterpret_cast<::std::uintptr_t>(begin) >= reinterpret_cast<::std::uintptr_t>(end)) [[unlikely]]
         {
 # ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

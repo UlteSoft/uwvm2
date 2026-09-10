@@ -30,6 +30,9 @@ namespace
     struct base_mode_t
     {
         ::std::string_view name;
+        fixture_t{"oob_unsigned_sum_load64",          "oob_unsigned_sum_load64.wat"          },
+        fixture_t{"oob_unsigned_sum_store64",         "oob_unsigned_sum_store64.wat"         },
+        fixture_t{"oob_unaligned_cross_end64",        "oob_unaligned_cross_end64.wat"        },
         ::std::string_view args;
     };
 
@@ -636,8 +639,14 @@ int main(int argc, char** argv)
     ::std::size_t mismatch_count{};
     auto const modes{make_modes()};
     ::std::cout << "[trap-matrix] deterministic policy seed=" << policy_seed() << " randomized_modes=" << seeded_policy_mode_count << '\n';
+    auto const fixture_filter{::std::getenv("UWVM_TRAP_MATRIX_FIXTURE")};
+    ::std::size_t selected_fixtures{};
     for(auto const& fixture: fixtures)
     {
+        // A fixture shard retains every backend/policy combination and its own capability probe. Keep artifacts
+        // separate per shard; the default (no filter) remains the complete matrix.
+        if(fixture_filter != nullptr && *fixture_filter != '\0' && ::std::string_view{fixture.name} != fixture_filter) { continue; }
+        ++selected_fixtures;
         auto const wat_path{wat_dir / fixture.wat_name};
         auto const wasm_path{artifact_dir / (::std::string{fixture.name} + ".wasm")};
         if(!compile_wat(wat2wasm_path, wat_path, wasm_path)) { return 1; }
@@ -698,6 +707,11 @@ int main(int argc, char** argv)
         }
     }
 
+    if(selected_fixtures == 0uz)
+    {
+        ::std::cerr << "[trap-matrix] no fixture matched UWVM_TRAP_MATRIX_FIXTURE\n";
+        return 1;
+    }
     if(ok && mismatch_count == 0uz)
     {
         ::std::cout << "[trap-matrix] all trap outputs matched instruction baselines\n";

@@ -520,15 +520,50 @@ template <auto Function>
     if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
     auto symbol_name_ref{get_llvm_string_ref(symbol_name)};
-    ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
-    if(auto existing{llvm_module->getGlobalVariable(symbol_name_ref, true)}; existing != nullptr) { return existing; }
+    if(auto existing_value{llvm_module->getNamedValue(symbol_name_ref)}; existing_value != nullptr)
+    {
+        auto existing{::llvm::dyn_cast<::llvm::GlobalVariable>(existing_value)};
+        // Opaque pointers do not encode the pointee type, but GlobalVariable still does. Reusing one symbol with a
+        // different storage extent would silently invalidate the object/provenance contract of later GEPs. Validate
+        // before touching LLVM's process-global symbol map so the fail-closed path has no externally visible side effect.
+        if(existing == nullptr || existing->getValueType() != object_type || !existing->isDeclaration()) [[unlikely]] { return nullptr; }
+        ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
+        return existing;
+    }
     auto global_value{llvm_module->getOrInsertGlobal(symbol_name_ref, object_type)};
     auto global{::llvm::dyn_cast<::llvm::GlobalVariable>(global_value)};
     if(global == nullptr) [[unlikely]] { return nullptr; }
     global->setLinkage(::llvm::GlobalValue::ExternalLinkage);
     global->setInitializer(nullptr);
+    ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(host_address));
     return global;
 #endif
+}
+
+// Describe an externally allocated, process-stable byte reservation to LLVM without embedding its absolute address in
+// cached objects. The external array extent is semantically important: a one-byte GlobalVariable would not describe
+// the mmap object reached by later non-zero GEPs, even though RuntimeDyld resolves the symbol to the correct address.
+[[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_byte_span_pointer(
+    ::llvm::IRBuilder<>& ir_builder,
+    ::std::uintptr_t host_address,
+    ::std::size_t byte_size,
+    ::uwvm2::utils::container::u8string_view symbol_name) noexcept
+{
+    if(byte_size == 0uz) [[unlikely]] { return nullptr; }
+    auto llvm_i8_type{::llvm::Type::getInt8Ty(ir_builder.getContext())};
+    auto byte_span_type{::llvm::ArrayType::get(llvm_i8_type, static_cast<::std::uint_least64_t>(byte_size))};
+    return get_llvm_external_host_object_pointer(ir_builder, host_address, byte_span_type, symbol_name);
+}
+
+// Every direct guest-memory store must stay observable until it either writes the mapped byte range or faults in a
+// guard page. Centralizing both properties prevents integer and floating-point opcode families from drifting apart.
+[[nodiscard]] inline constexpr ::llvm::StoreInst*
+    finalize_llvm_jit_direct_memory_store(::llvm::StoreInst* store_inst, ::llvm::Align memory_alignment) noexcept
+{
+    if(store_inst == nullptr) [[unlikely]] { return nullptr; }
+    store_inst->setAlignment(memory_alignment);
+    store_inst->setVolatile(true);
+    return store_inst;
 }
 
 [[nodiscard]] inline constexpr ::llvm::Value* get_llvm_external_host_object_address(::llvm::IRBuilder<>& ir_builder,
@@ -2631,6 +2666,10 @@ struct runtime_memory_access_info_t
     // Stable base address for mmap-backed direct memory access.
     ::std::byte* stable_memory_begin{};
 
+    // Number of reserved bytes addressable from stable_memory_begin. LLVM uses this as the external object's extent;
+    // inaccessible guard pages remain part of the reservation and turn invalid Wasm accesses into hardware faults.
+    ::std::size_t stable_memory_reserved_span_bytes{};
+
     // Atomic byte-length slot used by mmap-backed memories whose length can change concurrently.
     ::std::atomic_size_t* stable_memory_length_p{};
 
@@ -2645,6 +2684,9 @@ struct runtime_memory_access_info_t
 
     // True when mmap protection covers only a prefix of the address space and high offsets need a dynamic slow check.
     bool mmap_uses_partial_protection{};
+
+    // True only after resolving a concrete full wasm32 reservation with the unsigned 8-GiB address domain.
+    bool mmap_covers_wasm32_effective_domain{};
 };
 
 // Return the largest byte length that the concrete memory backend can safely expose for direct addressing.  This is
@@ -2707,6 +2749,29 @@ inline constexpr void populate_runtime_memory_access_info_mmap_fields(runtime_me
         result.stable_memory_begin = memory.memory_begin;
         result.stable_memory_length_p = memory.memory_length_p;
         result.mmap_requires_dynamic_bounds = memory.require_dynamic_determination_memory_size();
+        if(memory.memory_begin != nullptr && memory.reserved_begin != nullptr)
+        {
+            auto const reserved_span_bytes{memory.get_acquire_reserved_space_ceil()};
+            auto const reserved_address{reinterpret_cast<::std::uintptr_t>(memory.reserved_begin)};
+            auto const memory_address{reinterpret_cast<::std::uintptr_t>(memory.memory_begin)};
+            if(memory_address >= reserved_address)
+            {
+                auto const memory_displacement{memory_address - reserved_address};
+                if(memory_displacement <= reserved_span_bytes)
+                {
+                    result.stable_memory_reserved_span_bytes = reserved_span_bytes - static_cast<::std::size_t>(memory_displacement);
+                }
+            }
+        }
+        if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t) && sizeof(::std::uintptr_t) >= sizeof(::std::uint_least64_t))
+        {
+            constexpr auto required_unsigned_domain_span{
+                ::uwvm2::object::memory::linear::wasm32_max_effective_offset + ::uwvm2::object::memory::linear::mmap_guard_max_access_size};
+            result.mmap_covers_wasm32_effective_domain =
+                !result.mmap_requires_dynamic_bounds && memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32 &&
+                memory.memory_begin != nullptr && memory.memory_begin == memory.reserved_begin &&
+                result.stable_memory_reserved_span_bytes >= required_unsigned_domain_span;
+        }
         if(!result.mmap_requires_dynamic_bounds)
         {
             // If hardware protection covers the complete usable range, generated loads/stores can skip explicit dynamic
@@ -2980,8 +3045,8 @@ UWVM_ALWAYS_INLINE inline constexpr bool llvm_jit_add_overflow(I a, I b, I& resu
 }
 
 // Wasm32 defines the effective address in an unbounded intermediate domain and traps when the dynamic address plus the
-// memarg offset is not representable as u32.  Fully protected mmap memories still need this explicit predicate: their
-// guard reservation covers every in-range u32 access, but not the complete almost-8-GiB range of a widened u32+u32 sum.
+// memarg offset exceeds the maximum 4-GiB logical length. Checked/partial backends use this explicit predicate; the full
+// unsigned-domain mmap reservation can let hardware protection reject the same invalid access without emitting a branch.
 [[nodiscard]] inline constexpr ::llvm::Value*
     emit_llvm_wasm32_effective_offset_out_of_range(::llvm::IRBuilder<>& ir_builder, ::llvm::Value* effective_offset) noexcept
 {
@@ -8594,27 +8659,28 @@ template <llvm_jit_simd_code Op,
                 if(!ensure_memory0_access_info() || address_value == nullptr) [[unlikely]] { return nullptr; }
 
                 auto llvm_i8_type{::llvm::Type::getInt8Ty(llvm_context)};
-                auto llvm_i8_ptr_type{get_llvm_pointer_type(llvm_i8_type)};
                 auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
-                auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
 
                 // Wasm32 addresses are unsigned i32 bit patterns.  Widen before adding the static memarg offset so a
                 // high address cannot alias low memory (for example, 0xffffffff + 1 must overflow instead of becoming 0).
                 auto effective_offset{emit_llvm_wasm32_effective_offset(ir_builder, address_value, static_offset)};
                 if(effective_offset == nullptr) [[unlikely]] { return nullptr; }
-                static_cast<void>(llvm_i8_ptr_type);
                 auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
                 if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
                 auto const memory_begin_symbol_name{
                     ::uwvm2::utils::container::u8concat_uwvm(get_llvm_runtime_module_symbol_prefix(*runtime_module_ptr), u8"_memory0_begin")};
-                auto stable_memory_begin{get_llvm_external_host_object_pointer(
+                auto stable_memory_begin{get_llvm_external_host_byte_span_pointer(
                     ir_builder,
                     reinterpret_cast<::std::uintptr_t>(memory0_access_info.stable_memory_begin),
-                    llvm_i8_type,
+                    memory0_access_info.stable_memory_reserved_span_bytes,
                     ::uwvm2::utils::container::u8string_view{memory_begin_symbol_name.data(), memory_begin_symbol_name.size()})};
                 if(stable_memory_begin == nullptr) [[unlikely]] { return nullptr; }
 
-                if(memory0_access_info.mmap_requires_dynamic_bounds)
+                if(memory0_access_info.mmap_requires_dynamic_bounds
+#if defined(UWVM_SUPPORT_MMAP)
+                   || access_size > ::uwvm2::object::memory::linear::mmap_guard_max_access_size
+#endif
+                )
                 {
                     // Full dynamic-bounds mode checks every access before forming the final address.  The diagnostic trap
                     // receives both the effective offset and the current memory length.
@@ -8684,11 +8750,10 @@ template <llvm_jit_simd_code Op,
                     ir_builder.CreateBr(partial_continue_block);
                     ir_builder.SetInsertPoint(partial_continue_block);
                 }
-                else
+                else if(!memory0_access_info.mmap_covers_wasm32_effective_domain)
                 {
-                    // Hardware guards cover every address in the Wasm32 domain, including accesses that cross the
-                    // current logical length.  They do not cover the widened u32+u32 overflow range, so reject it before
-                    // forming a native pointer that could escape the registered reservation.
+                    // A mapping without the complete unsigned-domain reservation proof still needs the conservative
+                    // overflow gate. Never infer this proof merely from an absent dynamic-length check.
                     emit_llvm_conditional_trap(*llvm_module,
                                                ir_builder,
                                                emit_llvm_wasm32_effective_offset_out_of_range(ir_builder, effective_offset),
@@ -8696,11 +8761,11 @@ template <llvm_jit_simd_code Op,
                 }
 
                 // Form the final byte pointer only after any required software checks have dominated this point.  For
-                // fully protected mmap memories, in-domain invalid addresses are intentionally left to the guard mapping.
-                auto memory_begin_address{ir_builder.CreatePtrToInt(stable_memory_begin, llvm_intptr_type)};
-                auto effective_offset_intptr{ir_builder.CreateIntCast(effective_offset, llvm_intptr_type, false)};
-                auto memory_address{ir_builder.CreateAdd(memory_begin_address, effective_offset_intptr, get_llvm_string_ref(u8"memory.addr.int"))};
-                return ir_builder.CreateIntToPtr(memory_address, llvm_i8_ptr_type, get_llvm_string_ref(u8"memory.addr"));
+                // proven full wasm32 mappings, every u32+u32 offset and supported access width fits the reservation;
+                // logical OOB and u32 overflow are both intentionally left to the permanently inaccessible guard pages.
+                // Keep this GEP non-inbounds: logical OOB values that deliberately land in a guard page must remain
+                // ordinary IR values rather than becoming LLVM poison before the hardware fault is observed.
+                return ir_builder.CreateGEP(llvm_i8_type, stable_memory_begin, effective_offset, get_llvm_string_ref(u8"memory.addr"));
             }
         }};
 
@@ -9222,7 +9287,6 @@ template <llvm_jit_simd_code Op,
             auto llvm_i16_type{::llvm::Type::getInt16Ty(llvm_context)};
             auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
             auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
-
             if(result_type == runtime_operand_stack_value_type::i32)
             {
                 ::llvm::Type* llvm_load_type{};
@@ -9316,7 +9380,6 @@ template <llvm_jit_simd_code Op,
             auto llvm_i16_type{::llvm::Type::getInt16Ty(llvm_context)};
             auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
             auto llvm_i64_type{::llvm::Type::getInt64Ty(llvm_context)};
-
             if(value_type == runtime_operand_stack_value_type::i32)
             {
                 switch(store_bytes)
@@ -9326,23 +9389,20 @@ template <llvm_jit_simd_code Op,
                         auto truncated{ir_builder.CreateTrunc(value, llvm_i8_type)};
                         auto store_inst{
                             ir_builder.CreateStore(truncated, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i8_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     case 2uz:
                     {
                         auto truncated{ir_builder.CreateTrunc(value, llvm_i16_type)};
                         auto store_inst{
                             ir_builder.CreateStore(truncated, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i16_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     case 4uz:
                     {
                         auto store_inst{
                             ir_builder.CreateStore(value, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     [[unlikely]] default:
                         return nullptr;
@@ -9358,31 +9418,27 @@ template <llvm_jit_simd_code Op,
                         auto truncated{ir_builder.CreateTrunc(value, llvm_i8_type)};
                         auto store_inst{
                             ir_builder.CreateStore(truncated, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i8_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     case 2uz:
                     {
                         auto truncated{ir_builder.CreateTrunc(value, llvm_i16_type)};
                         auto store_inst{
                             ir_builder.CreateStore(truncated, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i16_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     case 4uz:
                     {
                         auto truncated{ir_builder.CreateTrunc(value, llvm_i32_type)};
                         auto store_inst{
                             ir_builder.CreateStore(truncated, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     case 8uz:
                     {
                         auto store_inst{
                             ir_builder.CreateStore(value, ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)))};
-                        store_inst->setAlignment(memory_alignment);
-                        return store_inst;
+                        return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
                     }
                     [[unlikely]] default:
                         return nullptr;
@@ -9396,9 +9452,7 @@ template <llvm_jit_simd_code Op,
                 auto store_inst{
                     ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i32_type),
                                            ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i32_type)))};
-                store_inst->setAlignment(memory_alignment);
-                store_inst->setVolatile(true);
-                return store_inst;
+                return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
             }
 
             if(value_type == runtime_operand_stack_value_type::f64)
@@ -9407,9 +9461,7 @@ template <llvm_jit_simd_code Op,
 
                 auto store_inst{ir_builder.CreateStore(ir_builder.CreateBitCast(value, llvm_i64_type),
                                                        ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_i64_type)))};
-                store_inst->setAlignment(memory_alignment);
-                store_inst->setVolatile(true);
-                return store_inst;
+                return finalize_llvm_jit_direct_memory_store(store_inst, memory_alignment);
             }
 
             return nullptr;
