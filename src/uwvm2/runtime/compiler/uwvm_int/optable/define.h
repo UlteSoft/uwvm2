@@ -52,6 +52,11 @@
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
+    // Keep unhandled-value assertions dependent without spelling `Value != Value`, which GCC diagnoses as a
+    // tautological self-comparison before the discarded `if constexpr` branch is selected.
+    template <auto Value>
+    inline constexpr bool dependent_false_v{false};
+
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
