@@ -903,6 +903,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 #  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error)
                     {
+                        // Full and partial guard paths omit the live-length check on at least part of their access
+                        // domain. POSIX does not guarantee that a failed range mprotect left every page unchanged, so
+                        // another guest thread could already have observed or modified a newly writable prefix. That
+                        // state cannot be made transactionally recoverable; only the per-access dynamically checked
+                        // layout may roll back and report memory.grow failure.
+                        if(!this->require_dynamic_determination_memory_size()) [[likely]] { ::fast_io::fast_terminate(); }
 #   ifdef UWVM_CPP_EXCEPTIONS
                         try
 #   endif
@@ -913,7 +919,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 #   ifdef UWVM_CPP_EXCEPTIONS
                         catch(::fast_io::error)
                         {
-                            // do nothing
+                            // A failed rollback can leave pages beyond the published logical length accessible.
+                            // Continuing would violate the fault-based bounds invariant; fail closed instead.
+                            ::fast_io::fast_terminate();
                         }
 #   endif
                         return false;
