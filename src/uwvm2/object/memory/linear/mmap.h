@@ -82,17 +82,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                                                                                 << max_partial_protection_wasm32_index};  // 256 MB
 
     // wasm32 full-protection layout (64-bit host only):
-    //   | 2GiB front guard | 4GiB usable window (u32 address space) | 2GiB back guard |
+    //   | 4GiB usable window (u32 address space) | 4GiB back guard |
     //   + trailing guard (platform-page aligned) to cover custom-page alignment + max foreseeable type size (64 bytes).
     //
-    // This layout lets the interpreter/LLVM AOT backend use guard faults for every access whose effective offset is in the
-    // u32 address domain.  The widened `(u64)(u32)dynamic + (u64)u32_static` sum must first be checked against UINT32_MAX:
-    // larger sums can exceed the 2-GiB back guard and must never be used to form a native pointer.
-    inline constexpr ::std::uint_least64_t wasm32_full_protection_front_guard_u64{1ull << 31u};  // 2 GiB
+    // Both address operands are unsigned u32, so their widened sum is at most 2^33-2. With an access width of at most
+    // 64 bytes, the last byte is at most 2^33+61, inside the trailing reservation. Only the first 4 GiB can be committed.
+    // Thus even an overflowing effective address faults inside this memory's reservation without a software u32 check.
+    // No front guard is needed for unsigned addresses. Keeping the total reservation unchanged also makes the signal
+    // registry base equal to the Wasm base, so fault offsets are not incorrectly increased by a front-guard displacement.
+    inline constexpr ::std::uint_least64_t wasm32_full_protection_front_guard_u64{0ull};
     inline constexpr ::std::uint_least64_t wasm32_full_protection_usable_u64{1ull << 32u};       // 4 GiB
-    inline constexpr ::std::uint_least64_t wasm32_full_protection_back_guard_u64{1ull << 31u};   // 2 GiB
+    inline constexpr ::std::uint_least64_t wasm32_full_protection_back_guard_u64{1ull << 32u};   // 4 GiB
+    inline constexpr ::std::size_t mmap_guard_max_access_size{64uz};
+    inline constexpr ::std::uint_least64_t wasm32_max_effective_offset{0x1fffffffeull};
     static_assert(wasm32_full_protection_front_guard_u64 + wasm32_full_protection_usable_u64 + wasm32_full_protection_back_guard_u64 ==
                   max_full_protection_wasm32_length);
+
+    // This is a reservation-domain proof, not a logical-bounds test. Callers may use it only for the full-protection
+    // wasm32 layout with custom_page >= platform_page; partial mappings and byte-granular custom pages remain checked.
+    [[nodiscard]] inline constexpr bool wasm32_full_protection_covers_access(::std::uint_least64_t effective_offset,
+                                                                            ::std::size_t access_size) noexcept
+    {
+        return sizeof(::std::size_t) >= sizeof(::std::uint_least64_t) && sizeof(::std::uintptr_t) >= sizeof(::std::uint_least64_t) &&
+               effective_offset <= wasm32_max_effective_offset && access_size <= mmap_guard_max_access_size;
+    }
+    static_assert(wasm32_max_effective_offset + mmap_guard_max_access_size <= max_full_protection_wasm32_length + mmap_guard_max_access_size);
 
     /// @note      Memory safety model for the mmap-backed linear memory:
     ///            - The base pointer `memory_begin` is stable for the lifetime of the instance; growth commits additional virtual address space instead of
@@ -351,7 +365,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
                 // Provides a 64-byte type protection mechanism (no foreseeable future type will exceed this size) to prevent custom page sizes (arbitrary
                 // sizes) from being smaller than the type size.
-                constexpr ::std::size_t max_type_size{64uz};
+                constexpr ::std::size_t max_type_size{mmap_guard_max_access_size};
 
                 // Does checking the size of custom_page cause subsequent calculations to overflow
                 // max_protection_space + max_type_size never overflow
@@ -429,8 +443,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 }
 # endif
 
-                // Place the usable base address inside the reserved VMA (full protection wasm32 on 64-bit hosts),
-                // otherwise the usable base equals the reserved base.
+                // The Wasm base starts at the reservation base for every layout. In full wasm32 mode, the unsigned
+                // widened address domain occupies the usable window plus the back guard, not a signed front window.
                 if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
                 {
                     if(this->status == mmap_memory_status_t::wasm32 && !this->require_dynamic_determination_memory_size())
@@ -452,15 +466,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 if UWVM_IF_NOT_CONSTEVAL
                 {
                     auto const reserved_space_for_signal{get_acquire_reserved_space_ceil()};
+                    // The shipped Wasm 1.0/1.1/2.0 feature profiles reject the post-2.0 multi-memory proposal, so the
+                    // only runtime memory is index 0. If multi-memory is enabled later, its actual instance index must
+                    // be carried into this registration so fault diagnostics retain the correct memory ownership.
                     ::uwvm2::object::memory::signal::register_protected_segment(this->reserved_begin,
                                                                                 this->reserved_begin + reserved_space_for_signal,
                                                                                 this->memory_length_p,
                                                                                 0uz);
                 }
 
-                // Set pages according to the initialized size
+                // Set pages according to the initialized size. A zero-page Wasm memory is valid and already has its
+                // inaccessible reservation; Windows commit APIs reject a zero region size, and POSIX does not require
+                // mprotect(addr, 0, ...) to succeed, so there is deliberately no OS commit call in that case.
                 // The minimum allocation unit for mmap is a page. Even if you request a size smaller than a page, the kernel will ultimately manage and
                 // map the memory in page-sized units.
+                if(memory_length != 0uz)
+                {
 
 # if defined(_WIN32) || defined(__CYGWIN__)                                                          // Windows
 #  if !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__) && defined(_WIN32_WINDOWS)  // WIN32
@@ -516,6 +537,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 #  endif
                 }
 # endif
+                }
 
                 // Publish initialized length only after pages are successfully committed
                 this->memory_length_p->store(memory_length, ::std::memory_order_release);
@@ -1021,7 +1043,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             // Provides a 64-byte type protection mechanism (no foreseeable future type will exceed this size) to prevent custom page sizes (arbitrary
             // sizes) from being smaller than the type size.
-            constexpr ::std::size_t max_type_size{64uz};
+            constexpr ::std::size_t max_type_size{mmap_guard_max_access_size};
 
             // | max_protection_space | custom_page_size | max_type_size | ... align to platform page size ... |
             // This section does not check for overflow because it was already checked during initialization.
