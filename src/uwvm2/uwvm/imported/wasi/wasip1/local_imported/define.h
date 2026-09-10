@@ -213,10 +213,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             }
         };
 
-        template <auto Fn, auto& Name>
+        template <auto Fn,
+                  auto& Name,
+                  ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t WasmFpControlPolicy =
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify>
         struct wasip1_local_imported_function final : wasip1_local_imported_function_base<Fn>
         {
             inline static constexpr ::uwvm2::utils::container::u8string_view function_name{Name};
+            inline static constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t wasm_fp_control_policy{
+                WasmFpControlPolicy};
         };
 
         // wasi: WASI-Preview1
@@ -231,7 +236,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         using clock_res_get = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_res_get), name_clock_res_get>;
 
         inline constexpr char8_t name_clock_time_get[] = u8"clock_time_get";
-        using clock_time_get = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_time_get), name_clock_time_get>;
+        // Audited built-in fast path: the clock query, nanosecond conversion, and guest store are integer-only. The external
+        // ABI may change accrued FP status flags (Wasm cannot observe them), but must preserve rounding, exception masks,
+        // and architecture FTZ/DAZ controls that affect subsequent Wasm arithmetic.
+        using clock_time_get =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_time_get),
+                                           name_clock_time_get,
+                                           ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::preserves_wasm_control>;
 
         inline constexpr char8_t name_environ_get[] = u8"environ_get";
         using environ_get = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::environ_get), name_environ_get>;
@@ -307,6 +318,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
 
         inline constexpr char8_t name_fd_write[] = u8"fd_write";
         using fd_write = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_write), name_fd_write>;
+        static_assert(clock_time_get::wasm_fp_control_policy ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::preserves_wasm_control);
+        static_assert(fd_write::wasm_fp_control_policy ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
 
         inline constexpr char8_t name_path_create_directory[] = u8"path_create_directory";
         using path_create_directory =
@@ -386,8 +401,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_res_get_wasm64), name_clock_res_get_wasm64>;
 
         inline constexpr char8_t name_clock_time_get_wasm64[] = u8"clock_time_get_wasm64";
+        // Same audited Wasm-control contract as clock_time_get; accrued status flags may change, while fd_write and every
+        // other wrapper stay conservative and retain the complete FP environment guard.
         using clock_time_get_wasm64 =
-            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_time_get_wasm64), name_clock_time_get_wasm64>;
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_time_get_wasm64),
+                                           name_clock_time_get_wasm64,
+                                           ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::preserves_wasm_control>;
 
         inline constexpr char8_t name_environ_get_wasm64[] = u8"environ_get_wasm64";
         using environ_get_wasm64 =
@@ -474,6 +493,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
 
         inline constexpr char8_t name_fd_write_wasm64[] = u8"fd_write_wasm64";
         using fd_write_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_write_wasm64), name_fd_write_wasm64>;
+        static_assert(clock_time_get_wasm64::wasm_fp_control_policy ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::preserves_wasm_control);
+        static_assert(fd_write_wasm64::wasm_fp_control_policy ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
 
         inline constexpr char8_t name_path_create_directory_wasm64[] = u8"path_create_directory_wasm64";
         using path_create_directory_wasm64 =
