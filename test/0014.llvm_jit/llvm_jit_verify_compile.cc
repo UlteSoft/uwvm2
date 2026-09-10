@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -545,13 +546,13 @@ namespace
         ::std::string log{};
         if(!read_text_file(log_path, log)) [[unlikely]] { return false; }
 
-        if(log.find("call_stack=unwind") != ::std::string::npos)
+        if(::uwvm2test::native_unwind::matches_policy(log, "unwind"))
         {
             default_uses_unwind = true;
             return true;
         }
 
-        if(log.find("call_stack=instruction") != ::std::string::npos || log.find("call_stack=none") != ::std::string::npos)
+        if(::uwvm2test::native_unwind::matches_policy(log, "instruction"))
         {
             default_uses_unwind = false;
             return true;
@@ -581,7 +582,9 @@ namespace
                            " -Raot -Rllvm-policy max -Rllvm-cache-path disable -Rllvm-call-stack unwind -Rclog file " +
                            quote_argument(log_path) + " --run " + quote_argument(wasm_path)};
         if(!run_trap_command(command, output_path, "aot native unwind")) [[unlikely]] { return false; }
-        return check_native_unwind_call_stack_trap_output(output_path);
+        ::std::string log{};
+        return read_text_file(log_path, log) && ::uwvm2test::native_unwind::matches_policy(log, "unwind") &&
+               check_native_unwind_call_stack_trap_output(output_path);
     }
 
     [[nodiscard]] bool run_command(::std::string const& command, char const* label)

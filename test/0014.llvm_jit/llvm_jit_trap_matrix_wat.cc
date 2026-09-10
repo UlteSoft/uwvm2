@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -67,9 +68,8 @@ namespace
        ((defined(__linux__) || defined(__FreeBSD__)) &&                                                                                                      \
         (defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64)) && !defined(__ILP32__))) &&                                                           \
     __has_include(<unwind.h>)
-    // Plain POSIX native unwind starts in a runtime helper and is diagnostic-only. Keep logical frames and compare any
-    // additionally resolved native frames without treating them as a logical-stack replacement.
-    inline constexpr ::std::array compare_policies{"unwind-uncheck", "auto"};
+    // Supported POSIX native walks must replace, not supplement, generated logical frames.
+    inline constexpr ::std::array compare_policies{"unwind", "unwind-uncheck", "auto"};
 #else
     inline constexpr ::std::array compare_policies{"auto"};
 #endif
@@ -276,6 +276,9 @@ namespace
         auto const stem{::std::string{fixture.name} + "." + mode.name + "." + policy};
         auto const output_path{artifact_dir / (stem + ".out")};
         auto const log_path{artifact_dir / (stem + ".log")};
+        ::std::error_code ec{};
+        ::std::filesystem::remove(log_path, ec);
+        if(ec) { return {.valid = false, .output_path = output_path}; }
         auto command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-cache-path disable -Rllvm-call-stack " + policy +
                      " -Rclog file " + quote_argument(log_path)};
         if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
@@ -296,7 +299,10 @@ namespace
         auto const plain_output{strip_ansi_codes(output)};
         auto trap_kind{parse_trap_kind(plain_output)};
         auto func_indices{parse_func_indices(plain_output)};
-        auto const valid{!trap_kind.empty() && !func_indices.empty()};
+        ::std::string log{};
+        if(!read_text_file(log_path, log)) { return {.valid = false, .output_path = output_path}; }
+        auto const valid{!trap_kind.empty() && !func_indices.empty() &&
+                         ::uwvm2test::native_unwind::matches_policy(strip_ansi_codes(log), policy)};
         if(!valid)
         {
             ::std::cerr << "failed to parse trap output for " << stem << ":\n" << output << '\n';

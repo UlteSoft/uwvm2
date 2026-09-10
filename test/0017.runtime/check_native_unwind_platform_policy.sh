@@ -131,7 +131,9 @@ check_platform win64-cygwin 0 0 -D_WIN32=1 -D_WIN64=1 -D__x86_64__=1 -D__CYGWIN_
 
 check_runtime backend-off-linux 0 0 0 0 0 0 -nostdinc -I"$matrix_tmp" -D__linux__=1 -D__x86_64__=1
 check_runtime linux-no-unwind-header 1 0 0 0 0 0 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__x86_64__=1
-check_runtime linux-with-unwind-header 1 1 0 1 0 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__x86_64__=1
+check_runtime linux-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__x86_64__=1
+check_runtime freebsd-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__FreeBSD__=1 -D__x86_64__=1
+check_runtime apple-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__APPLE__=1 -D__aarch64__=1
 check_runtime win64-x86_64 1 0 1 1 1 1 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__x86_64__=1
 check_runtime win64-arm64 1 0 1 1 1 1 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1
 check_runtime win64-arm64ec 0 0 0 0 0 0 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1 -D__arm64ec__=1
@@ -148,5 +150,11 @@ check_consumer_scope version \
     uwvm2/uwvm/cmdline/callback/version.h \
     UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_NATIVE_UNWIND \
     UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_AUTHORITATIVE_UNWIND
+
+runtime_source="$repo_root/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp"
+grep -Fq '# if UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE && UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES' "$runtime_source" ||
+    fail 'unwind-uncheck requested path is not explicitly gated by authoritative frame replacement'
+grep -Fq '# elif !UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES' "$runtime_source" ||
+    fail 'unwind-uncheck validation path can bypass authoritative frame replacement'
 
 printf 'native-unwind platform matrix: ok\n'

@@ -149,8 +149,8 @@ grep -q 'arch ~= "no" and arch ~= "none"' "$repo_root/xmake/utility/utility.lua"
 rg -q '\*\*Default:\*\* `none`' "$repo_root/documents/xmake-options.md" ||
     fail 'xmake option documentation does not record the safe march default'
 
-# POSIX native unwind is only an auxiliary compiler <unwind.h> backtrace. Dedicated libunwind cursors,
-# signal-context seeding, and frame/raw-stack scanning must not return.
+# POSIX native unwind uses registered CFI and an ordinary compiler <unwind.h> backtrace, without JIT logical push/pop.
+# Authority does not authorize dedicated cursor seeding or frame/raw-stack scanning; those must not return.
 bash "$repo_root/test/0017.runtime/check_win64_fault_context_bridge.sh"
 
 if rg -n 'get_signal_(frame_address|stack_pointer)|<libunwind\.h>|UNW_LOCAL_ONLY|unw_(getcontext|init_local2?|step|get_reg)|UNW_INIT_SIGNAL_FRAME|raw[_ -]stack|seeded[_ -]unwind|__builtin_frame_address|Intrinsic::frameaddress' \

@@ -589,7 +589,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief      POSIX SIGSEGV/SIGBUS entry point used to intercept protected-memory faults.
         /// @details    Faults inside registered protected segments are converted to wasm memory diagnostics.
         ///             POSIX captures only the faulting instruction address; generated frame and stack
-        ///             pointers are deliberately not seeded into the auxiliary native unwind path.
+        ///             pointers are deliberately not seeded into the POSIX CFI native replacement path.
         ///             Other faults are delegated to the previous handler, or to the platform default action
         ///             when no previous handler is available.
         inline constexpr void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept

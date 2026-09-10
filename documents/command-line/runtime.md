@@ -90,15 +90,17 @@ All generated Wasm functions carry LLVM `NoInline`, including under `max`/`pb-o3
 
 ## LLVM AOT Call Stacks
 
-`--runtime-llvm-jit-call-stack` accepts `auto`, `instruction`, and `none` everywhere. Auxiliary-only POSIX native-unwind targets additionally expose `unwind-uncheck`; checked `unwind` is exposed only where Win64 SEH supplies an authoritative generated-caller context.
+`--runtime-llvm-jit-call-stack` accepts `auto`, `instruction`, and `none` everywhere. Allow-listed targets with a compiled native-unwind backend additionally expose `unwind` and `unwind-uncheck`. Native modes replace generated logical frames; they are not auxiliary stack output.
 
-- `auto`: use native unwind only when the platform supplies an explicit generated-caller context that can replace logical frames; otherwise use instruction tracking.
+- `auto`: select checked native unwind when its capability check succeeds; otherwise select instruction tracking before code generation.
 - `instruction`: emit explicit per-function stack push/pop operations.
 - `none`: omit generated Wasm body frames from trap diagnostics.
-- `unwind`: require an authoritative native replacement for generated logical frames. The CLI exposes this only for the supported Win64 SEH caller-context path; unsupported programmatic selection fails closed.
-- `unwind-uncheck` (alias `unwind-unchecked`): enable the compiled native unwind path as auxiliary information. On POSIX, logical frames remain emitted, printed first, and authoritative.
+- `unwind`: require native replacement and omit per-function JIT push/pop operations. The POSIX live probe must recover generated caller frames; an unsupported or failed checked selection fails closed.
+- `unwind-uncheck` (alias `unwind-unchecked`): use the same native replacement and omitted push/pop policy, but skip the live self-check. This does not disable memory safety or unwind-table registration.
 
-The native-unwind path reports concrete generated functions from registered code ranges. It does not emit synthetic DWARF inline scopes, seeded POSIX cursors, frame-pointer scans, raw-stack scans, or inline call-chain expansion. POSIX uses an ordinary `<unwind.h>` backtrace after the authoritative logical stack. Win64 SEH alone receives explicit generated frame/stack context. AOT functions emit asynchronous unwind tables when native unwind is selected; fixed frame pointers are limited to the Win64 SEH bridge.
+The native-unwind path reports concrete generated functions from registered code ranges, preserving recursive frame multiplicity. POSIX uses an ordinary `<unwind.h>` walk through registered JIT CFI and unwindable host-runtime frames. It does not use seeded POSIX cursors, frame-pointer scans, raw-stack scans, synthetic inline scopes, or inline call-chain expansion. AOT functions emit asynchronous unwind tables when native unwind is selected; fixed frame pointers and explicit generated frame/stack context remain limited to the Win64 SEH bridge. The runtime's relevant host frames must also retain unwind metadata; the POSIX live probe checks the actual runtime path.
+
+Compiler logs report the effective `call_stack`, `unwind_backend`, `unwind_check=live|unchecked|off`, `unwind_replace_frames=yes|no`, and `call_stack_frames=emit|omit`. A native stack test must verify both the complete ordered frame chain and omitted logical-frame emission; merely printing one resolved JIT address is insufficient.
 
 ## LLVM IR Verification and Cache
 
