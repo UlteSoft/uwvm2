@@ -112,12 +112,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         cache_context base_context{};
         cache_policy policy{};
+        ::llvm::Module const* derived_context_module{};
+        cache_context derived_context{};
+        bool has_derived_context{};
 
-        [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) const UWVM_THROWS
+        [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) UWVM_THROWS
         {
             auto ctx{base_context};
             // Some callers already provide a fully qualified cache key, so avoid expensive bitcode hashing in that path.
             if(ctx.cache_key_is_complete) { return ctx; }
+
+            // One ObjectCache instance is attached to one freshly-created ExecutionEngine and its single input Module.
+            // LLVM asks getObject before code generation and notifyObjectCompiled afterwards; optimization/codegen may
+            // mutate that Module between callbacks. Reuse the lookup identity so a miss is stored under the exact key
+            // queried on the next process run, and avoid serializing a large lazy CU twice on the compile path.
+            if(has_derived_context && derived_context_module == ::std::addressof(module)) { return derived_context; }
 
             auto key{details::make_cache_key(u8"llvm-module-object")};
             details::append_cache_key_value(key, u8"base-key", ctx.cache_key);
@@ -125,6 +134,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto bitcode_hash{details::module_bitcode_hash(module)};
             details::append_cache_key_value(key, u8"bitcode-hash", bitcode_hash);
             ctx.cache_key = ::std::move(key);
+            derived_context_module = ::std::addressof(module);
+            derived_context = ctx;
+            has_derived_context = true;
             return ctx;
         }
 

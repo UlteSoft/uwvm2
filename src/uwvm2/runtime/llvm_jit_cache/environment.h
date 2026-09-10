@@ -435,7 +435,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         auto out{details::make_cache_key(u8"uwvm-runtime-abi")};
         // The schema version separates intentional ABI-fingerprint changes from ordinary project version changes.
-        details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v7");
+        details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v10");
+        // Native objects may omit the u32-sum overflow branch only with the matching unsigned-domain mmap layout.
+        // Never reuse such code with the former 2-GiB-front-guard reservation, even when project version fields match.
+        details::append_cache_key_value(out, u8"wasm32-mmap-layout", u8"unsigned-8g-domain-tail64-v1");
+        // Older native policies retained logical instrumentation; never reuse those objects as native-only code.
+        details::append_cache_key_value(out, u8"native-call-stack", u8"physical-activation-no-logical-jit-v1");
 #if defined(UWVM_VERSION_X)
         details::append_cache_key_value_u64(out, u8"version-x", static_cast<::std::uint_least64_t>(UWVM_VERSION_X));
 #else
@@ -487,7 +492,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         // Keep cached native objects separated when runtime bridge symbol naming or bridge-call ABI details change.
-        details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"semantic-discriminator-and-type-v1");
+        // v3 also makes generated raw-call operands and status values register-wide, avoiding target-specific narrow
+        // integer extension attributes at the handwritten LLVM/C++ ABI boundary.
+        details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"semantic-discriminator-and-type-v3");
         details::append_cache_key_value(out, u8"llvm-wasm-typed-result-abi", u8"void-scalar-tuple-struct-v1");
 #endif
         return out;

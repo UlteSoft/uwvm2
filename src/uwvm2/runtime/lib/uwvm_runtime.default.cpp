@@ -10993,6 +10993,13 @@ namespace uwvm2::runtime::lib
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module", rec.module_name);
             auto full_module_wasm_hash{runtime_llvm_jit_full_module_cache_fingerprint(*runtime_module)};
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_key, u8"module-wasm-hash", full_module_wasm_hash);
+            // The hand-built Wasm fingerprint is a cheap namespace hint, not a complete code identity: table, memory,
+            // global, element/data and proposal metadata can change emitted IR without changing function-body bytes.
+            // Hash the complete pre-optimization module after target attributes are installed. This also qualifies the
+            // manual parallel-object key, whose cache lookup happens before the normal LLVM ObjectCache callback.
+            auto full_module_ir_hash{::uwvm2::runtime::llvm_jit_cache::details::module_bitcode_hash(*merged_module)};
+            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
+                llvm_jit_cache_key, u8"module-ir-hash", full_module_ir_hash);
             auto llvm_jit_cache_codegen_policy{::uwvm2::runtime::llvm_jit_cache::details::make_cache_key(u8"codegen-policy")};
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"cache-unit", u8"full");
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy,
@@ -11010,6 +11017,7 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
+            // `module-ir-hash` above covers every IR input consumed by both the ordinary and partitioned emitters.
             llvm_jit_cache_context.cache_key_is_complete = true;
             auto llvm_jit_cache_policy{::uwvm2::runtime::llvm_jit_cache::default_cache_policy()};
 # if defined(__i386__) || defined(_M_IX86) || (defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64))
