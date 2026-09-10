@@ -99,12 +99,9 @@ struct llvm_jit_prepared_wasm_call_operands_t
     ::uwvm2::utils::container::vector<::llvm::Value*> arguments{};
 };
 
-// Memory snapshot values used for imported memories that can provide an address/length view only through a bridge call.
+// Size snapshot used for imported memories whose current byte length is available only through a bridge call.
 struct llvm_jit_memory_snapshot_values_t
 {
-    // Integer address of the beginning of the current memory snapshot.
-    ::llvm::Value* memory_begin_address{};
-
     // Byte length of the snapshot.
     ::llvm::Value* byte_length{};
 };
@@ -1719,14 +1716,19 @@ struct runtime_direct_callee_resolution_t
     return ::llvm::FunctionType::get(llvm_result_type, {llvm_parameter_types.data(), llvm_parameter_types.size()}, false);
 }
 
-// Runtime raw-call bridge signature.  Arguments are: module address, function index, result buffer address/size, and
-// parameter buffer address/size.
+// Exact runtime raw-call ABI signature. Every argument is register-wide uintptr_t/size_t, including the function index:
+// some ABIs attach target-specific extension attributes to uint32_t parameters even when LLVM represents them as i32.
+// Do not bind this handwritten FunctionType directly to pointer-typed or narrow-integer C++ implementations merely
+// because a particular ABI happens to pass those values in the same registers.
 [[nodiscard]] inline constexpr ::llvm::FunctionType* get_llvm_runtime_raw_call_bridge_function_type(::llvm::LLVMContext& llvm_context) noexcept
 {
+    static_assert(sizeof(::std::size_t) == sizeof(::std::uintptr_t),
+                  "generated raw-call ABI represents size_t operands with LLVM intptr");
+    static_assert(::std::numeric_limits<::std::size_t>::digits == ::std::numeric_limits<::std::uintptr_t>::digits,
+                  "generated raw-call ABI requires size_t and uintptr_t to have the same value width");
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context),
-                                     {llvm_intptr_type, llvm_i32_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type},
+                                     {llvm_intptr_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type, llvm_intptr_type},
                                      false);
 }
 
@@ -3564,42 +3566,36 @@ inline constexpr void llvm_jit_local_imported_memory_fill_bridge(::std::uintptr_
     }
 }
 
-// Acquire a best-effort address/length snapshot for a local-imported memory.  This is used only for memory.size-style
-// queries; actual loads/stores stay on bridge functions so provider locks do not outlive the snapshot.
-[[nodiscard]] inline constexpr bool llvm_jit_local_imported_memory_snapshot_bridge(::std::uintptr_t local_imported_module_address,
-                                                                                   ::std::size_t memory_index,
-                                                                                   ::std::uintptr_t* memory_begin_address_out,
-                                                                                   ::std::size_t* byte_length_out) noexcept
+// Acquire a validated length snapshot for a local-imported memory. This is used only for memory.size-style queries;
+// actual loads/stores stay on bridge functions so provider locks do not outlive the snapshot. In particular, do not
+// expose the provider's raw memory pointer after the guarded snapshot callback returns.
+[[nodiscard]] inline constexpr ::std::uintptr_t llvm_jit_local_imported_memory_snapshot_bridge(::std::uintptr_t local_imported_module_address,
+                                                                                               ::std::size_t memory_index,
+                                                                                               ::std::size_t* byte_length_out) noexcept
 {
-    if(memory_begin_address_out == nullptr || byte_length_out == nullptr) [[unlikely]] { return false; }
+    // C++ bool and narrow-integer return conventions are target-specific. Returning uintptr_t keeps the handwritten
+    // LLVM declaration ABI-identical without reproducing per-target zero/sign-extension attributes.
+    if(byte_length_out == nullptr) [[unlikely]] { return 0u; }
 
     auto local_imported_module{reinterpret_cast<::uwvm2::uwvm::wasm::type::local_imported_t*>(local_imported_module_address)};
-    if(local_imported_module == nullptr) [[unlikely]] { return false; }
+    if(local_imported_module == nullptr) [[unlikely]] { return 0u; }
 
     ::uwvm2::runtime::lib::details::local_imported_provider_memory_snapshot_t snapshot{};
     if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_access_snapshot(local_imported_module, memory_index, snapshot)) [[unlikely]]
     {
-        return false;
+        return 0u;
     }
 
     auto const page_size_bytes{
         ::uwvm2::runtime::lib::details::invoke_local_imported_provider_memory_page_size(local_imported_module, memory_index)};
-
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-    if(!::std::has_single_bit(page_size_bytes)) [[unlikely]]
-    {
-        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        return false;
-    }
-#endif
+    if(!runtime_local_imported_page_size_is_representable(page_size_bytes)) [[unlikely]] { return 0u; }
 
     auto const page_size_shift{static_cast<unsigned>(::std::countr_zero(page_size_bytes))};
-    if(page_size_shift >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { return false; }
-    if(snapshot.page_count > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max() >> page_size_shift)) [[unlikely]] { return false; }
+    if(page_size_shift >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { return 0u; }
+    if(snapshot.page_count > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max() >> page_size_shift)) [[unlikely]] { return 0u; }
 
-    *memory_begin_address_out = reinterpret_cast<::std::uintptr_t>(snapshot.memory_begin);
     *byte_length_out = static_cast<::std::size_t>(snapshot.page_count) << page_size_shift;
-    return true;
+    return 1u;
 }
 
 // Native memory.grow bridge.  It returns the old page count on success and -1 on Wasm-visible failure, matching the Wasm
@@ -5027,7 +5023,6 @@ template <typename EmitBridgeCallFromBuffers>
     auto& llvm_context{*state.llvm_context_holder};
     auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     auto const abi_layout{prepared_call.abi_layout};
 
     return emit_runtime_local_func_llvm_jit_runtime_raw_host_bridge_call(
@@ -5048,11 +5043,14 @@ template <typename EmitBridgeCallFromBuffers>
                                                       ::uwvm2::utils::container::u8string_view{module_symbol_name.data(), module_symbol_name.size()})};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
 
-            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<::uwvm2::runtime::lib::llvm_jit_call_raw_host_api>(
+            // Generated code is already covered by the outer LLVM-Wasm FP scope and native-unwind execution gate.
+            // Calling the public host/re-entry API here would redundantly reset FP state and recursively lock the gate
+            // for every imported call.
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call<::uwvm2::runtime::lib::details::llvm_jit_call_raw_from_generated_wasm_abi_bridge>(
                 state,
                 bridge_function_type,
                 {module_address,
-                 ::llvm::ConstantInt::get(llvm_i32_type, func_index),
+                 ::llvm::ConstantInt::get(llvm_intptr_type, func_index),
                  raw_call_buffers.result_buffer_address,
                  ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
                  raw_call_buffers.param_buffer_address,
@@ -6389,12 +6387,14 @@ template <typename CreateValue>
                                           false)};
             auto module_address{emit_local_imported_memory_module_address()};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
-            auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{module_address,
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
-                                                 ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
-                                                 address_value}
+            // ArrayRef is a borrowed view; a named array must own these operands through the complete switch/call.
+            ::llvm::Value* bridge_arguments_array[]{
+                module_address,
+                ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
+                ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
+                address_value,
             };
+            auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
             switch(result_type)
             {
@@ -6451,12 +6451,15 @@ template <typename CreateValue>
                 false)};
             auto module_address{emit_local_imported_memory_module_address()};
             if(module_address == nullptr) [[unlikely]] { return nullptr; }
-            auto const bridge_arguments{
-                ::llvm::ArrayRef<::llvm::Value*>{module_address,
-                                                 ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
-                                                 ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
-                                                 address_value, value}
+            // ArrayRef is a borrowed view; a named array must own these operands through the complete switch/call.
+            ::llvm::Value* bridge_arguments_array[]{
+                module_address,
+                ::llvm::ConstantInt::get(llvm_intptr_type, memory0_access_info.local_imported_memory_index),
+                ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), static_offset),
+                address_value,
+                value,
             };
+            auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
             switch(value_type)
             {

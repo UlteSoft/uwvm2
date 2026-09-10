@@ -94,6 +94,7 @@
 #endif
 
 #ifndef UWVM_MODULE
+# include <uwvm2/runtime/lib/uwvm_runtime_generated_wasm_bridge.h>
 # include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
 #endif
 
@@ -137,13 +138,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 
     extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;
-
-    extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
-                                                 ::std::uint_least32_t func_index,
-                                                 void* result_buffer,
-                                                 ::std::size_t result_bytes,
-                                                 void const* param_buffer,
-                                                 ::std::size_t param_bytes) noexcept;
 
 }
 

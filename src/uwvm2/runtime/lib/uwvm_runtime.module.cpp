@@ -38,6 +38,7 @@
 
 #include "uwvm_runtime_generation.h"
 #include "uwvm_runtime_execution_entry.h"
+#include "uwvm_runtime_generated_wasm_bridge.h"
 #include "uwvm_runtime_imported_function_lookup.h"
 #include "uwvm_runtime_local_imported_provider_callbacks.h"
 #include "uwvm_runtime_state_signature.h"
