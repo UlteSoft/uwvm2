@@ -93,6 +93,10 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifndef UWVM_MODULE
+# include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
+#endif
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
