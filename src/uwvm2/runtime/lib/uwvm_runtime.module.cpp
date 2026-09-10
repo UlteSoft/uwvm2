@@ -50,6 +50,7 @@
 # include "uwvm_runtime_call_indirect_table_views.h"
 # include "uwvm_runtime_llvm_lazy_worker_policy.h"
 # include "uwvm_runtime_native_unwind_execution_gate.h"
+# include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 # include "uwvm_runtime_wasm_fp_environment.h"
 #endif
 

@@ -67,7 +67,6 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
-#  include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
@@ -82,6 +81,7 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include "uwvm_runtime_call_indirect_table_views.h"
 #  include "uwvm_runtime_llvm_lazy_worker_policy.h"
+#  include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 #  include "uwvm_runtime_native_unwind_execution_gate.h"
 #  include "uwvm_runtime_wasm_fp_environment.h"
 # endif
@@ -10654,6 +10654,7 @@ namespace uwvm2::runtime::lib
                     failure_state.failed.store(true, ::std::memory_order_release);
                     co_return;
                 }
+                details::register_runtime_llvm_jit_expanded_lane_unroll_policy(pass_builder);
                 if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
                 set_llvm_module_target_triple_from_machine(*module, *target_machine);
