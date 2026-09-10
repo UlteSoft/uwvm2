@@ -25,6 +25,7 @@
 #include <fast_io.h>
 
 #include <uwvm2/imported/wasi/wasip1/func/clock_time_get_wasm64.h>
+#include "fp_control_probe.h"
 #ifdef UWVM_DLLIMPORT
 # error "UWVM_DLLIMPORT existed"
 #endif
@@ -77,10 +78,25 @@ int main()
 
     constexpr wasi_void_ptr_wasm64_t time_ptr{4096u};
 
+    ::uwvm2test::wasip1_fp_control::initial_state_restore restore_initial{};
+    ::uwvm2test::wasip1_fp_control::snapshot expected_control{};
+    if(!restore_initial.valid || !::uwvm2test::wasip1_fp_control::prepare_hostile(expected_control)) { ::fast_io::fast_terminate(); }
+
+    auto require_control_unchanged{
+        [&]() noexcept
+        {
+            if(!::uwvm2test::wasip1_fp_control::unchanged(expected_control))
+            {
+                ::fast_io::io::perrln(::fast_io::u8err(), u8"clock_time_get_wasm64 changed Wasm-relevant FP control");
+                ::fast_io::fast_terminate();
+            }
+        }};
+
     // Test 1: Basic monotonic clock with zero precision
     {
         auto const ret{::uwvm2::imported::wasi::wasip1::func::clock_time_get_wasm64(env, clockid_wasm64_t::clock_monotonic, timestamp_wasm64_t{}, time_ptr)};
         if(ret != errno_wasm64_t::esuccess) { ::fast_io::fast_terminate(); }
+        require_control_unchanged();
 
         auto const time1{
             ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<std::underlying_type_t<timestamp_wasm64_t>>(memory, time_ptr)};
@@ -104,6 +120,7 @@ int main()
             ::fast_io::io::perrln(::fast_io::u8err(), u8"clock_time_get_wasm64: time went backwards");
             ::fast_io::fast_terminate();
         }
+        require_control_unchanged();
     }
 
     // Test 2: Different precision hints should not affect returned time
@@ -132,6 +149,7 @@ int main()
             ::fast_io::io::perrln(::fast_io::u8err(), u8"clock_time_get_wasm64: time went backwards with different precisions");
             ::fast_io::fast_terminate();
         }
+        require_control_unchanged();
     }
 
     // Test 3: Invalid clock ID should return einval
@@ -142,6 +160,17 @@ int main()
             ::fast_io::io::perrln(::fast_io::u8err(), u8"clock_time_get_wasm64: invalid clockid did not return einval");
             ::fast_io::fast_terminate();
         }
+        require_control_unchanged();
+    }
+
+    // Test 4: The diagnostic-output branch is also part of the explicit preserving-control contract.
+    {
+        env.trace_wasip1_call = true;
+        auto const ret{::uwvm2::imported::wasi::wasip1::func::clock_time_get_wasm64(
+            env, clockid_wasm64_t::clock_monotonic, timestamp_wasm64_t{}, time_ptr)};
+        env.trace_wasip1_call = false;
+        if(ret != errno_wasm64_t::esuccess) { ::fast_io::fast_terminate(); }
+        require_control_unchanged();
     }
 }
 

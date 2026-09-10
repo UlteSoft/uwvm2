@@ -849,6 +849,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::std::uint_least64_t page_count{};
     };
 
+    // Function-level contract for callbacks entered from generated Wasm. `preserves_wasm_control` covers only state that
+    // affects subsequent Wasm arithmetic: rounding, exception masks, and architecture FTZ/DAZ controls. Accrued FP status
+    // flags may change across an external ABI and are not observable by Wasm. Missing, malformed, and unknown declarations
+    // remain conservative and use the complete FP environment save/restore guard.
+    enum class local_imported_wasm_fp_control_policy_t : unsigned char
+    {
+        may_modify,
+        preserves_wasm_control
+    };
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct global_get_all_result_t
     {
@@ -898,10 +908,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual bool global_is_mutable_from_index(::std::size_t index) const noexcept = 0;
             virtual void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept = 0;
             virtual bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept = 0;
+
+            // Internal header-only type-erasure vtable: providers enter through the constrained local_imported_module
+            // constructor, and the sole implementation is local_imported_module_derv_impl below. This is not the
+            // versioned preload/weak-symbol C ABI; every C++ participant must be rebuilt from the same uwvm2 headers.
+            // Keep new slots appended nevertheless, so source-level changes remain reviewable and existing slots stay put.
+            virtual ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+                function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept = 0;
         };
 
         template <typename>
         inline constexpr bool dependent_false_v{false};
+
+        template <::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t>
+        struct local_imported_wasm_fp_control_policy_constant
+        {
+        };
+
+        template <typename Function>
+        concept has_well_formed_local_imported_wasm_fp_control_policy = requires {
+            requires ::std::same_as<
+                ::std::remove_cv_t<decltype(::std::remove_cvref_t<Function>::wasm_fp_control_policy)>,
+                ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t>;
+            typename local_imported_wasm_fp_control_policy_constant<
+                ::std::remove_cvref_t<Function>::wasm_fp_control_policy>;
+        };
+
+        template <typename Function>
+        [[nodiscard]] inline consteval ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            local_imported_function_wasm_fp_control_policy() noexcept
+        {
+            using policy_type = ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t;
+            if constexpr(has_well_formed_local_imported_wasm_fp_control_policy<Function>)
+            {
+                if constexpr(::std::remove_cvref_t<Function>::wasm_fp_control_policy == policy_type::preserves_wasm_control)
+                {
+                    return policy_type::preserves_wasm_control;
+                }
+            }
+            // This also covers an undeclared policy, a wrong type, a non-constant value, and an unknown enum value.
+            return policy_type::may_modify;
+        }
+
+        struct local_imported_wasm_fp_control_missing_policy_probe
+        {
+        };
+        struct local_imported_wasm_fp_control_malformed_policy_probe
+        {
+            inline static constexpr bool wasm_fp_control_policy{true};
+        };
+        struct local_imported_wasm_fp_control_unknown_policy_probe
+        {
+            inline static constexpr local_imported_wasm_fp_control_policy_t wasm_fp_control_policy{
+                static_cast<local_imported_wasm_fp_control_policy_t>(0xffu)};
+        };
+        struct local_imported_wasm_fp_control_nonconstant_policy_probe
+        {
+            inline static local_imported_wasm_fp_control_policy_t wasm_fp_control_policy;
+        };
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_missing_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_malformed_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_unknown_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_nonconstant_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
 
         template <typename T, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> local_imported_storage_to_final_value_type() noexcept
@@ -1217,6 +1289,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
                 using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
                 return call_func_packed<func_type>(res, para);
+            }
+        }
+
+        template <::std::size_t N, typename FuncTuple>
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            function_wasm_fp_control_policy_from_index_impl(::std::size_t index) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size)
+            {
+                return ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify;
+            }
+            else
+            {
+                if(index != N) { return function_wasm_fp_control_policy_from_index_impl<N + 1uz, curr_tuple_type>(index); }
+
+                using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return local_imported_function_wasm_fp_control_policy<func_type>();
             }
         }
 
@@ -1740,6 +1832,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 }
             }
 
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+                function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept override
+            {
+                using policy_type = ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t;
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_func_tuple_type>::value};
+                    if(index < tuple_size) { return function_wasm_fp_control_policy_from_index_impl<0uz, curr_func_tuple_type>(index); }
+                }
+                return policy_type::may_modify;
+            }
+
             virtual inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept override
             {
                 if constexpr(has_local_function_tuple<rcvmod_type>)
@@ -2120,6 +2225,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return {}; }
             return this->ptr->get_all_function_information();
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr)
+            {
+                return ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify;
+            }
+            return this->ptr->function_wasm_fp_control_policy_from_index(index);
         }
 
         inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept
