@@ -10,7 +10,12 @@
 # include <cstddef>
 # include <cstdint>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm2/features/impl.h>
+# include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
 #endif
