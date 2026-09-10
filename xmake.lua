@@ -51,6 +51,15 @@ function def_build(opt)
 	set_encodings("utf-8")
 	set_warnings("all", "extra", "pedantic", "error")
 
+	local build_source_id = get_config("build-source-id")
+	if build_source_id and build_source_id ~= "none" then
+		if #build_source_id ~= 71 or not build_source_id:match("^sha256:[0-9a-f]+$") then
+			error("invalid --build-source-id: expected sha256:<64 lowercase hexadecimal digits>")
+		end
+		-- This define is consumed inside the cache policy header, including when that header is built as a module unit.
+		add_defines("UWVM2_BUILD_SOURCE_ID=u8\"" .. build_source_id .. "\"")
+	end
+
 	local enable_cxx_module = get_config("use-cxx-module")
 	if enable_cxx_module then
 		add_defines("UWVM_MODULE")
@@ -286,8 +295,17 @@ function def_build(opt)
 						return nil
 					end
 
-					-- Get Commit ID
-					local commit_id = git_command("git rev-parse HEAD") or "unknown"
+					-- Only a verified object id is a usable source identity. Never turn a failed Git query into a
+					-- defined "unknown" commit: the persistent native-object cache treats a defined id as provenance.
+					local commit_id = git_command("git rev-parse --verify HEAD")
+					if commit_id then
+						local commit_id_length = #commit_id
+						if (commit_id_length ~= 40 and commit_id_length ~= 64) or not commit_id:match("^[0-9a-fA-F]+$") then
+							commit_id = nil
+						else
+							commit_id = commit_id:lower()
+						end
+					end
 
 					-- Get the current branch name (may be empty, such as the separation HEAD status)
 					local current_branch = git_command("git branch --show-current")
@@ -334,13 +352,13 @@ function def_build(opt)
 						commit_date = os.date("!%Y-%m-%d", timestamp) -- Attention '! 'means forcing UTC
 					end
 
-					local is_dirty = false
 					local status_output = git_command("git status --porcelain")
-					if status_output and status_output ~= "" then
-						is_dirty = true -- There are uncommitted modifications or untracked files
-					end
+					-- Failure to inspect the worktree is not evidence of a clean tree, so fail closed as dirty.
+					local is_dirty = status_output == nil or status_output ~= ""
 
-					target:add("defines", "UWVM_GIT_COMMIT_ID=u8\"" .. commit_id .. "\"")
+					if commit_id then
+						target:add("defines", "UWVM_GIT_COMMIT_ID=u8\"" .. commit_id .. "\"")
+					end
 					target:add("defines", "UWVM_GIT_REMOTE_URL=u8\"" .. remote_url .. "\"")
 					target:add("defines", "UWVM_GIT_COMMIT_DATA=u8\"" .. commit_date .. "\"")
 					target:add("defines", "UWVM_GIT_UPSTREAM_BRANCH=u8\"" .. upstream_branch .. "\"")

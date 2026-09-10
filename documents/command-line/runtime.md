@@ -106,6 +106,10 @@ LLVM IR verification is mandatory in this reduced runtime and cannot be disabled
 
 The full-module backend can read and write native object-cache entries. Cache path selection is `default`, `disable`, or `path <directory>`. When caching is enabled, every newly written object is signed and every loaded object must have a valid signature. There are no command-line overrides for signing or verification.
 
+Persistent native-object caching requires a clean Git commit identity or a verified complete-source manifest ID. Source-archive packagers can pass `--build-source-id=sha256:<64 lowercase hex digits>`; the value must be regenerated whenever any packaged source input changes. Official release archives should carry the stable hash of a normalized, complete source manifest rather than a tag, version string, timestamp, path, or build artifact.
+
+Dirty Git worktrees and builds with neither identity fail closed even when an explicit cache path is requested. A Wasm-derived LLVM module hash does not cover host bridge/runtime/unwind semantics, and the cache signature provides integrity and context binding rather than source provenance. Developers may separately accept these risks with `UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE` or `UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE`; release builds must not define either macro.
+
 The signing identity is deterministically derived from the local execution context. It detects damaged entries, incompatible-context substitution, and accidental cache reuse; it is not a secret-key trust boundary and does not protect against an attacker who can act as the same OS account. Put the cache in an account-private directory, and use `disable` whenever that ownership boundary is not sufficient.
 
 ```bash
