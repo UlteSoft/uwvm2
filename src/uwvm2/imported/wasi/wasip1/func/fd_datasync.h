@@ -358,7 +358,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
 #  if defined(__linux__) && (defined(__NR_fdatasync) && defined(__NR_fsync))
         auto const result_fdatasync{::fast_io::system_call<__NR_fdatasync, int>(curr_fd_native_handle)};
-        if(::fast_io::linux_system_call_fails(result_fdatasync)) [[unlikely]]
+        if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(result_fdatasync)) [[unlikely]]
         {
             auto const err{static_cast<int>(-result_fdatasync)};
             switch(err)
@@ -366,7 +366,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 [[likely]] case ENOSYS:
                 {
                     auto const result_fsync{::fast_io::system_call<__NR_fsync, int>(curr_fd_native_handle)};
-                    if(::fast_io::linux_system_call_fails(result_fsync)) [[unlikely]]
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(result_fsync)) [[unlikely]]
                     {
                         auto const err{static_cast<int>(-result_fsync)};
                         switch(err)

@@ -559,7 +559,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::std::uint64_t fallocate_len{static_cast<::std::uint64_t>(len)};
             int result_syscall{::fast_io::system_call<__NR_fallocate, int>(curr_fd_native_handle, 0, fallocate_offset, fallocate_len)};
 
-            if(::fast_io::linux_system_call_fails(result_syscall)) [[unlikely]]
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(result_syscall)) [[unlikely]]
             {
                 int const err{static_cast<int>(-result_syscall)};
                 switch(err)
@@ -611,7 +611,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // N32 ABI: Register width is 64 bits, but pointers/longs remain 32 bits.
             int result_syscall{::fast_io::system_call<__NR_fallocate, int>(curr_fd_native_handle, 0, fallocate_offset, fallocate_len)};
 
-            if(::fast_io::linux_system_call_fails(result_syscall)) [[unlikely]]
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(result_syscall)) [[unlikely]]
             {
                 int const err{static_cast<int>(-result_syscall)};
                 switch(err)
@@ -683,7 +683,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                              fallocate_len_high);
             }
 
-            if(::fast_io::linux_system_call_fails(result_syscall)) [[unlikely]]
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(result_syscall)) [[unlikely]]
             {
                 int const err{static_cast<int>(-result_syscall)};
                 switch(err)

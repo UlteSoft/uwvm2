@@ -240,7 +240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 // Preserve unrelated OS flags: read current flags first, then toggle only WASI-managed bits.
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const curr_flags{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_GETFL)};
-                if(::fast_io::linux_system_call_fails(curr_flags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(curr_flags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-curr_flags)};
                     switch(err)
@@ -505,7 +505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const set_res{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_SETFL, new_oflags)};
 
-                if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(set_res)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-set_res)};
                     switch(err)
@@ -525,7 +525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // Verify that the flags were actually set by reading them back
                 int const verify_flags{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_GETFL)};
-                if(::fast_io::linux_system_call_fails(verify_flags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(verify_flags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-verify_flags)};
                     switch(err)
@@ -589,7 +589,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     // Attempt to restore
                     int const set_res{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_SETFL, curr_flags)};
-                    if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(set_res)) [[unlikely]]
                     {
                         // eio: An I/O exception occurred that we cannot control or recover from (e.g., rollback failure, sporadic F_GETFL failure, etc.).
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
@@ -777,7 +777,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 // Preserve unrelated OS flags: read current flags first, then toggle only WASI-managed bits.
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const curr_flags{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_GETFL)};
-                if(::fast_io::linux_system_call_fails(curr_flags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(curr_flags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-curr_flags)};
                     switch(err)
@@ -1042,7 +1042,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const set_res{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_SETFL, new_oflags)};
 
-                if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(set_res)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-set_res)};
                     switch(err)
@@ -1059,7 +1059,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // Verify that the flags were actually set by reading them back
                 int const verify_flags{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_GETFL)};
-                if(::fast_io::linux_system_call_fails(verify_flags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(verify_flags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-verify_flags)};
                     switch(err)
@@ -1122,7 +1122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     // Attempt to restore
                     int const set_res{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_SETFL, curr_flags)};
-                    if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(set_res)) [[unlikely]]
                     {
                         // eio: An I/O exception occurred that we cannot control or recover from (e.g., rollback failure, sporadic F_GETFL failure, etc.).
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
