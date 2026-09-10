@@ -70,12 +70,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     /// @note  After a runtime registry is published, changing full/lazy mode or backend configuration requires a quiescent
     ///        reset_runtime_state_host_api() call before the next run; incompatible reuse fails closed.
+    /// @note  This entry is not reentrant on one thread. Host callbacks that need generated-Wasm re-entry must use
+    ///        llvm_jit_call_raw_host_api().
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config) noexcept;
 
     /// @brief Lazily compile and run the main module using the configured lazy-capable backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     /// @note  After a runtime registry is published, changing full/lazy mode or backend configuration requires a quiescent
     ///        reset_runtime_state_host_api() call before the next run; incompatible reuse fails closed.
+    /// @note  This entry is not reentrant on one thread. Host callbacks that need generated-Wasm re-entry must use
+    ///        llvm_jit_call_raw_host_api().
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 
     /// @brief Stop lazy background compilation before a WASI proc_exit leaves the normal run loop.
@@ -88,12 +92,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     /// @note  Embedders must call this before destroying or replacing runtime storage referenced by compiled or lazy caches.
     /// @note  The caller must first quiesce wasm execution and host API calls. Reset joins internal workers but is not a barrier for
     ///        caller-owned execution threads; their surviving TLS caches are invalidated by the runtime generation on next entry.
+    /// @note  Same-thread reset during any active runtime execution entry fails closed.
+    /// @note  Reset also fails closed from provider callbacks made while this thread owns runtime publication.
     extern "C++" void reset_runtime_state_host_api() noexcept;
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     /// @brief Compatibility spelling retained for existing LLVM embedding callers.
     extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept;
 
+    /// @brief Invoke one generated function through the public raw ABI; this is the sole same-thread execution-callback re-entry API.
+    /// @note  Re-entry from provider callbacks during registry publication fails closed because the registry is incomplete.
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,

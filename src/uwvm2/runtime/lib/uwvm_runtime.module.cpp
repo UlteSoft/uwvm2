@@ -40,6 +40,7 @@
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 #include "uwvm_runtime_generation.h"
+#include "uwvm_runtime_execution_entry.h"
 #include "uwvm_runtime_imported_function_lookup.h"
 #include "uwvm_runtime_state_signature.h"
 #include "uwvm_runtime_wasip1_memory_bindings.h"

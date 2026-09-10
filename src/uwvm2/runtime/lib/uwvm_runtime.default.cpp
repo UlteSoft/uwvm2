@@ -71,6 +71,7 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 # include "uwvm_runtime_generation.h"
+# include "uwvm_runtime_execution_entry.h"
 # include "uwvm_runtime_imported_function_lookup.h"
 # include "uwvm_runtime_state_signature.h"
 # include "uwvm_runtime_wasip1_memory_bindings.h"
@@ -563,22 +564,6 @@ namespace uwvm2::runtime::lib
             return (::std::numeric_limits<::std::size_t>::max)();
         }
 
-        class runtime_state_publication_guard
-        {
-        public:
-            inline runtime_state_publication_guard() noexcept
-            {
-                while(g_runtime.runtime_state_publication_lock.test_and_set(::std::memory_order_acquire)) { ::fast_io::this_thread::yield(); }
-            }
-
-            runtime_state_publication_guard(runtime_state_publication_guard const&) = delete;
-            runtime_state_publication_guard& operator= (runtime_state_publication_guard const&) = delete;
-            runtime_state_publication_guard(runtime_state_publication_guard&&) = delete;
-            runtime_state_publication_guard& operator= (runtime_state_publication_guard&&) = delete;
-
-            inline ~runtime_state_publication_guard() { g_runtime.runtime_state_publication_lock.clear(::std::memory_order_release); }
-        };
-
         [[nodiscard]] inline ::std::uint_least64_t current_runtime_generation() noexcept
         {
             return g_runtime.runtime_generation.current();
@@ -680,6 +665,9 @@ namespace uwvm2::runtime::lib
         inline runtime_process_exit_state g_runtime_process_exit_state{};  // [global]
 #endif
 
+            g_runtime_execution_entry_depth = 0uz;
+            g_runtime_state_publication_depth = 0uz;
+            g_runtime_compilation_metadata_callback_depth = 0uz;
         inline constexpr compiled_module_record::~compiled_module_record() noexcept
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -764,6 +752,148 @@ namespace uwvm2::runtime::lib
 
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_execution_entry_depth() noexcept
+        { return g_runtime_execution_entry_depth; }
+#else
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_execution_entry_depth() noexcept
+        { return get_thread_state().runtime_execution_entry_depth; }
+#endif
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_compilation_metadata_callback_depth() noexcept
+        { return g_runtime_compilation_metadata_callback_depth; }
+#else
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_compilation_metadata_callback_depth() noexcept
+        { return get_thread_state().runtime_compilation_metadata_callback_depth; }
+#endif
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_state_publication_depth() noexcept
+        { return g_runtime_state_publication_depth; }
+#else
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t& get_runtime_state_publication_depth() noexcept
+        { return get_thread_state().runtime_state_publication_depth; }
+#endif
+
+        class runtime_compilation_metadata_callback_scope
+        {
+            bool entered{};
+#if !defined(UWVM_USE_THREAD_LOCAL)
+            os_thread_id_t thread_id{current_thread_id()};
+            bool owns_inserted_node{};
+#endif
+
+        public:
+            inline runtime_compilation_metadata_callback_scope() noexcept
+            {
+#if defined(UWVM_USE_THREAD_LOCAL)
+                // Native TLS has no fallback-map node ownership; update its depth directly.
+                if(!::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_enter(
+                       get_runtime_compilation_metadata_callback_depth())) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
+#else
+                // `try_emplace_and_visit` reports whether this scope inserted the fallback node. Both visitors mutate
+                // the node only while the container owns its lock; no reference survives the provider callback.
+                bool enter_succeeded{};
+                owns_inserted_node = g_thread_states.try_emplace_and_visit(
+                    thread_id,
+                    [&](auto& kv) constexpr noexcept
+                    {
+                        enter_succeeded = ::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_enter(
+                            kv.second.runtime_compilation_metadata_callback_depth);
+                    },
+                    [&](auto& kv) constexpr noexcept
+                    {
+                        enter_succeeded = ::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_enter(
+                            kv.second.runtime_compilation_metadata_callback_depth);
+                    });
+                if(!enter_succeeded) [[unlikely]] { ::fast_io::fast_terminate(); }
+#endif
+                entered = true;
+            }
+
+            runtime_compilation_metadata_callback_scope(runtime_compilation_metadata_callback_scope const&) = delete;
+            runtime_compilation_metadata_callback_scope& operator= (runtime_compilation_metadata_callback_scope const&) = delete;
+            runtime_compilation_metadata_callback_scope(runtime_compilation_metadata_callback_scope&&) = delete;
+            runtime_compilation_metadata_callback_scope& operator= (runtime_compilation_metadata_callback_scope&&) = delete;
+
+            inline ~runtime_compilation_metadata_callback_scope()
+            {
+                if(!entered) { return; }
+#if defined(UWVM_USE_THREAD_LOCAL)
+                if(!::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_leave(
+                       get_runtime_compilation_metadata_callback_depth())) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
+#else
+                bool leave_succeeded{};
+                ::std::size_t remaining_depth{(::std::numeric_limits<::std::size_t>::max)()};
+                auto const visited_count{g_thread_states.visit(
+                    thread_id,
+                    [&](auto& kv) constexpr noexcept
+                    {
+                        leave_succeeded = ::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_leave(
+                            kv.second.runtime_compilation_metadata_callback_depth);
+                        remaining_depth = kv.second.runtime_compilation_metadata_callback_depth;
+                    })};
+                if(visited_count != 1uz || !leave_succeeded) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                if(owns_inserted_node)
+                {
+                    // Erase only after `visit` released the node lock. Erasing inside the visitor would recursively
+                    // acquire the same container shard and can deadlock.
+                    if(!::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_owned_node_should_erase(
+                           owns_inserted_node, remaining_depth) ||
+                       g_thread_states.erase(thread_id) != 1uz) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                }
+#endif
+            }
+        };
+
+        class runtime_state_publication_guard
+        {
+            bool entered{};
+
+        public:
+            inline runtime_state_publication_guard() noexcept
+            {
+                // A same-thread recursive attempt cannot acquire this non-recursive lock. Fail before spinning.
+                if(!::uwvm2::runtime::lib::details::runtime_state_publication_access_allowed(get_runtime_state_publication_depth())) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
+
+                while(g_runtime.runtime_state_publication_lock.test_and_set(::std::memory_order_acquire)) { ::fast_io::this_thread::yield(); }
+
+                // Do not retain a TLS/map-backed node reference across callbacks. Every transition re-acquires the
+                // current thread's storage; reset releases this guard before erasing that storage.
+                if(!::uwvm2::runtime::lib::details::runtime_state_publication_enter(get_runtime_state_publication_depth())) [[unlikely]]
+                {
+                    g_runtime.runtime_state_publication_lock.clear(::std::memory_order_release);
+                    ::fast_io::fast_terminate();
+                }
+                entered = true;
+            }
+
+            runtime_state_publication_guard(runtime_state_publication_guard const&) = delete;
+            runtime_state_publication_guard& operator= (runtime_state_publication_guard const&) = delete;
+            runtime_state_publication_guard(runtime_state_publication_guard&&) = delete;
+            runtime_state_publication_guard& operator= (runtime_state_publication_guard&&) = delete;
+
+            inline ~runtime_state_publication_guard()
+            {
+                if(!entered) { return; }
+                if(!::uwvm2::runtime::lib::details::runtime_state_publication_leave(get_runtime_state_publication_depth())) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
+                g_runtime.runtime_state_publication_lock.clear(::std::memory_order_release);
+            }
+        };
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             // This marker follows the runtime's selected TLS representation. It must remain thread-specific because an imported
@@ -895,6 +1025,36 @@ namespace uwvm2::runtime::lib
         [[__gnu__::__tls_model__("local-dynamic")]]
 #  endif
 # endif
+        // Kept separate from LLVM-only FP/bridge markers: interpreter execution and reset need the same re-entry invariant.
+        inline thread_local ::std::size_t g_runtime_execution_entry_depth{};  // [global] [thread_local]
+
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        // Current-thread ownership of the non-recursive registry publication lock.
+        inline thread_local ::std::size_t g_runtime_state_publication_depth{};  // [global] [thread_local]
+
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        // Active only around provider calls that supply LLVM compilation metadata.
+        inline thread_local ::std::size_t g_runtime_compilation_metadata_callback_depth{};  // [global] [thread_local]
+
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
         inline thread_local preload_call_context_t g_preload_call_context{};  // [global] [thread_local]
 
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
@@ -942,6 +1102,12 @@ namespace uwvm2::runtime::lib
         {
             // Map-backed fallback for environments where C++ thread_local is disabled.
             call_stack_tls_state call_stack{};
+            // Runtime entry nesting is backend-neutral. It must survive a permitted public-raw re-entry until the outer entry leaves.
+            ::std::size_t runtime_execution_entry_depth{};
+            // Stored in the same fallback node, but publication guards re-acquire it on leave and never retain a node pointer.
+            ::std::size_t runtime_state_publication_depth{};
+            // Lazy single-CU metadata callbacks can run without publication-lock ownership, so retain a separate phase depth.
+            ::std::size_t runtime_compilation_metadata_callback_depth{};
             preload_call_context_t preload_call_context{};
             suppressed_call_stack_frame_t suppressed_call_stack_frame{};
 # if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -969,10 +1135,10 @@ namespace uwvm2::runtime::lib
 
         inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};  // [global]
 
-        /// @warning `g_thread_states` entries MUST be cleaned up on thread exit.
-        ///          Currently only the main thread is used; we clear `g_thread_states` at the end of
-        ///          `full_compile_and_run_main_module()` (by erasing the current thread state).
-        ///          When implementing `wasi-thread`, every created thread must erase its own state on exit to avoid
+        /// @warning Every `g_thread_states` insertion needs an explicit ownership boundary. Outermost runtime execution
+        ///          erases its current-thread state; a metadata-only compiler worker is erased by
+        ///          `runtime_compilation_metadata_callback_scope` only when that scope inserted the node. Any future
+        ///          standalone worker or `wasi-thread` entry must likewise erase its own node before thread exit to avoid
         ///          unbounded growth and possible thread-id reuse issues.
 
         struct thread_states_reserve_guard
@@ -2832,6 +2998,42 @@ namespace uwvm2::runtime::lib
             if(location.function_index >= module_cache.size()) [[unlikely]] { return nullptr; }
             return ::std::addressof(module_cache.index_unchecked(location.function_index));
         }
+
+        using ::uwvm2::runtime::lib::details::runtime_execution_entry_reentry;
+
+        class runtime_execution_entry_scope
+        {
+            bool entered{};
+
+        public:
+            inline explicit constexpr runtime_execution_entry_scope(
+                runtime_execution_entry_reentry reentry = runtime_execution_entry_reentry::reject) noexcept
+            {
+                auto& depth{get_runtime_execution_entry_depth()};
+                // Full/interpreter host entries are not recursively executable. The public LLVM raw API is the one
+                // callback re-entry surface whose nested lifetime is explicitly supported.
+                if(!::uwvm2::runtime::lib::details::runtime_execution_entry_enter(depth, reentry)) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
+                entered = true;
+            }
+
+            runtime_execution_entry_scope(runtime_execution_entry_scope const&) = delete;
+            runtime_execution_entry_scope& operator= (runtime_execution_entry_scope const&) = delete;
+
+            inline constexpr ~runtime_execution_entry_scope() noexcept
+            {
+                if(!entered) { return; }
+
+                // Never retain a pointer/reference to a map-backed node across erasure. A permitted nested raw call
+                // merely returns depth N to N-1; only the outermost entry owns complete per-thread cleanup.
+                auto& depth{get_runtime_execution_entry_depth()};
+                auto const leave_result{::uwvm2::runtime::lib::details::runtime_execution_entry_leave(depth)};
+                if(leave_result == ::uwvm2::runtime::lib::details::runtime_execution_entry_leave_result::invalid) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
+                if(leave_result == ::uwvm2::runtime::lib::details::runtime_execution_entry_leave_result::outermost)
+                { erase_current_thread_runtime_state(); }
+            }
+        };
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         struct cached_wasip1_runtime_module_context
@@ -13801,8 +14003,9 @@ namespace uwvm2::runtime::lib
     // =========================================================================
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
     {
-        // Construct cleanup before the FP scope so map-backed thread state outlives every guard that references it.
-        current_thread_runtime_state_erase_guard thread_state_erase_guard{};
+        // Declare the entry scope first so every FP/bridge guard is destroyed before outermost cleanup. Recursive
+        // full/lazy execution is unsupported and fails before it can disturb the active entry's per-thread state.
+        runtime_execution_entry_scope execution_entry_scope{};
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::runtime::lib::details::scoped_llvm_wasm_fp_environment fp_environment_guard{
             get_llvm_wasm_fp_environment_active_state(), runtime_compiler_requests_llvm_jit_translation()};
@@ -14028,64 +14231,92 @@ namespace uwvm2::runtime::lib
 
     extern "C++" void reset_runtime_state_host_api() noexcept
     {
+        // A compilation-metadata provider callback can run outside the publication lock (notably lazy single-CU
+        // materialization). Reset there would destroy state owned by the active compiler, so reject it before taking
+        // any gate or consulting backend readiness.
+        if(!::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_access_allowed(
+               get_runtime_compilation_metadata_callback_depth())) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+        // Provider callbacks may run while this thread owns the non-recursive publication lock. A reset from
+        // such a callback would otherwise spin forever before reaching any registry validation.
+        if(!::uwvm2::runtime::lib::details::runtime_state_publication_access_allowed(get_runtime_state_publication_depth())) [[unlikely]]
+        { ::fast_io::fast_terminate(); }
+        // Reset destroys both interpreter and LLVM per-thread state. It is never legal from any active execution
+        // entry, including a host callback whose generated-bridge token is temporarily suspended.
+        if(!::uwvm2::runtime::lib::details::runtime_execution_entry_reset_allowed(get_runtime_execution_entry_depth())) [[unlikely]]
+        { ::fast_io::fast_terminate(); }
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        // Reset invalidates map-backed/TLS state referenced by the FP and bridge RAII guards. Reject callback-driven reset
+        // before taking any runtime locks so a suspended token can never resume through erased storage.
+        if(::uwvm2::runtime::lib::details::is_llvm_wasm_fp_environment_active(get_llvm_wasm_fp_environment_active_state()) ||
+           get_llvm_jit_generated_wasm_bridge_entry_depth() != 0uz) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+
         // The configured backend may already have changed by the time an embedder requests reset. Always enter the native-unwind
         // gate so a previously published unwind-backed execution cannot overlap destruction of its address tables.
         auto native_unwind_execution_guard{g_runtime.llvm_jit_native_unwind_execution_gate.enter_if(true)};
 #endif
-        runtime_state_publication_guard runtime_state_guard{};
-        // Reset is intended for embedding hosts that reload runtime storage in the same process. The caller must quiesce its own
-        // execution threads first; reset joins internal schedulers, but does not synchronize concurrent host API calls. After workers
-        // stop, advance the generation before dropping registries so surviving caller TLS caches cannot match reloaded addresses.
+        {
+            runtime_state_publication_guard runtime_state_guard{};
+            // Reset is intended for embedding hosts that reload runtime storage in the same process. The caller must quiesce its own
+            // execution threads first; reset joins internal schedulers, but does not synchronize concurrent host API calls. After workers
+            // stop, advance the generation before dropping registries so surviving caller TLS caches cannot match reloaded addresses.
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-        g_runtime.lazy_scheduler.stop();
+            g_runtime.lazy_scheduler.stop();
 #  if defined(UWVM_RUNTIME_LLVM_JIT)
-        g_runtime.llvm_jit_urgent_scheduler.stop();
-        g_runtime.llvm_jit_urgent_request_count.store(0uz, ::std::memory_order_relaxed);
-        g_runtime.llvm_jit_urgent_start_lock.clear(::std::memory_order_release);
+            g_runtime.llvm_jit_urgent_scheduler.stop();
+            g_runtime.llvm_jit_urgent_request_count.store(0uz, ::std::memory_order_relaxed);
+            g_runtime.llvm_jit_urgent_start_lock.clear(::std::memory_order_release);
 #  endif
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        g_runtime.tiered_urgent_scheduler.stop();
-        g_runtime.tiered_schedulers_deferred.store(false, ::std::memory_order_release);
-        g_runtime.tiered_deferred_worker_count = 0uz;
-        g_runtime.tiered_scheduler_start_lock.clear(::std::memory_order_release);
-        reset_tiered_runtime_log_metrics();
+            g_runtime.tiered_urgent_scheduler.stop();
+            g_runtime.tiered_schedulers_deferred.store(false, ::std::memory_order_release);
+            g_runtime.tiered_deferred_worker_count = 0uz;
+            g_runtime.tiered_scheduler_start_lock.clear(::std::memory_order_release);
+            reset_tiered_runtime_log_metrics();
 #  endif
-        g_runtime.lazy_initialized.store(false, ::std::memory_order_release);
-        g_runtime.lazy_compile_active = false;
-        g_runtime.lazy_prefetch_module_id = SIZE_MAX;
-        g_runtime.lazy_prefetch_local_function_index = SIZE_MAX;
-        g_runtime.lazy_runtime_miss_count.store(0uz, ::std::memory_order_relaxed);
-        g_runtime.lazy_runtime_compiled_hit_count.store(0uz, ::std::memory_order_relaxed);
-        g_runtime.lazy_prefetch_lock.clear(::std::memory_order_release);
+            g_runtime.lazy_initialized.store(false, ::std::memory_order_release);
+            g_runtime.lazy_compile_active = false;
+            g_runtime.lazy_prefetch_module_id = SIZE_MAX;
+            g_runtime.lazy_prefetch_local_function_index = SIZE_MAX;
+            g_runtime.lazy_runtime_miss_count.store(0uz, ::std::memory_order_relaxed);
+            g_runtime.lazy_runtime_compiled_hit_count.store(0uz, ::std::memory_order_relaxed);
+            g_runtime.lazy_prefetch_lock.clear(::std::memory_order_release);
 # endif
 
-        advance_runtime_generation();
+            advance_runtime_generation();
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        clear_llvm_jit_call_indirect_table_views();
+            clear_llvm_jit_call_indirect_table_views();
 #endif
-        // Drop every registry that borrows module-owned storage before destroying the module records and their LLVM engines.
-        g_import_call_cache.clear();
+            // Drop every registry that borrows module-owned storage before destroying the module records and their LLVM engines.
+            g_import_call_cache.clear();
 # if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
-        g_wasip1_runtime_module_context_cache.clear();
-        details::clear_wasip1_memory_bindings(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env,
-                                              ::uwvm2::uwvm::imported::wasi::wasip1::storage::configured_wasip1_groups);
-        default_wasip1_memory_runtime_module_id = invalid_default_wasip1_memory_runtime_module_id;
+            g_wasip1_runtime_module_context_cache.clear();
+            details::clear_wasip1_memory_bindings(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env,
+                                                  ::uwvm2::uwvm::imported::wasi::wasip1::storage::configured_wasip1_groups);
+            default_wasip1_memory_runtime_module_id = invalid_default_wasip1_memory_runtime_module_id;
 # endif
-        g_runtime.defined_func_cache.clear();
-        g_runtime.defined_func_ptr_ranges.clear();
+            g_runtime.defined_func_cache.clear();
+            g_runtime.defined_func_ptr_ranges.clear();
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        g_runtime.llvm_jit_unwind_entries.clear();
-        g_runtime.llvm_jit_code_ranges.clear();
+            g_runtime.llvm_jit_unwind_entries.clear();
+            g_runtime.llvm_jit_code_ranges.clear();
 #endif
-        g_runtime.modules.clear();
-        g_runtime.module_name_to_id.clear();
+            g_runtime.modules.clear();
+            g_runtime.module_name_to_id.clear();
 
-        g_runtime.compiled_all.store(false, ::std::memory_order_release);
-        g_runtime.bridges_initialized.store(false, ::std::memory_order_release);
-        g_runtime.published_runtime_state = {};
+            g_runtime.compiled_all.store(false, ::std::memory_order_release);
+            g_runtime.bridges_initialized.store(false, ::std::memory_order_release);
+            g_runtime.published_runtime_state = {};
+        }
 
+        // Release current-thread publication ownership before erasing its TLS/map-backed node. The guard's destructor
+        // re-acquires the depth field, so letting it cross this erase would recreate a node or observe invalid storage.
         erase_current_thread_runtime_state();
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_USE_THREAD_LOCAL)
         llvm_jit_trap_return_address = 0u;
@@ -14111,6 +14342,20 @@ namespace uwvm2::runtime::lib
                                                  void const* param_buffer,
                                                  ::std::size_t param_bytes) noexcept
     {
+        // A metadata provider may be serving the very lazy compilation unit this raw call would wait for. This phase
+        // can exist without publication-lock ownership, so reject it independently and before any readiness/lock path.
+        if(!::uwvm2::runtime::lib::details::runtime_compilation_metadata_callback_access_allowed(
+               get_runtime_compilation_metadata_callback_depth())) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+        // Compilation-time/provider callbacks execute while this same thread owns the non-recursive publication
+        // lock. Re-entry there cannot observe a complete registry and must fail before compile_all attempts to relock.
+        if(!::uwvm2::runtime::lib::details::runtime_state_publication_access_allowed(get_runtime_state_publication_depth())) [[unlikely]]
+        { ::fast_io::fast_terminate(); }
+        // This is the sole public execution API that may recursively enter generated Wasm from a host callback.
+        // Nested exit must not erase state still owned by the surrounding full execution.
+        runtime_execution_entry_scope execution_entry_scope{runtime_execution_entry_reentry::allow_public_llvm_raw};
         ::uwvm2::runtime::lib::details::scoped_llvm_wasm_fp_environment fp_environment_guard{
             get_llvm_wasm_fp_environment_active_state()};
         if(!fp_environment_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
