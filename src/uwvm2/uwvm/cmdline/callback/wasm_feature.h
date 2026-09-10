@@ -39,13 +39,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     namespace wasm_feature_details
     {
         using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
-        using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         using cli_mode = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode;
 
         /// @brief Access the global wasm1.1 parser feature parameter used by CLI callbacks.
         inline constexpr auto& wasm1p1_parameter() noexcept
         {
-            return ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(
+            return ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_wasm1p1_parameter(
                 ::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para);
         }
 
