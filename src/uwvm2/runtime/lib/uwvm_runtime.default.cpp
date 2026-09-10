@@ -11170,6 +11170,10 @@ namespace uwvm2::runtime::lib
                 }
             }
 
+            auto memory_manager{
+                ::uwvm2::utils::container::make_delete_owned<
+                    ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()};
+            auto const memory_manager_observer{memory_manager.get()};
             ::llvm::ExecutionEngine* raw_engine{};
             if(use_parallel_objects)
             {
@@ -11191,11 +11195,8 @@ namespace uwvm2::runtime::lib
                                  .setOptLevel(codegen_opt_level)
                                  .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                                  .setMAttrs(host_target_attributes)
-                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                                     ::uwvm2::utils::container::make_delete_owned<
-                                         ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                                         .release()})
-                                 .create(target_machine.get());
+                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                                 .create(target_machine.release());
             }
             else
             {
@@ -11205,11 +11206,8 @@ namespace uwvm2::runtime::lib
                                  .setOptLevel(codegen_opt_level)
                                  .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                                  .setMAttrs(host_target_attributes)
-                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                                     ::uwvm2::utils::container::make_delete_owned<
-                                         ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                                         .release()})
-                                 .create(target_machine.get());
+                                 .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                                 .create(target_machine.release());
             }
             if(raw_engine == nullptr) [[unlikely]]
             {
@@ -11219,7 +11217,6 @@ namespace uwvm2::runtime::lib
                 }
                 return false;
             }
-            static_cast<void>(target_machine.release());
             // From this point the ExecutionEngine owns the target machine and all executable allocations are tracked by rec.
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
@@ -11285,6 +11282,15 @@ namespace uwvm2::runtime::lib
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-start module=\"", rec.module_name, u8"\"");
             // finalizeObject performs relocation, memory permission changes, and JIT event notifications.
             llvm_jit_engine->finalizeObject();
+            if(memory_manager_observer->has_finalization_failure()) [[unlikely]]
+            {
+                if(!use_parallel_objects) { llvm_jit_engine->setObjectCache(nullptr); }
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    llvm_jit_materialize_error(u8"LLVM JIT memory finalization failed for module=\"", rec.module_name, u8"\".");
+                }
+                return false;
+            }
             if(!use_parallel_objects) { llvm_jit_engine->setObjectCache(nullptr); }
             llvm_jit_materialize_runtime_log_line(u8"finalize-object-end module=\"",
                                                   rec.module_name,
