@@ -588,12 +588,14 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
 	local is_llvm_jit_test = is_0014_llvm_jit or (string.find(file, "llvm_jit", 1, true) ~= nil)
 	local is_parallel_compile_failure_state = string.find(file, "parallel_compile_failure_state.cc", 1, true) ~= nil
+	local is_wasm_entry_integer = string.find(file, "wasm_entry_integer.cc", 1, true) ~= nil
 	local test_libfuzzer = get_config("test-libfuzzer")
 
 	if not ((is_0013_uwvm_int and (not get_config("enable-test-uwvm-int") or not uwvm_uses_uwvm_int)) or
 		(is_0014_llvm_jit and not get_config("enable-test-llvm-jit")) or
 		(is_llvm_jit_test and not uwvm_uses_llvm_jit) or
 		(is_parallel_compile_failure_state and not uwvm_uses_uwvm_int) or
+		(is_wasm_entry_integer and not uwvm_has_runtime_backend) or
 		is_0015_backend_fuzzer or
 		(is_libfuzzer and not test_libfuzzer)) then
 		local name = path.basename(file)

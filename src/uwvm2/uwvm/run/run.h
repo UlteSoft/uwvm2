@@ -423,11 +423,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // here because fast_io scanners fail quickly on non-matching input, and `wasm_entry_scan_exact` rejects partial
         // matches after each attempted scan.
         //
-        // fast_io scanners only write to the target on a successful scan; no initialization needed.
+        // fast_io scanners write to the target only on a successful scan.  Value-initialize the temporary nonetheless:
+        // this keeps the successful short-circuit path visibly free of indeterminate reads for conservative compiler
+        // data-flow analysis and provides a deterministic defensive value if a future scanner contract regresses.
 
         if constexpr(allow_signed_decimal)
         {
-            Out signed_value;  // no init necessary
+            Out signed_value{};
             if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(signed_value)))
             {
                 out = signed_value;
@@ -435,7 +437,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        Unsigned unsigned_value;  // no init necessary
+        Unsigned unsigned_value{};
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex0x_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin0b_get<true, false>(unsigned_value)) ||
