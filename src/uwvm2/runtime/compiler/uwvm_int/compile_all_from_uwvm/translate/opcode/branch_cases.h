@@ -3013,17 +3013,7 @@ case wasm1_code::br_if:
             }
         }
 
-        bool const strict_need_taken_thunk{[&]() constexpr noexcept -> bool
-                                           {
-                                               if constexpr(stacktop_enabled && strict_cf_entry_like_call)
-                                               {
-                                                   return need_repair || (stacktop_cache_count != 0uz);
-                                               }
-                                               else
-                                               {
-                                                   return need_repair;
-                                               }
-                                           }()};
+        bool const strict_need_taken_thunk{need_repair || (stacktop_enabled && strict_cf_entry_like_call && stacktop_cache_count != 0uz)};
 
         if(!strict_need_taken_thunk)
         {
@@ -3462,17 +3452,7 @@ case wasm1_code::br_table:
 
             auto const target_base{target_frame.operand_stack_base};
             bool const need_repair{curr_size > target_base + expected_arity};
-            bool const strict_need_thunk{[&]() constexpr noexcept -> bool
-                                         {
-                                             if constexpr(stacktop_enabled && strict_cf_entry_like_call)
-                                             {
-                                                 return need_repair || (stacktop_cache_count != 0uz);
-                                             }
-                                             else
-                                             {
-                                                 return need_repair;
-                                             }
-                                         }()};
+            bool const strict_need_thunk{need_repair || (stacktop_enabled && strict_cf_entry_like_call && stacktop_cache_count != 0uz)};
             if(!strict_need_thunk)
             {
                 if constexpr(stacktop_enabled)
