@@ -7047,7 +7047,7 @@ namespace uwvm2::runtime::lib
             execute_defined_for_bridge(call_stack, info, stack_top_ptr);
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte*
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte*
             call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS
         {
             // The callback ABI returns the updated top in a register.  Only this non-tail bridge takes the address of its
@@ -7343,7 +7343,7 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte* call_indirect_bridge(
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte* call_indirect_bridge(
             ::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top) UWVM_THROWS
         {
             call_indirect_bridge_impl(wasm_module_id, type_index, table_index, ::std::addressof(stack_top));
