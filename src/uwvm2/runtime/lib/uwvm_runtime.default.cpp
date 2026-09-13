@@ -11416,7 +11416,7 @@ namespace uwvm2::runtime::lib
             execute_defined_for_bridge<TryTieredJit>(call_stack, info, stack_top_ptr);
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte*
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte*
             call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS
         {
             // Standard interpreter direct-call callback; it can still use ready LLVM entries when the generic optional path allows it.
@@ -11427,7 +11427,7 @@ namespace uwvm2::runtime::lib
         }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte*
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte*
             tiered_call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS
         {
             // Tier-aware direct-call callback gives every interpreter call boundary a chance to promote into LLVM.
@@ -11725,7 +11725,7 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte* call_indirect_bridge(
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte* call_indirect_bridge(
             ::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top) UWVM_THROWS
         {
             // Standard interpreter call_indirect callback with wasm table/type checks and optional backend dispatch.
@@ -11734,7 +11734,7 @@ namespace uwvm2::runtime::lib
         }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR [[nodiscard]] inline constexpr ::std::byte* tiered_call_indirect_bridge(
+        [[nodiscard]] UWVM2_RUNTIME_INTERPRETER_CALLBACK_FUNC_ATTR inline constexpr ::std::byte* tiered_call_indirect_bridge(
             ::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top) UWVM_THROWS
         {
             // Tier-aware indirect-call callback keeps wasm validation checks identical while allowing ready generated targets.
