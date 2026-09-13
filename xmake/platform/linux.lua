@@ -22,6 +22,14 @@ function linux_target()
         return triple:find("^powerpc%-") ~= nil or triple:find("^ppc%-") ~= nil
     end
 
+    local function triple_is_powerpc64le(triple)
+        if not triple or triple == "detect" then
+            return false
+        end
+        triple = triple:lower()
+        return triple:find("^powerpc64le") ~= nil or triple:find("^ppc64le") ~= nil
+    end
+
     local function triple_is_sparc(triple)
         if not triple or triple == "detect" then
             return false
@@ -103,6 +111,14 @@ function linux_target()
     end
 
     add_cxflags("-fno-rtti") -- disable rtti
+
+    if triple_is_powerpc64le(get_config("cross")) or triple_is_powerpc64le(get_config("target")) or
+        triple_is_powerpc64le(get_config("llvm-target")) then
+        -- GCC's IEEE long-double ABI makes `__float128` and `long double` the same C++ type on
+        -- powerpc64le.  Hide only the duplicate compiler spelling from header feature detection;
+        -- the ordinary long-double path retains the complete binary128 formatting support.
+        add_cxflags("-U__SIZEOF_FLOAT128__", "-U__FLOAT128__", {force = true})
+    end
     
     uwvm_add_native_unwind_cxflags()
 
