@@ -82,10 +82,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     ///        llvm_jit_call_raw_host_api().
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 
-    /// @brief Stop lazy background compilation before a WASI proc_exit leaves the normal run loop.
-    /// @note WASI proc_exit can terminate the process directly. Lazy compiler workers must be joined before that
-    ///       happens, otherwise they may still be inside LLVM or runtime-log code while global objects are being
-    ///       destroyed by the host process exit path.
+    /// @brief Stop every runtime-owned background worker before a WASI proc_exit leaves the normal run loop.
+    /// @note On Linux the fast exit path terminates the calling thread directly. Compiler and JIT-cache workers must therefore be
+    ///       joined explicitly, otherwise a surviving worker can keep the process alive indefinitely.
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept;
+
+    /// @brief Compatibility spelling for callers built against the original lazy-worker shutdown API.
     extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept;
 
     /// @brief Clear backend-neutral and selected-backend runtime state before loading a fresh module set in the same process.

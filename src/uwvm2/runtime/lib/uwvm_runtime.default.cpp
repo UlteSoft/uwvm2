@@ -14645,10 +14645,9 @@ namespace uwvm2::runtime::lib
     // - Import calls preserve WASI/preload context through cached target metadata.
     // - Preload memory APIs are thin wrappers over the active call context.
     // =========================================================================
-    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept
     {
-        // Host/process shutdown stops background compilers before global objects begin destruction. This avoids worker threads
-        // touching module records or LLVM state whose lifetime is about to end.
+        // Stop producers before draining the cache writer so no compiler can enqueue another object after the writer has stopped.
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
         g_runtime.lazy_scheduler.stop();
 # if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -14658,7 +14657,12 @@ namespace uwvm2::runtime::lib
         g_runtime.tiered_urgent_scheduler.stop();
 # endif
 #endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        ::uwvm2::runtime::llvm_jit_cache::shutdown_async_store_objects();
+#endif
     }
+
+    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept { runtime_stop_before_proc_exit_host_api(); }
 
     extern "C++" void reset_runtime_state_host_api() noexcept
     {

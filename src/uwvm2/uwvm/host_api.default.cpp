@@ -393,7 +393,7 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_poll_oneoff
 
 extern "C" void uwvm_wasip1_proc_exit(::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
 {
-    ::uwvm2::runtime::lib::lazy_compile_stop_before_proc_exit_host_api();
+    ::uwvm2::runtime::lib::runtime_stop_before_proc_exit_host_api();
     return ::uwvm2::imported::wasi::wasip1::func::proc_exit(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code);
 }
 
@@ -879,7 +879,7 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
 
 extern "C" void uwvm_wasip1_proc_exit_wasm64(::uwvm2::imported::wasi::wasip1::abi::exitcode_wasm64_t code) noexcept
 {
-    ::uwvm2::runtime::lib::lazy_compile_stop_before_proc_exit_host_api();
+    ::uwvm2::runtime::lib::runtime_stop_before_proc_exit_host_api();
     return ::uwvm2::imported::wasi::wasip1::func::proc_exit_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code);
 }
 

@@ -1041,6 +1041,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
     inline constexpr void flush_async_store_objects() noexcept { details::async_cache_store_worker_instance().flush(); }
 
+    inline constexpr void shutdown_async_store_objects() noexcept
+    {
+        // fast_exit terminates only the calling thread on Linux. Stop and join the writer explicitly before a WASI proc_exit so a
+        // sleeping cache thread cannot keep the process alive after the main thread has already exited.
+        details::async_cache_store_worker_instance().stop_and_join();
+    }
+
     [[nodiscard]] inline constexpr cache_load_result load_object(cache_context const& ctx, cache_policy const& policy) noexcept
     {
         cache_load_result result{};
