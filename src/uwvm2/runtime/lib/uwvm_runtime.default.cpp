@@ -9808,36 +9808,33 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
         {
-# if defined(__APPLE__)
-            // Cross-built JIT binaries must register the target of the running process, not the target baked into llvm-config's
-            // LLVM_NATIVE_TARGET. This is especially important for x86_64 Darwin binaries executed through Rosetta on Apple Silicon.
-#  if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+# if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            // Register the target selected by the compiler for this executable. LLVM's InitializeNativeTarget() follows the
+            // LLVM_NATIVE_TARGET recorded in llvm-config's generated headers, which can describe the build host instead when uwvm2
+            // is cross-compiled (for example, x86_64 Linux -> AArch64 Linux) and then makes MCJIT target selection fail at runtime.
             ::LLVMInitializeX86TargetInfo();
             ::LLVMInitializeX86Target();
             ::LLVMInitializeX86TargetMC();
             ::LLVMInitializeX86AsmPrinter();
             return true;
-#  elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
             ::LLVMInitializeAArch64TargetInfo();
             ::LLVMInitializeAArch64Target();
             ::LLVMInitializeAArch64TargetMC();
             ::LLVMInitializeAArch64AsmPrinter();
             return true;
-#  elif defined(__arm__) || defined(_M_ARM)
+# elif defined(__arm__) || defined(_M_ARM)
             ::LLVMInitializeARMTargetInfo();
             ::LLVMInitializeARMTarget();
             ::LLVMInitializeARMTargetMC();
             ::LLVMInitializeARMAsmPrinter();
             return true;
-#  elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+# elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
             ::LLVMInitializePowerPCTargetInfo();
             ::LLVMInitializePowerPCTarget();
             ::LLVMInitializePowerPCTargetMC();
             ::LLVMInitializePowerPCAsmPrinter();
             return true;
-#  else
-            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
-#  endif
 # else
             return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
 # endif
