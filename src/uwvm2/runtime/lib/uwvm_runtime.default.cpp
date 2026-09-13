@@ -8397,14 +8397,15 @@ namespace uwvm2::runtime::lib
             if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
         }
 
-        inline constexpr void invoke_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
-                                                                  call_stack_frame frame,
-                                                                  runtime_local_func_storage_t const* runtime_func,
-                                                                  compiled_local_func_t const* compiled_func,
-                                                                  ::std::size_t param_bytes,
-                                                                  ::std::size_t result_bytes,
-                                                                  ::std::byte* result_buffer,
-                                                                  ::std::byte const* param_buffer) noexcept
+        // Interpreter-only products retain this shared source region but compile out every LLVM raw-entry caller.
+        [[maybe_unused]] inline constexpr void invoke_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
+                                                                                   call_stack_frame frame,
+                                                                                   runtime_local_func_storage_t const* runtime_func,
+                                                                                   compiled_local_func_t const* compiled_func,
+                                                                                   ::std::size_t param_bytes,
+                                                                                   ::std::size_t result_bytes,
+                                                                                   ::std::byte* result_buffer,
+                                                                                   ::std::byte const* param_buffer) noexcept
         {
             // Non-tiered raw-buffer interpreter invocation uses the normal lazy compile guard.
             invoke_compiled_defined_raw_buffers_impl<false>(call_stack,
