@@ -25,6 +25,8 @@ namespace uwvm2::runtime::lib
         ::fast_io::fast_terminate();
     }
 
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept {}
+
     extern "C++" void reset_runtime_state_host_api() noexcept {}
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)

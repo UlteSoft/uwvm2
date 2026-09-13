@@ -62,6 +62,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     ///        llvm_jit_call_raw_host_api().
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config) noexcept;
 
+    /// @brief Stop every runtime-owned background worker before a WASI proc_exit leaves the normal run loop.
+    /// @note On Linux the fast exit path terminates the calling thread directly. The JIT-cache writer must therefore be joined
+    ///       explicitly, otherwise it can keep the reduced-runtime process alive indefinitely.
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept;
+
     /// @brief Clear backend-neutral and selected-backend runtime state before loading a fresh module set in the same process.
     /// @note  Embedders must call this before destroying or replacing the runtime module storage referenced by compiled caches.
     /// @note  The caller must first quiesce wasm execution and host API calls. Reset is not a barrier for caller-owned execution

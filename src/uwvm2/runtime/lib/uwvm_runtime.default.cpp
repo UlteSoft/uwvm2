@@ -8919,6 +8919,14 @@ namespace uwvm2::runtime::lib
     // - Import calls preserve WASI/preload context through cached target metadata.
     // - Preload memory APIs are thin wrappers over the active call context.
     // =========================================================================
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept
+    {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        // ROS has no lazy/tiered compiler, but its MCJIT object cache still owns one asynchronous writer.
+        ::uwvm2::runtime::llvm_jit_cache::shutdown_async_store_objects();
+#endif
+    }
+
     extern "C++" void reset_runtime_state_host_api() noexcept
     {
         // A compilation-metadata provider callback can run outside the publication lock (notably lazy single-CU

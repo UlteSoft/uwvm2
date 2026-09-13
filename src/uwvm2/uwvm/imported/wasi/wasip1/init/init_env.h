@@ -67,6 +67,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib { extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept; }
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
@@ -125,6 +127,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                 ::fast_io::fast_terminate();
             }
         }
+
+        // The default environment invokes this function pointer directly. Join the asynchronous signed-cache writer before Linux
+        // fast_exit terminates only the current thread.
+        ::uwvm2::runtime::lib::runtime_stop_before_proc_exit_host_api();
 
 #  if defined(__linux__)
         ::fast_io::fast_exit(static_cast<int>(code));
