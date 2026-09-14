@@ -68,6 +68,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         wasm64
     };
 
+# if defined(UWVM_TEST) && defined(UWVM_CPP_EXCEPTIONS) && !(defined(_WIN32) || defined(__CYGWIN__))
+    namespace details
+    {
+        using strict_grow_mprotect_test_hook_t = void (*)(void*, ::std::size_t, int);
+
+        // Test-only interception point for deterministic partial-mprotect failure injection. Real kernels differ in
+        // whether a particular invalid range fails before or after changing a prefix, so munmap-based tests are not
+        // portable enough to exercise both strict-growth recovery branches.
+        inline strict_grow_mprotect_test_hook_t strict_grow_mprotect_test_hook{};
+
+        inline void strict_grow_mprotect(void* address, ::std::size_t length, int protection)
+        {
+            if(strict_grow_mprotect_test_hook != nullptr) [[unlikely]]
+            {
+                strict_grow_mprotect_test_hook(address, length, protection);
+                return;
+            }
+            ::fast_io::details::sys_mprotect(address, length, protection);
+        }
+    }
+# endif
+
     // max_full_protection_wasm64_length not supported
 
     inline constexpr unsigned max_partial_protection_wasm64_index{40u};
@@ -898,7 +920,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     try
 #  endif
                     {
+#  if defined(UWVM_TEST) && defined(UWVM_CPP_EXCEPTIONS)
+                        ::uwvm2::object::memory::linear::details::strict_grow_mprotect(reinterpret_cast<void*>(protect_begin),
+                                                                                       protect_delta,
+                                                                                       PROT_READ | PROT_WRITE);
+#  else
                         ::fast_io::details::sys_mprotect(reinterpret_cast<void*>(protect_begin), protect_delta, PROT_READ | PROT_WRITE);
+#  endif
                     }
 #  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error)
@@ -914,7 +942,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 #   endif
                         {
                             // Ensure failure is not partially committed; otherwise, OOB may stop faulting in full-protection mode.
+#   if defined(UWVM_TEST) && defined(UWVM_CPP_EXCEPTIONS)
+                            ::uwvm2::object::memory::linear::details::strict_grow_mprotect(reinterpret_cast<void*>(protect_begin),
+                                                                                           protect_delta,
+                                                                                           PROT_NONE);
+#   else
                             ::fast_io::details::sys_mprotect(reinterpret_cast<void*>(protect_begin), protect_delta, PROT_NONE);
+#   endif
                         }
 #   ifdef UWVM_CPP_EXCEPTIONS
                         catch(::fast_io::error)
