@@ -559,17 +559,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const off_m{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
         wasm_f64 acc{conbine_details::load_local<wasm_f64>(type...[2u], off_m)};
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_l) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_k) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_j) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_h) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_g) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_f) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_e) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_d) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_c) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_b) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_a) + acc;
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_l), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_k), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_j), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_h), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_g), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_f), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_e), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_d), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_c), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_b), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_a), acc);
 
         conbine_details::push_operand<CompileOption, wasm_f64, curr_stack_top>(acc, type...);
 
@@ -615,17 +615,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const off_m{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
         wasm_f64 acc{conbine_details::load_local<wasm_f64>(typeref...[2u], off_m)};
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_l) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_k) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_j) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_h) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_g) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_f) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_e) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_d) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_c) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_b) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_a) + acc;
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_l), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_k), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_j), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_h), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_g), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_f), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_e), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_d), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_c), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_b), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_a), acc);
 
         conbine_details::push_operand_byref<CompileOption>(acc, typeref...);
     }
@@ -660,12 +660,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const off_g{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
         wasm_f64 acc{conbine_details::load_local<wasm_f64>(type...[2u], off_g)};
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_f) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_e) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_d) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_c) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_b) + acc;
-        acc = conbine_details::load_local<wasm_f64>(type...[2u], off_a) + acc;
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_f), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_e), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_d), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_c), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_b), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(type...[2u], off_a), acc);
 
         conbine_details::push_operand<CompileOption, wasm_f64, curr_stack_top>(acc, type...);
 
@@ -706,12 +706,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         auto const off_g{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
         wasm_f64 acc{conbine_details::load_local<wasm_f64>(typeref...[2u], off_g)};
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_f) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_e) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_d) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_c) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_b) + acc;
-        acc = conbine_details::load_local<wasm_f64>(typeref...[2u], off_a) + acc;
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_f), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_e), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_d), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_c), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_b), acc);
+        acc = numeric_details::eval_float_binop<numeric_details::float_binop::add>(conbine_details::load_local<wasm_f64>(typeref...[2u], off_a), acc);
 
         conbine_details::push_operand_byref<CompileOption>(acc, typeref...);
     }
@@ -1872,7 +1872,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least32_t>(x))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least32_t>(x))};
         conbine_details::push_operand<CompileOption, wasm_f32, curr_f32_stack_top>(out, type...);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -1906,7 +1906,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(typeref...[2u], local_off)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least32_t>(x))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least32_t>(x))};
         conbine_details::push_operand_byref<CompileOption>(out, typeref...);
     }
 
@@ -1931,7 +1931,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::uint_least32_t>(x))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::uint_least32_t>(x))};
         conbine_details::push_operand<CompileOption, wasm_f32, curr_f32_stack_top>(out, type...);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -1965,7 +1965,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(typeref...[2u], local_off)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::uint_least32_t>(x))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::uint_least32_t>(x))};
         conbine_details::push_operand_byref<CompileOption>(out, typeref...);
     }
 
@@ -1990,7 +1990,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least32_t>(x))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least32_t>(x))};
         conbine_details::push_operand<CompileOption, wasm_f64, curr_f64_stack_top>(out, type...);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2024,7 +2024,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(typeref...[2u], local_off)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least32_t>(x))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least32_t>(x))};
         conbine_details::push_operand_byref<CompileOption>(out, typeref...);
     }
 
@@ -2049,7 +2049,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(x))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(x))};
         conbine_details::push_operand<CompileOption, wasm_f64, curr_f64_stack_top>(out, type...);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2083,7 +2083,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(typeref...[2u], local_off)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(x))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(x))};
         conbine_details::push_operand_byref<CompileOption>(out, typeref...);
     }
 
@@ -3117,8 +3117,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 const add{conbine_details::read_imm<wasm_f32>(type...[0])};
 
         wasm_f32 const x{conbine_details::load_local<wasm_f32>(type...[2u], local_off)};
-        wasm_f32 const mul_out{x * mul};
-        wasm_f32 const out{mul_out + add};
+        wasm_f32 const mul_out{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x, mul)};
+        wasm_f32 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(mul_out, add)};
         conbine_details::store_local(type...[2u], local_off, out);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -3147,8 +3147,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 const add{conbine_details::read_imm<wasm_f32>(typeref...[0])};
 
         wasm_f32 const x{conbine_details::load_local<wasm_f32>(typeref...[2u], local_off)};
-        wasm_f32 const mul_out{x * mul};
-        wasm_f32 const out{mul_out + add};
+        wasm_f32 const mul_out{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x, mul)};
+        wasm_f32 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(mul_out, add)};
         conbine_details::store_local(typeref...[2u], local_off, out);
     }
 
@@ -3170,8 +3170,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(type...[0])};
 
         wasm_f64 const x{conbine_details::load_local<wasm_f64>(type...[2u], local_off)};
-        wasm_f64 const mul_out{x * mul};
-        wasm_f64 const out{mul_out + add};
+        wasm_f64 const mul_out{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x, mul)};
+        wasm_f64 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(mul_out, add)};
         conbine_details::store_local(type...[2u], local_off, out);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -3200,8 +3200,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(typeref...[0])};
 
         wasm_f64 const x{conbine_details::load_local<wasm_f64>(typeref...[2u], local_off)};
-        wasm_f64 const mul_out{x * mul};
-        wasm_f64 const out{mul_out + add};
+        wasm_f64 const mul_out{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x, mul)};
+        wasm_f64 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(mul_out, add)};
         conbine_details::store_local(typeref...[2u], local_off, out);
     }
 
@@ -4216,7 +4216,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const next_i{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step)};
         conbine_details::store_local(type...[2u], i_off, next_i);
 
-        wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
+        wasm_f64 const next_i_d{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
 
 #  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
@@ -4272,7 +4272,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const next_i{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step)};
         conbine_details::store_local(typeref...[2u], i_off, next_i);
 
-        wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
+        wasm_f64 const next_i_d{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
         if(!lt) { typeref...[0] = jmp_ip; }
     }

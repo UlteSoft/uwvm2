@@ -1,0 +1,308 @@
+/*************************************************************
+ * UlteSoft WebAssembly Virtual Machine (Version 2)          *
+ * Copyright (c) 2025-present UlteSoft. All rights reserved. *
+ * Licensed under the APL-2.0 License (see LICENSE file).    *
+ *************************************************************/
+
+#pragma once
+
+#include <bit>
+#include <cstdint>
+#include <type_traits>
+
+namespace uwvm2::runtime::compiler::shared::strict_float
+{
+    // A binary64 value evaluated in a 64-bit-significand x87/68881 register can double-round. SSE2 and native
+    // IEEE binary32/64 targets keep their existing instructions: this is a compile-time target property.
+#if (defined(__GNUC__) || defined(__clang__)) && \
+    (((defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC) && !defined(_SOFT_FLOAT) && \
+      (!defined(__SSE2_MATH__) || (defined(__FLT_EVAL_METHOD__) && __FLT_EVAL_METHOD__ != 0))) || \
+     (defined(__m68k__) && defined(__HAVE_68881__)))
+# define UWVM2_STRICT_FLOAT_EXTENDED 1
+#else
+# define UWVM2_STRICT_FLOAT_EXTENDED 0
+#endif
+    inline constexpr bool needs_extended_rounding{UWVM2_STRICT_FLOAT_EXTENDED != 0};
+
+    enum class operation { add, sub, mul, div, sqrt };
+    using u64 = ::std::uint64_t;
+    using u32 = ::std::uint32_t;
+
+    template <typename Float> using bits_t = ::std::conditional_t<sizeof(Float) == 4, u32, u64>;
+
+    struct extended_value
+    {
+        u64 significand;
+        unsigned sign_exponent;
+    };
+
+    [[nodiscard]] inline constexpr u64 round_shift_even(u64 value, unsigned shift) noexcept
+    {
+        if(shift > 64u) { return 0u; }
+        if(shift == 64u) { return value > (u64{1} << 63u); }
+        if(shift == 0u) { return value; }
+        u64 const truncated{value >> shift};
+        u64 const remainder{value & ((u64{1} << shift) - 1u)};
+        u64 const halfway{u64{1} << (shift - 1u)};
+        return truncated + (remainder > halfway || (remainder == halfway && (truncated & 1u) != 0u));
+    }
+
+    template <typename Float>
+    [[nodiscard]] inline constexpr bits_t<Float> round_extended(extended_value value) noexcept
+    {
+        static_assert(sizeof(Float) == 4 || sizeof(Float) == 8);
+        constexpr unsigned precision{sizeof(Float) == 4 ? 24u : 53u};
+        constexpr unsigned max_exponent{sizeof(Float) == 4 ? 255u : 2047u};
+        constexpr int bias{sizeof(Float) == 4 ? 127 : 1023};
+        u64 const sign{static_cast<u64>(value.sign_exponent >> 15u) << (sizeof(Float) * 8u - 1u)};
+        unsigned const exponent{value.sign_exponent & 0x7fffu};
+        if(exponent == 0x7fffu)
+        {
+            u64 const payload{(value.significand & ~(u64{1} << 63u)) == 0u ? 0u : u64{1} << (precision - 2u)};
+            return static_cast<bits_t<Float>>(sign | (static_cast<u64>(max_exponent) << (precision - 1u)) | payload);
+        }
+        if(value.significand == 0u) { return static_cast<bits_t<Float>>(sign); }
+        int result_exponent{static_cast<int>(exponent) - 16383 + bias};
+        if(result_exponent <= 0)
+        {
+            return static_cast<bits_t<Float>>(sign | round_shift_even(value.significand,
+                64u - precision + static_cast<unsigned>(1 - result_exponent)));
+        }
+        u64 significand{round_shift_even(value.significand, 64u - precision)};
+        if(significand == (u64{1} << precision)) { significand >>= 1u; ++result_exponent; }
+        if(result_exponent >= static_cast<int>(max_exponent))
+        { return static_cast<bits_t<Float>>(sign | (static_cast<u64>(max_exponent) << (precision - 1u))); }
+        return static_cast<bits_t<Float>>(sign | (static_cast<u64>(result_exponent) << (precision - 1u)) |
+                                          (significand & ((u64{1} << (precision - 1u)) - 1u)));
+    }
+
+    // Round the extended operation toward zero, then jam its inexact bit into the significand's low bit.
+    // Round-to-odd followed by RN-even gives one correctly rounded binary32/64 result, including subnormals.
+    // All finite binary32/64 add/mul/div/sqrt results fit the extended exponent range, so no earlier underflow
+    // loses this sticky information. FP controls are restored before returning; Wasm exception flags are unobservable.
+    // See Boldo/Melquiond, "When double rounding is odd". No long-double C++ layout or ambient precision assumption.
+    template <operation Op, typename Float>
+    [[nodiscard]] inline extended_value evaluate_extended(Float lhs, Float rhs = {}) noexcept
+    {
+#if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
+        struct raw_extended { unsigned char bytes[10]; } raw;
+        unsigned short saved_control, status;
+        unsigned short const truncate_extended{0x0f7fu};
+# define UWVM2_STRICT_X87(Load, Opcode) \
+        __asm__ volatile("fnstcw %[saved]\n\tfnclex\n\tfldcw %[control]\n\t" Load " %[left]\n\t" Opcode \
+                         "\n\tfstpt %[result]\n\tfnstsw %[status]\n\tfnclex\n\tfldcw %[saved]" \
+                         : [saved] "=&m"(saved_control), [result] "=m"(raw), [status] "=&a"(status) \
+                         : [control] "m"(truncate_extended), [left] "m"(lhs), [right] "m"(rhs) : "st", "memory")
+        if constexpr(sizeof(Float) == 4)
+        {
+            if constexpr(Op == operation::add) { UWVM2_STRICT_X87("flds", "fadds %[right]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_STRICT_X87("flds", "fsubs %[right]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_STRICT_X87("flds", "fmuls %[right]"); }
+            else if constexpr(Op == operation::div) { UWVM2_STRICT_X87("flds", "fdivs %[right]"); }
+            else { UWVM2_STRICT_X87("flds", "fsqrt"); }
+        }
+        else
+        {
+            if constexpr(Op == operation::add) { UWVM2_STRICT_X87("fldl", "faddl %[right]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_STRICT_X87("fldl", "fsubl %[right]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_STRICT_X87("fldl", "fmull %[right]"); }
+            else if constexpr(Op == operation::div) { UWVM2_STRICT_X87("fldl", "fdivl %[right]"); }
+            else { UWVM2_STRICT_X87("fldl", "fsqrt"); }
+        }
+# undef UWVM2_STRICT_X87
+        u64 significand{};
+        for(unsigned i{}; i != 8u; ++i) { significand |= static_cast<u64>(raw.bytes[i]) << (i * 8u); }
+        unsigned const sign_exponent{static_cast<unsigned>(raw.bytes[8]) | (static_cast<unsigned>(raw.bytes[9]) << 8u)};
+        return {significand | ((status & 0x20u) != 0u), sign_exponent};
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(__m68k__) && defined(__HAVE_68881__)
+        struct raw_extended { unsigned char bytes[12]; } raw;
+        unsigned saved_control, status;
+        unsigned const truncate_extended{0x10u};
+        unsigned const clear_status{};
+# define UWVM2_STRICT_M68K(Load, Opcode) \
+        __asm__ volatile("fmove.l %%fpcr,%[saved]\n\tfmove.l %[control],%%fpcr\n\tfmove.l %[clear],%%fpsr\n\t" \
+                         Load " %[left],%%fp0\n\t" Opcode "\n\tfmove.x %%fp0,%[result]\n\tfmove.l %%fpsr,%[status]" \
+                         "\n\tfmove.l %[clear],%%fpsr\n\tfmove.l %[saved],%%fpcr" \
+                         : [saved] "=&dm"(saved_control), [result] "=m"(raw), [status] "=&dm"(status) \
+                         : [control] "dm"(truncate_extended), [clear] "dm"(clear_status), [left] "m"(lhs), [right] "m"(rhs) \
+                         : "fp0", "cc", "memory")
+        if constexpr(sizeof(Float) == 4)
+        {
+            if constexpr(Op == operation::add) { UWVM2_STRICT_M68K("fmove.s", "fadd.s %[right],%%fp0"); }
+            else if constexpr(Op == operation::sub) { UWVM2_STRICT_M68K("fmove.s", "fsub.s %[right],%%fp0"); }
+            else if constexpr(Op == operation::mul) { UWVM2_STRICT_M68K("fmove.s", "fmul.s %[right],%%fp0"); }
+            else if constexpr(Op == operation::div) { UWVM2_STRICT_M68K("fmove.s", "fdiv.s %[right],%%fp0"); }
+            else { UWVM2_STRICT_M68K("fmove.s", "fsqrt.x %%fp0,%%fp0"); }
+        }
+        else
+        {
+            if constexpr(Op == operation::add) { UWVM2_STRICT_M68K("fmove.d", "fadd.d %[right],%%fp0"); }
+            else if constexpr(Op == operation::sub) { UWVM2_STRICT_M68K("fmove.d", "fsub.d %[right],%%fp0"); }
+            else if constexpr(Op == operation::mul) { UWVM2_STRICT_M68K("fmove.d", "fmul.d %[right],%%fp0"); }
+            else if constexpr(Op == operation::div) { UWVM2_STRICT_M68K("fmove.d", "fdiv.d %[right],%%fp0"); }
+            else { UWVM2_STRICT_M68K("fmove.d", "fsqrt.x %%fp0,%%fp0"); }
+        }
+# undef UWVM2_STRICT_M68K
+        u64 significand{};
+        for(unsigned i{4u}; i != 12u; ++i) { significand = (significand << 8u) | raw.bytes[i]; }
+        unsigned const sign_exponent{(static_cast<unsigned>(raw.bytes[0]) << 8u) | raw.bytes[1]};
+        return {significand | ((status & 8u) != 0u), sign_exponent};
+#else
+        static_assert(sizeof(Float) == 0, "extended arithmetic is only instantiated on supported x87/68881 targets");
+        return {};
+#endif
+    }
+
+    // Keep the uncommon control switch and integer packer out of every interpreter opfunc.
+    template <operation Op, typename Float>
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((__noinline__))
+#endif
+    [[nodiscard]] inline Float slow_operation(Float lhs, Float rhs = {}) noexcept
+    { return ::std::bit_cast<Float>(round_extended<Float>(evaluate_extended<Op>(lhs, rhs))); }
+
+    // RN extended results can only double-round to binary64 when the intermediate is exactly a
+    // binary64 midpoint (or in the destination subnormal range). Check that rare case before using
+    // the stored hardware result. Binary32 has enough guard precision with either PC=53 or PC=64
+    // for these binary32-input operations. Stores are explicit: C++ excess-precision temporaries
+    // must not leak into the next Wasm instruction. A cheap control read also protects header-only
+    // users and platforms whose FE_DFL_ENV selects a narrower precision.
+    // The explicit fixed-environment contract may elide that read: it promises RN, masked exceptions,
+    // and PC=53/64 on these targets. It never elides the binary64 midpoint/subnormal correctness test.
+    // As with any FP API, operands must arrive intact: m68k FMOVE itself obeys FPCR precision.
+    // The production byte-ABI entry establishes the Wasm environment before loading FP operands.
+    template <operation Op, typename Float>
+    [[nodiscard]] inline bool try_nearest_fast(Float const& lhs, Float const& rhs, Float& result) noexcept
+    {
+#if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
+# if !defined(UWVM_ASSUME_FIXED_WASM_FP_ENVIRONMENT)
+        unsigned short control;
+        __asm__ volatile("fnstcw %0" : "=m"(control) : : "memory");
+        if((control & 0x0c3fu) != 0x003fu) { return false; }
+        unsigned const precision{control & 0x0300u};
+        if(precision != 0x0300u && precision != 0x0200u) { return false; }
+# endif
+        struct raw_extended { unsigned char bytes[10]; } raw;
+# define UWVM2_NEAREST_X87(Load, Opcode, Store) \
+        __asm__ volatile(Load " %[left]\n\t" Opcode "\n\t" Store \
+                         : [result] "=m"(result), [extended] "=m"(raw) \
+                         : [left] "m"(lhs), [right] "m"(rhs) : "st", "memory")
+        if constexpr(sizeof(Float) == 4)
+        {
+            if constexpr(Op == operation::add) { UWVM2_NEAREST_X87("flds", "fadds %[right]", "fstps %[result]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_NEAREST_X87("flds", "fsubs %[right]", "fstps %[result]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_NEAREST_X87("flds", "fmuls %[right]", "fstps %[result]"); }
+            else if constexpr(Op == operation::div) { UWVM2_NEAREST_X87("flds", "fdivs %[right]", "fstps %[result]"); }
+            else { UWVM2_NEAREST_X87("flds", "fsqrt", "fstps %[result]"); }
+            return true;
+        }
+        else
+        {
+            if constexpr(Op == operation::add) { UWVM2_NEAREST_X87("fldl", "faddl %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_NEAREST_X87("fldl", "fsubl %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_NEAREST_X87("fldl", "fmull %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
+            else if constexpr(Op == operation::div) { UWVM2_NEAREST_X87("fldl", "fdivl %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
+            else { UWVM2_NEAREST_X87("fldl", "fsqrt", "fstl %[result]\n\tfstpt %[extended]"); }
+            unsigned const exponent{(static_cast<unsigned>(raw.bytes[8]) | (static_cast<unsigned>(raw.bytes[9]) << 8u)) & 0x7fffu};
+            unsigned const low{(static_cast<unsigned>(raw.bytes[0]) | (static_cast<unsigned>(raw.bytes[1]) << 8u)) & 2047u};
+            // The finite operands cannot underflow extended precision; exponent zero therefore means exact zero.
+            return exponent == 0u || (exponent >= 15361u && exponent < 17407u && low != 1024u);
+        }
+# undef UWVM2_NEAREST_X87
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(__m68k__) && defined(__HAVE_68881__)
+# if !defined(UWVM_ASSUME_FIXED_WASM_FP_ENVIRONMENT)
+        unsigned control;
+        __asm__ volatile("fmove.l %%fpcr,%0" : "=dm"(control) : : "memory");
+        if((control & 0xff30u) != 0u) { return false; }
+        unsigned const precision{control & 0xc0u};
+        if(precision != 0u && precision != 0x80u) { return false; }
+# endif
+        struct raw_extended { unsigned char bytes[12]; } raw;
+# define UWVM2_NEAREST_M68K(Load, Opcode, Store) \
+        __asm__ volatile(Load " %[left],%%fp0\n\t" Opcode "\n\t" Store \
+                         : [result] "=m"(result), [extended] "=m"(raw) \
+                         : [left] "m"(lhs), [right] "m"(rhs) : "fp0", "cc", "memory")
+        if constexpr(sizeof(Float) == 4)
+        {
+            if constexpr(Op == operation::add) { UWVM2_NEAREST_M68K("fmove.s", "fadd.s %[right],%%fp0", "fmove.s %%fp0,%[result]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_NEAREST_M68K("fmove.s", "fsub.s %[right],%%fp0", "fmove.s %%fp0,%[result]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_NEAREST_M68K("fmove.s", "fmul.s %[right],%%fp0", "fmove.s %%fp0,%[result]"); }
+            else if constexpr(Op == operation::div) { UWVM2_NEAREST_M68K("fmove.s", "fdiv.s %[right],%%fp0", "fmove.s %%fp0,%[result]"); }
+            else { UWVM2_NEAREST_M68K("fmove.s", "fsqrt.x %%fp0,%%fp0", "fmove.s %%fp0,%[result]"); }
+            return true;
+        }
+        else
+        {
+            if constexpr(Op == operation::add) { UWVM2_NEAREST_M68K("fmove.d", "fadd.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
+            else if constexpr(Op == operation::sub) { UWVM2_NEAREST_M68K("fmove.d", "fsub.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
+            else if constexpr(Op == operation::mul) { UWVM2_NEAREST_M68K("fmove.d", "fmul.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
+            else if constexpr(Op == operation::div) { UWVM2_NEAREST_M68K("fmove.d", "fdiv.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
+            else { UWVM2_NEAREST_M68K("fmove.d", "fsqrt.x %%fp0,%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
+            unsigned const exponent{((static_cast<unsigned>(raw.bytes[0]) << 8u) | raw.bytes[1]) & 0x7fffu};
+            unsigned const low{((static_cast<unsigned>(raw.bytes[10]) << 8u) | raw.bytes[11]) & 2047u};
+            return exponent == 0u || (exponent >= 15361u && exponent < 17407u && low != 1024u);
+        }
+# undef UWVM2_NEAREST_M68K
+#else
+        static_cast<void>(lhs); static_cast<void>(rhs); static_cast<void>(result);
+        return false;
+#endif
+    }
+
+    template <operation Op, typename Float>
+    [[nodiscard]] inline constexpr Float binary(Float lhs, Float rhs) noexcept
+    {
+        if constexpr(needs_extended_rounding)
+        {
+            if(!::std::is_constant_evaluated())
+            {
+                Float result;
+                if(try_nearest_fast<Op>(lhs, rhs, result)) { return result; }
+                return slow_operation<Op>(lhs, rhs);
+            }
+        }
+        if constexpr(Op == operation::add) { return lhs + rhs; }
+        else if constexpr(Op == operation::sub) { return lhs - rhs; }
+        else if constexpr(Op == operation::mul) { return lhs * rhs; }
+        else { return lhs / rhs; }
+    }
+
+    template <typename Float>
+    [[nodiscard]] inline Float square_root(Float value) noexcept
+    {
+        Float result;
+        if(try_nearest_fast<operation::sqrt>(value, Float{}, result)) { return result; }
+        return slow_operation<operation::sqrt>(value);
+    }
+
+    template <typename Out, typename In>
+    [[nodiscard]] inline constexpr Out convert(In value) noexcept
+    {
+        if constexpr(needs_extended_rounding)
+        {
+            if constexpr(::std::is_integral_v<In>)
+            {
+                bool const negative{::std::is_signed_v<In> && value < 0};
+                u64 const magnitude{negative ? u64{} - static_cast<u64>(value) : static_cast<u64>(value)};
+                if(magnitude == 0u) { return Out{}; }
+                unsigned const leading{static_cast<unsigned>(::std::countl_zero(magnitude))};
+                return ::std::bit_cast<Out>(round_extended<Out>({magnitude << leading,
+                    (negative ? 0x8000u : 0u) | (16383u + 63u - leading)}));
+            }
+            else if constexpr(sizeof(In) == 8 && sizeof(Out) == 4)
+            {
+                u64 const bits{::std::bit_cast<u64>(value)};
+                unsigned const exponent{static_cast<unsigned>((bits >> 52u) & 2047u)};
+                u64 const fraction{bits & ((u64{1} << 52u) - 1u)};
+                unsigned const sign{static_cast<unsigned>(bits >> 63u) << 15u};
+                if(exponent == 2047u)
+                { return ::std::bit_cast<Out>(round_extended<Out>({(u64{1} << 63u) | (fraction << 11u), sign | 0x7fffu})); }
+                // Every binary64 subnormal is below half the smallest binary32 subnormal.
+                if(exponent == 0u) { return ::std::bit_cast<Out>(static_cast<u32>(sign) << 16u); }
+                return ::std::bit_cast<Out>(round_extended<Out>({((u64{1} << 52u) | fraction) << 11u,
+                    sign | (exponent + 16383u - 1023u)}));
+            }
+        }
+        return static_cast<Out>(value);
+    }
+}

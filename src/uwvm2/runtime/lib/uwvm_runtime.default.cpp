@@ -74,6 +74,7 @@
 # include "uwvm_runtime_wasm_fp_environment.h"
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include "uwvm_runtime_call_indirect_table_views.h"
+#  include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 #  include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 #  include "uwvm_runtime_native_unwind_execution_gate.h"
 # endif
@@ -6337,6 +6338,7 @@ namespace uwvm2::runtime::lib
                                                                              bool legacy_light_preoptimized) noexcept
         {
             // Verify before/after optimization and run the selected full-module pipeline.
+            ::uwvm2::runtime::compiler::shared::strict_float_jit::lower(module);
             if(verify_llvm_jit_ir)
             {
                 if(::llvm::verifyModule(module)) [[unlikely]]
@@ -6414,6 +6416,7 @@ namespace uwvm2::runtime::lib
         {
             // Full-module LLVM materialization consumes emitted IR, optionally optimizes/splits it, creates an MCJIT engine, then
             // publishes typed/raw entry addresses into the runtime record.
+            ::uwvm2::runtime::compiler::shared::strict_float_jit::register_symbols();
             if(extra_materialize_threads == ::std::numeric_limits<::std::size_t>::max())
             {
                 extra_materialize_threads = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved;
