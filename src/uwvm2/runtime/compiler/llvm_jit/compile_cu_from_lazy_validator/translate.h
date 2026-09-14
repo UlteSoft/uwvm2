@@ -41,6 +41,7 @@
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Analysis/TargetTransformInfo.h>
+#  include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -1506,6 +1507,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                           ::llvm::CodeGenOptLevel codegen_opt_level,
                                                                           bool verify_llvm_jit_ir) noexcept
         {
+            ::uwvm2::runtime::compiler::shared::strict_float_jit::lower(module);
             if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }

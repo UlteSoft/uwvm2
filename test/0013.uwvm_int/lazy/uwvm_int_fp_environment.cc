@@ -30,7 +30,7 @@ namespace
     template <typename Float>
     struct hostile_global
     {
-        inline static constexpr ::uwvm2::utils::container::u8string_view global_name{::std::same_as<Float, float> ? u8"f32" : u8"f64"};
+        inline static constexpr ::uwvm2::utils::container::u8string_view global_name{sizeof(Float) == 4u ? u8"f32" : u8"f64"};
         inline static constexpr bool is_mutable{true};
         using value_type = Float;
         Float value{};
@@ -51,9 +51,13 @@ namespace
     {
         ::uwvm2::utils::container::u8string_view module_name{u8"fp-host"};
         using local_function_tuple = ::uwvm2::utils::container::tuple<hostile_function>;
-        using local_global_tuple = ::uwvm2::utils::container::tuple<hostile_global<float>, hostile_global<double>>;
+        // GCC's precise Wasm carriers may be distinct _Float32/_Float64 types, not float/double.
+        using local_global_tuple = ::uwvm2::utils::container::tuple<
+            hostile_global<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>,
+            hostile_global<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>>;
         local_global_tuple local_global{};
     };
+    static_assert(type::has_local_global_tuple<provider_module>);
 
     enum class boundary : unsigned { entry, global_get, global_set, function_call };
 
@@ -148,12 +152,47 @@ namespace
                 else
                 {
                     ok = check_entry(index + 1u, multiply ? ::std::numeric_limits<double>::min() : 1.0,
-                                     multiply ? 0.5 : ::std::bit_cast<double>(::std::uint64_t{0x3ca0000000000000ull}),
-                                     ::std::uint64_t{multiply ? 0x0008000000000000ull : 0x3ff0000000000000ull}, lazy);
+                                     multiply ? 0.5 : ::std::bit_cast<double>(::std::uint64_t{0x3ca0000000000001ull}),
+                                     ::std::uint64_t{multiply ? 0x0008000000000000ull : 0x3ff0000000000001ull}, lazy);
                 }
                 if(!ok || !fp::unchanged(host) || ::std::fetestexcept(FE_ALL_EXCEPT) != host_exceptions) { return 5; }
             }
         }
+#if ((defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC) && !defined(_SOFT_FLOAT)) || \
+    (defined(__m68k__) && defined(__HAVE_68881__))
+        // Build byte-ABI inputs using integers: on m68k a hostile PC=24 also rounds FMOVE into FP registers,
+        // so a C++ double argument could lose bits before the runtime even gets control.
+        ::std::uint64_t const raw_parameters[]{0x3ff0000000000000ull, 0x3ca0000000000001ull};
+        ::std::uint64_t raw_result{};
+        if(::std::fesetenv(FE_DFL_ENV) != 0) { return 7; }
+# if defined(__m68k__)
+        unsigned const narrow_control{0x40u};
+        unsigned restored_control{};
+        unsigned original_control{};
+        __asm__ volatile("fmove.l %%fpcr,%0" : "=dm"(original_control) : : "memory");
+        __asm__ volatile("fmove.l %0,%%fpcr" : : "dm"(narrow_control) : "memory");
+# else
+        unsigned short const narrow_control{0x007fu};
+        unsigned short restored_control{};
+        __asm__ volatile("fnclex; fldcw %0" : : "m"(narrow_control) : "memory");
+# endif
+        runtime::entry_function_abi_buffers narrow_buffers{reinterpret_cast<::std::byte const*>(raw_parameters), sizeof(raw_parameters),
+            reinterpret_cast<::std::byte*>(&raw_result), sizeof(raw_result)};
+        if(lazy) { runtime::lazy_compile_and_run_main_module(u8"fp-main", {9u, narrow_buffers, false}); }
+        else { runtime::full_compile_and_run_main_module(u8"fp-main", {9u, narrow_buffers}); }
+# if defined(__m68k__)
+        __asm__ volatile("fmove.l %%fpcr,%0" : "=dm"(restored_control) : : "memory");
+# else
+        __asm__ volatile("fnstcw %0" : "=m"(restored_control) : : "memory");
+# endif
+        auto const restore_status{::std::fesetenv(FE_DFL_ENV)};
+# if defined(__m68k__)
+        // Restore the test's precision explicitly too: libc's multi-CSR transfer under QEMU can leave PC=24
+        // active, corrupting C++ input preparation for the NEXT suite before its byte-ABI entry is called.
+        __asm__ volatile("fmove.l %0,%%fpcr" : : "dm"(original_control) : "memory");
+# endif
+        if(restore_status != 0 || restored_control != narrow_control || raw_result != 0x3ff0000000000001ull) { return 8; }
+#endif
         return callback_count == 24uz && callback_controls_valid ? 0 : 6;
     }
 }

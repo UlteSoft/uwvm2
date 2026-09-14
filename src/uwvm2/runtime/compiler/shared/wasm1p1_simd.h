@@ -32,6 +32,7 @@
 # include <limits>
 # include <memory>
 # include <type_traits>
+# include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import
@@ -490,7 +491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else if constexpr(Op == v128_binop::f32x4_add || Op == v128_binop::f32x4_sub || Op == v128_binop::f32x4_mul || Op == v128_binop::f32x4_eq)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto const l{v128_to_vec<v128_f32x4>(lhs)};
                 auto const r{v128_to_vec<v128_f32x4>(rhs)};
                 if constexpr(Op == v128_binop::f32x4_add) { return vec_to_v128(l + r); }
@@ -506,9 +507,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 auto const r{load_f32x4_lanes(rhs)};
                 for(::std::size_t i{}; i != 4uz; ++i)
                 {
-                    if constexpr(Op == v128_binop::f32x4_add) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] + r.lane[i]); }
-                    else if constexpr(Op == v128_binop::f32x4_sub) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] - r.lane[i]); }
-                    else if constexpr(Op == v128_binop::f32x4_mul) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] * r.lane[i]); }
+                    if constexpr(Op == v128_binop::f32x4_add) { l.lane[i] = strict_float::binary<strict_float::operation::add>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == v128_binop::f32x4_sub) { l.lane[i] = strict_float::binary<strict_float::operation::sub>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == v128_binop::f32x4_mul) { l.lane[i] = strict_float::binary<strict_float::operation::mul>(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == v128_binop::f32x4_eq)
                     {
                         lane_array<wasm_u32, 4uz> out{};  // init
@@ -535,7 +536,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             if constexpr(Op == v128_unop::not_) { return v128_bitwise_not(v); }
             else if constexpr(Op == v128_unop::f32x4_convert_i32x4_s || Op == v128_unop::f32x4_convert_i32x4_u)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_convertvector)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_convertvector) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto const lanes{v128_to_vec<v128_u32x4>(v)};
                 if constexpr(Op == v128_unop::f32x4_convert_i32x4_s)
                 {
@@ -551,8 +552,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 lane_array<wasm_f32, 4uz> out{};  // init
                 for(::std::size_t i{}; i != 4uz; ++i)
                 {
-                    if constexpr(Op == v128_unop::f32x4_convert_i32x4_s) { out.lane[i] = static_cast<wasm_f32>(::std::bit_cast<wasm_i32>(lanes.lane[i])); }
-                    else if constexpr(Op == v128_unop::f32x4_convert_i32x4_u) { out.lane[i] = static_cast<wasm_f32>(lanes.lane[i]); }
+                    if constexpr(Op == v128_unop::f32x4_convert_i32x4_s) { out.lane[i] = strict_float::convert<wasm_f32>(::std::bit_cast<wasm_i32>(lanes.lane[i])); }
+                    else if constexpr(Op == v128_unop::f32x4_convert_i32x4_u) { out.lane[i] = strict_float::convert<wasm_f32>(lanes.lane[i]); }
                     else
                     {
                         static_assert(dependent_false_v<Op>, "unhandled v128 unop");
@@ -1171,7 +1172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         {
             if constexpr(Op == simd_code::f32x4_extract_lane)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 return v128_to_vec<v128_f32x4>(v)[lane];
 # else
                 return load_f32x4_lanes(v).lane[lane];
@@ -1188,7 +1189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         {
             if constexpr(Op == simd_code::f64x2_extract_lane)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 return v128_to_vec<v128_f64x2>(v)[lane];
 # else
                 return load_f64x2_lanes(v).lane[lane];
@@ -1279,7 +1280,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         {
             if constexpr(Op == simd_code::f32x4_replace_lane)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto out{v128_to_vec<v128_f32x4>(v)};
                 out[lane] = x;
                 return vec_to_v128(out);
@@ -1300,7 +1301,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         {
             if constexpr(Op == simd_code::f64x2_replace_lane)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto out{v128_to_vec<v128_f64x2>(v)};
                 out[lane] = x;
                 return vec_to_v128(out);
@@ -1705,7 +1706,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                               Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc || Op == simd_code::f32x4_nearest ||
                               Op == simd_code::f32x4_convert_i32x4_s || Op == simd_code::f32x4_convert_i32x4_u || Op == simd_code::f32x4_demote_f64x2_zero)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f32x4_abs) { return vec_to_v128(v128_to_vec<v128_u32x4>(v) & vec_splat<v128_u32x4>(u32{0x7fffffffu})); }
                 else if constexpr(Op == simd_code::f32x4_neg) { return vec_to_v128(v128_to_vec<v128_u32x4>(v) ^ vec_splat<v128_u32x4>(u32{0x80000000u})); }
 #  if UWVM_HAS_BUILTIN(__builtin_convertvector)
@@ -1745,8 +1746,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     auto const in{load_uint_lanes<u32, 4uz>(v)};
                     for(::std::size_t i{}; i != 4uz; ++i)
                     {
-                        if constexpr(Op == simd_code::f32x4_convert_i32x4_s) { out.lane[i] = static_cast<wasm_f32>(as_signed_lane<u32>(in.lane[i])); }
-                        else if constexpr(Op == simd_code::f32x4_convert_i32x4_u) { out.lane[i] = static_cast<wasm_f32>(in.lane[i]); }
+                        if constexpr(Op == simd_code::f32x4_convert_i32x4_s) { out.lane[i] = strict_float::convert<wasm_f32>(as_signed_lane<u32>(in.lane[i])); }
+                        else if constexpr(Op == simd_code::f32x4_convert_i32x4_u) { out.lane[i] = strict_float::convert<wasm_f32>(in.lane[i]); }
                         else
                         {
                             static_assert(dependent_false_v<Op>, "unhandled f32x4 convert opcode");
@@ -1756,8 +1757,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f32x4_demote_f64x2_zero)
                 {
                     auto const in{load_f64x2_lanes(v)};
-                    out.lane[0] = static_cast<wasm_f32>(in.lane[0]);
-                    out.lane[1] = static_cast<wasm_f32>(in.lane[1]);
+                    out.lane[0] = strict_float::convert<wasm_f32>(in.lane[0]);
+                    out.lane[1] = strict_float::convert<wasm_f32>(in.lane[1]);
                 }
                 else if constexpr(Op == simd_code::f32x4_abs || Op == simd_code::f32x4_neg || Op == simd_code::f32x4_sqrt || Op == simd_code::f32x4_ceil ||
                                   Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc || Op == simd_code::f32x4_nearest)
@@ -1767,7 +1768,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     {
                         if constexpr(Op == simd_code::f32x4_abs) { out.lane[i] = ::std::fabs(in.lane[i]); }
                         else if constexpr(Op == simd_code::f32x4_neg) { out.lane[i] = -in.lane[i]; }
-                        else if constexpr(Op == simd_code::f32x4_sqrt) { out.lane[i] = ::std::sqrt(in.lane[i]); }
+                        else if constexpr(Op == simd_code::f32x4_sqrt)
+                        {
+                            if constexpr(strict_float::needs_extended_rounding) { out.lane[i] = strict_float::square_root(in.lane[i]); }
+                            else { out.lane[i] = ::std::sqrt(in.lane[i]); }
+                        }
                         else if constexpr(Op == simd_code::f32x4_ceil) { out.lane[i] = ::std::ceil(in.lane[i]); }
                         else if constexpr(Op == simd_code::f32x4_floor) { out.lane[i] = ::std::floor(in.lane[i]); }
                         else if constexpr(Op == simd_code::f32x4_trunc) { out.lane[i] = ::std::trunc(in.lane[i]); }
@@ -1789,7 +1794,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                               Op == simd_code::f64x2_promote_low_f32x4 || Op == simd_code::f64x2_convert_low_i32x4_s ||
                               Op == simd_code::f64x2_convert_low_i32x4_u)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f64x2_abs) { return vec_to_v128(v128_to_vec<v128_u64x2>(v) & vec_splat<v128_u64x2>(u64{0x7fffffffffffffffull})); }
                 else if constexpr(Op == simd_code::f64x2_neg)
                 {
@@ -1820,16 +1825,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 if constexpr(Op == simd_code::f64x2_promote_low_f32x4)
                 {
                     auto const in{load_f32x4_lanes(v)};
-                    out.lane[0] = static_cast<wasm_f64>(in.lane[0]);
-                    out.lane[1] = static_cast<wasm_f64>(in.lane[1]);
+                    out.lane[0] = strict_float::convert<wasm_f64>(in.lane[0]);
+                    out.lane[1] = strict_float::convert<wasm_f64>(in.lane[1]);
                 }
                 else if constexpr(Op == simd_code::f64x2_convert_low_i32x4_s || Op == simd_code::f64x2_convert_low_i32x4_u)
                 {
                     auto const in{load_uint_lanes<u32, 4uz>(v)};
                     for(::std::size_t i{}; i != 2uz; ++i)
                     {
-                        if constexpr(Op == simd_code::f64x2_convert_low_i32x4_s) { out.lane[i] = static_cast<wasm_f64>(as_signed_lane<u32>(in.lane[i])); }
-                        else if constexpr(Op == simd_code::f64x2_convert_low_i32x4_u) { out.lane[i] = static_cast<wasm_f64>(in.lane[i]); }
+                        if constexpr(Op == simd_code::f64x2_convert_low_i32x4_s) { out.lane[i] = strict_float::convert<wasm_f64>(as_signed_lane<u32>(in.lane[i])); }
+                        else if constexpr(Op == simd_code::f64x2_convert_low_i32x4_u) { out.lane[i] = strict_float::convert<wasm_f64>(in.lane[i]); }
                         else
                         {
                             static_assert(dependent_false_v<Op>, "unhandled f64x2 convert opcode");
@@ -1844,7 +1849,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     {
                         if constexpr(Op == simd_code::f64x2_abs) { out.lane[i] = ::std::fabs(in.lane[i]); }
                         else if constexpr(Op == simd_code::f64x2_neg) { out.lane[i] = -in.lane[i]; }
-                        else if constexpr(Op == simd_code::f64x2_sqrt) { out.lane[i] = ::std::sqrt(in.lane[i]); }
+                        else if constexpr(Op == simd_code::f64x2_sqrt)
+                        {
+                            if constexpr(strict_float::needs_extended_rounding) { out.lane[i] = strict_float::square_root(in.lane[i]); }
+                            else { out.lane[i] = ::std::sqrt(in.lane[i]); }
+                        }
                         else if constexpr(Op == simd_code::f64x2_ceil) { out.lane[i] = ::std::ceil(in.lane[i]); }
                         else if constexpr(Op == simd_code::f64x2_floor) { out.lane[i] = ::std::floor(in.lane[i]); }
                         else if constexpr(Op == simd_code::f64x2_trunc) { out.lane[i] = ::std::trunc(in.lane[i]); }
@@ -1998,7 +2007,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT, typename MaskU, ::std::size_t N, simd_code Op>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_float_compare(wasm_v128 lhs, wasm_v128 rhs) noexcept
         {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
             if constexpr(::std::same_as<FloatT, wasm_f32> && N == 4uz)
             {
                 auto const l{v128_to_vec<v128_f32x4>(lhs)};
@@ -2410,7 +2419,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             else if constexpr(Op == simd_code::f32x4_add || Op == simd_code::f32x4_sub || Op == simd_code::f32x4_mul || Op == simd_code::f32x4_div ||
                               Op == simd_code::f32x4_min || Op == simd_code::f32x4_max || Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f32x4_add || Op == simd_code::f32x4_sub || Op == simd_code::f32x4_mul || Op == simd_code::f32x4_div ||
                              Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
                 {
@@ -2441,10 +2450,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 auto const r{load_f32x4_lanes(rhs)};
                 for(::std::size_t i{}; i != 4uz; ++i)
                 {
-                    if constexpr(Op == simd_code::f32x4_add) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] + r.lane[i]); }
-                    else if constexpr(Op == simd_code::f32x4_sub) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] - r.lane[i]); }
-                    else if constexpr(Op == simd_code::f32x4_mul) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] * r.lane[i]); }
-                    else if constexpr(Op == simd_code::f32x4_div) { l.lane[i] = static_cast<wasm_f32>(l.lane[i] / r.lane[i]); }
+                    if constexpr(Op == simd_code::f32x4_add) { l.lane[i] = strict_float::binary<strict_float::operation::add>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f32x4_sub) { l.lane[i] = strict_float::binary<strict_float::operation::sub>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f32x4_mul) { l.lane[i] = strict_float::binary<strict_float::operation::mul>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f32x4_div) { l.lane[i] = strict_float::binary<strict_float::operation::div>(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f32x4_min) { l.lane[i] = wasm_float_min(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f32x4_max) { l.lane[i] = wasm_float_max(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f32x4_pmin) { l.lane[i] = wasm_float_pmin(l.lane[i], r.lane[i]); }
@@ -2459,7 +2468,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             else if constexpr(Op == simd_code::f64x2_add || Op == simd_code::f64x2_sub || Op == simd_code::f64x2_mul || Op == simd_code::f64x2_div ||
                               Op == simd_code::f64x2_min || Op == simd_code::f64x2_max || Op == simd_code::f64x2_pmin || Op == simd_code::f64x2_pmax)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f64x2_add || Op == simd_code::f64x2_sub || Op == simd_code::f64x2_mul || Op == simd_code::f64x2_div ||
                              Op == simd_code::f64x2_pmin || Op == simd_code::f64x2_pmax)
                 {
@@ -2490,10 +2499,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 auto const r{load_f64x2_lanes(rhs)};
                 for(::std::size_t i{}; i != 2uz; ++i)
                 {
-                    if constexpr(Op == simd_code::f64x2_add) { l.lane[i] = static_cast<wasm_f64>(l.lane[i] + r.lane[i]); }
-                    else if constexpr(Op == simd_code::f64x2_sub) { l.lane[i] = static_cast<wasm_f64>(l.lane[i] - r.lane[i]); }
-                    else if constexpr(Op == simd_code::f64x2_mul) { l.lane[i] = static_cast<wasm_f64>(l.lane[i] * r.lane[i]); }
-                    else if constexpr(Op == simd_code::f64x2_div) { l.lane[i] = static_cast<wasm_f64>(l.lane[i] / r.lane[i]); }
+                    if constexpr(Op == simd_code::f64x2_add) { l.lane[i] = strict_float::binary<strict_float::operation::add>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f64x2_sub) { l.lane[i] = strict_float::binary<strict_float::operation::sub>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f64x2_mul) { l.lane[i] = strict_float::binary<strict_float::operation::mul>(l.lane[i], r.lane[i]); }
+                    else if constexpr(Op == simd_code::f64x2_div) { l.lane[i] = strict_float::binary<strict_float::operation::div>(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f64x2_min) { l.lane[i] = wasm_float_min(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f64x2_max) { l.lane[i] = wasm_float_max(l.lane[i], r.lane[i]); }
                     else if constexpr(Op == simd_code::f64x2_pmin) { l.lane[i] = wasm_float_pmin(l.lane[i], r.lane[i]); }

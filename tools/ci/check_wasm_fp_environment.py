@@ -18,7 +18,7 @@ output = args.build_dir or Path(tempfile.mkdtemp(prefix='uwvm-fp-'))
 output.mkdir(parents=True, exist_ok=True)
 results = []
 for name in ('llvm_wasm_fp_environment', 'wasm_fp_control', 'wasm_fp_arch_environment',
-             'wasm_fp_fixed_contract', 'wasm_fp_ppc_generic'):
+             'wasm_fp_fixed_contract', 'wasm_fp_ppc_generic', 'strict_float'):
     binary = output.resolve() / name
     command = [args.cxx, '-std=c++20', '-O3', '-Wall', '-Wextra', *args.cxxflag,
                '-I', str(args.source_root / 'src'), str(args.source_root / 'test/0017.runtime' / (name + '.cc')),

@@ -40,6 +40,7 @@ module;
 // platform
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include <llvm/Analysis/TargetTransformInfo.h>
+# include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 # include <llvm/Config/llvm-config.h>
 # include <llvm/ExecutionEngine/ExecutionEngine.h>
 # include <llvm/ExecutionEngine/MCJIT.h>

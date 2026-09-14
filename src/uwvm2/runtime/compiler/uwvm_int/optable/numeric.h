@@ -33,6 +33,7 @@
 # include <limits>
 # include <memory>
 # include <type_traits>
+# include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -619,6 +620,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else if constexpr(Op == float_unop::sqrt)
             {
+                if constexpr(::uwvm2::runtime::compiler::shared::strict_float::needs_extended_rounding)
+                { return ::uwvm2::runtime::compiler::shared::strict_float::square_root(v); }
 # if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_sqrtf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_sqrt(v); }
@@ -660,10 +663,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // controlled ordering) so that NaN and signed-zero behavior exactly matches
             // the WebAssembly specification.
 
-            if constexpr(Op == float_binop::add) { return lhs + rhs; }
-            else if constexpr(Op == float_binop::sub) { return lhs - rhs; }
-            else if constexpr(Op == float_binop::mul) { return lhs * rhs; }
-            else if constexpr(Op == float_binop::div) { return lhs / rhs; }
+            namespace strict = ::uwvm2::runtime::compiler::shared::strict_float;
+            if constexpr(Op == float_binop::add) { return strict::binary<strict::operation::add>(lhs, rhs); }
+            else if constexpr(Op == float_binop::sub) { return strict::binary<strict::operation::sub>(lhs, rhs); }
+            else if constexpr(Op == float_binop::mul) { return strict::binary<strict::operation::mul>(lhs, rhs); }
+            else if constexpr(Op == float_binop::div) { return strict::binary<strict::operation::div>(lhs, rhs); }
             else if constexpr(Op == float_binop::copysign)
             {
 # if defined(__GNUC__) || defined(__clang__)

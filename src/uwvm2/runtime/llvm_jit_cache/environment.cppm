@@ -29,6 +29,7 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
