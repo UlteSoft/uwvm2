@@ -91,6 +91,17 @@
 # define UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_AUTHORITATIVE_UNWIND
 #endif
 
+#pragma push_macro("UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT")
+#undef UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT
+#if defined(UWVM2_USE_HUGE_FAST_IO_CPO_OUTPUT)
+// Preserve the original wide fast_io CPO when explicitly requested.
+# define UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(output) ,
+#else
+// Close the current CPO and continue through the already-locked stream.  Keeping this as a
+// preprocessing boundary avoids duplicating the platform matrix while bounding each template pack.
+# define UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(output) ); ::fast_io::io::perr(output,
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
     template <typename Stm>
@@ -103,7 +114,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                             u8"\n",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8" ----------------------------------------- \n",
+                            u8" ----------------------------------------- \n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -115,7 +127,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"__  __  ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n",
+                            u8"|\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -127,7 +140,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"|  \\/  | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n",
+                            u8"|\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -139,7 +153,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"| |\\/| | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n",
+                            u8"|\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -151,7 +166,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"| |  | | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n",
+                            u8"|\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -163,9 +179,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"|_|  |_| ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n",
+                            u8"|\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|                                         |\n",
+                            u8"|                                         |\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
@@ -177,7 +195,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"  Machine",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8" |\n",
+                            u8" |\n"
+                            UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(::std::forward<Stm>(stm))
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8" ----------------------------------------- \n\n");
 
@@ -287,10 +306,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
                                 // Copyright
                                 u8"\nCopyright (c) 2025-present UlteSoft. All rights reserved.  "
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
         // Install Path
 #if defined(UWVM_SUPPORT_INSTALL_PATH)
                                 u8"\nInstall Path: ",
-                                ::uwvm2::uwvm::utils::install_path::install_path.path_name,
+                                ::uwvm2::uwvm::utils::install_path::install_path.path_name
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
 #endif
                                 // Version
                                 u8"\nVersion: ",
@@ -519,6 +540,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                                 u8"Unknown Arch"
 #endif
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
 
 // ARM PROFILE
 #if defined(__ARM_ARCH)
@@ -793,7 +815,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8".",
                                 (static_cast<::std::make_unsigned_t<decltype(LINUX_VERSION_CODE)>>(LINUX_VERSION_CODE) >> 8u) & 0xFFu,
                                 u8".",
-                                static_cast<::std::make_unsigned_t<decltype(LINUX_VERSION_CODE)>>(LINUX_VERSION_CODE) & 0xFFu,
+                                static_cast<::std::make_unsigned_t<decltype(LINUX_VERSION_CODE)>>(LINUX_VERSION_CODE) & 0xFFu
 # endif
 #elif defined(__APPLE__)
         /*
@@ -871,14 +893,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8".",
                                 static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) / 100u % 100u,
                                 u8".",      
-                                static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) % 100u,
+                                static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) % 100u
 # elif defined(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__)
                                 ,   
                                 static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__) / 10000u,
                                 u8".",
                                 static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__) / 100u % 100u,
                                 u8".",
-                                static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__) % 100u,
+                                static_cast<::std::make_unsigned_t<decltype(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__)>>(__ENVIRONMENT_OS_VERSION_MIN_REQUIRED__) % 100u
 # endif
 
 #elif defined(__DragonFly__)
@@ -924,6 +946,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                                 u8"Unknown OS"
 #endif
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
                 // C Library
                                 u8"\nC Library: "
 #if defined(__EMSCRIPTEN__)
@@ -940,7 +963,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"GNU LIBC ",
                                 __GLIBC__,
                                 u8".",
-                                __GLIBC_MINOR__,
+                                __GLIBC_MINOR__
 #elif defined(__BIONIC__)
                                 u8"Bionic"
 #elif defined(__cloudlibc__)
@@ -972,6 +995,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                                 u8"Unknown"
 #endif
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
 #ifdef _POSIX_C_SOURCE
                                 u8"\nPOSIX: ",
                                 _POSIX_C_SOURCE,
@@ -1005,6 +1029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                                 u8"Custom Allocator"
 #endif
+                                UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT(u8log_output_ul)
                                 u8"\n"
                                 // Feature
                                 u8"Feature:\n"
@@ -1395,6 +1420,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
 #pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_AUTHORITATIVE_UNWIND")
 #pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_LLVM_JIT_CALL_STACK_HAS_NATIVE_UNWIND")
+#pragma pop_macro("UWVM2_UWVM_CMDLINE_VERSION_FAST_IO_CPO_SPLIT")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_NATIVE_UNWIND_PLATFORM_SUPPORTED")
 #pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_WIN64_SEH_PLATFORM_SUPPORTED")
 
