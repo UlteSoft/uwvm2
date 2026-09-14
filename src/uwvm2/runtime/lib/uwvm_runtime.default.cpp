@@ -5577,6 +5577,36 @@ namespace uwvm2::runtime::lib
             ::LLVMInitializePowerPCTargetMC();
             ::LLVMInitializePowerPCAsmPrinter();
             return true;
+# elif defined(__riscv)
+            ::LLVMInitializeRISCVTargetInfo();
+            ::LLVMInitializeRISCVTarget();
+            ::LLVMInitializeRISCVTargetMC();
+            ::LLVMInitializeRISCVAsmPrinter();
+            return true;
+# elif defined(__s390x__)
+            ::LLVMInitializeSystemZTargetInfo();
+            ::LLVMInitializeSystemZTarget();
+            ::LLVMInitializeSystemZTargetMC();
+            ::LLVMInitializeSystemZAsmPrinter();
+            return true;
+# elif defined(__loongarch__)
+            ::LLVMInitializeLoongArchTargetInfo();
+            ::LLVMInitializeLoongArchTarget();
+            ::LLVMInitializeLoongArchTargetMC();
+            ::LLVMInitializeLoongArchAsmPrinter();
+            return true;
+# elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+            ::LLVMInitializeMipsTargetInfo();
+            ::LLVMInitializeMipsTarget();
+            ::LLVMInitializeMipsTargetMC();
+            ::LLVMInitializeMipsAsmPrinter();
+            return true;
+# elif defined(__sparc__)
+            ::LLVMInitializeSparcTargetInfo();
+            ::LLVMInitializeSparcTarget();
+            ::LLVMInitializeSparcTargetMC();
+            ::LLVMInitializeSparcAsmPrinter();
+            return true;
 # else
             return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
 # endif

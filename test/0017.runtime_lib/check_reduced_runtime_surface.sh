@@ -218,6 +218,7 @@ grep -Fq '#pragma pop_macro("UWVM2_RUNTIME_LLVM_JIT_WIN64_SEH_PLATFORM_SUPPORTED
     fail 'runtime native-unwind capability does not restore the Win64 SEH platform macro'
 
 bash "$repo_root/test/0017.runtime/check_native_unwind_platform_policy.sh"
+bash "$repo_root/test/0017.runtime/check_llvm_jit_process_target_dispatch.sh"
 
 cxx="${CXX:-c++}"
 command -v "$cxx" >/dev/null 2>&1 || fail "C++ preprocessor is unavailable: $cxx"
