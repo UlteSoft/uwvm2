@@ -192,7 +192,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
 #else
             // The helper restores controls before `return v` can load an x87 return register, and before musttail.
-            local_imported_global_get_preserving_fp_control(local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
+            if constexpr(::uwvm2::runtime::lib::details::wasm_fp_environment_is_fixed)
+            { local_imported_module->global_get_from_index(global_index, reinterpret_cast<::std::byte*>(::std::addressof(v))); }
+            else
+            { local_imported_global_get_preserving_fp_control(local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v))); }
 #endif
             return v;
         }
@@ -208,8 +211,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_set(
                    local_imported_module, global_index, reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
 #else
-            if(!local_imported_global_set_preserving_fp_control(local_imported_module, global_index,
-                                                               reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
+            bool const success{[&]() noexcept
+            {
+                if constexpr(::uwvm2::runtime::lib::details::wasm_fp_environment_is_fixed)
+                { return local_imported_module->global_set_from_index(global_index, reinterpret_cast<::std::byte const*>(::std::addressof(v))); }
+                else
+                { return local_imported_global_set_preserving_fp_control(local_imported_module, global_index,
+                                                                         reinterpret_cast<::std::byte const*>(::std::addressof(v))); }
+            }()};
+            if(!success) [[unlikely]]
 #endif
             {
                 ::fast_io::fast_terminate();

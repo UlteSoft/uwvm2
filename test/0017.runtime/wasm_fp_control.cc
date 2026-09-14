@@ -24,7 +24,7 @@ namespace
         }
         if(!probe::unchanged(original)) { return 6; }
 
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__))
+#if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
         if(::std::fesetenv(FE_DFL_ENV) != 0) { return 9; }
         ::std::uint16_t original_x87{};
         __asm__ volatile("fnstcw %0" : "=m"(original_x87) : : "memory");

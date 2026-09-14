@@ -584,7 +584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
         {
-# if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+# if (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             // Register the target selected by the compiler for this executable. LLVM's InitializeNativeTarget() follows the
             // LLVM_NATIVE_TARGET recorded in llvm-config's generated headers, which can describe the build host instead when uwvm2
             // is cross-compiled (for example, x86_64 Linux -> AArch64 Linux) and then makes MCJIT target selection fail at runtime.
@@ -593,7 +593,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::LLVMInitializeX86TargetMC();
             ::LLVMInitializeX86AsmPrinter();
             return true;
-# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             ::LLVMInitializeAArch64TargetInfo();
             ::LLVMInitializeAArch64Target();
             ::LLVMInitializeAArch64TargetMC();
@@ -714,6 +714,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                         ::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-", all_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
+# if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && !defined(__mips_msa)
+            // The runtime must protect MSACSR and use an MSA-compatible ABI before native JIT enables MSA.
+            mattrs.emplace_back(u8"-msa");
+# endif
+# if defined(__riscv) && !defined(__riscv_flen)
+            mattrs.emplace_back(u8"-f");
+            mattrs.emplace_back(u8"-d");
+            mattrs.emplace_back(u8"-v");
+# endif
+# if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
+            mattrs.emplace_back(u8"-altivec");
+            mattrs.emplace_back(u8"-vsx");
+# endif
             return mattrs;
         }
 

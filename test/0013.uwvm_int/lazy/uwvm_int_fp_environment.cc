@@ -23,7 +23,7 @@ namespace
     void poison_fp_control() noexcept
     {
         ++callback_count;
-        callback_controls_valid = callback_controls_valid && ::std::fesetround(FE_UPWARD) == 0;
+        callback_controls_valid = callback_controls_valid && ::std::fesetround(fp::hostile_rounding_up) == 0;
         fp::enable_flush_control();
     }
 

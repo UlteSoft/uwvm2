@@ -9829,7 +9829,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
         {
-# if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+# if (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             // Register the target selected by the compiler for this executable. LLVM's InitializeNativeTarget() follows the
             // LLVM_NATIVE_TARGET recorded in llvm-config's generated headers, which can describe the build host instead when uwvm2
             // is cross-compiled (for example, x86_64 Linux -> AArch64 Linux) and then makes MCJIT target selection fail at runtime.
@@ -9838,7 +9838,7 @@ namespace uwvm2::runtime::lib
             ::LLVMInitializeX86TargetMC();
             ::LLVMInitializeX86AsmPrinter();
             return true;
-# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             ::LLVMInitializeAArch64TargetInfo();
             ::LLVMInitializeAArch64Target();
             ::LLVMInitializeAArch64TargetMC();
@@ -9940,6 +9940,22 @@ namespace uwvm2::runtime::lib
                                                                               llvm_jit_translate_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
+# if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && !defined(__mips_msa)
+            // A scalar-only runtime cannot save MSACSR (and may use an incompatible FR=0 ABI).
+            // Do not let native CPU discovery introduce an unprotected optional FP execution unit.
+            mattrs.emplace_back(u8"-msa");
+# endif
+# if defined(__riscv) && !defined(__riscv_flen)
+            // A software-FP libc need not maintain hardware FCSR. Keep JIT FP on the same software contract.
+            mattrs.emplace_back(u8"-f");
+            mattrs.emplace_back(u8"-d");
+            mattrs.emplace_back(u8"-v");
+# endif
+# if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
+            // Linux generic builds protect VSCR using HWCAP-gated helpers; other OSes need an AltiVec build.
+            mattrs.emplace_back(u8"-altivec");
+            mattrs.emplace_back(u8"-vsx");
+# endif
             return mattrs;
         }
 

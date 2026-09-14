@@ -1,18 +1,21 @@
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
+#include "../0008.imported/wasi/wasip1/func/fp_control_probe.h"
 
 #include <cfenv>
 #include <cstdint>
 #include <memory>
 
-#if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+#if !defined(__arm64ec__) && !defined(_M_ARM64EC) && (defined(__SSE__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1))
 # include <xmmintrin.h>
 #endif
 
 namespace
 {
     namespace fp = ::uwvm2::runtime::lib::details;
+    inline constexpr int round_down{::uwvm2test::wasip1_fp_control::hostile_rounding_down};
+    inline constexpr int round_up{::uwvm2test::wasip1_fp_control::hostile_rounding_up};
 
-#if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+#if !defined(__arm64ec__) && !defined(_M_ARM64EC) && (defined(__SSE__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1))
 # if defined(__x86_64__) || defined(_M_X64) || defined(__SSE2__)
     inline constexpr unsigned flush_control_mask{(1u << 15u) | (1u << 6u)};  // FTZ + DAZ
 # else
@@ -70,10 +73,10 @@ namespace
         bool fp_environment_active{};
         initial_environment_restore restore_initial{};
         if(!restore_initial.valid) { return 1; }
-        if(::std::fesetround(FE_DOWNWARD) != 0) { return 2; }
+        if(::std::fesetround(round_down) != 0) { return 2; }
         if(::std::feclearexcept(FE_ALL_EXCEPT) != 0 || ::std::feraiseexcept(FE_INVALID) != 0) { return 3; }
         enable_flush_controls();
-        if(::std::fegetround() != FE_DOWNWARD || !flush_controls_are_enabled() || (::std::fetestexcept(FE_ALL_EXCEPT) & FE_INVALID) == 0) { return 4; }
+        if(::std::fegetround() != round_down || !flush_controls_are_enabled() || (::std::fetestexcept(FE_ALL_EXCEPT) & FE_INVALID) == 0) { return 4; }
 
         {
             fp::scoped_llvm_wasm_fp_environment wasm_environment{fp_environment_active};
@@ -84,9 +87,9 @@ namespace
             {
                 fp::scoped_llvm_wasm_host_fp_environment_restore host_callback_environment{fp_environment_active};
                 if(!host_callback_environment.ready()) { return 8; }
-                if(::std::fesetround(FE_UPWARD) != 0 || ::std::feraiseexcept(FE_DIVBYZERO) != 0) { return 9; }
+                if(::std::fesetround(round_up) != 0 || ::std::feraiseexcept(FE_DIVBYZERO) != 0) { return 9; }
                 enable_flush_controls();
-                if(::std::fegetround() != FE_UPWARD || !flush_controls_are_enabled() ||
+                if(::std::fegetround() != round_up || !flush_controls_are_enabled() ||
                    (::std::fetestexcept(FE_ALL_EXCEPT) & FE_DIVBYZERO) == 0)
                 {
                     return 10;
@@ -107,7 +110,7 @@ namespace
         }
 
         if(fp::is_llvm_wasm_fp_environment_active(fp_environment_active)) { return 16; }
-        if(::std::fegetround() != FE_DOWNWARD || !flush_controls_are_enabled() ||
+        if(::std::fegetround() != round_down || !flush_controls_are_enabled() ||
            (::std::fetestexcept(FE_ALL_EXCEPT) & FE_INVALID) == 0 || (::std::fetestexcept(FE_ALL_EXCEPT) & FE_DIVBYZERO) != 0)
         {
             return 17;
@@ -116,7 +119,7 @@ namespace
         {
             fp::scoped_llvm_wasm_fp_environment disabled_environment{fp_environment_active, false};
             if(!disabled_environment.ready() || fp::is_llvm_wasm_fp_environment_active(fp_environment_active)) { return 18; }
-            if(::std::fegetround() != FE_DOWNWARD || !flush_controls_are_enabled() || (::std::fetestexcept(FE_ALL_EXCEPT) & FE_INVALID) == 0) { return 19; }
+            if(::std::fegetround() != round_down || !flush_controls_are_enabled() || (::std::fetestexcept(FE_ALL_EXCEPT) & FE_INVALID) == 0) { return 19; }
         }
 
         return 0;
