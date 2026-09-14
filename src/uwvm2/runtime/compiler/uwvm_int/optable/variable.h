@@ -52,6 +52,7 @@
 
 #ifndef UWVM_MODULE
 # include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
@@ -155,6 +156,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else { static_assert(::std::same_as<GlobalT, wasm_i32>); }
         }
 
+#if !defined(UWVM_RUNTIME_LLVM_JIT)
+        // Keep the control-register work in one small native frame, not in every register-ring opfunc. In particular,
+        // restore controls before the caller reloads its cached FP registers. Inline linkage retains header-only use;
+        // noinline avoids duplicating this boundary for every value type and interpreter register configuration.
+        UWVM_NOINLINE inline void local_imported_global_get_preserving_fp_control(local_imported_t* local_imported_module,
+                                                                                 ::std::size_t global_index,
+                                                                                 ::std::byte* out) noexcept
+        {
+            ::uwvm2::runtime::lib::details::scoped_wasm_host_fp_control_restore fp_environment_guard{};
+            if(!fp_environment_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            local_imported_module->global_get_from_index(global_index, out);
+        }
+
+        UWVM_NOINLINE inline bool local_imported_global_set_preserving_fp_control(local_imported_t* local_imported_module,
+                                                                                 ::std::size_t global_index,
+                                                                                 ::std::byte const* in) noexcept
+        {
+            ::uwvm2::runtime::lib::details::scoped_wasm_host_fp_control_restore fp_environment_guard{};
+            if(!fp_environment_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return local_imported_module->global_set_from_index(global_index, in);
+        }
+#endif
+
         template <typename GlobalT>
         UWVM_ALWAYS_INLINE inline constexpr GlobalT load_local_imported_global(local_imported_t* local_imported_module,
                                                                                 ::std::size_t global_index) noexcept
@@ -167,7 +191,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_get(
                 local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
 #else
-            local_imported_module->global_get_from_index(global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
+            // The helper restores controls before `return v` can load an x87 return register, and before musttail.
+            local_imported_global_get_preserving_fp_control(local_imported_module, global_index, reinterpret_cast<::std::byte*>(::std::addressof(v)));
 #endif
             return v;
         }
@@ -183,8 +208,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_global_set(
                    local_imported_module, global_index, reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
 #else
-            if(!local_imported_module->global_set_from_index(global_index,
-                                                             reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
+            if(!local_imported_global_set_preserving_fp_control(local_imported_module, global_index,
+                                                               reinterpret_cast<::std::byte const*>(::std::addressof(v)))) [[unlikely]]
 #endif
             {
                 ::fast_io::fast_terminate();

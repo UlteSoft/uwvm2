@@ -47,12 +47,12 @@
 #include "uwvm_runtime_local_imported_provider_callbacks.h"
 #include "uwvm_runtime_state_signature.h"
 #include "uwvm_runtime_wasip1_memory_bindings.h"
+#include "uwvm_runtime_wasm_fp_environment.h"
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "uwvm_runtime_call_indirect_table_views.h"
 # include "uwvm_runtime_llvm_lazy_worker_policy.h"
 # include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 # include "uwvm_runtime_native_unwind_execution_gate.h"
-# include "uwvm_runtime_wasm_fp_environment.h"
 #endif
 
 // platform

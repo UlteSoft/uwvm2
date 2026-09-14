@@ -54,12 +54,22 @@ fi
     exit 1
 }
 
-# Combined tiered/LLVM builds must guard interpreter local-imported globals, while interpreter-only builds deliberately
-# retain the lower-overhead direct virtual call in the preprocessor else branch.
+# Combined tiered/LLVM builds suspend the generated token through the runtime wrapper. Pure-interpreter optables stay
+# header-only, but their direct virtual calls must still preserve FP state before the musttail continuation.
 rg -q --fixed-strings 'invoke_local_imported_provider_global_get' "${int_variable}"
 rg -q --fixed-strings 'invoke_local_imported_provider_global_set' "${int_variable}"
 rg -q --fixed-strings 'local_imported_module->global_get_from_index' "${int_variable}"
 rg -q --fixed-strings 'local_imported_module->global_set_from_index' "${int_variable}"
+[[ "$(rg -c --fixed-strings 'scoped_wasm_host_fp_control_restore fp_environment_guard{};' "${int_variable}")" == 2 ]] || {
+    echo "pure-interpreter provider globals are missing their FP callback guards" >&2
+    exit 1
+}
+if rg -q --fixed-strings 'get_llvm_wasm_fp_environment_active_state(), runtime_compiler_requests_llvm_jit_translation()' "${runtime_impl}"; then
+    echo "full/lazy Wasm FP protection still depends on selecting LLVM" >&2
+    exit 1
+fi
+rg -q --fixed-strings 'inline constinit thread_local bool g_interpreter_wasm_fp_environment_active{};' "${runtime_impl}"
+rg -q --fixed-strings 'return g_interpreter_wasm_fp_environment_active;' "${runtime_impl}"
 
 # Header-driven 0013 tests instantiate the guarded branch whenever both backends are configured. The wrapper bodies live
 # in uwvm_runtime, so the test target must carry that object dependency or the safety bridge becomes an undefined symbol.
@@ -69,7 +79,7 @@ grep -q --fixed-strings 'add_deps("uwvm_runtime")' <<<"${combined_int_test_depen
     exit 1
 }
 
-guarded_definition_count="$(sed -n '/namespace details/,/namespace details/p' "${runtime_impl}" | rg -c 'invoke_host_preserving_llvm_wasm_fp_environment')"
+guarded_definition_count="$(sed -n '/namespace details/,/namespace details/p' "${runtime_impl}" | rg -c 'invoke_host_preserving_(llvm_wasm_fp_environment|wasm_fp_control)')"
 if [[ "${guarded_definition_count}" -lt 9 ]]; then
     echo "not every local-imported provider wrapper uses the conservative host callback scope" >&2
     exit 1
