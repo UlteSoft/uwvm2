@@ -71,11 +71,11 @@
 # include "uwvm_runtime_local_imported_provider_callbacks.h"
 # include "uwvm_runtime_state_signature.h"
 # include "uwvm_runtime_wasip1_memory_bindings.h"
+# include "uwvm_runtime_wasm_fp_environment.h"
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include "uwvm_runtime_call_indirect_table_views.h"
 #  include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 #  include "uwvm_runtime_native_unwind_execution_gate.h"
-#  include "uwvm_runtime_wasm_fp_environment.h"
 # endif
 
 // platform
@@ -189,8 +189,8 @@ namespace uwvm2::runtime::lib
 {
     namespace
     {
-#if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline constexpr bool& get_llvm_wasm_fp_environment_active_marker() noexcept;
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline constexpr ::std::size_t& get_llvm_jit_generated_bridge_scope_depth() noexcept;
 
         // A generated bridge may reuse the outer FP/unwind execution scopes only while this capability is live. Host
@@ -258,6 +258,7 @@ namespace uwvm2::runtime::lib
             // comparatively expensive fenv save/restore, but re-entry still has to use the public raw host API.
             llvm_jit_generated_bridge_scope_suspend_guard generated_bridge_scope_suspend{
                 get_llvm_jit_generated_bridge_scope_depth()};
+#endif
             if(policy == ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::preserves_wasm_control)
             {
                 ::std::forward<Callable>(callable)();
@@ -270,9 +271,6 @@ namespace uwvm2::runtime::lib
             ::uwvm2::runtime::lib::details::scoped_llvm_wasm_host_fp_environment_restore fp_environment_guard{
                 get_llvm_wasm_fp_environment_active_marker()};
             if(!fp_environment_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
-#else
-            static_cast<void>(policy);
-#endif
             ::std::forward<Callable>(callable)();
         }
 
@@ -326,7 +324,7 @@ namespace uwvm2::runtime::lib
             return static_cast<local_imported_wasm_fp_control_policy_t>(
                 ::uwvm2::runtime::lib::details::invoke_local_imported_provider_function_wasm_fp_control_policy(module, function_index));
 #else
-            // Interpreter-only execution has no generated bridge capability or active LLVM-Wasm FP environment to protect.
+            // The pure-interpreter adapter obtains this policy from its constexpr function tuple.
             return module->function_wasm_fp_control_policy_from_index(function_index);
 #endif
         }
@@ -604,9 +602,11 @@ namespace uwvm2::runtime::lib
 
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
-            // Kept beside the logical call stack so both native TLS and the map-backed fallback preserve nested LLVM
-            // execution scopes without introducing an unconditional thread_local variable.
+#if defined(UWVM_RUNTIME_LLVM_JIT) || !defined(UWVM_USE_THREAD_LOCAL)
+            // Native-TLS interpreter builds use a separate constant-initialized marker below, avoiding early
+            // initialization of the call-stack vector and changes to compilation allocation/layout.
             bool llvm_wasm_fp_environment_active{};
+#endif
             // Capability proving that a generated-Wasm bridge is executing beneath a fully published outer JIT entry.
             // Host callbacks suspend it before leaving trusted runtime code, even when they promise to preserve FP state.
             ::std::size_t llvm_jit_generated_bridge_scope_depth{};
@@ -673,6 +673,17 @@ namespace uwvm2::runtime::lib
 # endif
         inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
+# if !defined(UWVM_RUNTIME_LLVM_JIT)
+#  if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#   ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#   else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#   endif
+#  endif
+        inline constinit thread_local bool g_interpreter_wasm_fp_environment_active{};  // [global] [thread_local]
+# endif
+
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #  ifdef UWVM
         [[__gnu__::__tls_model__("local-exec")]]
@@ -680,7 +691,7 @@ namespace uwvm2::runtime::lib
         [[__gnu__::__tls_model__("local-dynamic")]]
 #  endif
 # endif
-        // Kept separate from LLVM-only FP/bridge markers: interpreter execution and reset need the same re-entry invariant.
+        // Kept separate from FP/bridge markers: interpreter execution and reset need the same re-entry invariant.
         inline thread_local ::std::size_t g_runtime_execution_entry_depth{};  // [global] [thread_local]
 
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
@@ -722,7 +733,11 @@ namespace uwvm2::runtime::lib
             // lifetime of the thread. Keeping the vector capacity is safe; every retained value is backend-neutral storage.
             g_call_stack.frames.clear();
             g_call_stack.call_indirect_cache = {};
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             g_call_stack.llvm_wasm_fp_environment_active = false;
+# else
+            g_interpreter_wasm_fp_environment_active = false;
+# endif
             g_call_stack.llvm_jit_generated_bridge_scope_depth = 0uz;
             g_runtime_execution_entry_depth = 0uz;
             g_runtime_state_publication_depth = 0uz;
@@ -950,10 +965,16 @@ namespace uwvm2::runtime::lib
             }
         };
 
-#if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline constexpr bool& get_llvm_wasm_fp_environment_active_marker() noexcept
-        { return get_call_stack().llvm_wasm_fp_environment_active; }
+        {
+#if defined(UWVM_USE_THREAD_LOCAL) && !defined(UWVM_RUNTIME_LLVM_JIT)
+            return g_interpreter_wasm_fp_environment_active;
+#else
+            return get_call_stack().llvm_wasm_fp_environment_active;
+#endif
+        }
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline constexpr ::std::size_t& get_llvm_jit_generated_bridge_scope_depth() noexcept
         { return get_call_stack().llvm_jit_generated_bridge_scope_depth; }
 #endif
@@ -2614,7 +2635,7 @@ namespace uwvm2::runtime::lib
                 ::fast_io::fast_terminate();
             }
 #else
-            // No generated bridge token or LLVM-Wasm FP environment exists in a pure interpreter build.
+            // The pure-interpreter adapter returns its own immutable signature cache; no generated token is involved.
             auto const info{m->get_function_information_from_index(idx)};
             if(!info.successed) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -5550,7 +5571,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
         {
-# if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+# if (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             // Register the target selected by the compiler for this executable. LLVM's InitializeNativeTarget() follows the
             // LLVM_NATIVE_TARGET recorded in llvm-config's generated headers, which can describe the build host instead when uwvm2
             // is cross-compiled (for example, x86_64 Linux -> AArch64 Linux) and then makes MCJIT target selection fail at runtime.
@@ -5559,7 +5580,7 @@ namespace uwvm2::runtime::lib
             ::LLVMInitializeX86TargetMC();
             ::LLVMInitializeX86AsmPrinter();
             return true;
-# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             ::LLVMInitializeAArch64TargetInfo();
             ::LLVMInitializeAArch64Target();
             ::LLVMInitializeAArch64TargetMC();
@@ -5661,6 +5682,19 @@ namespace uwvm2::runtime::lib
                                                                               llvm_jit_translate_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
+# if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && !defined(__mips_msa)
+            // Match optional JIT FP units to the runtime's protected controls and MSA-compatible ABI.
+            mattrs.emplace_back(u8"-msa");
+# endif
+# if defined(__riscv) && !defined(__riscv_flen)
+            mattrs.emplace_back(u8"-f");
+            mattrs.emplace_back(u8"-d");
+            mattrs.emplace_back(u8"-v");
+# endif
+# if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
+            mattrs.emplace_back(u8"-altivec");
+            mattrs.emplace_back(u8"-vsx");
+# endif
             return mattrs;
         }
 
@@ -8411,16 +8445,27 @@ namespace uwvm2::runtime::lib
     {
         // Local-imported metadata, global, and memory operations are extensible native-provider calls. LLVM compilation
         // and generated Wasm both use these entry points; the common host-callback scope suspends any live generated-
-        // bridge depth token for the complete virtual call and restores an active LLVM-Wasm FP environment. Combined
-        // LLVM/interpreter builds use the same boundary for interpreter global access, while interpreter-only builds
-        // retain their direct virtual-call path.
+        // bridge depth token for the complete virtual call and restores Wasm FP controls (globals use the light guard).
+        // Combined LLVM/interpreter builds share this boundary. Pure-interpreter optables use a small guarded native
+        // boundary with header-only linkage instead.
+        template <typename Callable>
+        inline void invoke_host_preserving_wasm_fp_control(Callable&& callable) noexcept
+        {
+            llvm_jit_generated_bridge_scope_suspend_guard generated_bridge_scope_suspend{
+                get_llvm_jit_generated_bridge_scope_depth()};
+            // Header-driven runners have no production-entry marker; always guard native globals without a TLS lookup.
+            scoped_wasm_host_fp_control_restore fp_control_guard{};
+            if(!fp_control_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            ::std::forward<Callable>(callable)();
+        }
+
         extern "C++" void invoke_local_imported_provider_global_get(void* opaque_module,
                                                                      ::std::size_t global_index,
                                                                      ::std::byte* out) noexcept
         {
             auto module{static_cast<local_imported_t*>(opaque_module)};
             if(module == nullptr || out == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept { module->global_get_from_index(global_index, out); });
+            invoke_host_preserving_wasm_fp_control([&]() noexcept { module->global_get_from_index(global_index, out); });
         }
 
         extern "C++" bool invoke_local_imported_provider_global_set(void* opaque_module,
@@ -8430,7 +8475,7 @@ namespace uwvm2::runtime::lib
             auto module{static_cast<local_imported_t*>(opaque_module)};
             if(module == nullptr || in == nullptr) [[unlikely]] { return false; }
             bool result{};
-            invoke_host_preserving_llvm_wasm_fp_environment([&]() noexcept { result = module->global_set_from_index(global_index, in); });
+            invoke_host_preserving_wasm_fp_control([&]() noexcept { result = module->global_set_from_index(global_index, in); });
             return result;
         }
 
@@ -8757,11 +8802,11 @@ namespace uwvm2::runtime::lib
         // Declare the entry scope first so every FP/bridge guard is destroyed before outermost cleanup. Recursive
         // full execution is unsupported and fails before it can disturb the active entry's per-thread state.
         runtime_execution_entry_scope execution_entry_scope{};
-#if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::runtime::lib::details::scoped_llvm_wasm_fp_environment fp_environment_guard{
-            get_llvm_wasm_fp_environment_active_marker(), runtime_compiler_requests_llvm_jit_translation()};
+            get_llvm_wasm_fp_environment_active_marker()};
         if(!fp_environment_guard.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         auto native_unwind_execution_guard{
             g_runtime.llvm_jit_native_unwind_execution_gate.enter_if(runtime_llvm_jit_unwind_call_stack_requested())};
 #endif

@@ -32,7 +32,9 @@ namespace uwvm2::runtime::lib::details
 
     // A local-imported provider is native extension code, even when the operation looks like an ordinary metadata,
     // global, or memory query. These narrow runtime entry points apply the same conservative host-callback boundary as
-    // imported functions: suspend the generated-only bridge capability and preserve an active LLVM-Wasm FP environment.
+    // imported functions: suspend the generated-only bridge capability and preserve Wasm FP controls. Global accesses
+    // use a lightweight control-only guard (accrued status is caller-saved); public execution entries still restore
+    // the complete embedding environment. Globals are also guarded for header-driven interpreter runners.
     extern "C++" void invoke_local_imported_provider_global_get(void* module,
                                                                  ::std::size_t global_index,
                                                                  ::std::byte* out) noexcept;

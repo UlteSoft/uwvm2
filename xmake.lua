@@ -594,6 +594,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 	local is_llvm_jit_test = is_0014_llvm_jit or (string.find(file, "llvm_jit", 1, true) ~= nil)
 	local is_parallel_compile_failure_state = string.find(file, "parallel_compile_failure_state.cc", 1, true) ~= nil
 	local is_wasm_entry_integer = string.find(file, "wasm_entry_integer.cc", 1, true) ~= nil
+	local is_uwvm_int_fp_environment = string.find(file, "uwvm_int_fp_environment.cc", 1, true) ~= nil
 	local test_libfuzzer = get_config("test-libfuzzer")
 
 	if not ((is_0013_uwvm_int and (not get_config("enable-test-uwvm-int") or not uwvm_uses_uwvm_int)) or
@@ -619,6 +620,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- backend-neutral guarded entry points implemented by uwvm_runtime. Even header-driven interpreter tests must
 		-- link that object target once those templates are instantiated.
 		if uwvm_uses_llvm_jit and is_0013_uwvm_int then
+			add_deps("uwvm_runtime")
+		end
+		-- This regression calls the production entry even in interpreter-only builds.
+		if is_uwvm_int_fp_environment then
 			add_deps("uwvm_runtime")
 		end
 
