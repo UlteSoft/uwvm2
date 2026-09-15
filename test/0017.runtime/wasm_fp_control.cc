@@ -12,7 +12,7 @@ namespace
     [[nodiscard]] int test_control_restore() noexcept
     {
         probe::initial_state_restore restore_initial{};
-        if(!restore_initial.valid || ::std::fesetenv(FE_DFL_ENV) != 0) { return 1; }
+        if(!restore_initial.valid || ::uwvm2::runtime::lib::details::set_default_wasm_fp_environment() != 0) { return 1; }
         probe::snapshot const original{::std::fegetround(), probe::read_arch_control()};
         {
             guard outer{};
@@ -21,14 +21,14 @@ namespace
             if(!probe::prepare_hostile(hostile)) { return 3; }
             {
                 guard inner{};
-                if(!inner.ready() || ::std::fesetenv(FE_DFL_ENV) != 0) { return 4; }
+                if(!inner.ready() || ::uwvm2::runtime::lib::details::set_default_wasm_fp_environment() != 0) { return 4; }
             }
             if(!probe::unchanged(hostile)) { return 5; }
         }
         if(!probe::unchanged(original)) { return 6; }
 
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
-        if(::std::fesetenv(FE_DFL_ENV) != 0) { return 9; }
+        if(::uwvm2::runtime::lib::details::set_default_wasm_fp_environment() != 0) { return 9; }
         ::std::uint16_t original_x87{};
         __asm__ volatile("fnstcw %0" : "=m"(original_x87) : : "memory");
 # if defined(__SSE__) || defined(__x86_64__)

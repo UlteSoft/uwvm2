@@ -2,6 +2,8 @@
 
 本文补充代码旁的注释，覆盖下表中的浮点修复链，不引入新的执行逻辑。这里的 sNaN 指 signaling NaN，qNaN 指 quiet NaN；“能传 NaN”不等于“能逐位传递 sNaN”。
 
+后续新执行的 RV32、MIPS N32/R6、大端/软浮点及 s390x 生产入口补测与新增代码修复，另见[跨架构补测记录](floating-point-cross-coverage.md)；不要把本文末尾的历史“仅补注释”验证与后续执行覆盖混为一谈。
+
 ## 对应提交
 
 | 主仓库提交 | 修复目的 | ROS 对应 |

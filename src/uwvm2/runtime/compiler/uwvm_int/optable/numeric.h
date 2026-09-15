@@ -426,14 +426,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <float_unop Op, typename FloatT>
         // Native builtins implement host semantics, not automatically Wasm semantics.
-        // RISC-V's conversion-based ceil/floor/trunc can return a large/sNaN input
-        // unchanged; arithmetic rounding must quiet it. The outer evaluator also
+        // RISC-V's conversion-based rounding can return a large/sNaN input
+        // unchanged; arithmetic rounding must quiet it. This includes nearest:
+        // GCC 15 + RV32 glibc nearbyintf preserves sNaNs at both O0 and O3,
+        // although the previously tested RV64 configuration quieted them. Do not
+        // infer libc/compiler behavior from the ISA or from one optimization
+        // level. Classify only NaNs; finite inputs retain native rounding and
+        // fused/byref/tail paths all share this evaluator. The outer evaluator also
         // selects integer rounding on SSE2-without-SSE4.1/legacy-NaN builds and
         // normalizes affected arithmetic results. Sign-only operations are excluded.
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop_native(FloatT v) noexcept
         {
 # if defined(__riscv)
-            if constexpr(Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc)
+            if constexpr(Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc || Op == float_unop::nearest)
             { v = ::uwvm2::runtime::compiler::shared::strict_float::quiet_arithmetic_nan(v); }
 # endif
             if constexpr(Op == float_unop::abs)

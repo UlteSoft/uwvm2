@@ -59,6 +59,23 @@ namespace uwvm2::runtime::lib::details
 #else
     inline constexpr bool wasm_fp_environment_is_fixed{false};
 
+    [[nodiscard]] inline int set_default_wasm_fp_environment() noexcept
+    {
+# if defined(__clang__) && defined(__mips__) && defined(_MIPS_SIM) && defined(_ABIN32) && _MIPS_SIM == _ABIN32
+        // LLVM 22 N32 can materialize the constant FE_DFL_ENV pointer as
+        // 0x00000000ffffffff. The N32 ABI/libc compares the sign-extended sentinel
+        // 0xffffffffffffffff; a mismatch dereferences -1 and raises SIGBUS.
+        // Loading an actual 32-bit pointer object uses LW (sign extension).
+        // Volatile prevents folding it back into the broken constant sequence,
+        // including under LTO. This is one entry-boundary load, not per-op work;
+        // it is NOT a solution for floating-value ABI/sNaN transport.
+        ::std::fenv_t const* volatile default_environment{FE_DFL_ENV};
+        return ::std::fesetenv(default_environment);
+# else
+        return ::std::fesetenv(FE_DFL_ENV);
+# endif
+    }
+
     // Interpreter and generated Wasm FP instructions both assume the IEEE default environment: round-to-nearest/
     // ties-to-even, gradual underflow, and masked exceptions. Save the embedding environment once at a public execution
     // entry, not in individual Wasm opfuncs. Keep the historical LLVM names for existing users of this header.
@@ -83,7 +100,7 @@ namespace uwvm2::runtime::lib::details
             ready_state = false;
             if(::std::fegetenv(::std::addressof(saved_environment)) != 0) [[unlikely]] { return; }
             restore_environment = true;
-            if(::std::fesetenv(FE_DFL_ENV) != 0) [[unlikely]] { return; }
+            if(set_default_wasm_fp_environment() != 0) [[unlikely]] { return; }
 
             *active_state = true;
             ready_state = true;

@@ -6,6 +6,7 @@ x86_64 runner uses --cxx. Generated objects are executed with qemu-user for cros
 targets. Retains IR and logs for baseline and none/O2/O3 production lowering.
 """
 import argparse
+import json
 from pathlib import Path
 import shlex
 import subprocess
@@ -17,7 +18,8 @@ parser.add_argument("--cc", default="clang")
 parser.add_argument("--llvm-config", default="llvm-config")
 parser.add_argument("--llc", default="llc")
 parser.add_argument("--opt", default="opt")
-parser.add_argument("--sdk-root", type=Path, required=True)
+parser.add_argument("--sdk-root", type=Path)
+parser.add_argument("--target-config", type=Path, help="Explicit JSON targets: name, triple, cxx/run arrays, input_flags/llc_flags")
 parser.add_argument("--extra-sdk-root", type=Path)
 parser.add_argument("--qemu-dir", type=Path, default=Path("/usr/bin"))
 parser.add_argument("--build-dir", type=Path)
@@ -38,6 +40,12 @@ targets = [
     ("s390x", "s390x-linux-gnu", "s390x"),
     ("loongarch64", "loongarch64-linux-gnu", "loongarch64"),
 ]
+configured = {}
+if args.target_config:
+    configured = {t["name"]: t for t in json.loads(args.target_config.read_text())}
+    targets = [(name, t["triple"], None) for name, t in configured.items()]
+elif not args.sdk_root:
+    parser.error("--sdk-root or --target-config is required")
 selected = set(args.only.split(",")) if args.only else {t[0] for t in targets}
 if not selected <= {t[0] for t in targets}:
     parser.error("Unknown target in --only")
@@ -62,19 +70,24 @@ run([args.cxx, *config("--cxxflags"), "-std=c++20", "-O2", "-I" + str(repo / "sr
 for name, triple, emulator in targets:
     if name not in selected:
         continue
-    sdk = args.sdk_root.resolve()
-    if emulator and not (sdk / ("usr/bin/" + triple + "-g++-15")).exists() and args.extra_sdk_root:
-        sdk = args.extra_sdk_root.resolve()
-    compiler = [sdk / ("usr/bin/" + triple + "-g++-15"), "--sysroot=" + str(sdk)] if emulator else [args.cxx]
+    target = configured.get(name, {})
+    if target:
+        compiler = [*target["cxx"], *target.get("input_flags", [])]
+    else:
+        sdk = args.sdk_root.resolve()
+        if emulator and not (sdk / ("usr/bin/" + triple + "-g++-15")).exists() and args.extra_sdk_root:
+            sdk = args.extra_sdk_root.resolve()
+        compiler = [sdk / ("usr/bin/" + triple + "-g++-15"), "--sysroot=" + str(sdk)] if emulator else [args.cxx]
     original, fixed = build / (name + "-original.ll"), build / (name + "-fixed.ll")
-    run([args.cc, "--target=" + triple, "-O2", "-fno-math-errno", "-fno-trapping-math", "-ffp-contract=off",
+    run([args.cc, "--target=" + triple, *target.get("input_flags", []), "-O2", "-fno-math-errno", "-fno-trapping-math", "-ffp-contract=off",
          "-S", "-emit-llvm", fixtures / "fp_native_rounding_input.c", "-o", original], name + "-input")
     prepared = build / (name + "-prepared.ll")
     run([lower, original, prepared, "native-before"], name + "-prepare")
     original = prepared
-    run([lower, original, fixed, "native"], name + "-lower")
+    lowering_mode = target.get("lowering_mode", "native")
+    run([lower, original, fixed, lowering_mode], name + "-lower")
     constrained = build / (name + "-constrained.ll")
-    run([lower, original, constrained, "native-constrained"], name + "-constrain")
+    run([lower, original, constrained, lowering_mode + "-constrained"], name + "-constrain")
     for mode in ["before", "none", "O2", "O3", "constrained-none", "constrained-O2", "constrained-O3"]:
         source = constrained if mode.startswith("constrained-") else fixed
         ir = original if mode == "before" else source
@@ -83,11 +96,20 @@ for name, triple, emulator in targets:
             ir = build / (name + "-" + mode + ".ll")
             run([args.opt, "-S", "-passes=default<" + pipeline + ">", "-verify-each", source, "-o", ir], name + "-" + mode + "-opt")
         obj, binary = build / (name + "-" + mode + ".o"), build / (name + "-" + mode)
-        run([args.llc, "-O3", "-filetype=obj", ir, "-o", obj], name + "-" + mode + "-codegen")
-        run([*compiler, "-std=c++20", "-O2", "-no-pie", "-I" + str(repo / "src"),
-             fixtures / "fp_native_rounding_runner.cpp", obj, "-lm", "-o", binary], name + "-" + mode + "-link")
-        command = [args.qemu_dir / ("qemu-" + emulator), "-L", sdk / ("usr/" + triple), binary] if emulator else [binary]
-        expected_failure = mode == "before" and name == "riscv64"
+        # ABI/ISA features must also reach the module code generator, not only
+        # individual function attributes (notably MIPS R6 / NaN2008 ELF flags).
+        run([args.llc, "-O3", *target.get("llc_flags", []), "-filetype=obj", ir, "-o", obj], name + "-" + mode + "-codegen")
+        absent = target.get("baseline_missing_symbol") if mode == "before" else None
+        linked = run([*compiler, "-std=c++20", "-O2", "-no-pie", "-I" + str(repo / "src"),
+                      fixtures / "fp_native_rounding_runner.cpp", obj, "-lm", "-o", binary],
+                     name + "-" + mode + "-link", not absent)
+        if absent:
+            if linked.returncode == 0 or "undefined reference" not in linked.stderr or absent not in linked.stderr:
+                raise RuntimeError("Expected the specifically configured missing-libm-symbol baseline")
+            print(name + "-before: missing " + absent + " link failure reproduced (not an executed semantic test)", flush=True)
+            continue
+        command = [*target["run"], binary] if target else ([args.qemu_dir / ("qemu-" + emulator), "-L", sdk / ("usr/" + triple), binary] if emulator else [binary])
+        expected_failure = mode == "before" and target.get("expected_baseline_failure", name == "riscv64")
         result = run(command, name + "-" + mode + "-run", not expected_failure)
         if expected_failure and result.returncode != 1:
             raise RuntimeError("Expected the baseline RISC-V semantic failure")

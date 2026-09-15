@@ -53,7 +53,7 @@ int main(int argc, char** argv)
                 builder.CreateRetVoid();
             }
         }
-        if(mode == "native-constrained")
+        if(mode.find("constrained") != ::std::string_view::npos)
         {
             for(auto& function: *module)
             {
@@ -98,8 +98,21 @@ int main(int argc, char** argv)
     auto lower = [&]
     {
         if(mode == "native-before") { return; }
+        if(mode == "modern-nan")
+        {
+            // Cross-host equivalent of a NaN2008 MIPS build: no legacy NaN or
+            // extended-precision repair. Forcing normalize_nan=true here would
+            // conceal defects in the actual native fast path we want to test.
+            uwvm2::runtime::compiler::shared::strict_float_jit::lower(*module, false, false, false);
+            return;
+        }
         if(native)
         {
+            // Prove the no-target-feature path does not assume F/D from the
+            // compiler host. llc may still run the resulting integer-only
+            // nearest code on an F/D-capable test machine.
+            if(mode.starts_with("native-integer"))
+            { for(auto& function: *module) { function.removeFnAttr("target-features"); } }
             uwvm2::runtime::compiler::shared::strict_float_jit::lower(*module, false);
             return;
         }

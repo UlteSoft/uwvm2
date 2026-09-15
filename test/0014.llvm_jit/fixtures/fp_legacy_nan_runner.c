@@ -33,7 +33,16 @@ void vector_add(void const*, void const*, void*);
 #if defined(__mips__)
 static void exit_process(unsigned value)
 {
-    register long number __asm__("$2") = sizeof(void*) == 8 ? 5058 : 4001;
+    // N32 has 32-bit pointers but its own syscall table, not O32's table.
+    // Using sizeof(void*) here would turn a successful N32 test into SIGILL
+    // after an unrecognized syscall, hiding whether the generated FP code ran.
+# if _MIPS_SIM == _ABIN32
+    register long number __asm__("$2") = 6058;
+# elif _MIPS_SIM == _ABI64
+    register long number __asm__("$2") = 5058;
+# else
+    register long number __asm__("$2") = 4001;
+# endif
     register long argument __asm__("$4") = value;
     __asm__ volatile("syscall" : "+r"(number) : "r"(argument) : "$7", "memory");
     __builtin_trap();
@@ -97,13 +106,24 @@ static int test_main(void)
         u64 b = i ? 0x7ff8000000000000ull : 0x7ff0000000000001ull, out64;
         promote(&a, &out64);
         demote(&b, &out32);
-        CHECK_BAD(out64 != 0x7ff8000000000000ull, "promote", a, out64);
-        CHECK_BAD(out32 != 0x7fc00000u, "demote", b, out32);
+        // A canonical input requires a canonical result; an sNaN may produce
+        // any arithmetic NaN. Native NaN2008 hardware may preserve its payload,
+        // unlike our conservative legacy normalization. Do not reject a valid
+        // payload/sign or weaken this to native isnan on legacy-encoding hosts.
+        CHECK_BAD(i ? (out64 & 0x7fffffffffffffffull) != 0x7ff8000000000000ull :
+                      (out64 & 0x7ff8000000000000ull) != 0x7ff8000000000000ull, "promote", a, out64);
+        CHECK_BAD(i ? (out32 & 0x7fffffffu) != 0x7fc00000u :
+                      (out32 & 0x7fc00000u) != 0x7fc00000u, "demote", b, out32);
     }
     u32 a[4] = {0x7f800001u, 0x7fc00000u, 0x3f800000u, 0xff800123u};
     u32 b[4] = {0x3f800000u, 0x3f800000u, 0x3f800000u, 0x3f800000u}, out[4];
     vector_add(a, b, out);
-    for(unsigned i = 0; i < 4; ++i) { CHECK_BAD(out[i] != (i == 2 ? 0x40000000u : 0x7fc00000u), "vector add", a[i], out[i]); }
+    for(unsigned i = 0; i < 4; ++i)
+    {
+        CHECK_BAD(i == 2 ? out[i] != 0x40000000u :
+                  i == 1 ? (out[i] & 0x7fffffffu) != 0x7fc00000u :
+                           (out[i] & 0x7fc00000u) != 0x7fc00000u, "vector add", a[i], out[i]);
+    }
     return errors ? 1 : 0;
 }
 #if defined(__mips__)

@@ -21,7 +21,11 @@ inline ::fast_io::intfpos_t posix_seek_impl(int fd, ::fast_io::intfpos_t offset,
 		throw_posix_error();
 	}
 	return static_cast<::fast_io::intfpos_t>(static_cast<my_make_unsigned_t<off_t>>(ret));
-#elif defined(__linux__)
+// RV32 has the split-offset llseek ABI but no __NR_lseek. Do not invent an
+// alias: off_t may already be 64-bit, and the raw syscall still takes separate
+// high/low words and an output pointer. Let libc select the matching ABI when
+// the single-register lseek syscall is absent; keep existing native fast paths.
+#elif defined(__linux__) && defined(__NR_lseek)
 #if defined(__NR_llseek)
 	if constexpr (sizeof(off_t) <= sizeof(::std::int_least32_t))
 	{
