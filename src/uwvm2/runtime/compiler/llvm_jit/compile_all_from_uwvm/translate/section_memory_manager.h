@@ -36,6 +36,9 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  if defined(__APPLE__) && defined(__aarch64__)
+#   include "macho_headers.h"
+#  endif
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__linux__) && defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  include <sys/mman.h>
@@ -340,6 +343,71 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
             return ::llvm::JITSymbol{address, ::llvm::JITSymbolFlags::Exported};
         }
 
+# if defined(__APPLE__) && defined(__aarch64__)
+        using ::llvm::SectionMemoryManager::notifyObjectLoaded;
+
+        inline void notifyObjectLoaded(::llvm::RuntimeDyld& dyld, ::llvm::object::ObjectFile const& object) override
+        {
+            // LLVM 20's MachO/AArch64 loader resolves SUBTRACTOR/UNSIGNED EH
+            // relocations, then its legacy processFDE applies a section delta
+            // again. The resulting FDE can name unmapped memory instead of the
+            // function. Save the exact relocation expression before that pass,
+            // and reapply it immediately before registering CFI. This is also
+            // idempotent on LLVM versions that already produce the right value.
+            // Do not guess a function from an address range or a frame pointer.
+            // https://github.com/llvm/llvm-project/blob/llvmorg-20.1.8/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldMachO.cpp
+            auto const macho{::llvm::dyn_cast<::llvm::object::MachOObjectFile>(&object)};
+            if(macho == nullptr || !macho->is64Bit() || !macho->isLittleEndian() || object.getArch() != ::llvm::Triple::aarch64) { return; }
+            for(auto const& section: object.sections())
+            {
+                auto name{section.getName()};
+                if(!name) { ::llvm::consumeError(name.takeError()); finalization_failure_ = true; return; }
+                if(*name != "__eh_frame") { continue; }
+                auto contents{section.getContents()};
+                if(!contents) { ::llvm::consumeError(contents.takeError()); finalization_failure_ = true; return; }
+                auto const end{section.relocation_end()};
+                for(auto it{section.relocation_begin()}; it != end; ++it)
+                {
+                    if(it->getType() != ::llvm::MachO::ARM64_RELOC_SUBTRACTOR) { continue; }
+                    auto const offset{it->getOffset()};
+                    auto const sub{macho->getRelocation(it->getRawDataRefImpl())};
+                    if(macho->getAnyRelocationLength(sub) != 3u || macho->getAnyRelocationPCRel(sub) ||
+                       offset > contents->size() || contents->size() - offset < sizeof(::std::uint64_t))
+                    { finalization_failure_ = true; return; }
+                    auto const sub_symbol{it->getSymbol()};
+                    if(sub_symbol == object.symbol_end()) { finalization_failure_ = true; return; }
+                    auto sub_section{sub_symbol->getSection()};
+                    if(!sub_section) { ::llvm::consumeError(sub_section.takeError()); finalization_failure_ = true; return; }
+                    if(*sub_section == object.section_end() || **sub_section != section) { finalization_failure_ = true; return; }
+                    auto sub_name{sub_symbol->getName()};
+                    if(!sub_name) { ::llvm::consumeError(sub_name.takeError()); finalization_failure_ = true; return; }
+                    if(++it == end || it->getType() != ::llvm::MachO::ARM64_RELOC_UNSIGNED || it->getOffset() != offset)
+                    { finalization_failure_ = true; return; }
+                    auto const add{macho->getRelocation(it->getRawDataRefImpl())};
+                    if(macho->getAnyRelocationLength(add) != 3u || macho->getAnyRelocationPCRel(add))
+                    { finalization_failure_ = true; return; }
+                    auto const add_symbol{it->getSymbol()};
+                    if(add_symbol == object.symbol_end()) { finalization_failure_ = true; return; }
+                    auto add_name{add_symbol->getName()};
+                    if(!add_name) { ::llvm::consumeError(add_name.takeError()); finalization_failure_ = true; return; }
+                    auto const sub_address{dyld.getSymbol(*sub_name).getAddress()};
+                    auto const add_address{dyld.getSymbol(*add_name).getAddress()};
+                    if(sub_address == 0u || add_address == 0u) { finalization_failure_ = true; return; }
+                    auto const loaded{dyld.getSectionContent(dyld.getSymbolSectionID(*sub_name))};
+                    if(offset > loaded.size() || loaded.size() - offset < sizeof(::std::uint64_t))
+                    { finalization_failure_ = true; return; }
+                    ::std::uint64_t addend{};
+                    ::std::memcpy(&addend, contents->data() + offset, sizeof(addend));
+                    // Mach-O's relocation expression uses modulo-2^64 arithmetic,
+                    // including negative addends. The original object is immutable;
+                    // no already-relocated bytes feed this calculation.
+                    auto const address{reinterpret_cast<::std::uint8_t*>(const_cast<char*>(loaded.data() + offset))};
+                    macho_eh_relocations_.push_back(macho_eh_relocation{address, add_address - sub_address + addend});
+                }
+            }
+        }
+# endif
+
         inline constexpr ::std::uint8_t*
             allocateCodeSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name) noexcept override
         {
@@ -411,6 +479,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
             if(!register_win64_seh_function_table(addr, load_addr, size)) [[unlikely]] { finalization_failure_ = true; }
 # elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME && defined(__APPLE__)
             static_cast<void>(load_addr);
+#  if defined(__aarch64__)
+            if(finalization_failure_) [[unlikely]] { return; }
+            auto const begin{reinterpret_cast<::std::uintptr_t>(addr)};
+            for(auto const& relocation: macho_eh_relocations_)
+            {
+                auto const location{reinterpret_cast<::std::uintptr_t>(relocation.address)};
+                if(location < begin || location - begin > size || size - (location - begin) < sizeof(relocation.value)) { continue; }
+                ::std::memcpy(relocation.address, &relocation.value, sizeof(relocation.value));
+            }
+#  endif
             // The Apple unwinder accepts FDE pointers one at a time for JIT code. Keep the original section
             // range so the exact same FDE set can be deregistered before MCJIT releases the underlying memory.
             visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) constexpr noexcept { __register_frame(fde); });
@@ -452,6 +530,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
 
     private:
         bool finalization_failure_{};
+
+# if defined(__APPLE__) && defined(__aarch64__)
+        struct macho_eh_relocation
+        {
+            ::std::uint8_t* address{};
+            ::std::uint64_t value{};
+        };
+        // Load-time bookkeeping only: it changes neither generated instructions
+        // nor per-call overhead, and remains owned by the engine with its CFI.
+        ::uwvm2::utils::container::vector<macho_eh_relocation> macho_eh_relocations_{};
+# endif
 
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
         struct runtime_llvm_jit_win64_loaded_section

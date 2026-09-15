@@ -48,6 +48,9 @@ module;
 # include <llvm/ExecutionEngine/ExecutionEngine.h>
 # include <llvm/ExecutionEngine/MCJIT.h>
 # include <llvm/ExecutionEngine/SectionMemoryManager.h>
+# if defined(__APPLE__) && defined(__aarch64__)
+#  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/macho_headers.h>
+# endif
 # include <llvm/InitializePasses.h>
 # include <llvm/IR/LegacyPassManager.h>
 # include <llvm/IR/Verifier.h>
