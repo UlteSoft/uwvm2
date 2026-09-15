@@ -1562,7 +1562,10 @@ inline void posix_clock_settime([[maybe_unused]] posix_clock_id pclk_id, [[maybe
 	struct timespec res{
 		static_cast<::std::time_t>(timestamp.seconds), static_cast<long>(timestamp.subseconds / mul_factor)};
 	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
-#ifdef __linux__
+// New 32-bit Linux ABIs (e.g. RV32) only expose clock_settime64. Its kernel
+// timespec layout must not be guessed from a userspace timespec or aliased to
+// the old syscall number; libc performs the ABI conversion in the fallback.
+#if defined(__linux__) && defined(__NR_clock_settime)
 	system_call_throw_error(system_call<__NR_clock_settime, int>(clk, __builtin_addressof(res)));
 #else
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)

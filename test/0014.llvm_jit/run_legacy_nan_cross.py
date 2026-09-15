@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise production NaN lowering on MIPS O32/N64, BE/LE and optional SPARC/m68k.
+"""Exercise production NaN lowering on MIPS O32/N32/N64, BE/LE and optional SPARC/m68k.
 
 MIPS tests require LLVM tools and qemu-user, not a libc/C++ SDK. The optional
 --extra-sdk-root supplies GCC 15 cross toolchains/sysroots for SPARC64 and m68k.
@@ -28,10 +28,18 @@ fixtures = Path(__file__).resolve().parent / "fixtures"
 build = (args.build_dir or Path(tempfile.mkdtemp(prefix="uwvm-native-nan-"))).resolve()
 build.mkdir(parents=True, exist_ok=True)
 mips_targets = [
-    ("mips", "mips-linux-gnu", "24Kf", "mips32r2"),
-    ("mipsel", "mipsel-linux-gnu", "24Kf", "mips32r2"),
-    ("mips64", "mips64-linux-gnuabi64", "MIPS64R2-generic", "mips64r2"),
-    ("mips64el", "mips64el-linux-gnuabi64", "MIPS64R2-generic", "mips64r2"),
+    ("mips", "mips-linux-gnu", "24Kf", "mips32r2", "legacy"),
+    ("mipsel", "mipsel-linux-gnu", "24Kf", "mips32r2", "legacy"),
+    ("mips64", "mips64-linux-gnuabi64", "MIPS64R2-generic", "mips64r2", "legacy"),
+    ("mips64el", "mips64el-linux-gnuabi64", "MIPS64R2-generic", "mips64r2", "legacy"),
+    ("mipsn32", "mips64-linux-gnuabin32", "MIPS64R2-generic", "mips64r2", "legacy"),
+    ("mipsn32el", "mips64el-linux-gnuabin32", "MIPS64R2-generic", "mips64r2", "legacy"),
+    ("mips-nan2008", "mips-linux-gnu", "mips32r6-generic", "mips32r6", "2008"),
+    ("mipsel-nan2008", "mipsel-linux-gnu", "mips32r6-generic", "mips32r6", "2008"),
+    ("mips64-nan2008", "mips64-linux-gnuabi64", "I6400", "mips64r6", "2008"),
+    ("mips64el-nan2008", "mips64el-linux-gnuabi64", "I6400", "mips64r6", "2008"),
+    ("mipsn32-nan2008", "mips64-linux-gnuabin32", "I6400", "mips64r6", "2008"),
+    ("mipsn32el-nan2008", "mips64el-linux-gnuabin32", "I6400", "mips64r6", "2008"),
 ]
 extra_targets = [("sparc64", "sparc64-linux-gnu", "v9"), ("m68k", "m68k-linux-gnu", "M68040")]
 available = {target[0] for target in mips_targets + (extra_targets if args.extra_sdk_root else [])}
@@ -75,21 +83,32 @@ def report(name, mode, result):
 lower = build / "lower"
 run([args.cxx, *config("--cxxflags"), "-std=c++20", "-O2", "-I" + str(repo / "src"),
      fixtures / "fp_legacy_nan_lowering.cpp", *config("--ldflags", "--libs", "--system-libs"), "-o", lower], "host-build")
-for name, triple, cpu, arch in mips_targets:
+for name, triple, cpu, arch, nan_encoding in mips_targets:
     if name not in selected:
         continue
-    flags = ["--target=" + triple, "-march=" + arch, "-mnan=legacy", "-O2", "-ffp-contract=off", "-fno-math-errno", "-fno-trapping-math"]
+    # ABI and NaN encoding are independent test dimensions. A canonicalizing
+    # legacy test cannot certify the NaN2008 native fast path. Use R6 CPUs for
+    # NaN2008 so ELF encoding and QEMU FPU mode agree without a target libc.
+    flags = ["--target=" + triple, "-march=" + arch, "-mnan=" + nan_encoding, "-O2", "-ffp-contract=off", "-fno-math-errno", "-fno-trapping-math"]
     original, fixed = build / (name + "-original.ll"), build / (name + "-fixed.ll")
     run([args.cc, *flags, "-S", "-emit-llvm", fixtures / "fp_legacy_nan_input.c", "-o", original], name + "-input")
-    run([lower, original, fixed], name + "-lower")
+    run([lower, original, fixed, *(["modern-nan"] if nan_encoding == "2008" else [])], name + "-lower")
     for mode in ["before", "none", "O2", "O3"]:
         ir = optimized_ir(name, mode, original, fixed)
         obj, binary = build / (name + "-" + mode + ".o"), build / (name + "-" + mode)
-        run([args.llc, "-O3", "-filetype=obj", ir, "-o", obj], name + "-" + mode + "-codegen")
+        # Function target attributes alone do not set all ELF ISA/NaN flags.
+        # Match llc's module target to the native runner, especially R6/NaN2008;
+        # otherwise an ISA-mismatched object may fail before the FP test executes.
+        run([args.llc, "-O3", "-mcpu=" + arch, "-mattr=" + ("+nan2008" if nan_encoding == "2008" else "-nan2008"),
+             "-filetype=obj", ir, "-o", obj], name + "-" + mode + "-codegen")
         run([args.cc, *flags, "-fno-builtin", "-fno-stack-protector", "-nostdlib", "-static", "-fuse-ld=lld", "-Wl,-e,bare_entry",
              fixtures / "fp_legacy_nan_runner.c", obj, "-o", binary], name + "-" + mode + "-link")
-        result = run([args.qemu_dir / ("qemu-" + name), "-cpu", cpu, binary], name + "-" + mode + "-run", mode != "before")
-        report(name, mode, result)
+        expected_failure = mode == "before" and nan_encoding == "legacy"
+        result = run([args.qemu_dir / ("qemu-" + name.split("-")[0]), "-cpu", cpu, binary], name + "-" + mode + "-run", not expected_failure)
+        if expected_failure:
+            report(name, mode, result)
+        else:
+            print(name + "-" + mode + ": PASS", flush=True)
 
 if args.extra_sdk_root:
     sdk = args.extra_sdk_root.resolve()

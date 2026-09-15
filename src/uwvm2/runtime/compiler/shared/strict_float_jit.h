@@ -9,6 +9,7 @@
 #include <exception>
 #include <string>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/DynamicLibrary.h>
@@ -186,9 +187,147 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         }
     }
 
+    // RV32 has no FCVT.L.D; LLVM may lower f64 roundeven to the C23 libm symbol,
+    // which musl does not provide. Do not substitute nearbyint/rint: their result
+    // depends on FRM, unlike Wasm nearest. Use explicitly encoded RNE on RV32D
+    // and integer IR otherwise, including when the target features are unknown.
+    // Both cover every fixed-vector lane. With F enabled, ordinary f32 stays native. The exception-ignoring constrained f32 form
+    // also needs rewriting to the equivalent ordinary intrinsic: LLVM 22
+    // otherwise emits roundevenf even though FCVT.W.S supports this operation.
+    // Other targets retain their existing instruction-selection paths.
+    inline void lower_rv32_roundeven(::llvm::Module& module) noexcept
+    {
+        if(::llvm::Triple{module.getTargetTriple()}.getArch() != ::llvm::Triple::riscv32) { return; }
+        for(auto& function: module)
+        {
+            for(auto& block: function)
+            {
+                for(auto it{block.begin()}; it != block.end();)
+                {
+                    auto call{::llvm::dyn_cast<::llvm::CallInst>(&*it++)};
+                    if(!call || (!call->getType()->getScalarType()->isDoubleTy() && !call->getType()->getScalarType()->isFloatTy())) { continue; }
+                    auto id{call->getIntrinsicID()};
+                    if(id != ::llvm::Intrinsic::roundeven && id != ::llvm::Intrinsic::experimental_constrained_roundeven) { continue; }
+                    if(id == ::llvm::Intrinsic::experimental_constrained_roundeven)
+                    {
+                        // Wasm ignores accrued exceptions. Do not silently erase
+                        // a strict/maytrap exception contract in unrelated IR.
+                        auto metadata{::llvm::dyn_cast<::llvm::MetadataAsValue>(call->getArgOperand(1u))};
+                        auto text{metadata ? ::llvm::dyn_cast<::llvm::MDString>(metadata->getMetadata()) : nullptr};
+                        if(!text || text->getString() != "fpexcept.ignore") { continue; }
+                    }
+                    auto vector{::llvm::dyn_cast<::llvm::FixedVectorType>(call->getType())};
+                    if(call->getType()->isVectorTy() && !vector) { continue; }
+                    ::llvm::IRBuilder<> b{call};
+                    bool has_double_fpu{}, has_single_fpu{};
+                    auto features{function.getFnAttribute("target-features")};
+                    if(features.isValid())
+                    {
+                        ::llvm::SmallVector<::llvm::StringRef, 32> names{};
+                        features.getValueAsString().split(names, ',');
+                        for(auto name: names)
+                        {
+                            if(name == "+f") { has_single_fpu = true; }
+                            else if(name == "-f") { has_single_fpu = false; }
+                            else if(name == "+d") { has_double_fpu = true; }
+                            else if(name == "-d") { has_double_fpu = false; }
+                        }
+                    }
+                    if(call->getType()->getScalarType()->isFloatTy() && has_single_fpu)
+                    {
+                        if(id == ::llvm::Intrinsic::experimental_constrained_roundeven)
+                        {
+                            auto intrinsic{::llvm::Intrinsic::getOrInsertDeclaration(&module, ::llvm::Intrinsic::roundeven, {call->getType()})};
+                            auto result{b.CreateCall(intrinsic, {call->getArgOperand(0u)})};
+                            call->replaceAllUsesWith(result);
+                            call->eraseFromParent();
+                        }
+                        continue;
+                    }
+                    bool const wide{call->getType()->getScalarType()->isDoubleTy()};
+                    auto integer{b.getIntNTy(wide ? 64u : 32u)};
+                    ::llvm::Type* bits_type{vector ? static_cast<::llvm::Type*>(::llvm::FixedVectorType::get(integer, vector->getNumElements())) : integer};
+                    auto constant{[&](::std::uint64_t value) -> ::llvm::Constant*
+                    {
+                        auto c{::llvm::ConstantInt::get(integer, value)};
+                        return vector ? ::llvm::ConstantVector::getSplat(vector->getElementCount(), c) : c;
+                    }};
+                    auto raw{b.CreateBitCast(call->getArgOperand(0u), bits_type)};
+                    auto magnitude{b.CreateAnd(raw, constant(wide ? 0x7fffffffffffffffull : 0x7fffffffull))};
+                    if(wide && has_double_fpu)
+                    {
+                        // For |x| < 2^52, RN-even (|x| + 2^52) - 2^52 is the
+                        // exact integral result. Both instructions MUST encode
+                        // RNE: LLVM 22 emitted dynamic rounding even for explicit
+                        // tonearest constrained fadd/fsub in this regression.
+                        // Inline asm keeps the fixed rounding in the instruction,
+                        // avoids FRM save/restore and avoids emulated i64 shifts.
+                        auto scalar_type{b.getDoubleTy()};
+                        auto signature{::llvm::FunctionType::get(scalar_type, {scalar_type, scalar_type}, false)};
+                        // Early-clobber prevents output from sharing the bias
+                        // register, which is still read by the second instruction.
+                        auto round{::llvm::InlineAsm::get(signature,
+                            "fadd.d $0, $1, $2, rne\n\tfsub.d $0, $0, $2, rne", "=&f,f,f", false)};
+                        auto bias{::llvm::ConstantFP::get(scalar_type, 4503599627370496.0)};
+                        auto absolute{b.CreateBitCast(magnitude, call->getType())};
+                        ::llvm::Value* rounded{};
+                        if(vector)
+                        {
+                            rounded = ::llvm::PoisonValue::get(call->getType());
+                            for(unsigned lane{}; lane != vector->getNumElements(); ++lane)
+                            {
+                                auto item{b.CreateCall(round, {b.CreateExtractElement(absolute, lane), bias})};
+                                rounded = b.CreateInsertElement(rounded, item, lane);
+                            }
+                        }
+                        else { rounded = b.CreateCall(round, {absolute, bias}); }
+                        // Larger finite values are integral already; retain inf
+                        // and quiet NaN bits explicitly. Exceptions are ignored
+                        // by this Wasm lowering contract, including unused lanes.
+                        auto result{b.CreateSelect(b.CreateICmpULT(magnitude, constant(0x4330000000000000ull)),
+                                                  b.CreateBitCast(rounded, bits_type), magnitude)};
+                        result = b.CreateSelect(b.CreateICmpUGT(magnitude, constant(0x7ff0000000000000ull)),
+                                                b.CreateOr(magnitude, constant(0x0008000000000000ull)), result);
+                        result = b.CreateOr(result, b.CreateAnd(raw, constant(0x8000000000000000ull)));
+                        call->replaceAllUsesWith(b.CreateBitCast(result, call->getType()));
+                        call->eraseFromParent();
+                        continue;
+                    }
+                    // Unknown/software-only target features cannot authorize D
+                    // instructions. Keep the fully integer f32/f64 fallback in that case.
+                    unsigned const fraction{wide ? 52u : 23u}, bias{wide ? 1023u : 127u};
+                    auto exponent{b.CreateLShr(magnitude, constant(fraction))};
+                    auto in_range{b.CreateAnd(b.CreateICmpUGE(exponent, constant(bias)), b.CreateICmpULT(exponent, constant(bias + fraction)))};
+                    // Clamp BEFORE shifting: selecting a different final result
+                    // does not license an oversized/underflowed LLVM shift.
+                    auto shift{b.CreateSelect(in_range, b.CreateSub(constant(bias + fraction), exponent), constant(1u))};
+                    auto unit{b.CreateShl(constant(1u), shift)};
+                    auto mask{b.CreateSub(unit, constant(1u))};
+                    auto whole{b.CreateAnd(magnitude, b.CreateNot(mask))};
+                    auto remainder{b.CreateAnd(magnitude, mask)};
+                    auto half{b.CreateLShr(unit, constant(1u))};
+                    auto odd{b.CreateICmpNE(b.CreateAnd(whole, unit), constant(0u))};
+                    auto increment{b.CreateOr(b.CreateICmpUGT(remainder, half), b.CreateAnd(b.CreateICmpEQ(remainder, half), odd))};
+                    auto rounded{b.CreateAdd(whole, b.CreateSelect(increment, unit, constant(0u)))};
+                    // |x| <= 0.5 rounds to signed zero (tie to even); larger
+                    // values below 1 round to signed one. Large finite/inf stay.
+                    auto small{b.CreateSelect(b.CreateICmpUGT(magnitude, constant(wide ? 0x3fe0000000000000ull : 0x3f000000ull)),
+                                              constant(wide ? 0x3ff0000000000000ull : 0x3f800000ull), constant(0u))};
+                    auto result{b.CreateSelect(b.CreateICmpULT(exponent, constant(bias)), small, b.CreateSelect(in_range, rounded, magnitude))};
+                    result = b.CreateSelect(b.CreateICmpUGT(magnitude, constant(wide ? 0x7ff0000000000000ull : 0x7f800000ull)),
+                                            b.CreateOr(magnitude, constant(wide ? 0x0008000000000000ull : 0x00400000ull)), result);
+                    result = b.CreateOr(result, b.CreateAnd(raw, constant(wide ? 0x8000000000000000ull : 0x80000000ull)));
+                    call->replaceAllUsesWith(b.CreateBitCast(result, call->getType()));
+                    call->eraseFromParent(); // No intrinsic remains; repeated lowering is idempotent.
+                }
+            }
+        }
+    }
+
     inline void lower(::llvm::Module& module, bool enabled = needs_lowering, bool bit_preserving_abi = needs_bit_preserving_abi,
                       bool normalize_nan = fp::needs_nan_canonicalization) noexcept
     {
+        lower_rv32_roundeven(module);
         // RISC-V's conversion-based rounding keeps large/NaN operands unchanged.
         // Normalize only rounding results; arithmetic, transport and sign operations
         // retain their native code. Check the generated target, including cross-JITs.

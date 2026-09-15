@@ -72,7 +72,7 @@ namespace
     {
         probe::initial_state_restore original{};
         [[maybe_unused]] restore_aux auxiliary{};
-        if(!original.valid || ::std::fesetenv(FE_DFL_ENV) != 0) { return 1; }
+        if(!original.valid || ::uwvm2::runtime::lib::details::set_default_wasm_fp_environment() != 0) { return 1; }
         probe::snapshot host{};
         if(!probe::prepare_hostile(host)) { return 2; }
         poison_aux();

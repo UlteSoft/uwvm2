@@ -2,6 +2,7 @@
 // under x87/68881 excess precision. These test arithmetic semantics; separate
 // raw-bit tests cover sNaN transport through parser, storage and call ABIs.
 #include <uwvm2/runtime/compiler/shared/strict_float.h>
+#include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #include <bit>
 #include <cfenv>
 #include <cmath>
@@ -58,7 +59,16 @@ int check(fp::operation op, fp::bits_t<Float> lhs, fp::bits_t<Float> rhs, fp::bi
 int main()
 {
     ::std::fenv_t original{};
-    if(::std::fegetenv(&original) != 0 || ::std::fesetenv(FE_DFL_ENV) != 0) { return 1; }
+    if(::std::fegetenv(&original) != 0) { return 1; }
+#if defined(UWVM_ASSUME_FIXED_WASM_FP_ENVIRONMENT) || defined(__wasm__)
+    // This test is the embedding host for the fixed-environment build. The
+    // production guard deliberately has no fenv helper in that configuration.
+    // Load the sentinel from a pointer object here too (Clang N32 sign extension).
+    ::std::fenv_t const* volatile default_environment{FE_DFL_ENV};
+    if(::std::fesetenv(default_environment) != 0) { return 1; }
+#else
+    if(::uwvm2::runtime::lib::details::set_default_wasm_fp_environment() != 0) { return 1; }
+#endif
     int errors{};
     errors += check<double>(fp::operation::add, 0x3ff0000000000000ull, 0x3ca0000000000001ull, 0x3ff0000000000001ull);
     errors += check<double>(fp::operation::sub, 0x3ff0000000000000ull, 0x3c90000000000001ull, 0x3fefffffffffffffull);

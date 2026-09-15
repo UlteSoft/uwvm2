@@ -77,6 +77,17 @@ function linux_target()
     if use_llvm_compiler then
         set_toolchains("clang")
 
+        -- LLVM's MIPS backend disables tail calls by default, independently of
+        -- Clang accepting [[clang::musttail]]. The interpreter requires bounded
+        -- host stack depth even at -O0; never work around this by dropping that
+        -- attribute. Internal opfunc visibility is handled in their macros.
+        local mips_target = get_config("target") or ""
+        local mips_llvm_target = get_config("llvm-target") or ""
+        if is_arch("mips") or is_arch("mips64") or mips_target:lower():find("^mips") or
+            mips_llvm_target:lower():find("^mips") then
+            add_cxflags("-mllvm -mips-tail-calls", {force = true})
+        end
+
         -- lld does not support the PPC64 ELFv1 ABI used by big-endian Linux, and
         -- 32-bit PowerPC glibc linker scripts use absolute paths that bfd resolves
         -- through sysroot correctly. SPARC64 also uses relocations in GCC startup

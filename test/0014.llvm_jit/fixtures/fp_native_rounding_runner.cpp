@@ -21,17 +21,24 @@ unsigned check()
     constexpr unsigned fraction = sizeof(F) == 4 ? 23 : 52, exponents = sizeof(F) == 4 ? 256 : 2048;
     constexpr U sign = U{1} << (sizeof(F) * 8 - 1), quiet = U{1} << (fraction - 1);
     unsigned errors{};
+    std::uint64_t state{0x6a09e667f3bcc909ull};
     using vector_fn = void (*)(void const*, void*);
 #define WIDTH(W) vector_round##W##_0, vector_round##W##_1, vector_round##W##_2, vector_round##W##_3, vector_round##W##_4
     vector_fn vector32[]{WIDTH(32)}, vector64[]{WIDTH(64)};
 #undef WIDTH
     for(unsigned e{}; e < exponents; ++e)
     {
-        for(unsigned variant{}; variant < 4; ++variant)
+        for(unsigned variant{}; variant < 8; ++variant)
         {
             for(unsigned neg{}; neg < 2; ++neg)
             {
-                U input = (U(e) << fraction) | (neg ? sign : 0) | (variant == 1 ? 1 : variant == 2 ? quiet : variant == 3 ? quiet | 1 : 0);
+                state ^= state << 13; state ^= state >> 7; state ^= state << 17;
+                constexpr U mask = (U{1} << fraction) - 1;
+                // Both sides of the midpoint, carry into the next binade, and
+                // nontrivial deterministic payloads exercise integer IR shifts
+                // and ties-to-even independently of the production algorithm.
+                U payloads[]{0, 1, U(quiet - 1), quiet, U(quiet | 1), U(mask - 1), mask, U(state) & mask};
+                U input = (U(e) << fraction) | (neg ? sign : 0) | payloads[variant];
                 for(unsigned op{}; op < 5; ++op)
                 {
                     U actual;
@@ -86,6 +93,30 @@ int main()
     uwvm2::runtime::lib::details::scoped_llvm_wasm_fp_environment environment{active};
     if(!environment.ready()) { return 2; }
     auto errors = check<float>() + check<double>();
+#if defined(__riscv) && __riscv_xlen == 32
+    // roundeven encodes a fixed mode, unlike nearbyint. Prove the new RV32
+    // libcall-free f64 lowering and constrained-to-native f32 rewrite do not
+    // accidentally depend on caller FRM. Check both scalar and every SIMD lane.
+    for(int mode: {FE_TONEAREST, FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO})
+    {
+        if(std::fesetround(mode) != 0) { return 3; }
+        std::uint64_t inputs[]{0x3ff8000000000000ull, 0x4004000000000000ull, 0xbfe0000000000000ull, 0xc004000000000000ull};
+        std::uint64_t expected[]{0x4000000000000000ull, 0x4000000000000000ull, 0x8000000000000000ull, 0xc000000000000000ull};
+        for(unsigned i{}; i != 4; ++i) { errors += rounding64(inputs[i], 4) != expected[i]; }
+        for(unsigned i{}; i != 4; i += 2)
+        {
+            std::uint64_t output[2]{};
+            vector_round64_4(inputs + i, output);
+            errors += output[0] != expected[i] || output[1] != expected[i + 1];
+        }
+        std::uint32_t inputs32[]{0x3fc00000u, 0x40200000u, 0xbf000000u, 0xc0200000u};
+        std::uint32_t expected32[]{0x40000000u, 0x40000000u, 0x80000000u, 0xc0000000u};
+        std::uint32_t output32[4]{};
+        vector_round32_4(inputs32, output32);
+        for(unsigned i{}; i != 4; ++i)
+        { errors += rounding32(inputs32[i], 4) != expected32[i] || output32[i] != expected32[i]; }
+    }
+#endif
     std::printf("Native LLVM rounding: %u failures\n", errors);
     return errors != 0;
 }

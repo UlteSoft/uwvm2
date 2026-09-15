@@ -505,6 +505,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         // uses integer FP results even on SSE2 hosts; old ST0 objects are incompatible.
         details::append_cache_key_value(out, u8"llvm-wasm-fp-bit-abi", u8"integer-globals-i386-no-x87-v1");
         details::append_cache_key_value(out, u8"llvm-wasm-native-nan", u8"canonical-native-rounding-v1");
+        // RV32 f64 nearest must not reload an object requiring an unavailable
+        // C23 roundeven libcall (e.g. musl), even without a git revision in the key.
+        details::append_cache_key_value(out, u8"llvm-wasm-rv32-nearest", u8"fixed-rne-d-or-integer-v1");
         // Separates pre-fix objects even when a build has no embedded git revision.
         details::append_cache_key_value(out, u8"llvm-wasm-fp-rounding", u8"extended-round-to-odd-v1");
         details::append_cache_key_value(out, u8"llvm-wasm-fp-rounding-mode",

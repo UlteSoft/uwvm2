@@ -44,6 +44,12 @@
 # define UWVM_INTERPRETER_OPFUNC_COLD_MACRO [[__gnu__::__sysv_abi__]] UWVM_GNU_COLD
 #elif defined(__i386__) || defined(_M_IX86)
 # define UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_FASTCALL UWVM_GNU_COLD
+#elif defined(__clang__) && defined(__mips__)
+// LLVM MIPS rejects direct musttail calls to interposable symbols, even with
+// -mllvm -mips-tail-calls. These opfuncs are private dispatch implementation,
+// not the public runtime API. Keep hot/cold targets equally non-interposable;
+// removing musttail would turn a Wasm instruction chain into host recursion.
+# define UWVM_INTERPRETER_OPFUNC_COLD_MACRO [[__gnu__::__visibility__("hidden")]] UWVM_GNU_COLD
 #else
 # define UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_GNU_COLD
 #endif
@@ -55,6 +61,10 @@
 # define UWVM_INTERPRETER_OPFUNC_HOT_MACRO [[__gnu__::__sysv_abi__]] UWVM_GNU_HOT
 #elif defined(__i386__) || defined(_M_IX86)
 # define UWVM_INTERPRETER_OPFUNC_HOT_MACRO UWVM_FASTCALL UWVM_GNU_HOT
+#elif defined(__clang__) && defined(__mips__)
+// See the cold counterpart: visibility is part of MIPS tail-call eligibility,
+// including at -O0, and must not be applied globally to exported runtime APIs.
+# define UWVM_INTERPRETER_OPFUNC_HOT_MACRO [[__gnu__::__visibility__("hidden")]] UWVM_GNU_HOT
 #else
 # define UWVM_INTERPRETER_OPFUNC_HOT_MACRO UWVM_GNU_HOT
 #endif
