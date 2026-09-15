@@ -68,6 +68,9 @@
 # include <llvm/ExecutionEngine/JITEventListener.h>
 # include <llvm/ExecutionEngine/MCJIT.h>
 # include <llvm/ExecutionEngine/SectionMemoryManager.h>
+# if defined(__APPLE__) && defined(__aarch64__)
+#  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/macho_headers.h>
+# endif
 # include <llvm/Config/llvm-config.h>
 # include <llvm/InitializePasses.h>
 # include <llvm/IR/Constants.h>
