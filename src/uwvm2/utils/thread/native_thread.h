@@ -927,7 +927,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 try
 # endif
                 {
-                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{[handle]() constexpr noexcept { handle.resume(); }});
+                    // Construct from the callable in its final slot. Passing a
+                    // temporary native_thread_type makes Clang 20/libc++ check
+                    // fast_io's forwarding constructor while resolving its own
+                    // move construction, recursively evaluating the callable
+                    // constraint. Direct emplacement also avoids that extra move.
+                    ::std::construct_at(this->workers.buffer + this->worker_count, [handle]() constexpr noexcept { handle.resume(); });
                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                 catch(...)
@@ -1089,7 +1094,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             {
                 for(; this->worker_count != extra_worker_count; ++this->worker_count)
                 {
-                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{run_worker});
+                    // See lazy_compile_scheduler::start: pass the callable,
+                    // not a thread temporary, to avoid recursive constraints
+                    // during Clang 20/libc++ move-constructor resolution.
+                    ::std::construct_at(this->workers.buffer + this->worker_count, run_worker);
                 }
             }
 # ifdef UWVM_CPP_EXCEPTIONS
