@@ -16,6 +16,17 @@ namespace fp_rounding_oracle
     // Only exact floating operations: split x into integral/fractional components,
     // then adjust the integral part by one. No call to the rounding functions under test.
     template <class Float>
+#if defined(__clang__) && defined(__mips__) && defined(__mips_isa_rev) && __mips_isa_rev >= 6
+    // Clang 22.1.8 and the tested LLVM 23 snapshot can spill an FGR64CC
+    // comparison result with opcode 0 (PHI) when this independent oracle is
+    // inlined into the multi-lane test driver. The machine verifier reports
+    // illegal PHI stores after register allocation, before the test can run.
+    // Isolate only the oracle: its input/result remain integer bits, while
+    // production SIMD evaluators and their caller still compile at O3. Do not
+    // disable engine optimization or change expected values to hide this
+    // compiler failure. Other targets keep their existing test code generation.
+    [[gnu::noinline]]
+#endif
     bits_t<Float> expected(bits_t<Float> input, unsigned op)
     {
         using bits = bits_t<Float>;
