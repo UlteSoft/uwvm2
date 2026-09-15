@@ -231,6 +231,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             return out;
         }
 
+        template <typename UInt, ::std::size_t N, bool Force = false>
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 canonicalize_native_float_lanes(wasm_v128 v) noexcept
+        {
+            if constexpr(strict_float::needs_nan_canonicalization || Force)
+            {
+                constexpr UInt magnitude{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7fffffffull : 0x7fffffffffffffffull)};
+                constexpr UInt infinity{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+                constexpr UInt nan{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7fc00000ull : 0x7ff8000000000000ull)};
+                auto lanes{load_uint_lanes<UInt, N>(v)};
+                for(auto& lane: lanes.lane) { if((lane & magnitude) > infinity) { lane = nan; } }
+                return store_uint_lanes<UInt, N>(lanes);
+            }
+            else { return v; }
+        }
+
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__)
         using v128_u8x16 [[__gnu__::__vector_size__(16)]] = u8;
         using v128_i8x16 [[__gnu__::__vector_size__(16)]] = s8;
@@ -494,9 +509,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto const l{v128_to_vec<v128_f32x4>(lhs)};
                 auto const r{v128_to_vec<v128_f32x4>(rhs)};
-                if constexpr(Op == v128_binop::f32x4_add) { return vec_to_v128(l + r); }
-                else if constexpr(Op == v128_binop::f32x4_sub) { return vec_to_v128(l - r); }
-                else if constexpr(Op == v128_binop::f32x4_mul) { return vec_to_v128(l * r); }
+                if constexpr(Op == v128_binop::f32x4_add) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l + r)); }
+                else if constexpr(Op == v128_binop::f32x4_sub) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l - r)); }
+                else if constexpr(Op == v128_binop::f32x4_mul) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l * r)); }
                 else if constexpr(Op == v128_binop::f32x4_eq) { return vec_to_v128(::std::bit_cast<v128_u32x4>(l == r)); }
                 else
                 {
@@ -716,7 +731,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 auto const bits{::std::bit_cast<u32>(x)};
                 auto const sign{bits & u32{0x80000000u}};
                 auto const exp{(bits >> 23u) & u32{0xffu}};
-                if(exp == u32{0xffu}) { return x; }
+                if(exp == u32{0xffu})
+                { return (bits & u32{0x007fffffu}) ? ::std::bit_cast<wasm_f32>(bits | u32{0x00400000u}) : x; }
                 if(exp < u32{126u}) { return ::std::bit_cast<wasm_f32>(sign); }
                 if(exp == u32{126u})
                 {
@@ -739,7 +755,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 auto const bits{::std::bit_cast<u64>(x)};
                 auto const sign{bits & u64{0x8000000000000000ull}};
                 auto const exp{(bits >> 52u) & u64{0x7ffu}};
-                if(exp == u64{0x7ffu}) { return x; }
+                if(exp == u64{0x7ffu})
+                { return (bits & u64{0x000fffffffffffffull}) ? ::std::bit_cast<wasm_f64>(bits | u64{0x0008000000000000ull}) : x; }
                 if(exp < u64{1022u}) { return ::std::bit_cast<wasm_f64>(sign); }
                 if(exp == u64{1022u})
                 {
@@ -947,7 +964,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_min(FloatT a, FloatT b) noexcept
         {
-            if(::std::isnan(a) || ::std::isnan(b)) { return (::std::numeric_limits<FloatT>::quiet_NaN)(); }
+            if(::std::isnan(a) || ::std::isnan(b)) { return strict_float::canonical_nan<FloatT>(); }
             if(a == b)
             {
                 if(::std::signbit(a)) { return a; }
@@ -959,7 +976,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_max(FloatT a, FloatT b) noexcept
         {
-            if(::std::isnan(a) || ::std::isnan(b)) { return (::std::numeric_limits<FloatT>::quiet_NaN)(); }
+            if(::std::isnan(a) || ::std::isnan(b)) { return strict_float::canonical_nan<FloatT>(); }
             if(a == b)
             {
                 if(::std::signbit(a)) { return b; }
@@ -1408,7 +1425,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         }
 
         template <simd_code Op>
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_unop(wasm_v128 v) noexcept
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_unop_native(wasm_v128 v) noexcept
         {
             if constexpr(Op == simd_code::v128_not) { return v128_bitwise_not(v); }
             else if constexpr(Op == simd_code::i8x16_abs || Op == simd_code::i8x16_neg || Op == simd_code::i8x16_popcnt)
@@ -1896,6 +1913,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             {
                 static_assert(dependent_false_v<Op>, "unhandled SIMD unary opcode");
             }
+        }
+
+        template <simd_code Op>
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_unop(wasm_v128 v) noexcept
+        {
+            constexpr bool integral32{Op == simd_code::f32x4_ceil || Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc || Op == simd_code::f32x4_nearest};
+            constexpr bool integral64{Op == simd_code::f64x2_ceil || Op == simd_code::f64x2_floor || Op == simd_code::f64x2_trunc || Op == simd_code::f64x2_nearest};
+            if constexpr(strict_float::uses_integer_rounding && (integral32 || integral64))
+            {
+                constexpr auto mode{Op == simd_code::f32x4_ceil || Op == simd_code::f64x2_ceil ? strict_float::integral_rounding::ceil :
+                                    Op == simd_code::f32x4_floor || Op == simd_code::f64x2_floor ? strict_float::integral_rounding::floor :
+                                    Op == simd_code::f32x4_trunc || Op == simd_code::f64x2_trunc ? strict_float::integral_rounding::trunc : strict_float::integral_rounding::nearest};
+                using UInt = ::std::conditional_t<integral32, u32, u64>;
+                constexpr ::std::size_t count{integral32 ? 4uz : 2uz};
+                auto lanes{load_uint_lanes<UInt, count>(v)};
+                for(auto& lane: lanes.lane) { lane = strict_float::round_integral_bits<mode>(lane); }
+                return store_uint_lanes<UInt, count>(lanes);
+            }
+            auto result{eval_full_unop_native<Op>(v)};
+            constexpr bool round32{Op == simd_code::f32x4_ceil || Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc};
+            constexpr bool round64{Op == simd_code::f64x2_ceil || Op == simd_code::f64x2_floor || Op == simd_code::f64x2_trunc};
+# if defined(__riscv)
+            if constexpr(round32) { return canonicalize_native_float_lanes<u32, 4uz, true>(result); }
+            else if constexpr(round64) { return canonicalize_native_float_lanes<u64, 2uz, true>(result); }
+# endif
+            if constexpr(round32 || Op == simd_code::f32x4_nearest || Op == simd_code::f32x4_sqrt || Op == simd_code::f32x4_demote_f64x2_zero)
+            { return canonicalize_native_float_lanes<u32, 4uz>(result); }
+            else if constexpr(round64 || Op == simd_code::f64x2_nearest || Op == simd_code::f64x2_sqrt || Op == simd_code::f64x2_promote_low_f32x4)
+            { return canonicalize_native_float_lanes<u64, 2uz>(result); }
+            else { return result; }
         }
 
         template <typename U, ::std::size_t N, simd_code Op>
@@ -2447,10 +2494,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 {
                     auto const l{v128_to_vec<v128_f32x4>(lhs)};
                     auto const r{v128_to_vec<v128_f32x4>(rhs)};
-                    if constexpr(Op == simd_code::f32x4_add) { return vec_to_v128(l + r); }
-                    else if constexpr(Op == simd_code::f32x4_sub) { return vec_to_v128(l - r); }
-                    else if constexpr(Op == simd_code::f32x4_mul) { return vec_to_v128(l * r); }
-                    else if constexpr(Op == simd_code::f32x4_div) { return vec_to_v128(l / r); }
+                    if constexpr(Op == simd_code::f32x4_add) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l + r)); }
+                    else if constexpr(Op == simd_code::f32x4_sub) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l - r)); }
+                    else if constexpr(Op == simd_code::f32x4_mul) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l * r)); }
+                    else if constexpr(Op == simd_code::f32x4_div) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l / r)); }
                     else if constexpr(Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
                     {
                         auto const lb{::std::bit_cast<v128_u32x4>(l)};
@@ -2509,10 +2556,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 {
                     auto const l{v128_to_vec<v128_f64x2>(lhs)};
                     auto const r{v128_to_vec<v128_f64x2>(rhs)};
-                    if constexpr(Op == simd_code::f64x2_add) { return vec_to_v128(l + r); }
-                    else if constexpr(Op == simd_code::f64x2_sub) { return vec_to_v128(l - r); }
-                    else if constexpr(Op == simd_code::f64x2_mul) { return vec_to_v128(l * r); }
-                    else if constexpr(Op == simd_code::f64x2_div) { return vec_to_v128(l / r); }
+                    if constexpr(Op == simd_code::f64x2_add) { return canonicalize_native_float_lanes<u64, 2uz>(vec_to_v128(l + r)); }
+                    else if constexpr(Op == simd_code::f64x2_sub) { return canonicalize_native_float_lanes<u64, 2uz>(vec_to_v128(l - r)); }
+                    else if constexpr(Op == simd_code::f64x2_mul) { return canonicalize_native_float_lanes<u64, 2uz>(vec_to_v128(l * r)); }
+                    else if constexpr(Op == simd_code::f64x2_div) { return canonicalize_native_float_lanes<u64, 2uz>(vec_to_v128(l / r)); }
                     else if constexpr(Op == simd_code::f64x2_pmin || Op == simd_code::f64x2_pmax)
                     {
                         auto const lb{::std::bit_cast<v128_u64x2>(l)};

@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--cxx", default="clang++")
 parser.add_argument("--llvm-config", default="llvm-config")
 parser.add_argument("--llc", default="llc")
+parser.add_argument("--opt", default="opt")
 parser.add_argument("--i686-cxx", default="i686-linux-gnu-g++")
 parser.add_argument("--i686-flags", default="")
 parser.add_argument("--run-prefix", default="")
@@ -52,17 +53,29 @@ for label, features, cpu in [
     ("sse2", "+sse2", "pentium4"),
     ("sse41", "+sse2,+sse4.1", "penryn"),
 ]:
-    ir = build / (label + ".ll")
-    obj = build / (label + ".o")
-    runner = build / (label + "-runner")
-    run([lower, features, ir], label + "-lower")
-    run([args.llc, "-O3", "-mtriple=i386-linux-gnu", "-mcpu=" + cpu,
-         "-filetype=obj", ir, "-o", obj], label + "-codegen")
-    run([args.i686_cxx, *shlex.split(args.i686_flags), "-std=c++20", "-O3",
-         "-I" + str(repo / "src"), "-fno-pie", "-no-pie",
-         fixtures / "fp_bits_runner.cpp", obj, "-lm", "-o", runner], label + "-link")
-    run([*shlex.split(args.run_prefix), runner], label + "-run")
-    assembly = run([args.objdump, "-dr", obj], label + "-assembly")
-    (build / (label + ".asm")).write_text(assembly)
-    print(label + ": PASS", flush=True)
+    original = build / (label + ".ll")
+    run([lower, features, original], label + "-lower")
+    for pipeline in ["none", "O2", "O3"]:
+        name = label + "-" + pipeline
+        ir = original
+        if pipeline != "none":
+            ir = build / (name + ".ll")
+            run([args.opt, "-S", "-passes=default<" + pipeline + ">", "-verify-each",
+                 original, "-o", ir], name + "-optimize")
+        obj = build / (name + ".o")
+        run([args.llc, "-O3", "-mtriple=i386-linux-gnu", "-mcpu=" + cpu,
+             "-filetype=obj", ir, "-o", obj], name + "-codegen")
+        # A bridge compiled for SSE2 can behave differently from an x87 bridge
+        # even when both execute the same generated object.
+        for host, flags in [("x87", []), ("sse2", ["-msse2", "-mfpmath=sse"])]:
+            variant = name + "-bridge-" + host
+            runner = build / (variant + "-runner")
+            run([args.i686_cxx, *shlex.split(args.i686_flags), "-std=c++20", "-O3",
+                 "-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off", *flags,
+                 "-I" + str(repo / "src"), "-fno-pie", "-no-pie",
+                 fixtures / "fp_bits_runner.cpp", obj, "-lm", "-o", runner], variant + "-link")
+            run([*shlex.split(args.run_prefix), runner], variant + "-run")
+            print(variant + ": PASS", flush=True)
+        assembly = run([args.objdump, "-dr", obj], name + "-assembly")
+        (build / (name + ".asm")).write_text(assembly)
 print("Artifacts:", build)

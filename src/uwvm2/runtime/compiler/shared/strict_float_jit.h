@@ -12,6 +12,7 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/TargetParser/Triple.h>
 
 namespace uwvm2::runtime::compiler::shared::strict_float_jit
 {
@@ -74,9 +75,116 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         }
     }
 
-    inline void lower(::llvm::Module& module, bool enabled = needs_lowering, bool bit_preserving_abi = needs_bit_preserving_abi) noexcept
+    // Keep native arithmetic on noncanonical-NaN hosts, then normalize its result
+    // using integer IR. Transport, sign operations and typed calls are excluded.
+    inline void canonicalize_native_nan_results(::llvm::Module& module, bool rounding_only = false)
     {
+        for(auto& function: module)
+        {
+            for(auto& block: function)
+            {
+                for(auto it{block.begin()}; it != block.end();)
+                {
+                    auto& instruction{*it++};
+                    auto scalar{instruction.getType()->getScalarType()};
+                    if((!scalar->isFloatTy() && !scalar->isDoubleTy()) || instruction.getMetadata("uwvm.wasm.nan.normalized")) { continue; }
+                    if(rounding_only)
+                    {
+                        auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)};
+                        if(!call) { continue; }
+                        switch(call->getIntrinsicID())
+                        {
+                            case ::llvm::Intrinsic::ceil: case ::llvm::Intrinsic::experimental_constrained_ceil:
+                            case ::llvm::Intrinsic::floor: case ::llvm::Intrinsic::experimental_constrained_floor:
+                            case ::llvm::Intrinsic::trunc: case ::llvm::Intrinsic::experimental_constrained_trunc:
+                            case ::llvm::Intrinsic::roundeven: case ::llvm::Intrinsic::experimental_constrained_roundeven:
+                            case ::llvm::Intrinsic::nearbyint: case ::llvm::Intrinsic::experimental_constrained_nearbyint:
+                            case ::llvm::Intrinsic::rint: case ::llvm::Intrinsic::experimental_constrained_rint: break;
+                            default: continue;
+                        }
+                    }
+                    bool arithmetic{};
+                    switch(instruction.getOpcode())
+                    {
+                        case ::llvm::Instruction::FAdd: case ::llvm::Instruction::FSub:
+                        case ::llvm::Instruction::FMul: case ::llvm::Instruction::FDiv:
+                        case ::llvm::Instruction::FPTrunc: case ::llvm::Instruction::FPExt: arithmetic = true; break;
+                        default:
+                            if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)})
+                            {
+                                switch(call->getIntrinsicID())
+                                {
+                                    case ::llvm::Intrinsic::experimental_constrained_fadd:
+                                    case ::llvm::Intrinsic::experimental_constrained_fsub:
+                                    case ::llvm::Intrinsic::experimental_constrained_fmul:
+                                    case ::llvm::Intrinsic::experimental_constrained_fdiv:
+                                    case ::llvm::Intrinsic::experimental_constrained_fptrunc:
+                                    case ::llvm::Intrinsic::experimental_constrained_fpext:
+                                    case ::llvm::Intrinsic::sqrt: case ::llvm::Intrinsic::experimental_constrained_sqrt:
+                                    case ::llvm::Intrinsic::ceil: case ::llvm::Intrinsic::experimental_constrained_ceil:
+                                    case ::llvm::Intrinsic::floor: case ::llvm::Intrinsic::experimental_constrained_floor:
+                                    case ::llvm::Intrinsic::trunc: case ::llvm::Intrinsic::experimental_constrained_trunc:
+                                    case ::llvm::Intrinsic::roundeven: case ::llvm::Intrinsic::experimental_constrained_roundeven:
+                                    case ::llvm::Intrinsic::nearbyint: case ::llvm::Intrinsic::experimental_constrained_nearbyint:
+                                    case ::llvm::Intrinsic::rint: case ::llvm::Intrinsic::experimental_constrained_rint:
+                                    case ::llvm::Intrinsic::minimum: case ::llvm::Intrinsic::maximum:
+                                    case ::llvm::Intrinsic::minnum: case ::llvm::Intrinsic::maxnum: arithmetic = true; break;
+                                    default: break;
+                                }
+                            }
+                    }
+                    if(!arithmetic) { continue; }
+                    ::llvm::IRBuilder<> b{instruction.getNextNode()};
+                    bool const wide{scalar->isDoubleTy()};
+                    auto integer{b.getIntNTy(wide ? 64u : 32u)};
+                    auto vector{::llvm::dyn_cast<::llvm::FixedVectorType>(instruction.getType())};
+                    ::llvm::Type* bits_type{vector ? static_cast<::llvm::Type*>(::llvm::FixedVectorType::get(integer, vector->getNumElements())) : integer};
+                    auto constant{[&](::std::uint64_t value) -> ::llvm::Constant*
+                    {
+                        auto c{::llvm::ConstantInt::get(integer, value)};
+                        return vector ? ::llvm::ConstantVector::getSplat(vector->getElementCount(), c) : c;
+                    }};
+                    auto raw{b.CreateBitCast(&instruction, bits_type)};
+                    auto classified{raw};
+                    bool classified_wide{wide};
+                    bool conversion{instruction.getOpcode() == ::llvm::Instruction::FPTrunc || instruction.getOpcode() == ::llvm::Instruction::FPExt};
+                    if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)})
+                    { conversion = call->getIntrinsicID() == ::llvm::Intrinsic::experimental_constrained_fptrunc ||
+                                   call->getIntrinsicID() == ::llvm::Intrinsic::experimental_constrained_fpext; }
+                    if(conversion)
+                    {
+                        auto source{instruction.getOperand(0u)};
+                        classified_wide = source->getType()->getScalarType()->isDoubleTy();
+                        auto source_integer{b.getIntNTy(classified_wide ? 64u : 32u)};
+                        ::llvm::Type* source_bits{vector ? static_cast<::llvm::Type*>(::llvm::FixedVectorType::get(source_integer, vector->getNumElements())) : source_integer};
+                        classified = b.CreateBitCast(source, source_bits);
+                    }
+                    auto classification_constant{[&](::std::uint64_t value)
+                    { return ::llvm::ConstantInt::get(classified->getType(), value); }};
+                    auto magnitude{b.CreateAnd(classified, classification_constant(classified_wide ? 0x7fffffffffffffffull : 0x7fffffffull))};
+                    auto nan{b.CreateICmpUGT(magnitude, classification_constant(classified_wide ? 0x7ff0000000000000ull : 0x7f800000ull))};
+                    auto bits{b.CreateSelect(nan, constant(wide ? 0x7ff8000000000000ull : 0x7fc00000ull), raw)};
+                    auto result{b.CreateBitCast(bits, instruction.getType())};
+                    instruction.replaceUsesWithIf(result, [&](::llvm::Use& use) { return use.getUser() != raw; });
+                    instruction.setMetadata("uwvm.wasm.nan.normalized", ::llvm::MDNode::get(module.getContext(), {}));
+                }
+            }
+        }
+    }
+
+    inline void lower(::llvm::Module& module, bool enabled = needs_lowering, bool bit_preserving_abi = needs_bit_preserving_abi,
+                      bool normalize_nan = fp::needs_nan_canonicalization) noexcept
+    {
+        // RISC-V's conversion-based rounding keeps large/NaN operands unchanged.
+        // Normalize only rounding results; arithmetic, transport and sign operations
+        // retain their native code. Check the generated target, including cross-JITs.
+        if(::llvm::Triple{module.getTargetTriple()}.isRISCV()) { canonicalize_native_nan_results(module, true); }
         if(!enabled) { return; }
+        if(normalize_nan && !fp::needs_extended_rounding && !bit_preserving_abi)
+        {
+            canonicalize_native_nan_results(module);
+            return;
+        }
         register_symbols(true);
         auto& context{module.getContext()};
         auto i64{::llvm::Type::getInt64Ty(context)};
@@ -254,5 +362,9 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                 }
             }
         }
+        // The integer bridge already returns Wasm NaNs. Normalize only native
+        // instructions left over after lowering, avoiding redundant vector work
+        // on scalar-only targets such as m68k.
+        if(normalize_nan) { canonicalize_native_nan_results(module); }
     }
 }
