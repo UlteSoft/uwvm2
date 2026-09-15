@@ -16,6 +16,8 @@
 
 ROS 只同步其已有功能对应的修复与说明；表中不表示为 ROS 恢复 SIMD、lazy 或 tiered 实现。原有测试配置、汇编与性能记录分别见 [环境与位模式审计](floating-point-environment.md) 和 [原生 NaN 补充审计](floating-point-native-nan.md)。
 
+2026-09-15 后续验证说明：当前两仓已有的 SIMD 实现已纳入配对测试，ROS 的 i686 浮点/SIMD 矩阵也已完成。下文历史条目的“主仓库”标签不是当前 ROS 不含 SIMD 的声明；实际快照、测试数量和未完成范围以[配对平台验证记录](../../test/0014.llvm_jit/PAIRED_PLATFORM_VALIDATION.md)为准。同步仍不恢复 ROS 已删除的 lazy/tiered 模式。
+
 ## 1. GCC 无优化时为什么可能传不对 sNaN
 
 问题不是“所有 GCC 都不能传 NaN”，也不是 `memcpy` 或 `std::bit_cast` 的语言语义允许任意改位。触发点是生成的浮点临时值、复制以及调用 ABI。

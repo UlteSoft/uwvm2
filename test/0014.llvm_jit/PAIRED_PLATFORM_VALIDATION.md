@@ -14,6 +14,10 @@ After the directed sanitizer matrix completed, its 36 successful, inactive ELF e
 
 Local evidence: `/tmp/uwvm-comprehensive-audit.i2TDbc` (**L**). Do not delete these directories until the follow-up builds have finished and evidence has been archived.
 
+The completed fresh CLI evidence is backed up locally as `L/latest-cli-evidence-20260915.tar.gz`. The FP/no-inline/MIPS follow-up has a separate 602-file, content-verified backup, `L/validation-followup-evidence-20260915.tar.gz` (SHA-256 `20944702fb94ea1f3eb1d8568c87d8fc75610245c254c715a3b4a6ee776e62b2`). It contains commands, results, original failures, IR/diagnostics and source-parity records, not SDKs or full compiler binaries. The matching remote copies remain under R.
+
+After diagnosing the terminated LLVM 22 module build, 1,210 inactive runtime-target BMI intermediates (8,038,458,168 bytes, about 7.49 GiB) were removed from the exact `full-modules/build-y/.gens/uwvm_runtime` directory. The main-target BMIs needed by the location-space reproducer, source, dependency commands and logs remain. `R/logs/obsolete-runtime-bmis-cleanup.json` records every deleted file's hash/size/inode. These obsolete BMIs are incompatible with the fresh LLVM 23 build; their original bytes are not backed up, but they can be regenerated.
+
 ## Snapshot boundaries
 
 Initial main HEAD: `d936f9bb6be987d24e82139b7fc23400e586e7c3`.
@@ -27,7 +31,67 @@ Baseline full CLI binaries:
 
 These LLVM 22 binaries **precede the final native-stack cache, SIMD scalar-target, native-thread and Mach-O relocation fixes described below**. The main binary has no build-source ID and correctly refuses persistent cache use; ROS has an ID and was used for authenticated cache-hit checks.
 
-`R/full-modules` is a different snapshot, containing the final native stack guard as of its build start, but not every subsequent SIMD/thread/cache/Mach-O edit. Its complete named-module build was still running when this ledger was written. No complete fresh paired build containing all latest edits has passed yet.
+`R/full-modules` is a different snapshot, containing the final native stack guard as of its build start, but not every subsequent SIMD/thread/cache/Mach-O edit. Its LLVM 22/libstdc++ 16 named-module build terminated at 40% with `ran out of source locations`, **not OOM**. The isolated replay reports 2,140,802,865 bytes of loaded AST source-location space, about 99% of the compiler's address space. `bits/version.h` alone was entered 9,129 times, accounting for 874,147,395 file-location bytes plus macro locations. Raising physical RAM cannot fix that counter limit. Evidence: `module-location-probe`, `logs/full-modules-resume.log`. The failed `xmake --files` attempt separately failed dependency scanning and is not the compiler reproducer. Complete paired named-module builds remain pending; no default build policy or standard-library header was changed to hide the failure.
+
+## Fresh paired LLVM 23 CLI closure
+
+The 20:55 CST frozen source snapshots are under `/var/tmp/uwvm-comprehensive.kH4XCt/latest-72hOuQ` (local copies under `L/latest.72hOuQ`). All 3,457 main and 3,362 ROS manifest entries were rehashed after transport. Manifest SHA-256 values, also used as the build-source IDs:
+
+- Main: `e8ba3a9077d87f7c35243d63e3772347d8eef833d9d77a81558c0754b753b870`.
+- ROS: `067b5a85b8eb351e551e3f123f3adc940de687280c4548ca134f1fbacb2b6036`.
+
+Both complete **header-mode** release builds passed with the matching LLVM 23/compiler-rt/libc++/LLVM-libunwind SDK, O3, native ISA, TLS, default memory mapping and each product's default combine configuration (main heavy, ROS soft). They contain the final cached native guard and the then-current shared-worktree repairs. They do not certify edits made after this freeze. Binary SHA-256:
+
+- Main: `f55166e243fba2e7b0c1c05869ee71271627a2798d424c274cd08817307386ae`.
+- ROS: `1235b91470c160b0684ef6963cbc6bc0c5e353202a938a4d7df8ab423b39bdbc`.
+
+The 22:14 CST source-drift check covers all currently tracked/untracked `src/` files: 1,662 main and 1,609 ROS, no additions or removals since the freeze. In each product only `section_memory_manager.cppm` differs, by the later Apple/aarch64 global-fragment include documented separately in `MODULE_VALIDATION.md`. This is not a complete new module build. The current shared-source guard also passes 49 files plus four removed-mode paths; frozen/earlier guards covered 29/33 files, respectively (`logs/current-source-drift.json`, `logs/shared-parity-final.json`).
+
+Dynamic binding logs identify `_Unwind_Backtrace` in the SDK's `libunwind.so.1` for both actual CLIs. `libgcc_s` is also loaded transitively; merely reading `ldd` would not establish which provider executed. The required native probe checks omitted logical frames and the exact native caller chain.
+
+| Fresh binary checks | Main | ROS | Evidence under R |
+| --- | ---: | ---: | --- |
+| Full/lazy/tiered or ROS-supported exact trap/policy matrix | 5,184 | 756 | trap-tests/*-latest-llvm23 |
+| Deeper recursive/non-OOM trap chains | 250 | 50 | latest-cli-full/recursive-corrected; latest-cli-ros/recursive |
+| Feature/import-alias/DataCount integration | 65 | 65 | latest-cli-*/features |
+| SIMD boundary/width/offset/grow checks | 652 | 652 | latest-cli-*/memory |
+| Persistent signed-cache integration | passed | passed | latest-cli-*/signed-cache-integration.log |
+| New authenticated-cache recursive trap regression | 108 runs / 72 trap replays | 108 runs / 72 trap replays | unwind-cache-latest-* |
+| Native stack exhaustion | 285 runs across both products / 19 profiles, all passed | | latest-native-exhaustion |
+| Start/initialization ordering | 98 runs across both products, all passed | | latest-start-order |
+
+The first main recursive-driver invocation duplicated `-Rllvm-cache-path` in the campaign wrapper; the CLI rejected it before Wasm execution. That failure remains in `latest-cli-full/results.json`. Removing the duplicate wrapper option produced the separate successful `logs/latest-full-recursive-corrected.log`; no runtime source was changed for this harness mistake.
+
+`check_native_unwind_cache.py` is paired and committed as main `a6e1ad077f2ef9e40011d3b1f7c8890a02377220` / ROS `b79ab20d95c95be06482459850afe457f0e65653`. It requires a verified-signature cache hit on each replay, eight repeated recursive activations plus their wrapper, three trap kinds and six CLI optimization policies. Instruction and checked-native policies are tested independently. The same entry is warmed with a nontrapping argument so normal shutdown can drain the asynchronous cache writer; a fatal cold run is not a reliable cache seed. A no-provenance baseline is correctly rejected by this test for failing its required cache-hit condition.
+
+The first small cache smoke process was killed by systemd-oomd (9.8 MiB scope, host pressure policy) while two large compilations overlapped. No new parent hard-limit OOM-kill event occurred. The auxiliary FP matrix was explicitly interrupted, and the successful paired full builds plus cache regressions completed before resuming heavy FP compilation serially. Initial failure/interruption evidence remains in `logs/latest-cache-smoke-pressure.log` and `logs/latest-fp-interruption.json`.
+
+Fresh shared rounding checks also pass with Clang 22: 1,584 per product, 16 helper-free functions per product, including eight single-instruction stack-free SSE4.1 packed roundings. These are shared-evaluator checks, not a substitute for complete CLI execution. Evidence: `rounding-latest-{full,ros}-clang22`.
+
+The paired no-inline unit also passes with the matching LLVM 23 SDK, checking actual retained calls after O1/O2/O3/Os/Oz optimization as well as mandatory unoptimized function attributes (`latest-noinline-policies-v4`). The expanded regression is committed as main `1ac3b2225` / ROS `90bebb9c`. The earlier v1/v2/v3 attempts failed at test-program linking, before any assertions: unavailable zstd development linkage, an accidentally shadowing non-PIC distro libunwind archive, and a dangling extracted zstd symlink. The successful build selects the SDK's matching unwinder and the host's real zstd runtime explicitly; no runtime protection or optimization policy was changed to bypass a test.
+
+Actual latest interpreter binaries: 54 selected scalar/SIMD add specializations across both products have no helper calls or native-stack accesses and retain tail dispatch (`latest-int-assembly-v2`). SIMD operand-stack loads/stores are still present and are not native stack spills. Clang uses packed additions plus unused-lane clearing for some scalar register-cache variants; requiring only ADDSS/ADDSD would be a false failure.
+
+The actual signed-cache JIT benchmark objects are byte-identical between products. Their nonempty executable `.ltext` section is 227 bytes; the loop is four `vmulps` / four `vaddps`, decrement and branch, with no calls or native-stack accesses. Wrapper calls remain outside the loop. Evidence: `latest-jit-assembly-v3`. Earlier inspection attempts lacked the SDK loader path or compared empty `.text` sections; those attempts are not executable-byte validation. The corrected check discovers disassembled sections and rejects empty bytes.
+
+Latest rotating CPU-time kernel measurements on E-core 16: main JIT 1.530 ns/iteration, ROS JIT 1.523, WAVM 3.779, main interpreter 29.787 and ROS interpreter 33.094 (`paired-latest-vm-bench`). Other background builds were present. This is one kernel, not an overall speed ranking or a causal comparison against LLVM 22: the toolchain and snapshots both changed.
+
+The fresh ROS i686 matrix now passes **168/168**: six GCC/Clang x87/SSE2/SSE4.1 profiles, 14 scalar/boundary/tail/SIMD test sources, O0 and O3. All 116 resumed cases completed, and the merge with the earlier 52 passes requires exactly 168 unique `(target, source, optimization)` tuples, successful compilation and execution, and the frozen ROS source identity. Evidence: `fp-latest-ros-i686-combined.json`, `fp-latest-ros-i686-resume`, `logs/fp-latest-ros-i686-resume.log`. The original interruption is retained; this is shared FP/opfunc coverage, not a full i686 JIT CLI build.
+
+## MIPS32r6 compiler failure diagnosis and test-oracle repair
+
+The two earlier Clang 22 O3 SIMD failures also reproduce with the available LLVM 23 snapshot `4c4c1db7c69a6fda6cfa6bc6066bb09a433edc89` on the fresh main source (`fp-mips23-latest`, 0/2). The MIPS SDK, O32 ABI, NaN2008 encoding, CPU and optimization level were retained; the compiler host uses its own matching libc++ loader paths while the MIPS guest retains libstdc++/libgcc. These failures happen during compilation, not Wasm execution or QEMU.
+
+Retained optimized IR plus `llc -verify-machineinstrs` identifies invalid machine instructions instead of only the final `MCInst 0` diagnostic:
+
+- The SIMD NaN test's independent rounding oracle is inlined into `check<unsigned>()`; condition-register (`fgr64cc`) spills become illegal PHI stores/loads after greedy allocation. Isolating only `fp_rounding_oracle::expected()` fixes this test. The paired, Clang/MIPS-r6-only `noinline` attribute leaves production SIMD evaluators, O3 optimization, integer-bit inputs/results and expected values unchanged. All four main/ROS × Clang 22/23 builds and QEMU runs pass. Commits: main `8267a5b3e`, ROS `11192c66`. Evidence: `mipsr6-machine-probe`, `mipsr6-oracle-guarded-*`; original failures are retained as negative controls.
+- The separate SIMD bit test has invalid `$d2_64 = PHI killed $at` copies after pseudo expansion in the multi-operation f64 test driver. Its independent, target-gated invocation adapter now passes all four main/ROS × Clang 22/23 O3 builds and QEMU runs (`mipsr6-bits-guarded-*`). It preserves the real optimized opfunc, explicit three-argument template specialization, byref/tail modes and every original bit assertion. Commits: main `6f968ac8c`, ROS `4b24fdf4`; the latter also tracks the previously untracked ROS regression. The first prototype omitted that template argument pack and failed before execution; its harness error remains in `mipsr6-bits-isolated`. Original backend failures and IR remain in `mipsr6-machine-probe-uwvm_int_simd_fp_bits`.
+
+The four native-x86_64 preprocessed-token comparisons (two test components × both products) are identical before/after these guards: approximately 2.53 million tokens for each bit test and 144,868 for each oracle. Evidence: `nonmips-test-token-equivalence`. The exact completed token-output intermediates (1,554,296,222 bytes, about 1.45 GiB) were removed after retaining their semantic digests and rebuild commands. These tests do not constitute a rerun of the entire cross matrix or the newly guarded MIPS O0 cases.
+
+Crucially, `fixtures/mipsr6_fp_select_backend.cpp` reduces the copy failure to an independent scalar-condition vector select followed by pseudo-minimum, with no UWVM headers or library calls. Both tested MIPS backends still fail; native x86_64 control compilations pass (`mipsr6-independent-backend-repro`). This is an explicitly retained backend diagnostic, not a passing runtime-suite member. Complete MIPS JIT select/SIMD combinations therefore remain unvalidated despite the eight successful directed O3 test runs.
+
+These test-driver findings do **not** fix LLVM's backend itself or establish complete MIPS JIT/CLI coverage. The [upstream MIPS register-copy/spill implementation](https://github.com/llvm/llvm-project/blob/llvmorg-22.1.8/llvm/lib/Target/Mips/MipsSEInstrInfo.cpp) is relevant to the emitted opcode-zero diagnostics; the [similar upstream report](https://github.com/llvm/llvm-project/issues/181442) is background, not evidence that our reproducer is identical to that issue. No global optimization disable, reduced precision or runtime safety-check removal was introduced.
 
 ## Completed checks
 
@@ -85,7 +149,7 @@ The fixes are target-gated and explain the compiler/ABI failure in code:
 - PPC32 without VSX could emit an invalid 64-bit GPR load for f64 min/max.
 - SPARC constrained demotion could call unavailable `__truncdfsf2`; ordinary native conversion plus an input-NaN bit guard preserves the required result. Builder constrained-FP state is restored immediately.
 
-The cache fingerprint includes `llvm-simd-scalar-lowering=scalar-target-contract-v2`, so reusing a project version/source ID cannot replay objects from the old scalar-target contract. Latest full-CLI cache replay after this fingerprint change is still pending.
+The cache fingerprint includes `llvm-simd-scalar-lowering=scalar-target-contract-v2`, so reusing a project version/source ID cannot replay objects from the old scalar-target contract. Fresh paired full-CLI signed replay now passes on the LLVM 23 snapshots above; cross-ISA persistent-cache replay is still separate work.
 
 For x86_64 SSE2, AArch64 NEON and PPC64LE VSX, all 236 checked IR and assembly outputs were byte-identical before/after these workarounds (`simd-fastpaths`). This is not a claim that every instruction on every architecture is call-free.
 
@@ -119,11 +183,12 @@ Independent native-thread emplacement fixes were committed as main `ee54468b4986
 
 ## Still required before claiming completion
 
-- Fresh complete main and ROS builds containing **all** latest shared-worktree changes, followed by CLI regressions on those exact binaries.
+- Revalidate any shared-worktree changes after the 20:55 freeze; fresh paired header-mode builds and CLI regressions for that exact freeze are complete.
 - Complete paired named-module builds; the small Mach-O global-fragment fixture is not a substitute.
-- Full CLI native/instruction trap matrices with the matching LLVM-libunwind SDK, and on macOS after the relocation repair.
+- Full macOS CLI native/instruction traps after the relocation repair; the matching Linux LLVM-libunwind CLI matrices now pass.
 - Remaining distro-ISA and ROS FP matrices, allocator configurations, all strict tests and all uwvm-int/LLVM policy combinations.
 - Resolve or explicitly reject the remaining x86_64 no-SSE ABI builds and MIPS32r6 LLVM compiler failures.
+- Do not mistake the MIPS test-oracle/driver isolation for a fix of the independent LLVM select/SIMD backend defect; validate complete MIPS JIT combinations and rerun affected guarded-test configurations separately.
 - Additional OS/ISA/ABI coverage unavailable to these QEMU and SDK profiles, including SPARC32 execution and missing distro MIPS toolchains.
 - Full semantic WAST coverage, stateful module registration scripts and unsupported proposals are not established by these directed suites.
 
