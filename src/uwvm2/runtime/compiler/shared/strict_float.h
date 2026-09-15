@@ -82,7 +82,7 @@ namespace uwvm2::runtime::compiler::shared::strict_float
     // loses this sticky information. FP controls are restored before returning; Wasm exception flags are unobservable.
     // See Boldo/Melquiond, "When double rounding is odd". No long-double C++ layout or ambient precision assumption.
     template <operation Op, typename Float>
-    [[nodiscard]] inline extended_value evaluate_extended(Float lhs, Float rhs = {}) noexcept
+    [[nodiscard]] inline extended_value evaluate_extended([[maybe_unused]] Float lhs, [[maybe_unused]] Float rhs = {}) noexcept
     {
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
         struct raw_extended { unsigned char bytes[10]; } raw;

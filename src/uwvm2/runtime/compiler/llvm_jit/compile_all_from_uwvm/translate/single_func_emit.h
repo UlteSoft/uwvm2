@@ -22,6 +22,14 @@
 # define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 0
 #endif
 
+// Native provider callbacks copy scalar bits. Use integer returns/arguments so
+// neither a legacy FP ABI nor an x87 register can quiet an sNaN in transit.
+[[nodiscard]] inline ::llvm::Type* get_llvm_jit_scalar_bits_type(::llvm::Type* type) noexcept
+{
+    return type->isFloatTy() ? ::llvm::Type::getInt32Ty(type->getContext()) :
+           type->isDoubleTy() ? ::llvm::Type::getInt64Ty(type->getContext()) : type;
+}
+
 struct llvm_jit_stack_value_t
 {
     // Wasm scalar type represented by `value`.
@@ -5094,7 +5102,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
 }
 
 // Emit the local-imported global.get bridge call for the resolved scalar type.
-[[nodiscard]] inline constexpr ::llvm::CallInst*
+[[nodiscard]] inline constexpr ::llvm::Value*
     emit_runtime_local_func_llvm_jit_local_imported_global_get_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
                                                                            ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
                                                                            validation_module_traits_t::wasm_u32 global_index,
@@ -5110,7 +5118,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     auto& llvm_context{*state.llvm_context_holder};
     auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto bridge_function_type{::llvm::FunctionType::get(llvm_global_type, {llvm_intptr_type, llvm_intptr_type}, false)};
+    auto bridge_function_type{::llvm::FunctionType::get(get_llvm_jit_scalar_bits_type(llvm_global_type), {llvm_intptr_type, llvm_intptr_type}, false)};
 
     auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(runtime_module, global_index)};
     auto module_pointer{get_llvm_external_host_object_pointer(ir_builder,
@@ -5126,14 +5134,15 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     };
     auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
-    return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+    auto result{emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>>(
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>>(
         state,
         global_access_info.value_type,
         bridge_function_type,
-        bridge_arguments);
+        bridge_arguments)};
+    return result == nullptr ? nullptr : ir_builder.CreateBitCast(result, llvm_global_type);
 }
 
 // Emit the local-imported global.set bridge call for the resolved scalar type.
@@ -5154,7 +5163,7 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     auto& llvm_context{*state.llvm_context_holder};
     auto& ir_builder{*state.ir_builder};
     auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-    auto bridge_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, llvm_value_type}, false)};
+    auto bridge_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, get_llvm_jit_scalar_bits_type(llvm_value_type)}, false)};
 
     auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(runtime_module, global_index)};
     auto module_pointer{get_llvm_external_host_object_pointer(ir_builder,
@@ -5167,14 +5176,14 @@ template <auto I32BridgeFunction, auto I64BridgeFunction, auto F32BridgeFunction
     ::llvm::Value* bridge_arguments_array[]{
         module_address,
         ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
-        value,
+        ir_builder.CreateBitCast(value, get_llvm_jit_scalar_bits_type(llvm_value_type)),
     };
     auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
     return emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call<llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>>(
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>>(
         state,
         global_access_info.value_type,
         bridge_function_type,
@@ -5854,12 +5863,12 @@ template <typename CreateValue>
     // Dispatcher-local local-imported global getter.  Some opcode case files use this directly instead of the standalone
     // helper when all required LLVM locals are already in scope.
     [[maybe_unused]] auto const emit_local_imported_global_get_bridge_call{
-        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_global_type) constexpr noexcept -> ::llvm::CallInst*
+        [&](runtime_global_access_info_t const& global_access_info, ::llvm::Type* llvm_global_type) constexpr noexcept -> ::llvm::Value*
         {
             if(global_access_info.local_imported_module_ptr == nullptr || llvm_global_type == nullptr) [[unlikely]] { return nullptr; }
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-            auto bridge_function_type{::llvm::FunctionType::get(llvm_global_type, {llvm_intptr_type, llvm_intptr_type}, false)};
+            auto bridge_function_type{::llvm::FunctionType::get(get_llvm_jit_scalar_bits_type(llvm_global_type), {llvm_intptr_type, llvm_intptr_type}, false)};
             auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
             if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
             auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(
@@ -5878,13 +5887,14 @@ template <typename CreateValue>
             };
             auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
-            return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+            auto result{emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_f64>>(
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_get_bridge<runtime_wasm_i64>>(
                 global_access_info.value_type,
                 bridge_function_type,
-                bridge_arguments);
+                bridge_arguments)};
+            return result == nullptr ? nullptr : ir_builder.CreateBitCast(result, llvm_global_type);
         }};
 
     // Dispatcher-local local-imported global setter matching the getter above.
@@ -5895,7 +5905,7 @@ template <typename CreateValue>
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
             auto bridge_function_type{
-                ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, llvm_value_type}, false)};
+                ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_intptr_type, llvm_intptr_type, get_llvm_jit_scalar_bits_type(llvm_value_type)}, false)};
             auto runtime_module_ptr{local_func_storage.runtime_module_ptr};
             if(runtime_module_ptr == nullptr) [[unlikely]] { return nullptr; }
             auto const module_symbol_name{get_llvm_local_imported_global_module_symbol_name(
@@ -5910,14 +5920,14 @@ template <typename CreateValue>
             ::llvm::Value* bridge_arguments_array[]{
                 module_address,
                 ::llvm::ConstantInt::get(llvm_intptr_type, global_access_info.local_imported_global_index),
-                value,
+                ir_builder.CreateBitCast(value, get_llvm_jit_scalar_bits_type(llvm_value_type)),
             };
             auto const bridge_arguments{::llvm::ArrayRef<::llvm::Value*>{bridge_arguments_array}};
 
             return emit_runtime_scalar_bridge_call.template operator()<llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
                                                                        llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f32>,
-                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_f64>>(
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i32>,
+                                                                       llvm_jit_local_imported_global_set_bridge<runtime_wasm_i64>>(
                 global_access_info.value_type,
                 bridge_function_type,
                 bridge_arguments);

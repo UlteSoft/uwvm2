@@ -28,7 +28,7 @@ namespace
         if(::std::fesetenv(FE_DFL_ENV) != 0) { return 9; }
         ::std::uint16_t original_x87{};
         __asm__ volatile("fnstcw %0" : "=m"(original_x87) : : "memory");
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
         ::std::uint32_t original_sse{};
         __asm__ volatile("stmxcsr %0" : "=m"(original_sse) : : "memory");
 # endif
@@ -40,7 +40,7 @@ namespace
             auto const changed_x87{static_cast<::std::uint16_t>((original_x87 & ~0x0f00u) | 0x0600u)};
             auto const unmasked_x87{static_cast<::std::uint16_t>(changed_x87 & ~0x0004u)};
             __asm__ volatile("fnclex\n\tfldcw %0" : : "m"(unmasked_x87) : "memory");
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
             auto const changed_sse{static_cast<::std::uint32_t>((original_sse & ~0x0000023fu) | 0x0000c000u)};
             __asm__ volatile("ldmxcsr %0" : : "m"(changed_sse) : "memory");
 # endif
@@ -48,7 +48,7 @@ namespace
         ::std::uint16_t restored_x87{};
         __asm__ volatile("fnstcw %0" : "=m"(restored_x87) : : "memory");
         if(restored_x87 != original_x87) { return 11; }
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
         ::std::uint32_t restored_sse{};
         __asm__ volatile("stmxcsr %0" : "=m"(restored_sse) : : "memory");
         if(restored_sse != original_sse) { return 12; }

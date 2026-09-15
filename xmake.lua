@@ -622,6 +622,11 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		if uwvm_uses_llvm_jit and is_0013_uwvm_int then
 			add_deps("uwvm_runtime")
 		end
+
+		if string.find(file, "uwvm_int_fp_bit_environment.cc", 1, true) ~= nil then
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+		end
 		-- This regression calls the production entry even in interpreter-only builds.
 		if is_uwvm_int_fp_environment then
 			add_deps("uwvm_runtime")
