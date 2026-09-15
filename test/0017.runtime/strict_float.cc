@@ -1,3 +1,6 @@
+// Known midpoint/subnormal regressions exercise single Wasm rounding even
+// under x87/68881 excess precision. These test arithmetic semantics; separate
+// raw-bit tests cover sNaN transport through parser, storage and call ABIs.
 #include <uwvm2/runtime/compiler/shared/strict_float.h>
 #include <bit>
 #include <cfenv>

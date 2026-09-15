@@ -1,3 +1,6 @@
+// Test actual backend entry and hostile native callbacks, not only standalone
+// fenv helpers. Interpreter and LLVM share the same Wasm control assumptions;
+// lazy/tiered transitions must not let callbacks leak controls into continuation.
 // Exercise the production full/lazy entries, not a header-only interpreter runner. Build this test both with and
 // without LLVM, and with both TLS representations: selecting uwvm-int in a combined binary used to disable the guard.
 #define UWVM2TEST_STRICT_NO_INTERPRETER 1

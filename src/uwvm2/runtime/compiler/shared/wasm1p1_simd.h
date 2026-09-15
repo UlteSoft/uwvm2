@@ -3,6 +3,14 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// SIMD must keep arithmetic and bit transport separate. Arithmetic lanes share
+// strict_float rounding and affected-target NaN normalization, including width
+// conversions whose source NaN can otherwise become infinity. Integer-lane
+// rounding handles the SSE2/legacy fallback without a per-lane libm repair call.
+// abs/neg, splat/extract/replace and pmin/pmax selection retain the
+// specified operand bits; do not apply arithmetic NaN normalization to them.
+// Compile-time target selection retains native vector arithmetic where conformant.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

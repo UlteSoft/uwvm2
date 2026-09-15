@@ -16,6 +16,9 @@
 
 namespace uwvm2::runtime::compiler::shared::strict_float_jit
 {
+    // This bridge is part of the generated-object ABI. Cache hits must rebind its
+    // symbol in the current process, just like new objects; persisting a native
+    // function address or reusing an older FP-return object is not compatible.
     inline constexpr char symbol_name[]{"uwvm_strict_float_bits_v1"};
     inline void register_symbols(bool enabled = needs_lowering) noexcept
     {
@@ -75,6 +78,10 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         }
     }
 
+    // Canonicalizing an arithmetic NaN is allowed by Wasm even when preserving
+    // its payload would also be allowed. Transport, reinterpret, sign operations,
+    // and selection must NOT be fed through this repair pass. Normal and
+    // constrained intrinsics and every vector lane need the same arithmetic rule.
     // Keep native arithmetic on noncanonical-NaN hosts, then normalize its result
     // using integer IR. Transport, sign operations and typed calls are excluded.
     inline void canonicalize_native_nan_results(::llvm::Module& module, bool rounding_only = false)
@@ -151,6 +158,10 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                     if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)})
                     { conversion = call->getIntrinsicID() == ::llvm::Intrinsic::experimental_constrained_fptrunc ||
                                    call->getIntrinsicID() == ::llvm::Intrinsic::experimental_constrained_fpext; }
+                    // Classify the SOURCE for width conversions: legacy demotion can
+                    // discard a tiny NaN payload and yield infinity; checking only
+                    // the native result would then miss the NaN. Promotion also
+                    // needs arithmetic quieting even when hardware only moves bits.
                     if(conversion)
                     {
                         auto source{instruction.getOperand(0u)};
@@ -165,6 +176,9 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                     auto nan{b.CreateICmpUGT(magnitude, classification_constant(classified_wide ? 0x7ff0000000000000ull : 0x7f800000ull))};
                     auto bits{b.CreateSelect(nan, constant(wide ? 0x7ff8000000000000ull : 0x7fc00000ull), raw)};
                     auto result{b.CreateBitCast(bits, instruction.getType())};
+                    // Keep the raw bitcast's use of the original instruction or the
+                    // replacement would form a cycle. Metadata makes repeated lowering
+                    // idempotent; wrappers/materialization can revisit the module.
                     instruction.replaceUsesWithIf(result, [&](::llvm::Use& use) { return use.getUser() != raw; });
                     instruction.setMetadata("uwvm.wasm.nan.normalized", ::llvm::MDNode::get(module.getContext(), {}));
                 }
@@ -179,6 +193,10 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         // Normalize only rounding results; arithmetic, transport and sign operations
         // retain their native code. Check the generated target, including cross-JITs.
         if(::llvm::Triple{module.getTargetTriple()}.isRISCV()) { canonicalize_native_nan_results(module, true); }
+        // The RISC-V rounding repair intentionally precedes this early return:
+        // disabling extended-precision/ABI bridge lowering does not prove that
+        // the generated target's native rounding quiets sNaNs. Use the module triple,
+        // not the compiler host macros, for cross-generated RISC-V code.
         if(!enabled) { return; }
         if(normalize_nan && !fp::needs_extended_rounding && !bit_preserving_abi)
         {
@@ -213,6 +231,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
 #endif
             if(bit_preserving_abi)
             {
+                // This is a PRIVATE generated-function ABI, not a change to native
+                // C/C++ float returns. SSE2 only changes arithmetic selection; the
+                // ordinary i386 FP result ABI still uses ST0. All generated callers,
+                // callees and wrappers must opt in together, including indirect and
+                // multi-result calls. Native crossings remain byte/integer bridges.
                 // LLVM's no-x87 i386 ABI returns f32/f64 bits in integer registers. It also
                 // prevents load/store/select/PHI legalization from quieting sNaNs in ST0.
                 // Apply consistently to typed definitions, declarations, raw wrappers and

@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP constant transport (c1a55bfa): the uncached tail and by-reference paths copy
+// immediate bytes directly to the operand stack. Do not hoist a Float temporary
+// above the compile-time cache branch: GCC -O0/i386 or 68881 can quiet an sNaN
+// merely while returning/copying that value. Safe native-cache profiles retain
+// their existing path; no per-constant FP guard or NaN classification is needed.
+// Rationale and regression map: documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

@@ -1,3 +1,6 @@
+// Exercise every lane, including mixed finite/NaN inputs, so scalar-only
+// normalization cannot mask a missing vector path. Check canonical invalid
+// results and width conversions separately from pure lane transport.
 #include <uwvm2/uwvm/io/impl.h>
 #include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>

@@ -1,3 +1,6 @@
+// A correct fenv does not force each C++ expression to Wasm binary32/64
+// precision. Probe excess precision separately; volatile stores alone cannot
+// undo an earlier extended-precision rounding to an exact destination midpoint.
 // Diagnostic for a pre-existing native arithmetic limitation, NOT a test that the environment guard can fix.
 // x87/68881 extended intermediates can double-round even with FE_TONEAREST and all FP boundaries protected.
 #include <bit>

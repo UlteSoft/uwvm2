@@ -3,6 +3,13 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP conversion has two different contracts. Reinterpret changes only the logical
+// type: equal-sized stack bytes and stack height are already correct, so the
+// uncached path intentionally does nothing. bit_cast<Float> followed by a native
+// FP return is NOT a safe substitute on x87/68881, especially at GCC -O0.
+// Numerical convert/promote/demote instead require Wasm rounding/NaN semantics;
+// they share strict_float with scalar/fused arithmetic and the LLVM bridge.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

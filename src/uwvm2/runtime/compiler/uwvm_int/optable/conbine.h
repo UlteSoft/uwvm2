@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Fused FP arithmetic must call the shared numeric evaluator, not spell out
+// host +, -, *, / independently. Otherwise fusion bypasses x87/68881 single-rounding
+// and legacy/default-NaN fixes while ordinary instructions pass the same tests.
+// The evaluator's compile-time target checks retain native modern instructions;
+// this does not insert an environment guard or split the fused dispatch.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

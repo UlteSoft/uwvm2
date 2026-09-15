@@ -1,3 +1,6 @@
+// Inspect the explicit-contract build for eliminated environment work, while
+// retaining numeric correctness checks. This probe is not authorization to
+// omit guards for arbitrary native callbacks or to disable other sandbox checks.
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 static_assert(uwvm2::runtime::lib::details::wasm_fp_environment_is_fixed);
 extern "C" void fixed_fp_boundary(void (*callback)() noexcept) noexcept

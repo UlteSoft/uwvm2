@@ -3,6 +3,13 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP fusion preserves instruction semantics as well as stack effects: arithmetic
+// and integral rounding use the shared strict evaluators, while sign-only and
+// select/local-copy variants preserve raw bits. Uncached variants must not fetch
+// an sNaN through a Float-return helper before selecting/masking it (GCC -O0 can
+// expose the x87/68881 ABI). Integer masks and alias-safe copies keep the original
+// fused dispatch; local destinations may coincide with selected sources.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

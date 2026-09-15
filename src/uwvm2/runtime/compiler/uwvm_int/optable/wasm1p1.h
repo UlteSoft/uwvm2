@@ -340,6 +340,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
+        // Splat/extract/replace-lane are transport, not numerical conversions.
+        // Use same-width integer helpers end to end, including the scalar stack
+        // boundary: wrapping a Float-returning lane helper in bit_cast is too late
+        // if GCC -O0 or an x87/68881 ABI has already quieted the signaling bit.
         // These SIMD operations move scalar bits; a native floating return can
         // quiet an sNaN on x87/68881 even when no arithmetic was requested.
         template <typename T>

@@ -3109,6 +3109,10 @@ auto const emit_local_get_typed_to{
         if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
     }};
 
+// Both f32/f64 emitters accept same-sized raw integers as well as finite FP
+// constants by const reference. Do not narrow this to a by-value Float API:
+// the NaN literal path intentionally avoids a native floating return/copy,
+// including GCC -O0/i386. Size checks retain the bytecode width invariant.
 [[maybe_unused]] auto const emit_const_f32_to{
     [&](bytecode_vec_t& dst, auto const& imm) constexpr UWVM_THROWS
     {

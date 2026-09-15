@@ -1,3 +1,7 @@
+// Generate expectations independently with MPFR, then consume endian-neutral
+// integer bits on the target. A host long-double oracle can suffer the same
+// double rounding as the implementation; do not use it as independent proof.
+// Keep producer and consumer free of fast-math assumptions that discard NaNs.
 // Build with -DUWVM_FP_ORACLE_GENERATE and MPFR/GMP to generate a deterministic corpus;
 // build without MPFR for a native/cross-target consumer. stdin/stdout are endian-neutral hex.
 #include <uwvm2/runtime/compiler/shared/strict_float.h>

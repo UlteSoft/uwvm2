@@ -668,6 +668,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     /// };
     template <typename SingleGlobal>
     concept has_global_get = has_global_value_type<SingleGlobal> && requires(SingleGlobal& g) {
+        // A value-returning provider owns its native FP ABI: on i386 its result
+        // can pass through ST0 even in an SSE2 build. GCC -O0 commonly exposes
+        // this boundary; successful optimized inlining is not a provider contract.
         // Reference getters permit bit-exact FP storage access even when the native
         // value-return ABI uses x87/68881. Existing value getters remain supported.
         requires ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type> ||
@@ -1661,6 +1664,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 using value_type = typename global_type::value_type;
                 static_assert(::std::is_trivially_copyable_v<value_type>, "global get requires trivially copyable value types");
 
+            // const& retains the provider's storage (or extends a by-value temporary's
+            // lifetime) without another FP value copy. It cannot undo quieting inside
+            // a by-value getter. Providers requiring exact NaN bits should return a
+            // reference; neither volatile nor restoring fenv recovers destroyed bits.
                 // Preserve reference-returning provider storage without an FP value copy.
                 // A value-returning native getter still owns its native FP ABI semantics.
                 value_type const& v{global_get(::fast_io::get<N>(globals))};

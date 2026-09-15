@@ -1,3 +1,6 @@
+// SIMD bit operations must preserve lane payloads and signaling bits even when
+// scalar helpers use x87/68881. Integer lane observations distinguish transport
+// and pmin/pmax selection from arithmetic NaN canonicalization.
 // SIMD float lanes are bit patterns for moves, sign operations and pseudo-min/max.
 #include <uwvm2/uwvm/io/impl.h>
 #include <uwvm2/runtime/compiler/uwvm_int/optable/wasm1p1.h>

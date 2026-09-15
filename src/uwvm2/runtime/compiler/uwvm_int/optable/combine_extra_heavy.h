@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Extra-heavy FP fusion is not exempt from Wasm rounding and bit-preservation.
+// Copysign with immediate/local operands must use integer masks on uncached
+// profiles before any Float temporary can quiet an sNaN. Arithmetic still routes
+// through the shared evaluator, preventing a fused-only double-rounding/NaN bug.
+// Preserve the fused dispatch and compile-time native-cache fast paths.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

@@ -1,3 +1,7 @@
+// Expected results must not reuse round_integral_bits or the bridge: that would
+// let the same bug validate itself. Integral/fractional decomposition supplies
+// rounding expectations; integer conversion expectations decode bits instead
+// of invoking a possibly out-of-range native FP-to-integer conversion.
 #pragma once
 #include <bit>
 #include <cmath>

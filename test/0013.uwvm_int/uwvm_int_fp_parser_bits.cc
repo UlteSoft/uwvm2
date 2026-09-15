@@ -1,3 +1,6 @@
+// Test the earliest boundary: parser-time sNaN loss cannot be fixed by a later
+// runtime fenv guard or JIT bridge. Compare stored integer bits for both Wasm
+// constant-expression implementations, including unoptimized GCC builds.
 // Global initializers are bit patterns, not native floating-point expressions.
 #include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 #include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>

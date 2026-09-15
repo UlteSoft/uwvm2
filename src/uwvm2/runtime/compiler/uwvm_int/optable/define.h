@@ -900,6 +900,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr bool f32_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos)};
             constexpr bool f64_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos)};
 # if defined(__i386__) || defined(_M_IX86) || (defined(__m68k__) && defined(__HAVE_68881__))
+            // This is an ABI restriction, not just a choice of arithmetic instructions:
+            // i386 float/double returns still use ST0 with -msse2/-mfpmath=sse.
+            // GCC -O0 can leave a floating load/bit_cast helper out of line, exposing that
+            // return path; x87/68881 transfers may quiet sNaNs before a Wasm operation.
+            // Inlining at -O3 can hide the bug but is not a representation guarantee.
+            // Reject custom FP-cache profiles on these ABIs at compile time; modern
+            // targets retain their register caches without an extra run-time branch.
             // Native floating cache carriers can quiet sNaNs in x87/68881.
             // These ABIs must use the raw-byte operand stack, as the runtime profiles already do.
             static_assert(!f32_enabled && !f64_enabled, "This ABI requires uncached floating operands to preserve Wasm NaN bits");

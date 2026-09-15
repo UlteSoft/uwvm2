@@ -1,3 +1,7 @@
+// Performance probe, not a correctness oracle: the uncorrected native baseline
+// may be faster precisely because it double-rounds. Compare common and strict
+// paths only after independent correctness tests; QEMU timings are not hardware
+// performance evidence.
 // Native timings only: QEMU timings are not hardware-performance evidence.
 #include <uwvm2/runtime/compiler/shared/strict_float.h>
 #include <bit>

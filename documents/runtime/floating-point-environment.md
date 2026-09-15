@@ -1,5 +1,7 @@
 # 浮点环境边界、契约快路径与跨架构验证
 
+逐层修改原因、GCC `-O0` / sNaN ABI 条件与回归设计见 [维护注释索引](floating-point-change-rationale.md)。
+
 后续的舍入、原生 NaN 编码与 LLVM 指令生成检查见 [补充审计](floating-point-native-nan.md)。
 
 ## 2026-09-15：NaN 位模式与浮点 ABI 补充审计

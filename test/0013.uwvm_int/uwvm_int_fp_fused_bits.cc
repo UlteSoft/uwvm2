@@ -1,3 +1,6 @@
+// Fusion can bypass the fixed ordinary opfuncs. Exercise immediate/local
+// copysign variants with integer observations, including aliasing and both
+// dispatch forms; passing the scalar test alone does not validate these paths.
 // All copysign fusion families must retain the magnitude operand's NaN payload.
 #define UWVM_ENABLE_UWVM_INT_COMBINE_OPS 1
 #define UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS 1

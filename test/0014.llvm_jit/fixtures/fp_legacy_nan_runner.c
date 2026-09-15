@@ -1,3 +1,6 @@
+// Observe generated results as integer bits: host isnan/quiet-bit conventions
+// differ on legacy targets. Canonical invalid results and NaN width conversions
+// must be checked, not merely whether native arithmetic reports a NaN.
 typedef unsigned int u32;
 typedef unsigned long long u64;
 typedef __SIZE_TYPE__ usize;

@@ -307,6 +307,10 @@ case wasm1_code::f32_const:
     // [ safe      ] unsafe (could be the section_end)
     //           ^^ code_curr
 
+    // Test integer bits before decoding to Float: a native helper return
+    // can quiet sNaNs at GCC -O0 even if no Wasm arithmetic is emitted.
+    // Flush pending fusion to preserve instruction order and avoid storing
+    // NaNs in its Float-valued state; emit the literal's exact integer bits.
     // Keep NaN literals out of native floating temporaries and delayed arithmetic
     // fusion state. This is a translation-only cold path; finite constants keep
     // their existing fusion fast paths.
@@ -426,6 +430,10 @@ case wasm1_code::f64_const:
     // [     safe  ] unsafe (could be the section_end)
     //           ^^ code_curr
 
+    // Test integer bits before decoding to Float: a native helper return
+    // can quiet sNaNs at GCC -O0 even if no Wasm arithmetic is emitted.
+    // Flush pending fusion to preserve instruction order and avoid storing
+    // NaNs in its Float-valued state; emit the literal's exact integer bits.
     // Keep NaN literals out of native floating temporaries and delayed arithmetic
     // fusion state. This is a translation-only cold path; finite constants keep
     // their existing fusion fast paths.

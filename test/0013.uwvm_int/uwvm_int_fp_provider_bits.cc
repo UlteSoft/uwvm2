@@ -1,3 +1,6 @@
+// A reference-returning getter must cross type erasure and global opfuncs
+// without a native floating value return. Integer observations detect quiet-bit
+// loss; value-return providers are not promised recovery of bits lost in their ABI.
 // Exercise the production imported-global opcode and reference-provider ABI.
 #include <uwvm2/runtime/compiler/uwvm_int/optable/variable.h>
 #include <uwvm2/utils/macro/push_macros.h>

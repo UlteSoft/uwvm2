@@ -1,3 +1,7 @@
+// IR verifier success does not test ABI legalization. Keep typed callees and
+// wrappers non-inlined, then execute their emitted i386 objects: SSE2 arithmetic
+// does not by itself remove ST0 returns. Indirect/mixed-result calls must agree
+// on the same private no-x87 ABI as direct scalar calls.
 // Cross-codegen regression: run with FEATURES OUTPUT.ll on an LLVM host, then
 // compile for i386 and link fp_bits_runner.cpp with the native i686 SDK.
 #include <uwvm2/runtime/compiler/shared/strict_float_jit.h>

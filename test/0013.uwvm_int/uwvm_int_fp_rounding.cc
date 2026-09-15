@@ -1,3 +1,6 @@
+// Cover ordinary/fused tail/byref evaluators AND the integer JIT bridge: a fix
+// only in one dispatch path is incomplete. Include O0/O3 and SSE2 without SSE4.1;
+// host rounding may preserve sNaNs, whereas Wasm rounding must quiet them.
 // Independent rounding oracle: split the exact input into integral/fractional
 // parts. Never use the tested bridge (or ceil/floor/trunc/nearbyint) as expected.
 #define UWVM_ENABLE_UWVM_INT_COMBINE_OPS 1

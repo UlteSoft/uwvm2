@@ -1,3 +1,6 @@
+// Compare the real lane evaluator to the independent scalar MPFR corpus,
+// checking every output lane. Scalar helper success alone does not prove that
+// compiler-vector and fallback SIMD branches share strict arithmetic semantics.
 // Consume strict_float_oracle.cpp's independent MPFR corpus through the actual uwvm-int SIMD evaluator.
 // i64 conversions have no corresponding SIMD opcode and are skipped; i32 SIMD conversions are checked below.
 #include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>

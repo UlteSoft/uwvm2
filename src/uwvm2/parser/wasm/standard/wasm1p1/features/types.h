@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Extended constant-expression FP literals use the same raw-storage contract as
+// wasm1 global initializers: activate f32/f64 storage, then copy decoded integer
+// bits into it. An intermediate Float-return bit_cast/helper can quiet an sNaN
+// on GCC -O0/i386 or 68881 before either interpreter or JIT sees the expression.
+// This is bit transport, so arithmetic NaN canonicalization would also be wrong.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @brief       WebAssembly Release 1.1 (Draft 2021-11-16)

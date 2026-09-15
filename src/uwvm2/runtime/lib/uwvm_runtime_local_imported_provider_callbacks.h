@@ -35,6 +35,10 @@ namespace uwvm2::runtime::lib::details
     // imported functions: suspend the generated-only bridge capability and preserve Wasm FP controls. Global accesses
     // use a lightweight control-only guard (accrued status is caller-saved); public execution entries still restore
     // the complete embedding environment. Globals are also guarded for header-driven interpreter runners.
+    // Byte buffers serve a second, independent purpose: provider globals are
+    // bit-preserving loads/stores, so a native float/double bridge would be wrong
+    // on i386 ST0 even after FP controls were restored. Generated LLVM bridges
+    // expose i32/i64 carriers and only bitcast within IR, never across this ABI.
     extern "C++" void invoke_local_imported_provider_global_get(void* module,
                                                                  ::std::size_t global_index,
                                                                  ::std::byte* out) noexcept;
