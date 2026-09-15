@@ -383,6 +383,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // Sign-only Wasm operations are representation operations, not FP arithmetic. In particular,
         // loading an sNaN into x87 before masking its sign already loses an observable payload bit.
+        // Unlike arithmetic, abs/neg/copysign must retain every non-sign bit, including
+        // the Wasm signaling bit. Do not replace these byte/integer helpers with a
+        // FloatT-returning wrapper around bit_cast/fabs/copysign: an unoptimized native
+        // ABI round-trip may quiet the operand before the mask is applied. Read both
+        // copysign operands before writing so local/stack aliases remain valid.
         template <typename FloatT> using float_bits = ::std::conditional_t<sizeof(FloatT) == 4uz, wasm_u32, wasm_u64>;
 
         template <float_unop Op, typename UInt>
@@ -420,6 +425,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <float_unop Op, typename FloatT>
+        // Native builtins implement host semantics, not automatically Wasm semantics.
+        // RISC-V's conversion-based ceil/floor/trunc can return a large/sNaN input
+        // unchanged; arithmetic rounding must quiet it. The outer evaluator also
+        // selects integer rounding on SSE2-without-SSE4.1/legacy-NaN builds and
+        // normalizes affected arithmetic results. Sign-only operations are excluded.
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop_native(FloatT v) noexcept
         {
 # if defined(__riscv)

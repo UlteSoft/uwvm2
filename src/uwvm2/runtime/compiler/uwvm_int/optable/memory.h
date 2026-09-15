@@ -150,6 +150,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return ::std::bit_cast<wasm_i64>(tmp);
         }
 
+        // Decode little-endian bytes through an integer, then copy to the caller's
+        // storage. A correct bit_cast<Float> representation can still be lost in the
+        // helper's FP return ABI (GCC -O0/i386 ST0, including SSE2 arithmetic builds).
+        // Keeping the destination by reference avoids that return altogether; callers
+        // must also use byte copies on uncached stacks. Value-return overloads are
+        // for numerical consumers, not an end-to-end sNaN transport guarantee.
         // The output-reference form is used by bit-preserving transport. A native FP return
         // can quiet sNaNs even when the caller only intends to copy the representation.
         UWVM_ALWAYS_INLINE inline constexpr void load_f32_le(::std::byte const* p, wasm_f32& out) noexcept
@@ -166,6 +172,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return ::std::bit_cast<wasm_f32>(tmp);
         }
 
+        // Decode little-endian bytes through an integer, then copy to the caller's
+        // storage. A correct bit_cast<Float> representation can still be lost in the
+        // helper's FP return ABI (GCC -O0/i386 ST0, including SSE2 arithmetic builds).
+        // Keeping the destination by reference avoids that return altogether; callers
+        // must also use byte copies on uncached stacks. Value-return overloads are
+        // for numerical consumers, not an end-to-end sNaN transport guarantee.
         // The output-reference form is used by bit-preserving transport. A native FP return
         // can quiet sNaNs even when the caller only intends to copy the representation.
         UWVM_ALWAYS_INLINE inline constexpr void load_f64_le(::std::byte const* p, wasm_f64& out) noexcept
@@ -208,6 +220,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr void store_i64_le(::std::byte* p, wasm_i64 v) noexcept
         { store_u64_le(p, ::std::bit_cast<::std::uint_least64_t>(v)); }
 
+        // Both stores accept storage by reference and copy to integer carriers before
+        // endian conversion. This avoids native FP argument/copy instructions (also
+        // seen in GCC's unoptimized _Float64 bit_cast path); memcpy itself is not
+        // arithmetic. A caller that already returned Float by value may have lost
+        // the signaling bit, so uncached store opfuncs copy directly from stack bytes.
         UWVM_ALWAYS_INLINE inline constexpr void store_f32_le(::std::byte* p, wasm_f32 const& v) noexcept
         {
             ::std::uint_least32_t bits;
@@ -801,6 +818,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         template <::std::size_t WasmBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
+        // Cold trap helpers are still called from interpreter opfuncs. The cold
+        // macro retains their platform calling convention (notably i386 fastcall);
+        // replacing it with a bare cold attribute can make a tail call ABI-invalid.
+        // Cold placement is only a layout hint, not a different argument ABI.
         UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;

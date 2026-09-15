@@ -1,3 +1,6 @@
+// The external symbol deliberately exposes only integers. Native Float-return
+// prototypes would introduce x87/68881 transfers outside the generated function;
+// checking every vector lane also catches partial scalar-only lowering.
 #pragma once
 #include <uwvm2/runtime/compiler/shared/strict_float_bits.h>
 #include <cstdint>

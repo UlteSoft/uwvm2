@@ -1,3 +1,7 @@
+// Scalar fenv alone cannot prove auxiliary FP controls are restored. Exercise
+// architecture-specific controls at entry/callback boundaries, while leaving
+// unsupported-target coverage explicit rather than treating a skipped branch
+// as execution evidence for that architecture.
 // Cross-architecture numeric and supplementary-vector controls, independent of the runtime's C++26 optable size.
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #include "../0008.imported/wasi/wasip1/func/fp_control_probe.h"

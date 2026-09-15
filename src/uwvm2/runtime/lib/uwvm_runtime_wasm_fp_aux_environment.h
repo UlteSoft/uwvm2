@@ -39,6 +39,11 @@ namespace uwvm2::runtime::lib::details
         }
     }
 #endif
+    // Do not replace the scalar libc guard with just these auxiliary registers:
+    // notably Linux PPC also coordinates FPSCR exception state with the OS.
+    // Conversely FE_DFL_ENV alone does not prove VSCR/MSACSR are safe. Generic
+    // PPC uses runtime HWCAP for optional AltiVec; a MIPS build without an MSA
+    // guard must not enable uncovered MSA arithmetic in the generated target.
     // ISO fenv does not cover every SIMD control register. VSCR.NJ (PowerPC) and MSACSR.FS/RM/Enables (MIPS MSA)
     // can change vector arithmetic independently of the scalar environment. Preserve them at the same boundaries.
     class scoped_wasm_auxiliary_fp_environment

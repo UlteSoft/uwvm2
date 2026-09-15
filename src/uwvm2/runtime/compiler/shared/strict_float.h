@@ -24,6 +24,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float
 #endif
     inline constexpr bool needs_extended_rounding{UWVM2_STRICT_FLOAT_EXTENDED != 0};
 
+    // Separate three obligations: the runtime guard establishes FP controls, this
+    // file implements arithmetic rounding/NaNs, and byte/integer transport preserves
+    // non-arithmetic payloads. None replaces the others. In particular these
+    // Float-valued arithmetic APIs are not raw sNaN transport APIs.
+    // See documents/runtime/floating-point-change-rationale.md.
     // These ABIs use the pre-IEEE-754-2008, inverted signaling bit. Wasm always
     // uses the 2008 encoding, including on an older host or with software FP.
 #if defined(__hppa__) || defined(__hppa) || defined(__sh__) || (defined(__mips__) && !defined(__mips_nan2008))
@@ -76,6 +81,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         else { return value; }
     }
 
+    // GCC 15's SSE2 ceil/floor/trunc fallback (without SSE4.1 ROUND*) may return
+    // an sNaN unchanged. This is distinct from GCC -O0 ABI transport quieting:
+    // arithmetic rounding MUST quiet NaNs, while transport MUST NOT change bits.
+    // Integer rounding handles the fallback directly, avoiding a libm call plus
+    // repair; targets with suitable native rounding retain their existing path.
     enum class integral_rounding { ceil, floor, trunc, nearest };
 
 #if ((defined(__i386__) || defined(__x86_64__)) && defined(__SSE2__) && !defined(__SSE4_1__)) || UWVM2_STRICT_FLOAT_LEGACY_NAN
@@ -111,6 +121,10 @@ namespace uwvm2::runtime::compiler::shared::strict_float
             else if constexpr(Mode == integral_rounding::trunc) { return zero; }
             else { return magnitude > (UInt{bias - 1u} << fraction) ? (zero | one) : zero; }
         }
+        // Earlier branches handled zero, magnitudes below one, already-integral
+        // large values, infinities and NaNs. Here shift is in [1, fraction], so
+        // all integer shifts are defined. Remainder and retained parity implement
+        // ties-to-even without depending on the host rounding mode or FP flags.
         unsigned const shift{bias + fraction - static_cast<unsigned>(magnitude >> fraction)};
         UInt const step{UInt{1} << shift};
         UInt const mask{step - 1u}, remainder{raw & mask};

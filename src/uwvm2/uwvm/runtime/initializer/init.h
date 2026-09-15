@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP global initialization is bit transport, including imported/global.get copies.
+// The parser's preserved f32/f64 bytes must reach rec.global/g.global storage via
+// memcpy; a native floating assignment/return can quiet sNaNs on x87/68881.
+// Public execution guards do not cover this earlier stage and cannot restore
+// bits already lost. Keep both widths and resolved-global paths byte-based.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

@@ -22,6 +22,11 @@
 # define UWVM2_RUNTIME_LLVM_JIT_HOST_ADDRESS_CARRIER 0
 #endif
 
+// LLVM IR bitcast alone is insufficient if a native bridge returns float/double:
+// i386 ST0 can quiet an sNaN, including with SSE2 arithmetic and at GCC -O0.
+// The provider implementation, function-pointer signature, emitted direct path
+// and bytecode-fallback path must agree on i32/i64 carriers. Bitcast only inside
+// generated IR; these are bit representations, never numerical FP conversions.
 // Native provider callbacks copy scalar bits. Use integer returns/arguments so
 // neither a legacy FP ABI nor an x87 register can quiet an sNaN in transit.
 [[nodiscard]] inline ::llvm::Type* get_llvm_jit_scalar_bits_type(::llvm::Type* type) noexcept

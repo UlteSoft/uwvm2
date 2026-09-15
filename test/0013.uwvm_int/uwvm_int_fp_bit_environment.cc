@@ -1,3 +1,7 @@
+// Production raw-byte entry regression: opfunc-only tests miss translation,
+// initial globals, provider adapters and direct/indirect call ABIs. Keep input
+// and observations in integer storage so the test harness cannot quiet sNaNs
+// before Wasm runs. Arithmetic rounding expectations differ from transport.
 #define UWVM2_FP_BITS_FULL_ONLY 1
 // Production raw-byte entry tests, including native imported-global boundaries.
 #define UWVM2TEST_STRICT_NO_INTERPRETER 1

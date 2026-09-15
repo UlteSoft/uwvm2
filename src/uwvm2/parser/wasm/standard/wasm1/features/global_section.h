@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP initializer decoding must remain a byte/integer operation all the way into
+// opcode storage. Merely bit_casting to Float and assigning can pass through a
+// native FP return/copy (notably GCC -O0/i386), quieting an sNaN before execution.
+// Decode Wasm little-endian integers first, activate the union member, then memcpy
+// the representation. The runtime FP guard is too late to repair parser-time loss.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @brief       WebAssembly Release 1.0 (2019-07-20)

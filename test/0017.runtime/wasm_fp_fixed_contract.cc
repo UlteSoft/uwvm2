@@ -1,3 +1,6 @@
+// This build explicitly supplies the fixed-environment trust contract. Verify
+// the elided guard path without interpreting it as runtime safety detection:
+// callers must establish/preserve controls, and numerical/ABI fixes stay enabled.
 // This mode is a whole-thread embedding promise, not a check of arbitrary hostile callbacks.
 #define UWVM_ASSUME_FIXED_WASM_FP_ENVIRONMENT 1
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>

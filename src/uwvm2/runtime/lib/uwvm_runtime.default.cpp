@@ -250,6 +250,11 @@ namespace uwvm2::runtime::lib
 #endif
 
         template <typename Callable>
+        // Only an explicit provider contract can skip callback control restoration.
+        // A Wasm module cannot certify arbitrary native callbacks. Keep this guard
+        // in an ordinary call frame that returns before interpreter tail dispatch,
+        // and keep public-entry save/restore even when a provider is trusted.
+        // Trust in FP controls does not grant the generated-only bridge capability.
         inline void invoke_host_with_llvm_wasm_fp_control_policy(
             ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t policy,
             Callable&& callable) noexcept
@@ -6338,6 +6343,9 @@ namespace uwvm2::runtime::lib
                                                                              bool legacy_light_preoptimized) noexcept
         {
             // Verify before/after optimization and run the selected full-module pipeline.
+            // Raw wrappers and their typed callees must be lowered consistently:
+            // on i386 this includes the private no-x87 result ABI, not just rounding
+            // instructions. Cache fingerprints/symbol rebinding cover cached objects.
             ::uwvm2::runtime::compiler::shared::strict_float_jit::lower(module);
             if(verify_llvm_jit_ir)
             {

@@ -494,6 +494,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         // v3 also makes generated raw-call operands and status values register-wide, avoiding target-specific narrow
         // integer extension attributes at the handwritten LLVM/C++ ABI boundary.
         details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"semantic-discriminator-and-type-v3");
+        // These keys invalidate machine code, not merely diagnostics. A build can
+        // lack an embedded git revision yet load old objects with ST0 returns,
+        // double rounding or unnormalized native NaNs. Keep independent ABI and
+        // arithmetic-semantic revisions so cache hits cannot bypass a source fix.
         // Native globals use integer carriers on every target. i386 additionally
         // uses integer FP results even on SSE2 hosts; old ST0 objects are incompatible.
         details::append_cache_key_value(out, u8"llvm-wasm-fp-bit-abi", u8"integer-globals-i386-no-x87-v1");

@@ -1,3 +1,6 @@
+// Produce native rounding IR with a raw-storage boundary. RISC-V's fallback
+// may leave sNaNs untouched; this input must reach the shared LLVM repair pass,
+// not just the C++ interpreter's already-correct rounding helper.
 typedef unsigned int u32;
 typedef unsigned long long u64;
 #define ROUND(U, F, W, S)                                                                                                                                      \

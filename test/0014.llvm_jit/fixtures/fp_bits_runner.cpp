@@ -1,3 +1,7 @@
+// Call generated objects through raw/integer buffers, never through an ordinary
+// C++ floating prototype for the private i386 ABI. Compile the production bridge
+// with x87 and SSE2 separately: emitter features and native bridge flags may differ.
+// Integer observations catch sNaN corruption even when optimized inlining would not.
 // Linked with the i386 object emitted by fp_bits_lowering.cpp, not a standalone unit target.
 #include <uwvm2/runtime/compiler/shared/strict_float_bits.h>
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>

@@ -1,3 +1,7 @@
+// Native generated rounding must satisfy the same oracle for scalar/vector
+// and ordinary/constrained IR. Install production Wasm controls (including
+// auxiliary SIMD controls) so inherited host FTZ/RM is not mistaken for a
+// lowering error; keep bit transport and arithmetic quieting expectations distinct.
 #include "fp_rounding_oracle.h"
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #include <cstdio>

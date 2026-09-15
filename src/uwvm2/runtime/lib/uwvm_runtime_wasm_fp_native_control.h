@@ -6,6 +6,11 @@ namespace uwvm2::runtime::lib::details
 #if (defined(__GNUC__) || defined(__clang__)) && \
     ((defined(__i386__) && defined(__SSE__)) || defined(__x86_64__) || defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC) || \
      (defined(__riscv) && defined(__riscv_flen)))
+    // Guard units the JIT/callback can execute, not only those used by this TU.
+    // x86_64 always covers MXCSR even under -mno-sse: emitted code/native callees
+    // can still use SSE. x87 precision and masks matter independently of MXCSR.
+    // This is a callback control-only optimization; the public entry still saves
+    // and restores the embedding environment including accrued status flags.
     inline constexpr bool wasm_fp_has_native_control_guard{true};
     class scoped_wasm_native_fp_control_restore
     {

@@ -1,3 +1,6 @@
+// Compile without AltiVec enabled: a generic PPC runtime can still host native
+// JIT vector code. Optional VSCR access must follow OS HWCAP, not just compiler
+// feature macros, and must preserve the scalar libc environment as well.
 // Build without -maltivec as well as with it: a JIT may use more ISA features than its host executable.
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 

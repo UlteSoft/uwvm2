@@ -1,5 +1,7 @@
 # 浮点舍入、原生 NaN 与指令生成补充审计（2026-09-15）
 
+这些修复与前序 ABI/环境修复的关系、代码位置及维护约束见 [维护注释索引](floating-point-change-rationale.md)。
+
 这是 [浮点环境与位模式审计](floating-point-environment.md) 的后续补丁。环境控制正确，不代表宿主舍入 builtin、NaN 编码和 LLVM lowering 自动满足 Wasm。
 
 ## 复现的问题与修复

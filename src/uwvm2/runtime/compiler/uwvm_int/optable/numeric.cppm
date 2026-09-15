@@ -3,6 +3,9 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// The global module fragment must also make the shared helpers for strict scalar arithmetic semantics
+// visible. Updating only the non-module header path would leave module builds
+// with missing declarations or inconsistent floating-point behavior.
 
 /**
  * @author      MacroModel

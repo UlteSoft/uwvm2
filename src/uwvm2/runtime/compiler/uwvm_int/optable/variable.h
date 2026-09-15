@@ -131,6 +131,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename GlobalT>
+        // Globals and locals are transport, not arithmetic. Use destination references
+        // plus memcpy for FP storage in both directions: GCC -O0 may expose an x87
+        // return/copy even when the source expression is only bit_cast or assignment.
+        // A control-register guard cannot reconstruct an sNaN already quieted by the
+        // value ABI. Keep the uncached local/global opfunc paths byte-based as well.
         UWVM_ALWAYS_INLINE inline constexpr void load_global(global_storage_t* global_p, GlobalT& v) noexcept
         {
             if constexpr(::std::same_as<GlobalT, wasm_i32>) { v = global_p->storage.i32; }
@@ -155,6 +160,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
 #if !defined(UWVM_RUNTIME_LLVM_JIT)
+        // The guard must finish in this ordinary helper frame BEFORE the opfunc's
+        // musttail dispatch. A live RAII guard in the tail-dispatch frame would need
+        // destruction after the callee, violating the intended tail-call lifetime.
+        // Byte output also prevents a second FP ABI conversion after restoration.
         // Keep the control-register work in one small native frame, not in every register-ring opfunc. In particular,
         // restore controls before the caller reloads its cached FP registers. Inline linkage retains header-only use;
         // noinline avoids duplicating this boundary for every value type and interpreter register configuration.

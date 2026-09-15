@@ -19,6 +19,12 @@
 namespace uwvm2::runtime::lib::details
 {
 #if defined(UWVM_ASSUME_FIXED_WASM_FP_ENVIRONMENT) || defined(__wasm__)
+    // A presence-defined macro enables the contract, even if defined as 0. It is
+    // not run-time detection, and not an option to disable all sandbox checks.
+    // Every entry/callback must already preserve RN-even, gradual underflow,
+    // masked exceptions and sufficient precision (x87 PC=53/64, not PC=24).
+    // Eliding controls cannot fix an FP ABI's sNaN transport, excess-precision
+    // double rounding, or a host's different NaN encoding; those fixes stay active.
     // Opt-in whole-thread embedding contract, not a property inferred from a Wasm module: every entry already has
     // Wasm-compatible controls and every native callback/signal handler preserves them. Accrued status is caller-saved.
     // A Wasm host has these semantics by construction. See documents/runtime/floating-point-environment.md.

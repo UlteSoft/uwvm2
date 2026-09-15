@@ -1,3 +1,6 @@
+// Historical LLVM names also serve interpreter-only entry. Exercise nested
+// save/restore of the embedding environment; callback fast paths must not
+// weaken the complete public-entry restoration contract.
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #include "../0008.imported/wasi/wasip1/func/fp_control_probe.h"
 

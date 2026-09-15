@@ -1,3 +1,6 @@
+// Input for cross-target LLVM generation, not the oracle. Keep operations
+// visible until production lowering repairs the target's legacy/default NaNs;
+// exact expectations live in the independent integer-observing runner.
 // Freestanding raw-byte ABI: no host FP parameter/result conversion can hide errors.
 #define CALC(F, W, S)                                                                                                                                          \
     void calc##W(unsigned op, void const* a, void const* b, void* out)                                                                                         \

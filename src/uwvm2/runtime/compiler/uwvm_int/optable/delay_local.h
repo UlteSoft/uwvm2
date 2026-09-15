@@ -3,6 +3,13 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Delayed-local fusion must preserve the same FP contract as ordinary opfuncs.
+// copysign's uncached f32/f64 localget/localset/localtee variants operate directly
+// on bytes; loading a Float rhs first can already quiet an sNaN on x87/68881.
+// Keep the fused stack effects (set consumes, tee retains) and tail dispatch:
+// expanding to several ordinary opfuncs would add dispatch overhead to fix a
+// representation problem. Arithmetic variants still use the strict evaluators.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel

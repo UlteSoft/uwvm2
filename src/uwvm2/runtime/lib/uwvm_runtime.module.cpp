@@ -43,6 +43,9 @@
 #include "uwvm_runtime_local_imported_provider_callbacks.h"
 #include "uwvm_runtime_state_signature.h"
 #include "uwvm_runtime_wasip1_memory_bindings.h"
+// The FP execution boundary is shared by interpreter-only and LLVM builds.
+// Keep this outside UWVM_RUNTIME_LLVM_JIT, matching the non-module runtime;
+// an interpreter-only module build must not silently omit host FP isolation.
 #include "uwvm_runtime_wasm_fp_environment.h"
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "uwvm_runtime_call_indirect_table_views.h"

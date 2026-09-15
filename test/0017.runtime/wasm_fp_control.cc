@@ -1,3 +1,6 @@
+// Callback restoration is intentionally control-only, unlike public entry
+// restoration. Check controls affecting future Wasm arithmetic, including
+// x87 masks/precision and MXCSR where available; accrued flags are caller-saved.
 #include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 #include "../0008.imported/wasi/wasip1/func/fp_control_probe.h"
 

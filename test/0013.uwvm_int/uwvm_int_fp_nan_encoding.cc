@@ -1,3 +1,6 @@
+// A quiet-bit-only test misses legacy payload rewriting and all-ones default
+// NaNs. Invalid arithmetic with no NaN operands must be canonical; width
+// conversions also include tiny payloads that host demotion can turn into infinity.
 // Wasm's quiet bit is independent of the host's historical NaN convention.
 #include <uwvm2/runtime/compiler/uwvm_int/optable/numeric.h>
 #include <uwvm2/runtime/compiler/shared/strict_float_bits.h>

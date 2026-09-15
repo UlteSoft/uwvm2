@@ -1,3 +1,6 @@
+// Cover generated scalar/vector arithmetic and conversion paths, not only the
+// native strict_float helper. Emitted objects must also be linked and executed:
+// correct-looking IR alone does not rule out target ABI or legalization errors.
 // Standalone LLVM test: emit scalar AND vector instructions, apply the production lowering,
 // verify idempotence/zero-overhead bypass, and run the resulting integer-ABI entries in MCJIT.
 // Pass --emit to write portable IR for llc + a cross-target oracle consumer.

@@ -1,3 +1,6 @@
+// Freestanding codegen isolates MSACSR save/restore from SDK availability.
+// Inspect emitted control instructions as well as runtime tests; successful
+// assembly does not establish coverage for a build that never enables MSA.
 // Build only explicitly for a MIPS MSA Linux target with -nostdlib -static -Wl,-e,_start.
 // This checks the actual auxiliary guard without substituting libc fenv stubs or requiring a cross C++ runtime.
 #if defined(UWVM_TEST_FREESTANDING_MIPS_MSA) && defined(__mips_msa)

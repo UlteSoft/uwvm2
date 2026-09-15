@@ -1,3 +1,7 @@
+// Regression contract: sNaN input/output must be observed as integers, not with
+// isnan or a Float-returning test helper. Run both GCC -O0 and optimized builds:
+// inlining can hide the i386 ST0 ABI bug. Tail and byref must preserve the same
+// bits; this is not an arithmetic-NaN test.
 // Keep all test inputs/observations in integer bits: native FP return ABIs can
 // quiet a signaling NaN before the interpreter is entered.
 #include <uwvm2/runtime/compiler/uwvm_int/optable/numeric.h>

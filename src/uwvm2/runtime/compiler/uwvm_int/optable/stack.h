@@ -294,6 +294,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 // Condition is cached (i32 ring), but value type has no stack-top cache range.
                 // This configuration can occur when ValueT is not cachable on the current ABI/ISA; in that case the two values are on the operand stack.
+            // Selection must retain the chosen sNaN payload/quiet bit exactly; a
+            // floating conditional/value-return helper can quiet it on x87/68881.
+            // memmove, not memcpy, also permits selecting the destination itself.
                 // Select bytes, not native FP values. The selected address may equal the destination.
                 type...[1u] -= sizeof(ValueT);
                 ::std::memmove(type...[1u] - sizeof(ValueT),
@@ -330,6 +333,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
+            // Selection must retain the chosen sNaN payload/quiet bit exactly; a
+            // floating conditional/value-return helper can quiet it on x87/68881.
+            // memmove, not memcpy, also permits selecting the destination itself.
                 // Select bytes, not native FP values. The selected address may equal the destination.
                 type...[1u] -= sizeof(ValueT);
                 ::std::memmove(type...[1u] - sizeof(ValueT),

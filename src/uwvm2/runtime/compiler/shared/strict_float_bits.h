@@ -12,6 +12,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
 {
     namespace fp = strict_float;
 
+    // bridge's integer parameters/results are essential even if it gets inlined
+    // in a unit test: the JIT invokes a real native address, and GCC -O0 can expose
+    // the ordinary FP ABI. Returning Float would add an uncontrolled FP transfer.
+    // This bridge evaluates arithmetic (NaNs may be quieted/canonicalized); pure
+    // Wasm transport/sign/reinterpret operations must not be routed through it.
     // i386's ordinary and fastcall FP result ABIs use ST0 even when SSE2 is enabled. Generated
     // Wasm uses the no-x87 bit-preserving ABI; every operation that could require a native FP
     // result libcall must therefore go through this integer-only bridge instead.

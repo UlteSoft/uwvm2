@@ -1,3 +1,7 @@
+// Exercise production lowering on target IR, including repeated application:
+// metadata/use replacement must be idempotent and leave verifiable IR. Native
+// rounding modes also cover ordinary/constrained scalar and vector intrinsics,
+// including RISC-V when extended-precision bridge lowering is disabled.
 #include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/IR/Verifier.h>
