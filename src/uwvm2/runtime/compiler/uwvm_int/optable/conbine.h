@@ -110,6 +110,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T>
+        UWVM_ALWAYS_INLINE inline constexpr void load_local(::std::byte* local_base, local_offset_t off, T& out) noexcept
+        { ::std::memcpy(::std::addressof(out), local_base + off, sizeof(out)); }
+
+        template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr T load_local(::std::byte* local_base, local_offset_t off) noexcept
         {
             T v;  // no init
@@ -118,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T>
-        UWVM_ALWAYS_INLINE inline constexpr void store_local(::std::byte* local_base, local_offset_t off, T v) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void store_local(::std::byte* local_base, local_offset_t off, T const& v) noexcept
         { ::std::memcpy(local_base + off, ::std::addressof(v), sizeof(v)); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename T>
@@ -162,7 +166,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename T, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... TypeRef>
             requires (CompileOption.is_tail_call)
-        UWVM_ALWAYS_INLINE inline constexpr void push_operand(T v, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void push_operand(T const& v, TypeRef&... typeref) noexcept
         {
             if constexpr(stacktop_enabled_for<CompileOption, T>())
             {
@@ -183,7 +187,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename T, uwvm_int_stack_top_type... TypeRef>
             requires (!CompileOption.is_tail_call)
-        UWVM_ALWAYS_INLINE inline constexpr void push_operand_byref(T v, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void push_operand_byref(T const& v, TypeRef&... typeref) noexcept
         {
             ::std::memcpy(typeref...[1u], ::std::addressof(v), sizeof(v));
             typeref...[1u] += sizeof(v);
@@ -9484,6 +9488,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         using local_offset_t = ::std::size_t;
 
         template <typename T>
+        UWVM_ALWAYS_INLINE inline constexpr void load_local(::std::byte* local_base, local_offset_t off, T& out) noexcept
+        { ::std::memcpy(::std::addressof(out), local_base + off, sizeof(out)); }
+
+        template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr T load_local(::std::byte* local_base, local_offset_t off) noexcept
         {
             T v;  // no init
@@ -9492,7 +9500,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T>
-        UWVM_ALWAYS_INLINE inline constexpr void store_local(::std::byte* local_base, local_offset_t off, T v) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void store_local(::std::byte* local_base, local_offset_t off, T const& v) noexcept
         { ::std::memcpy(local_base + off, ::std::addressof(v), sizeof(v)); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT>
@@ -9523,7 +9531,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... TypeRef>
             requires (CompileOption.is_tail_call)
-        UWVM_ALWAYS_INLINE inline constexpr void push_value(OperandT v, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void push_value(OperandT const& v, TypeRef&... typeref) noexcept
         {
             if constexpr(details::stacktop_enabled_for<CompileOption, OperandT>())
             {
@@ -9966,7 +9974,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f32 out;
+            details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
 
             push_value<CompileOption, wasm_f32, curr_f32_stack_top>(out, type...);
@@ -10022,7 +10031,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f64 out;
+            details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
 
             push_value<CompileOption, wasm_f64, curr_f64_stack_top>(out, type...);
@@ -11868,7 +11878,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        wasm_f32 const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f32 out;
+        details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -11911,7 +11922,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        wasm_f64 const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f64 out;
+        details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }

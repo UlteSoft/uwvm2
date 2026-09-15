@@ -668,7 +668,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     /// };
     template <typename SingleGlobal>
     concept has_global_get = has_global_value_type<SingleGlobal> && requires(SingleGlobal& g) {
-        { global_get(g) } -> ::std::same_as<typename ::std::remove_cvref_t<SingleGlobal>::value_type>;
+        // Reference getters permit bit-exact FP storage access even when the native
+        // value-return ABI uses x87/68881. Existing value getters remain supported.
+        requires ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type> ||
+                 ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type&> ||
+                 ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type const&>;
     };
 
     /// @brief   check has global set
@@ -1657,7 +1661,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 using value_type = typename global_type::value_type;
                 static_assert(::std::is_trivially_copyable_v<value_type>, "global get requires trivially copyable value types");
 
-                value_type const v{global_get(::fast_io::get<N>(globals))};
+                // Preserve reference-returning provider storage without an FP value copy.
+                // A value-returning native getter still owns its native FP ABI semantics.
+                value_type const& v{global_get(::fast_io::get<N>(globals))};
                 if constexpr(::std::same_as<value_type, ::uwvm2::object::global::wasm_funcref_t> ||
                              ::std::same_as<value_type, ::uwvm2::object::global::wasm_externref_t>)
                 {

@@ -899,6 +899,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr bool i64_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.i64_stack_top_begin_pos, CompileOption.i64_stack_top_end_pos)};
             constexpr bool f32_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos)};
             constexpr bool f64_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos)};
+# if defined(__i386__) || defined(_M_IX86) || (defined(__m68k__) && defined(__HAVE_68881__))
+            // Native floating cache carriers can quiet sNaNs in x87/68881.
+            // These ABIs must use the raw-byte operand stack, as the runtime profiles already do.
+            static_assert(!f32_enabled && !f64_enabled, "This ABI requires uncached floating operands to preserve Wasm NaN bits");
+# endif
             constexpr bool v128_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.v128_stack_top_begin_pos, CompileOption.v128_stack_top_end_pos)};
 
             if constexpr(i32_enabled)

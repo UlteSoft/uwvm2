@@ -6,6 +6,8 @@
 #pragma once
 
 #include "strict_float_bits.h"
+#include <exception>
+#include <string>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Module.h>
@@ -14,12 +16,65 @@
 namespace uwvm2::runtime::compiler::shared::strict_float_jit
 {
     inline constexpr char symbol_name[]{"uwvm_strict_float_bits_v1"};
-    inline void register_symbols(bool enabled = fp::needs_extended_rounding) noexcept
+    inline void register_symbols(bool enabled = needs_lowering) noexcept
     {
         if(enabled) { ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name, reinterpret_cast<void*>(&bridge)); }
     }
 
-    inline void lower(::llvm::Module& module, bool enabled = fp::needs_extended_rounding) noexcept
+    // Software-only i386 has no libgcc comparison helpers in a normal hard-float
+    // SDK. IEEE comparisons can be expressed in integer IR without changing any
+    // operand bits (and without introducing an external floating ABI).
+    inline ::llvm::Value* lower_compare(::llvm::IRBuilder<>& b, ::llvm::Value* lhs, ::llvm::Value* rhs,
+                                        ::llvm::CmpInst::Predicate predicate)
+    {
+        auto scalar{lhs->getType()->getScalarType()};
+        unsigned const width{scalar->isFloatTy() ? 32u : 64u};
+        auto integer{::llvm::IntegerType::get(b.getContext(), width)};
+        auto vector{::llvm::dyn_cast<::llvm::FixedVectorType>(lhs->getType())};
+        ::llvm::Type* bits_type{vector ? static_cast<::llvm::Type*>(::llvm::FixedVectorType::get(integer, vector->getNumElements())) : integer};
+        auto constant{[&](::std::uint64_t value) -> ::llvm::Constant*
+        {
+            auto c{::llvm::ConstantInt::get(integer, value)};
+            return vector ? ::llvm::ConstantVector::getSplat(vector->getElementCount(), c) : c;
+        }};
+        auto x{b.CreateBitCast(lhs, bits_type)}, y{b.CreateBitCast(rhs, bits_type)};
+        auto zero{constant(0u)}, sign{constant(::std::uint64_t{1u} << (width - 1u))};
+        auto magnitude{constant(width == 32u ? 0x7fffffffull : 0x7fffffffffffffffull)};
+        auto infinity{constant(width == 32u ? 0x7f800000ull : 0x7ff0000000000000ull)};
+        auto ax{b.CreateAnd(x, magnitude)}, ay{b.CreateAnd(y, magnitude)};
+        auto unordered{b.CreateOr(b.CreateICmpUGT(ax, infinity), b.CreateICmpUGT(ay, infinity))};
+        auto both_zero{b.CreateICmpEQ(b.CreateOr(ax, ay), zero)};
+        auto equal{b.CreateOr(b.CreateICmpEQ(x, y), both_zero)};
+        auto negative_x{b.CreateICmpNE(b.CreateAnd(x, sign), zero)};
+        auto negative_y{b.CreateICmpNE(b.CreateAnd(y, sign), zero)};
+        auto less{b.CreateAnd(b.CreateNot(both_zero),
+            b.CreateSelect(b.CreateXor(negative_x, negative_y), negative_x,
+                b.CreateSelect(negative_x, b.CreateICmpUGT(x, y), b.CreateICmpULT(x, y))))};
+        auto greater{b.CreateNot(b.CreateOr(less, equal))};
+        auto ordered{b.CreateNot(unordered)};
+        switch(predicate)
+        {
+            case ::llvm::CmpInst::FCMP_FALSE: return ::llvm::Constant::getNullValue(equal->getType());
+            case ::llvm::CmpInst::FCMP_OEQ: return b.CreateAnd(ordered, equal);
+            case ::llvm::CmpInst::FCMP_OGT: return b.CreateAnd(ordered, greater);
+            case ::llvm::CmpInst::FCMP_OGE: return b.CreateAnd(ordered, b.CreateNot(less));
+            case ::llvm::CmpInst::FCMP_OLT: return b.CreateAnd(ordered, less);
+            case ::llvm::CmpInst::FCMP_OLE: return b.CreateAnd(ordered, b.CreateOr(less, equal));
+            case ::llvm::CmpInst::FCMP_ONE: return b.CreateAnd(ordered, b.CreateNot(equal));
+            case ::llvm::CmpInst::FCMP_ORD: return ordered;
+            case ::llvm::CmpInst::FCMP_UNO: return unordered;
+            case ::llvm::CmpInst::FCMP_UEQ: return b.CreateOr(unordered, equal);
+            case ::llvm::CmpInst::FCMP_UGT: return b.CreateOr(unordered, greater);
+            case ::llvm::CmpInst::FCMP_UGE: return b.CreateOr(unordered, b.CreateNot(less));
+            case ::llvm::CmpInst::FCMP_ULT: return b.CreateOr(unordered, less);
+            case ::llvm::CmpInst::FCMP_ULE: return b.CreateOr(unordered, b.CreateOr(less, equal));
+            case ::llvm::CmpInst::FCMP_UNE: return b.CreateOr(unordered, b.CreateNot(equal));
+            case ::llvm::CmpInst::FCMP_TRUE: return ::llvm::Constant::getAllOnesValue(equal->getType());
+            default: ::std::terminate();
+        }
+    }
+
+    inline void lower(::llvm::Module& module, bool enabled = needs_lowering, bool bit_preserving_abi = needs_bit_preserving_abi) noexcept
     {
         if(!enabled) { return; }
         register_symbols(true);
@@ -31,7 +86,7 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         // subsequent optimization must not move FP work across a callback that changes the controls.
         for(auto& function: module)
         {
-            bool native_arithmetic{};
+            bool native_arithmetic{}, native_rounding{};
 #if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             // A portable x87 interpreter may run on an SSE2-capable host. The JIT's actual function
             // features, not the interpreter's compile flags, then permit native arithmetic/demotion.
@@ -43,14 +98,87 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                 auto const item{features.split(',')};
                 if(item.first == "+sse2") { native_arithmetic = true; }
                 else if(item.first == "-sse2") { native_arithmetic = false; }
+                else if(item.first == "+sse4.1") { native_rounding = true; }
+                else if(item.first == "-sse4.1") { native_rounding = false; }
                 features = item.second;
             }
 #endif
+            if(bit_preserving_abi)
+            {
+                // LLVM's no-x87 i386 ABI returns f32/f64 bits in integer registers. It also
+                // prevents load/store/select/PHI legalization from quieting sNaNs in ST0.
+                // Apply consistently to typed definitions, declarations, raw wrappers and
+                // indirect callers. Native runtime bridges already use an integer/byte ABI.
+                auto attribute{function.getFnAttribute("target-features")};
+                auto value{attribute.isStringAttribute() ? attribute.getValueAsString().str() : ::std::string{}};
+                if(!value.empty()) { value += ','; }
+                value += "-x87";
+                function.addFnAttr("target-features", value);
+            }
             for(auto& block: function)
             {
                 for(auto it{block.begin()}; it != block.end();)
                 {
                     auto& instruction{*it++};
+                    if(bit_preserving_abi)
+                    {
+                        ::llvm::CmpInst::Predicate predicate{::llvm::CmpInst::BAD_FCMP_PREDICATE};
+                        unsigned conversion{};
+                        bool saturating{};
+                        if(auto compare{::llvm::dyn_cast<::llvm::FCmpInst>(&instruction)}) { predicate = compare->getPredicate(); }
+                        else if(instruction.getOpcode() == ::llvm::Instruction::FPToSI) { conversion = 13u; }
+                        else if(instruction.getOpcode() == ::llvm::Instruction::FPToUI) { conversion = 14u; }
+                        else if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)})
+                        {
+                            auto id{call->getIntrinsicID()};
+                            if(id == ::llvm::Intrinsic::experimental_constrained_fcmp || id == ::llvm::Intrinsic::experimental_constrained_fcmps)
+                            {
+                                auto metadata{::llvm::cast<::llvm::MetadataAsValue>(call->getArgOperand(2u))};
+                                auto name{::llvm::cast<::llvm::MDString>(metadata->getMetadata())->getString()};
+                                for(unsigned p{::llvm::CmpInst::FCMP_FALSE}; p <= ::llvm::CmpInst::FCMP_TRUE; ++p)
+                                {
+                                    auto candidate{static_cast<::llvm::CmpInst::Predicate>(p)};
+                                    if(name == ::llvm::CmpInst::getPredicateName(candidate)) { predicate = candidate; break; }
+                                }
+                            }
+                            else if(id == ::llvm::Intrinsic::experimental_constrained_fptosi || id == ::llvm::Intrinsic::fptosi_sat)
+                            { conversion = 13u; saturating = id == ::llvm::Intrinsic::fptosi_sat; }
+                            else if(id == ::llvm::Intrinsic::experimental_constrained_fptoui || id == ::llvm::Intrinsic::fptoui_sat)
+                            { conversion = 14u; saturating = id == ::llvm::Intrinsic::fptoui_sat; }
+                        }
+                        if(predicate != ::llvm::CmpInst::BAD_FCMP_PREDICATE && !native_arithmetic)
+                        {
+                            ::llvm::IRBuilder<> builder{&instruction};
+                            auto result{lower_compare(builder, instruction.getOperand(0u), instruction.getOperand(1u), predicate)};
+                            instruction.replaceAllUsesWith(result);
+                            instruction.eraseFromParent();
+                            continue;
+                        }
+                        // SSE2 can convert to i32 directly, but i64 legalization
+                        // still requires x87 even on otherwise SSE-only targets.
+                        if(conversion != 0u && (!native_arithmetic || instruction.getType()->getScalarType()->isIntegerTy(64u)))
+                        {
+                            ::llvm::IRBuilder<> builder{&instruction};
+                            auto vector{::llvm::dyn_cast<::llvm::FixedVectorType>(instruction.getType())};
+                            auto source{instruction.getOperand(0u)};
+                            bool const wide{source->getType()->getScalarType()->isDoubleTy()};
+                            auto result_type{instruction.getType()->getScalarType()};
+                            auto code{conversion | (wide ? 16u : 0u) | (saturating ? 32u : 0u) | (result_type->isIntegerTy(64u) ? 64u : 0u)};
+                            auto callee{module.getOrInsertFunction(symbol_name, signature)};
+                            ::llvm::Value* result{vector ? ::llvm::PoisonValue::get(vector) : nullptr};
+                            for(unsigned lane{}; lane != (vector ? vector->getNumElements() : 1u); ++lane)
+                            {
+                                auto value{vector ? builder.CreateExtractElement(source, builder.getInt32(lane)) : source};
+                                auto bits{builder.CreateZExtOrTrunc(builder.CreateBitCast(value, wide ? i64 : i32), i64)};
+                                auto converted{builder.CreateCall(callee, {bits, builder.getInt64(0u), builder.getInt32(code)})};
+                                auto scalar_result{builder.CreateTruncOrBitCast(converted, result_type)};
+                                result = vector ? builder.CreateInsertElement(result, scalar_result, builder.getInt32(lane)) : scalar_result;
+                            }
+                            instruction.replaceAllUsesWith(result);
+                            instruction.eraseFromParent();
+                            continue;
+                        }
+                    }
                     unsigned opcode{~0u};
                     switch(instruction.getOpcode())
                     {
@@ -61,12 +189,41 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                         case ::llvm::Instruction::SIToFP: opcode = 5u; break;
                         case ::llvm::Instruction::UIToFP: opcode = 6u; break;
                         case ::llvm::Instruction::FPTrunc: opcode = 7u; break;
+                        case ::llvm::Instruction::FPExt: if(bit_preserving_abi) { opcode = 8u; } break;
                         default:
-                            if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)};
-                               call != nullptr && call->getIntrinsicID() == ::llvm::Intrinsic::sqrt) { opcode = 4u; }
+                            if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)}; call != nullptr)
+                            {
+                                switch(call->getIntrinsicID())
+                                {
+                                    case ::llvm::Intrinsic::experimental_constrained_fadd: opcode = 0u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fsub: opcode = 1u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fmul: opcode = 2u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fdiv: opcode = 3u; break;
+                                    case ::llvm::Intrinsic::sqrt:
+                                    case ::llvm::Intrinsic::experimental_constrained_sqrt: opcode = 4u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_sitofp: opcode = 5u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_uitofp: opcode = 6u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fptrunc: opcode = 7u; break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fpext: if(bit_preserving_abi) { opcode = 8u; } break;
+                                    case ::llvm::Intrinsic::ceil:
+                                    case ::llvm::Intrinsic::experimental_constrained_ceil: if(bit_preserving_abi) { opcode = 9u; } break;
+                                    case ::llvm::Intrinsic::floor:
+                                    case ::llvm::Intrinsic::experimental_constrained_floor: if(bit_preserving_abi) { opcode = 10u; } break;
+                                    case ::llvm::Intrinsic::trunc:
+                                    case ::llvm::Intrinsic::experimental_constrained_trunc: if(bit_preserving_abi) { opcode = 11u; } break;
+                                    case ::llvm::Intrinsic::roundeven:
+                                    case ::llvm::Intrinsic::nearbyint:
+                                    case ::llvm::Intrinsic::rint:
+                                    case ::llvm::Intrinsic::experimental_constrained_roundeven:
+                                    case ::llvm::Intrinsic::experimental_constrained_nearbyint:
+                                    case ::llvm::Intrinsic::experimental_constrained_rint: if(bit_preserving_abi) { opcode = 12u; } break;
+                                    default: break;
+                                }
+                            }
                     }
                     if(opcode == ~0u) { continue; }
-                    if(native_arithmetic && (opcode < 5u || opcode == 7u)) { continue; }
+                    if(native_arithmetic && (opcode < 5u || opcode == 7u || opcode == 8u)) { continue; }
+                    if(native_rounding && opcode >= 9u) { continue; }
                     auto vector_type{::llvm::dyn_cast<::llvm::FixedVectorType>(instruction.getType())};
                     auto scalar_type{instruction.getType()->getScalarType()};
                     if(!scalar_type->isFloatTy() && !scalar_type->isDoubleTy()) { continue; }

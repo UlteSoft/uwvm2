@@ -590,7 +590,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f32>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f32) == sizeof(wasm_i32));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_f32>()};
@@ -667,7 +673,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f32>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f32) == sizeof(wasm_i32));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_i32>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_i32>()};
@@ -2228,7 +2240,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f64>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f64) == sizeof(wasm_i64));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_f64>()};
@@ -2305,7 +2323,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f64>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f64) == sizeof(wasm_i64));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_i64>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_i64>()};
@@ -2932,12 +2956,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        ::std::uint_least32_t const bits{::std::bit_cast<::std::uint_least32_t>(v)};
-        wasm_i32 const out{details::from_u32_bits<wasm_i32>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i32) == sizeof(wasm_f32));
     }
 
     /// @brief `f32.reinterpret_i32` (non-tail-call/byref): bitcasts i32 to f32.
@@ -2958,12 +2978,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
-        ::std::uint_least32_t const bits{details::to_u32_bits(v)};
-        wasm_f32 const out{::std::bit_cast<wasm_f32>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i32) == sizeof(wasm_f32));
     }
 
     /// @brief `i64.reinterpret_f64` (non-tail-call/byref): bitcasts f64 to i64.
@@ -2984,12 +3000,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        ::std::uint_least64_t const bits{::std::bit_cast<::std::uint_least64_t>(v)};
-        wasm_i64 const out{details::from_u64_bits<wasm_i64>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i64) == sizeof(wasm_f64));
     }
 
     /// @brief `f64.reinterpret_i64` (non-tail-call/byref): bitcasts i64 to f64.
@@ -3010,12 +3022,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
-        ::std::uint_least64_t const bits{details::to_u64_bits(v)};
-        wasm_f64 const out{::std::bit_cast<wasm_f64>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i64) == sizeof(wasm_f64));
     }
 
     /// @brief Translation helpers for convert opcodes.

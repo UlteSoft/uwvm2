@@ -508,7 +508,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     ::std::uint_least32_t raw;
                     ::std::memcpy(::std::addressof(raw), section_curr, 4uz);
                     raw = ::fast_io::little_endian(raw);
-                    auto value{::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(raw)};
                     // Pointer move: advance by the 4 bytes proven safe by the fixed-width payload check.
                     section_curr += 4uz;
 
@@ -518,8 +517,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f32 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f32 = {}},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const);
+                    ::std::memcpy(::std::addressof(global_expr.opcodes.back_unchecked().storage.f32), ::std::addressof(raw), sizeof(raw));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
@@ -555,7 +555,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     ::std::uint_least64_t raw;
                     ::std::memcpy(::std::addressof(raw), section_curr, 8uz);
                     raw = ::fast_io::little_endian(raw);
-                    auto value{::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(raw)};
                     // Pointer move: advance by the 8 bytes proven safe by the fixed-width payload check.
                     section_curr += 8uz;
 
@@ -564,8 +563,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     //                                        ^^ section_curr
                     global_expr.opcodes.reserve(1uz);
                     global_expr.opcodes.emplace_back_unchecked(
-                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f64 = value},
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.f64 = {}},
                         ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const);
+                    ::std::memcpy(::std::addressof(global_expr.opcodes.back_unchecked().storage.f64), ::std::addressof(raw), sizeof(raw));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(

@@ -4655,14 +4655,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
                             ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const):
                         {
-                            rec.global.storage.f32 = op.storage.f32;
+                            ::std::memcpy(::std::addressof(rec.global.storage.f32), ::std::addressof(op.storage.f32), sizeof(rec.global.storage.f32));
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
                         case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
                             ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const):
                         {
-                            rec.global.storage.f64 = op.storage.f64;
+                            ::std::memcpy(::std::addressof(rec.global.storage.f64), ::std::addressof(op.storage.f64), sizeof(rec.global.storage.f64));
                             rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
                             break;
                         }
@@ -4849,13 +4849,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
                     ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const):
                 {
-                    g.global.storage.f32 = op.storage.f32;
+                    ::std::memcpy(::std::addressof(g.global.storage.f32), ::std::addressof(op.storage.f32), sizeof(g.global.storage.f32));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
                     ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const):
                 {
-                    g.global.storage.f64 = op.storage.f64;
+                    ::std::memcpy(::std::addressof(g.global.storage.f64), ::std::addressof(op.storage.f64), sizeof(g.global.storage.f64));
                     break;
                 }
                 case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD0u):
@@ -4992,12 +4992,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         }
                         case ::uwvm2::object::global::global_type::wasm_f32:
                         {
-                            g.global.storage.f32 = resolved_global->storage.f32;
+                            ::std::memcpy(::std::addressof(g.global.storage.f32), ::std::addressof(resolved_global->storage.f32), sizeof(g.global.storage.f32));
                             break;
                         }
                         case ::uwvm2::object::global::global_type::wasm_f64:
                         {
-                            g.global.storage.f64 = resolved_global->storage.f64;
+                            ::std::memcpy(::std::addressof(g.global.storage.f64), ::std::addressof(resolved_global->storage.f64), sizeof(g.global.storage.f64));
                             break;
                         }
                         case ::uwvm2::object::global::global_type::wasm_v128:

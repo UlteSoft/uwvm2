@@ -294,12 +294,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 // Condition is cached (i32 ring), but value type has no stack-top cache range.
                 // This configuration can occur when ValueT is not cachable on the current ABI/ISA; in that case the two values are on the operand stack.
-                ValueT const v2{get_curr_val_from_operand_stack_cache<ValueT>(type...)};
-                ValueT const v1{get_curr_val_from_operand_stack_cache<ValueT>(type...)};
-
-                ValueT const out{cond != wasm_i32{0} ? v1 : v2};
-                ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
-                type...[1u] += sizeof(out);
+                // Select bytes, not native FP values. The selected address may equal the destination.
+                type...[1u] -= sizeof(ValueT);
+                ::std::memmove(type...[1u] - sizeof(ValueT),
+                               cond != wasm_i32{0} ? type...[1u] - sizeof(ValueT) : type...[1u], sizeof(ValueT));
             }
         }
         else
@@ -332,12 +330,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                ValueT const v2{get_curr_val_from_operand_stack_cache<ValueT>(type...)};
-                ValueT const v1{get_curr_val_from_operand_stack_cache<ValueT>(type...)};
-
-                ValueT const out{cond != wasm_i32{0} ? v1 : v2};
-                ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
-                type...[1u] += sizeof(out);
+                // Select bytes, not native FP values. The selected address may equal the destination.
+                type...[1u] -= sizeof(ValueT);
+                ::std::memmove(type...[1u] - sizeof(ValueT),
+                               cond != wasm_i32{0} ? type...[1u] - sizeof(ValueT) : type...[1u], sizeof(ValueT));
             }
         }
 
@@ -369,12 +365,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i32 const cond{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
-        ValueT const v2{get_curr_val_from_operand_stack_cache<ValueT>(typeref...)};
-        ValueT const v1{get_curr_val_from_operand_stack_cache<ValueT>(typeref...)};
-
-        ValueT const out{cond != wasm_i32{0} ? v1 : v2};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Select bytes, not native FP values. The selected address may equal the destination.
+        typeref...[1u] -= sizeof(ValueT);
+        ::std::memmove(typeref...[1u] - sizeof(ValueT),
+                       cond != wasm_i32{0} ? typeref...[1u] - sizeof(ValueT) : typeref...[1u], sizeof(ValueT));
     }
 
     namespace translate

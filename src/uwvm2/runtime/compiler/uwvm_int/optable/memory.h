@@ -108,6 +108,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T>
+        UWVM_ALWAYS_INLINE inline constexpr void read_imm(::std::byte const*& ip, T& out) noexcept
+        {
+            ::std::memcpy(::std::addressof(out), ip, sizeof(out));
+            ip += sizeof(out);
+        }
+
+        template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr T read_imm(::std::byte const*& ip) noexcept
         {
             T v;  // no init
@@ -143,12 +150,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return ::std::bit_cast<wasm_i64>(tmp);
         }
 
+        // The output-reference form is used by bit-preserving transport. A native FP return
+        // can quiet sNaNs even when the caller only intends to copy the representation.
+        UWVM_ALWAYS_INLINE inline constexpr void load_f32_le(::std::byte const* p, wasm_f32& out) noexcept
+        {
+            auto const bits{load_i32_le(p)};
+            ::std::memcpy(::std::addressof(out), ::std::addressof(bits), sizeof(out));
+        }
+
         UWVM_ALWAYS_INLINE inline constexpr wasm_f32 load_f32_le(::std::byte const* p) noexcept
         {
             ::std::uint_least32_t tmp;  // no init
             ::std::memcpy(::std::addressof(tmp), p, sizeof(tmp));
             tmp = ::fast_io::little_endian(tmp);
             return ::std::bit_cast<wasm_f32>(tmp);
+        }
+
+        // The output-reference form is used by bit-preserving transport. A native FP return
+        // can quiet sNaNs even when the caller only intends to copy the representation.
+        UWVM_ALWAYS_INLINE inline constexpr void load_f64_le(::std::byte const* p, wasm_f64& out) noexcept
+        {
+            auto const bits{load_i64_le(p)};
+            ::std::memcpy(::std::addressof(out), ::std::addressof(bits), sizeof(out));
         }
 
         UWVM_ALWAYS_INLINE inline constexpr wasm_f64 load_f64_le(::std::byte const* p) noexcept
@@ -185,11 +208,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr void store_i64_le(::std::byte* p, wasm_i64 v) noexcept
         { store_u64_le(p, ::std::bit_cast<::std::uint_least64_t>(v)); }
 
-        UWVM_ALWAYS_INLINE inline constexpr void store_f32_le(::std::byte* p, wasm_f32 v) noexcept
-        { store_u32_le(p, ::std::bit_cast<::std::uint_least32_t>(v)); }
+        UWVM_ALWAYS_INLINE inline constexpr void store_f32_le(::std::byte* p, wasm_f32 const& v) noexcept
+        {
+            ::std::uint_least32_t bits;
+            ::std::memcpy(::std::addressof(bits), ::std::addressof(v), sizeof(bits));
+            store_u32_le(p, bits);
+        }
 
-        UWVM_ALWAYS_INLINE inline constexpr void store_f64_le(::std::byte* p, wasm_f64 v) noexcept
-        { store_u64_le(p, ::std::bit_cast<::std::uint_least64_t>(v)); }
+        UWVM_ALWAYS_INLINE inline constexpr void store_f64_le(::std::byte* p, wasm_f64 const& v) noexcept
+        {
+            // GCC's unoptimized bit_cast<_Float64 -> u64> can use fld/fst.
+            // Explicit byte copying keeps even signaling NaNs unchanged.
+            ::std::uint_least64_t bits;
+            ::std::memcpy(::std::addressof(bits), ::std::addressof(v), sizeof(bits));
+            store_u64_le(p, bits);
+        }
 
         // Use integer arithmetic for byte-pointer offsetting on the runtime path to avoid UB when the effective offset is intentionally
         // outside the logical bounds (fault-based bounds checks rely on guard pages).
@@ -768,7 +801,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         template <::std::size_t WasmBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_u32 = details::wasm_u32;
@@ -796,7 +829,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i32_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_u32 = details::wasm_u32;
@@ -846,7 +879,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i64_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i64_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_i64 = details::wasm_i64;
@@ -901,7 +934,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f32_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_f32_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_f32 = details::wasm_f32;
@@ -956,7 +989,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f64_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_f64_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_f64 = details::wasm_f64;
@@ -1174,7 +1207,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f32 out;
+            details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -1244,7 +1278,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f64 out;
+            details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -2121,7 +2156,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
-            wasm_f32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
+            wasm_f32 value;
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
+            { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...); }
+            else
+            {
+                type...[1u] -= sizeof(value);
+                ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
+            }
 
             wasm_i32 addr{};
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
@@ -2201,7 +2243,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
-            wasm_f64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
+            wasm_f64 value;
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
+            { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...); }
+            else
+            {
+                type...[1u] -= sizeof(value);
+                ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
+            }
 
             wasm_i32 addr{};
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
@@ -2921,7 +2970,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f32 out;
+        details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -2952,7 +3002,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        wasm_f64 const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f64 out;
+        details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -3226,7 +3277,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
-        wasm_f32 const value{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+        wasm_f32 value;
+        typeref...[1u] -= sizeof(value);
+        ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -3254,7 +3307,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
-        wasm_f64 const value{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+        wasm_f64 value;
+        typeref...[1u] -= sizeof(value);
+        ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         auto const eff65{details::wasm32_effective_offset(addr, offset)};
 

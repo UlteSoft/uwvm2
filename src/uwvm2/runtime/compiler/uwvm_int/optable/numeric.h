@@ -381,6 +381,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         }
 
+        // Sign-only Wasm operations are representation operations, not FP arithmetic. In particular,
+        // loading an sNaN into x87 before masking its sign already loses an observable payload bit.
+        template <typename FloatT> using float_bits = ::std::conditional_t<sizeof(FloatT) == 4uz, wasm_u32, wasm_u64>;
+
+        template <float_unop Op, typename UInt>
+        UWVM_ALWAYS_INLINE inline constexpr UInt eval_float_sign_bits(UInt value) noexcept
+        {
+            constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+            if constexpr(Op == float_unop::abs) { return value & ~sign; }
+            else { static_assert(Op == float_unop::neg); return value ^ sign; }
+        }
+
+        template <typename UInt>
+        UWVM_ALWAYS_INLINE inline constexpr UInt eval_float_copysign_bits(UInt left, UInt right) noexcept
+        {
+            constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+            return (left & ~sign) | (right & sign);
+        }
+
+        template <typename FloatT, float_unop Op>
+        UWVM_ALWAYS_INLINE inline constexpr void float_sign_memory(::std::byte* destination, ::std::byte const* source) noexcept
+        {
+            float_bits<FloatT> bits;
+            ::std::memcpy(::std::addressof(bits), source, sizeof(bits));
+            bits = eval_float_sign_bits<Op>(bits);
+            ::std::memcpy(destination, ::std::addressof(bits), sizeof(bits));
+        }
+
+        template <typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr void float_copysign_memory(::std::byte* destination, ::std::byte const* left, ::std::byte const* right) noexcept
+        {
+            float_bits<FloatT> lhs, rhs;
+            ::std::memcpy(::std::addressof(lhs), left, sizeof(lhs));
+            ::std::memcpy(::std::addressof(rhs), right, sizeof(rhs));
+            auto const result{eval_float_copysign_bits(lhs, rhs)};
+            ::std::memcpy(destination, ::std::addressof(result), sizeof(result));
+        }
+
         template <float_unop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
         {
@@ -847,10 +885,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                OperandT const v{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const out{eval_float_unop<Op, OperandT>(v)};
-                ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-                typeref...[1u] += sizeof(out);
+                if constexpr(Op == float_unop::abs || Op == float_unop::neg)
+                {
+                    auto const address{typeref...[1u] - sizeof(OperandT)};
+                    float_sign_memory<OperandT, Op>(address, address);
+                }
+                else
+                {
+                    OperandT const v{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const out{eval_float_unop<Op, OperandT>(v)};
+                    ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+                    typeref...[1u] += sizeof(out);
+                }
             }
         }
 
@@ -893,11 +939,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                OperandT const rhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const lhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const out{eval_float_binop<Op, OperandT>(lhs, rhs)};
-                ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-                typeref...[1u] += sizeof(out);
+                if constexpr(Op == float_binop::copysign)
+                {
+                    typeref...[1u] -= sizeof(OperandT);
+                    float_copysign_memory<OperandT>(typeref...[1u] - sizeof(OperandT), typeref...[1u] - sizeof(OperandT), typeref...[1u]);
+                }
+                else
+                {
+                    OperandT const rhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const lhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const out{eval_float_binop<Op, OperandT>(lhs, rhs)};
+                    ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+                    typeref...[1u] += sizeof(out);
+                }
             }
         }
 
@@ -1602,10 +1656,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const out{numeric_details::eval_float_unop<Op, wasm_f32>(v)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg)
+        {
+            auto const address{typeref...[1u] - sizeof(wasm_f32)};
+            numeric_details::float_sign_memory<wasm_f32, Op>(address, address);
+        }
+        else
+        {
+            wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const out{numeric_details::eval_float_unop<Op, wasm_f32>(v)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, uwvm_int_stack_top_type... TypeRef>
@@ -1625,11 +1687,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_binop::copysign)
+        {
+            typeref...[1u] -= sizeof(wasm_f32);
+            numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u] - sizeof(wasm_f32), typeref...[1u] - sizeof(wasm_f32), typeref...[1u]);
+        }
+        else
+        {
+            wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     // f32 unary wrappers
@@ -1679,10 +1749,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const out{numeric_details::eval_float_unop<Op, wasm_f64>(v)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg)
+        {
+            auto const address{typeref...[1u] - sizeof(wasm_f64)};
+            numeric_details::float_sign_memory<wasm_f64, Op>(address, address);
+        }
+        else
+        {
+            wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const out{numeric_details::eval_float_unop<Op, wasm_f64>(v)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, uwvm_int_stack_top_type... TypeRef>
@@ -1702,11 +1780,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_binop::copysign)
+        {
+            typeref...[1u] -= sizeof(wasm_f64);
+            numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u] - sizeof(wasm_f64), typeref...[1u] - sizeof(wasm_f64), typeref...[1u]);
+        }
+        else
+        {
+            wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     // f64 unary wrappers

@@ -635,6 +635,11 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_deps("uwvm_runtime")
 		end
 
+		if string.find(file, "uwvm_int_fp_bit_environment.cc", 1, true) ~= nil then
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+		end
+
 		if is_0013_uwvm_int_lazy then
 			add_deps("uwvm_runtime")
 			add_deps("uwvm")

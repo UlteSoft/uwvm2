@@ -1740,6 +1740,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f32x4_nearest) { return vec_roundeven_f32x4_v128(v); }
 #  endif
 # endif
+                // Keep the scalar fallback bitwise too: 68881/x87 fabs and even FP loads may
+                // quiet a signaling NaN. Integer lane transport also handles big-endian hosts.
+                if constexpr(Op == simd_code::f32x4_abs || Op == simd_code::f32x4_neg)
+                {
+                    auto bits{load_uint_lanes<u32, 4uz>(v)};
+                    for(auto& lane: bits.lane)
+                    {
+                        if constexpr(Op == simd_code::f32x4_abs) { lane &= 0x7fffffffu; }
+                        else { lane ^= 0x80000000u; }
+                    }
+                    return store_uint_lanes<u32, 4uz>(bits);
+                }
                 lane_array<wasm_f32, 4uz> out{};  // init
                 if constexpr(Op == simd_code::f32x4_convert_i32x4_s || Op == simd_code::f32x4_convert_i32x4_u)
                 {
@@ -1821,6 +1833,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 else if constexpr(Op == simd_code::f64x2_nearest) { return vec_roundeven_f64x2_v128(v); }
 #  endif
 # endif
+                if constexpr(Op == simd_code::f64x2_abs || Op == simd_code::f64x2_neg)
+                {
+                    auto bits{load_uint_lanes<u64, 2uz>(v)};
+                    for(auto& lane: bits.lane)
+                    {
+                        if constexpr(Op == simd_code::f64x2_abs) { lane &= 0x7fffffffffffffffull; }
+                        else { lane ^= 0x8000000000000000ull; }
+                    }
+                    return store_uint_lanes<u64, 2uz>(bits);
+                }
                 lane_array<wasm_f64, 2uz> out{};  // init
                 if constexpr(Op == simd_code::f64x2_promote_low_f32x4)
                 {
@@ -2446,6 +2468,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     }
                 }
 # endif
+                if constexpr(Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
+                {
+                    auto l{load_uint_lanes<u32, 4uz>(lhs)};
+                    auto const r{load_uint_lanes<u32, 4uz>(rhs)};
+                    for(::std::size_t i{}; i != 4uz; ++i)
+                    {
+                        auto const a{::std::bit_cast<wasm_f32>(l.lane[i])};
+                        auto const b{::std::bit_cast<wasm_f32>(r.lane[i])};
+                        bool const take_rhs{Op == simd_code::f32x4_pmin ? b < a : a < b};
+                        if(take_rhs) { l.lane[i] = r.lane[i]; }
+                    }
+                    return store_uint_lanes<u32, 4uz>(l);
+                }
                 auto l{load_f32x4_lanes(lhs)};
                 auto const r{load_f32x4_lanes(rhs)};
                 for(::std::size_t i{}; i != 4uz; ++i)
@@ -2495,6 +2530,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                     }
                 }
 # endif
+                if constexpr(Op == simd_code::f64x2_pmin || Op == simd_code::f64x2_pmax)
+                {
+                    auto l{load_uint_lanes<u64, 2uz>(lhs)};
+                    auto const r{load_uint_lanes<u64, 2uz>(rhs)};
+                    for(::std::size_t i{}; i != 2uz; ++i)
+                    {
+                        auto const a{::std::bit_cast<wasm_f64>(l.lane[i])};
+                        auto const b{::std::bit_cast<wasm_f64>(r.lane[i])};
+                        bool const take_rhs{Op == simd_code::f64x2_pmin ? b < a : a < b};
+                        if(take_rhs) { l.lane[i] = r.lane[i]; }
+                    }
+                    return store_uint_lanes<u64, 2uz>(l);
+                }
                 auto l{load_f64x2_lanes(lhs)};
                 auto const r{load_f64x2_lanes(rhs)};
                 for(::std::size_t i{}; i != 2uz; ++i)

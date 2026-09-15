@@ -340,6 +340,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
+        // These SIMD operations move scalar bits; a native floating return can
+        // quiet an sNaN on x87/68881 even when no arithmetic was requested.
+        template <typename T>
+        using scalar_move_type = ::std::conditional_t<::std::same_as<T, wasm_f32>, wasm_i32,
+                                 ::std::conditional_t<::std::same_as<T, wasm_f64>, wasm_i64, T>>;
+
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT>
         inline consteval bool stacktop_enabled_for() noexcept
         {
@@ -727,8 +733,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_f32>(type...)};
-        auto const out{wasm1p1_simd_details::eval_v128_splat_f32<Op>(v)};
+        static_assert(Op == wasm1p1_simd_details::v128_splatop::f32x4);
+        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_i32>(type...)};
+        auto const out{wasm1p1_simd_details::eval_v128_splat_i32<wasm1p1_simd_details::v128_splatop::i32x4>(v)};
         wasm1p1_simd_details::push_v128_to_memory_stack(out, type...[1u]);
 
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
@@ -742,8 +749,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_simd_f32x4_splat(TypeRef & ... typeref) UWVM_THROWS
     {
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
-        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_f32>(typeref...)};
-        auto const out{wasm1p1_simd_details::eval_v128_splat_f32<Op>(v)};
+        static_assert(Op == wasm1p1_simd_details::v128_splatop::f32x4);
+        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_i32>(typeref...)};
+        auto const out{wasm1p1_simd_details::eval_v128_splat_i32<wasm1p1_simd_details::v128_splatop::i32x4>(v)};
         wasm1p1_simd_details::push_v128_to_memory_stack(out, typeref...[1u]);
     }
 
@@ -755,8 +763,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(type...)};
-        auto const out{wasm1p1_simd_details::eval_f32x4_extract_lane<Lane>(v)};
-        wasm1p1_simd_details::push_f32_to_memory_stack(out, type...[1u]);
+        static_assert(Lane < 4uz);
+        auto const out{wasm1p1_simd_details::eval_extract_lane_i32<wasm1p1_simd_details::simd_code::i32x4_extract_lane>(v, Lane)};
+        wasm1p1_simd_details::push_i32_to_memory_stack(out, type...[1u]);
 
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -770,8 +779,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(typeref...)};
-        auto const out{wasm1p1_simd_details::eval_f32x4_extract_lane<Lane>(v)};
-        wasm1p1_simd_details::push_f32_to_memory_stack(out, typeref...[1u]);
+        static_assert(Lane < 4uz);
+        auto const out{wasm1p1_simd_details::eval_extract_lane_i32<wasm1p1_simd_details::simd_code::i32x4_extract_lane>(v, Lane)};
+        wasm1p1_simd_details::push_i32_to_memory_stack(out, typeref...[1u]);
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -1026,12 +1036,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_simd_full_splat(Type... type) UWVM_THROWS
     {
-        auto const v{get_curr_val_from_operand_stack_cache<ScalarT>(type...)};
+        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_details::scalar_move_type<ScalarT>>(type...)};
         wasm1p1_simd_details::wasm_v128 out;  // no init
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_full_splat_i32<Op>(v); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_full_splat_i64<Op>(v); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_full_splat_f32<Op>(v); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_full_splat_f64<Op>(v); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_full_splat_i32<wasm1p1_simd_details::simd_code::i32x4_splat>(v); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_full_splat_i64<wasm1p1_simd_details::simd_code::i64x2_splat>(v); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD splat scalar type");
@@ -1049,12 +1059,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_simd_full_splat(TypeRef & ... typeref) UWVM_THROWS
     {
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
-        auto const v{get_curr_val_from_operand_stack_cache<ScalarT>(typeref...)};
+        auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_details::scalar_move_type<ScalarT>>(typeref...)};
         wasm1p1_simd_details::wasm_v128 out;  // no init
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_full_splat_i32<Op>(v); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_full_splat_i64<Op>(v); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_full_splat_f32<Op>(v); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_full_splat_f64<Op>(v); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_full_splat_i32<wasm1p1_simd_details::simd_code::i32x4_splat>(v); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_full_splat_i64<wasm1p1_simd_details::simd_code::i64x2_splat>(v); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD splat scalar type");
@@ -1069,11 +1079,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const lane{wasm1p1_details::read_imm<wasm1p1_simd_details::u8>(type...[0])};
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(type...)};
-        ScalarT out;  // no init
+        wasm1p1_details::scalar_move_type<ScalarT> out;  // Preserve lane bits on legacy FP ABIs.
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_extract_lane_i32<Op>(v, lane); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_extract_lane_i64<Op>(v, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_extract_lane_f32<Op>(v, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_extract_lane_f64<Op>(v, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_extract_lane_i32<wasm1p1_simd_details::simd_code::i32x4_extract_lane>(v, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_extract_lane_i64<wasm1p1_simd_details::simd_code::i64x2_extract_lane>(v, lane); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD extract-lane scalar type");
@@ -1092,11 +1102,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const lane{wasm1p1_details::read_imm<wasm1p1_simd_details::u8>(typeref...[0])};
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(typeref...)};
-        ScalarT out;  // no init
+        wasm1p1_details::scalar_move_type<ScalarT> out;  // Preserve lane bits on legacy FP ABIs.
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_extract_lane_i32<Op>(v, lane); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_extract_lane_i64<Op>(v, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_extract_lane_f32<Op>(v, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_extract_lane_f64<Op>(v, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_extract_lane_i32<wasm1p1_simd_details::simd_code::i32x4_extract_lane>(v, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_extract_lane_i64<wasm1p1_simd_details::simd_code::i64x2_extract_lane>(v, lane); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD extract-lane scalar type");
@@ -1110,13 +1120,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const lane{wasm1p1_details::read_imm<wasm1p1_simd_details::u8>(type...[0])};
-        auto const x{get_curr_val_from_operand_stack_cache<ScalarT>(type...)};
+        auto const x{get_curr_val_from_operand_stack_cache<wasm1p1_details::scalar_move_type<ScalarT>>(type...)};
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(type...)};
         wasm1p1_simd_details::wasm_v128 out;  // no init
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_replace_lane_i32<Op>(v, x, lane); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_replace_lane_i64<Op>(v, x, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_replace_lane_f32<Op>(v, x, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_replace_lane_f64<Op>(v, x, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_replace_lane_i32<wasm1p1_simd_details::simd_code::i32x4_replace_lane>(v, x, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_replace_lane_i64<wasm1p1_simd_details::simd_code::i64x2_replace_lane>(v, x, lane); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD replace-lane scalar type");
@@ -1134,13 +1144,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const lane{wasm1p1_details::read_imm<wasm1p1_simd_details::u8>(typeref...[0])};
-        auto const x{get_curr_val_from_operand_stack_cache<ScalarT>(typeref...)};
+        auto const x{get_curr_val_from_operand_stack_cache<wasm1p1_details::scalar_move_type<ScalarT>>(typeref...)};
         auto const v{get_curr_val_from_operand_stack_cache<wasm1p1_simd_details::wasm_v128>(typeref...)};
         wasm1p1_simd_details::wasm_v128 out;  // no init
         if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i32>) { out = wasm1p1_simd_details::eval_replace_lane_i32<Op>(v, x, lane); }
         else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_i64>) { out = wasm1p1_simd_details::eval_replace_lane_i64<Op>(v, x, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_replace_lane_f32<Op>(v, x, lane); }
-        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_replace_lane_f64<Op>(v, x, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f32>) { out = wasm1p1_simd_details::eval_replace_lane_i32<wasm1p1_simd_details::simd_code::i32x4_replace_lane>(v, x, lane); }
+        else if constexpr(::std::same_as<ScalarT, wasm1p1_simd_details::wasm_f64>) { out = wasm1p1_simd_details::eval_replace_lane_i64<wasm1p1_simd_details::simd_code::i64x2_replace_lane>(v, x, lane); }
         else
         {
             static_assert(sizeof(ScalarT) == 0, "unhandled SIMD replace-lane scalar type");

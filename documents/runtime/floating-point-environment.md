@@ -1,5 +1,45 @@
 # 浮点环境边界、契约快路径与跨架构验证
 
+## 2026-09-15：NaN 位模式与浮点 ABI 补充审计
+
+环境控制正确并不足以保证位模式正确。x87 的原生 f32/f64 返回寄存器，以及某些编译器生成的浮点临时值，会把 signaling NaN 静默变成 quiet NaN。Wasm 的纯搬运、reinterpret、abs、neg、copysign 必须保留相应非符号位；不能把算术指令允许的 NaN 变化套用到这些操作上。
+
+本次处理包括：
+
+- uwvm-int 的 constants、locals、globals、provider globals、select、memory、reinterpret 和符号操作；无浮点缓存路径直接复制字节或修改整数位。
+- delay-local 和 immediate/local 融合的所有 copysign 模板；保留融合派发，不用拆回多个普通指令规避问题。
+- Wasm 1.0/1.1 全局常量解析、定义全局初始化、导入全局初始化；NaN 指令常量不经过原生浮点临时值或延迟常量状态。有限常量继续走原有融合路径。
+- 主仓库 SIMD fallback 的符号操作、pmin/pmax 和 scalar lane 搬运；ROS 不引入 SIMD 实现。
+- i386 LLVM 私有 ABI 统一禁用 x87 返回/搬运，使用整数返回位模式。无 SSE2 时还降低比较、转换、算术与舍入，避免引入不兼容的原生浮点返回 libcall；SSE2 保留原生算术/i32 转换，SSE4.1 保留原生舍入，仍需 x87 的 i64 转换走整数 bridge。
+- LLVM native global callback 改用整数参数/返回载体；缓存环境增加独立 ABI 版本项，旧对象不能按新 ABI 复用。
+- x86_64 即使使用 no-SSE 编译选项，provider 控制边界也覆盖 MXCSR。没有关闭现有 fenv、边界检查或其他安全保护。
+
+i386/68881 的默认解释器配置本来就不使用浮点缓存；现在布局检查明确拒绝这些 ABI 上的自定义浮点缓存。现代架构的缓存快路径保持不变。
+
+native global provider 可以让 `global_get` 返回 `value_type const&` 或 `value_type&`，并让 `global_set` 接受 const 引用，以避免宿主回调自己的值返回 ABI 改写位模式。原有按值 getter 仍兼容，但运行时无法恢复回调返回前已经丢失的 signaling-NaN 信息；需要位精确契约的 provider 应采用引用形式。
+
+### 回归与性能证据
+
+Linux 测试统一限制为 64 GiB、无 swap、CPU 16–31（16 个 E-core）；i686 使用原生 32 位加载器，其余交叉目标使用 QEMU。
+
+- 标量 opfunc：主仓库 21 组配置全部通过，含 Clang/GCC i686 的 O0/O3、i686 SSE2、m68k O0/O3，以及 x86_64、AArch64、ARMhf、PPC32、PPC64 BE/LE、AltiVec、RISC-V、s390x、LoongArch64、Alpha、HPPA、SPARC64、SH4。ROS 的 19 组对应 GCC/本机配置通过。
+- 主仓库 SIMD：上述基础矩阵的 19 组配置通过。融合 copysign、引用 provider 和 Wasm 1.0/1.1 全局解析另覆盖 Clang/GCC i686、m68k、O0/O3；解析还覆盖 AArch64 与 PPC64 大端。
+- 实际运行时 raw-byte 入口：主仓库 x86_64/AArch64 的 full/lazy × interpreter/LLVM 全部通过；i686 的 full/lazy interpreter 通过。ROS x86_64 interpreter/LLVM 和 i686 interpreter 通过。覆盖直接/间接调用、provider、内存、定义全局、NaN 常量及初始全局。
+- LLVM 22 的 i386 生成对象：无 SSE、SSE2、SSE4.1 均执行通过，包括符号/搬运、算术/舍入、整数转换、饱和转换和全部普通比较谓词、合法 constrained 比较谓词、标量/向量比较。另对 PPC32/PPC64 BE/LE、m68k、LoongArch64、RISC-V、SPARC64、s390x、ARMhf 执行了原生 LLVM 浮点调用位模式探针。
+- 原有 x86_64 full/ROS 浮点环境入口回归用新 runtime 对象重新链接后通过；MXCSR 默认/no-SSE 控制回归通过。
+- x86_64 汇编与修复前同配置对象对照：主仓库 710 个 f32、774 个 f64、934 个整数算术 opfunc，ROS 216 个 f32、216 个 f64、446 个整数算术 opfunc，机器码及重定位全部相同。i386 JIT 的 SSE2 add 保留 `addss`，SSE4.1 ceil 保留 `roundsd`。
+- 每组 4 次 before/after 交错运行、每次 7 个计时样本、每样本 1,000 万轮：主仓库 arithmetic/provider 中位耗时变化为 −0.01% / +0.006%，ROS 为 −1.58% / +0.008%；结果位均为 `46189a80`。这些微基准未显示性能回退，不代表所有工作负载的性能保证。
+
+测试源码为 `uwvm_int_fp_bits`、`uwvm_int_fp_fused_bits`、`uwvm_int_fp_provider_bits`、`uwvm_int_fp_parser_bits`、`uwvm_int_fp_bit_environment`，主仓库另有 `uwvm_int_simd_fp_bits`。启用对应 xmake 测试选项后可按这些 target 名称构建运行。
+
+LLVM 交叉回归入口：
+
+```sh
+python3 test/0014.llvm_jit/run_fp_bits_cross.py --help
+```
+
+脚本接受 LLVM 工具、i686 编译器/sysroot 参数及原生加载器前缀，保留生成 IR、对象、汇编和执行日志。这里没有安装原生 i386 LLVM 库，i386 的证据是生产 lowering 生成的对象在原生 32 位进程中执行，而不是完整 i386 JIT 进程；没有实测所有历史 CPU、非 Linux OS、编译器组合，也不把这些测试等同于整个沙箱的安全证明。
+
 ## 范围与结论
 
 这里的“关闭保护”仅指浮点环境的保存、建立和恢复。它不允许关闭 Wasm 内存边界、间接调用类型检查、trap、调用深度、重入或 JIT bridge token 检查。

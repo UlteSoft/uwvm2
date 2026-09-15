@@ -12,7 +12,7 @@ namespace uwvm2::runtime::lib::details
         // Clang ARM64EC defines __x86_64__ for its hybrid ABI, but executes AArch64 instructions.
 #if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
         unsigned short x87_control;
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
         unsigned sse_control;
 # endif
 #elif defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC)
@@ -25,7 +25,7 @@ namespace uwvm2::runtime::lib::details
         {
 #if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             __asm__ volatile("fnstcw %0" : "=m"(x87_control) : : "memory");
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
             __asm__ volatile("stmxcsr %0" : "=m"(sse_control) : : "memory");
 # endif
 #elif defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC)
@@ -45,7 +45,7 @@ namespace uwvm2::runtime::lib::details
             __asm__ volatile("fnstsw %0" : "=a"(status) : : "memory");
             if((status & 0x00ffu) != 0u) { __asm__ volatile("fnclex" : : : "memory"); }
             __asm__ volatile("fldcw %0" : : "m"(x87_control) : "memory");
-# if defined(__SSE__)
+# if defined(__SSE__) || defined(__x86_64__)
             __asm__ volatile("ldmxcsr %0" : : "m"(sse_control) : "memory");
 # endif
 #elif defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC)

@@ -162,12 +162,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
-        wasm_f32 imm;  // no init
-        ::std::memcpy(::std::addressof(imm), type...[0], sizeof(imm));
-        type...[0] += sizeof(imm);
-
         if constexpr(CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos)
         {
+            wasm_f32 imm;
+            ::std::memcpy(::std::addressof(imm), type...[0], sizeof(imm));
             constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
             static_assert(sizeof...(Type) >= range_end);
@@ -180,9 +178,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
 
-            ::std::memcpy(type...[1u], ::std::addressof(imm), sizeof(imm));
-            type...[1u] += sizeof(imm);
+            ::std::memcpy(type...[1u], type...[0], sizeof(wasm_f32));
+            type...[1u] += sizeof(wasm_f32);
         }
+        type...[0] += sizeof(wasm_f32);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -206,12 +205,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
-        wasm_f64 imm;  // no init
-        ::std::memcpy(::std::addressof(imm), type...[0], sizeof(imm));
-        type...[0] += sizeof(imm);
-
         if constexpr(CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos)
         {
+            wasm_f64 imm;
+            ::std::memcpy(::std::addressof(imm), type...[0], sizeof(imm));
             constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
             static_assert(sizeof...(Type) >= range_end);
@@ -224,9 +221,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
 
-            ::std::memcpy(type...[1u], ::std::addressof(imm), sizeof(imm));
-            type...[1u] += sizeof(imm);
+            ::std::memcpy(type...[1u], type...[0], sizeof(wasm_f64));
+            type...[1u] += sizeof(wasm_f64);
         }
+        type...[0] += sizeof(wasm_f64);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -315,12 +313,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 imm;  // no init
-        ::std::memcpy(::std::addressof(imm), typeref...[0], sizeof(imm));
-        typeref...[0] += sizeof(imm);
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(imm), sizeof(imm));
-        typeref...[1u] += sizeof(imm);
+        ::std::memcpy(typeref...[1u], typeref...[0], sizeof(wasm_f32));
+        typeref...[0] += sizeof(wasm_f32);
+        typeref...[1u] += sizeof(wasm_f32);
     }
 
     /// @brief `f64.const` opcode (non-tail-call/byref): pushes an f64 immediate onto the operand stack.
@@ -344,12 +339,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 imm;  // no init
-        ::std::memcpy(::std::addressof(imm), typeref...[0], sizeof(imm));
-        typeref...[0] += sizeof(imm);
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(imm), sizeof(imm));
-        typeref...[1u] += sizeof(imm);
+        ::std::memcpy(typeref...[1u], typeref...[0], sizeof(wasm_f64));
+        typeref...[0] += sizeof(wasm_f64);
+        typeref...[1u] += sizeof(wasm_f64);
     }
 
     namespace translate

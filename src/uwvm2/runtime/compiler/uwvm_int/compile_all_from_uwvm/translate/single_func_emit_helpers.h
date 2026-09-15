@@ -3110,8 +3110,9 @@ auto const emit_local_get_typed_to{
     }};
 
 [[maybe_unused]] auto const emit_const_f32_to{
-    [&](bytecode_vec_t& dst, wasm_f32 imm) constexpr UWVM_THROWS
+    [&](bytecode_vec_t& dst, auto const& imm) constexpr UWVM_THROWS
     {
+        static_assert(sizeof(imm) == sizeof(wasm_f32));
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
         bool fused_spill_and_const{};
@@ -3194,8 +3195,9 @@ auto const emit_local_get_typed_to{
     }};
 
 [[maybe_unused]] auto const emit_const_f64_to{
-    [&](bytecode_vec_t& dst, wasm_f64 imm) constexpr UWVM_THROWS
+    [&](bytecode_vec_t& dst, auto const& imm) constexpr UWVM_THROWS
     {
+        static_assert(sizeof(imm) == sizeof(wasm_f64));
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
         bool fused_spill_and_const{};
