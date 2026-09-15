@@ -299,7 +299,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             {
                 for(; this->worker_count != extra_worker_count; ++this->worker_count)
                 {
-                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{run_worker});
+                    // Construct directly from the callable in its final slot.
+                    // A thread temporary makes Clang 20/libc++ recursively check
+                    // fast_io's forwarding-constructor callable constraint while
+                    // resolving move construction; it also adds an extra move.
+                    ::std::construct_at(this->workers.buffer + this->worker_count, run_worker);
                 }
             }
 # ifdef UWVM_CPP_EXCEPTIONS
