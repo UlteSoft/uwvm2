@@ -14,6 +14,24 @@ using code = s::simd_code;
 
 UWVM_INTERPRETER_OPFUNC_HOT_MACRO void finish_simd(std::byte const*, std::byte*, std::byte*) noexcept {}
 
+#if defined(__clang__) && defined(__mips__) && defined(__mips_isa_rev) && __mips_isa_rev >= 6
+// Clang 22/23 can merge this driver's different operand-stack layouts into a
+// GPR boolean -> FGR64CC select, then emit an invalid opcode-0 register copy.
+// Keep the real opfunc optimized at O3 in its own test invocation, instead of
+// combining it with the multi-operation driver's setup/oracle control flow.
+// The explicit argument pack selects the same byref/tail specialization as
+// the original deduced call; omitting it instantiates an invalid empty pack.
+// This is test-only: no VM dispatch, floating semantics or protection changes.
+template <auto Op>
+UWVM_NOINLINE void invoke_simd_op(std::byte const*& ip, std::byte*& sp, std::byte*& locals) noexcept
+{
+    Op(ip, sp, locals);
+}
+# define UWVM_TEST_SIMD_INVOKER(F, ...) invoke_simd_op<&F<__VA_ARGS__, std::byte const*, std::byte*, std::byte*>>
+#else
+# define UWVM_TEST_SIMD_INVOKER(F, ...) F<__VA_ARGS__>
+#endif
+
 template <bool Tail, class Float, class UInt>
 UWVM_NOINLINE unsigned check_simd(UInt input)
 {
@@ -62,20 +80,20 @@ UWVM_NOINLINE unsigned check_simd(UInt input)
                 std::memcpy(immediate, &end, sizeof(end));
             }
 #define CASES(SHAPE)                                                                                                                                           \
-    case 0: o::uwvmint_simd_full_unop<options, code::SHAPE##_abs>(ip, sp, locals); break;                                                                      \
-    case 1: o::uwvmint_simd_full_unop<options, code::SHAPE##_neg>(ip, sp, locals); break;                                                                      \
-    case 2: o::uwvmint_simd_full_binop<options, code::SHAPE##_pmin>(ip, sp, locals); break;                                                                    \
-    case 3: o::uwvmint_simd_full_binop<options, code::SHAPE##_pmax>(ip, sp, locals); break;                                                                    \
-    case 4: o::uwvmint_simd_full_splat<options, code::SHAPE##_splat, Float>(ip, sp, locals); break;                                                            \
-    case 5: o::uwvmint_simd_full_extract_lane<options, code::SHAPE##_extract_lane, Float>(ip, sp, locals); break;                                              \
-    case 6: o::uwvmint_simd_full_replace_lane<options, code::SHAPE##_replace_lane, Float>(ip, sp, locals); break;
+    case 0: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_unop, options, code::SHAPE##_abs)(ip, sp, locals); break;                                                                      \
+    case 1: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_unop, options, code::SHAPE##_neg)(ip, sp, locals); break;                                                                      \
+    case 2: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_binop, options, code::SHAPE##_pmin)(ip, sp, locals); break;                                                                    \
+    case 3: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_binop, options, code::SHAPE##_pmax)(ip, sp, locals); break;                                                                    \
+    case 4: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_splat, options, code::SHAPE##_splat, Float)(ip, sp, locals); break;                                                            \
+    case 5: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_extract_lane, options, code::SHAPE##_extract_lane, Float)(ip, sp, locals); break;                                              \
+    case 6: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_full_replace_lane, options, code::SHAPE##_replace_lane, Float)(ip, sp, locals); break;
             if constexpr(sizeof(Float) == 4)
             {
                 switch(op)
                 {
                     CASES(f32x4)
-                    case 7: o::uwvmint_simd_f32x4_splat<options, s::v128_splatop::f32x4>(ip, sp, locals); break;
-                    case 8: o::uwvmint_simd_f32x4_extract_lane<options, 3uz>(ip, sp, locals); break;
+                    case 7: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_f32x4_splat, options, s::v128_splatop::f32x4)(ip, sp, locals); break;
+                    case 8: UWVM_TEST_SIMD_INVOKER(o::uwvmint_simd_f32x4_extract_lane, options, 3uz)(ip, sp, locals); break;
                 }
             }
             else
@@ -117,6 +135,8 @@ UWVM_NOINLINE unsigned check_simd(UInt input)
     }
     return errors;
 }
+
+#undef UWVM_TEST_SIMD_INVOKER
 
 int main()
 {
