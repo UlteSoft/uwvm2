@@ -43,7 +43,7 @@ namespace
         return ::llvm::verifyModule(module, ::std::addressof(::llvm::errs())) ? 12 : 0;
     }
 
-    [[nodiscard]] int check_o3_preserves_wasm_call_boundary() noexcept
+    [[nodiscard]] int check_optimized_wasm_call_boundary(::llvm::OptimizationLevel level) noexcept
     {
         ::llvm::LLVMContext context{};
         ::llvm::Module module{"llvm-aot-noinline-o3", context};
@@ -81,7 +81,7 @@ namespace
         pass_builder.registerFunctionAnalyses(function_analysis_manager);
         pass_builder.registerLoopAnalyses(loop_analysis_manager);
         pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager, module_analysis_manager);
-        auto module_pass_manager{pass_builder.buildPerModuleDefaultPipeline(::llvm::OptimizationLevel::O3)};
+        auto module_pass_manager{pass_builder.buildPerModuleDefaultPipeline(level)};
         module_pass_manager.run(module, module_analysis_manager);
 
         if(::llvm::verifyModule(module, ::std::addressof(::llvm::errs()))) { return 22; }
@@ -104,5 +104,14 @@ namespace
 int main()
 {
     if(auto const status{check_function_policy()}; status != 0) { return status; }
-    return check_o3_preserves_wasm_call_boundary();
+    // Inlining decisions are not monotonic across speed/size pipelines. O3
+    // alone cannot establish the mandatory boundary for O1/O2 or size-tuned
+    // future policies. The unoptimized policy is checked above; each pipeline
+    // here must retain the actual call, not merely the attribute's spelling.
+    for(auto const level: {::llvm::OptimizationLevel::O1, ::llvm::OptimizationLevel::O2,
+                          ::llvm::OptimizationLevel::O3, ::llvm::OptimizationLevel::Os, ::llvm::OptimizationLevel::Oz})
+    {
+        if(auto const status{check_optimized_wasm_call_boundary(level)}; status != 0) { return status; }
+    }
+    return 0;
 }
