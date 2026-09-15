@@ -5,6 +5,7 @@
 #include <uwvm2/runtime/lib/uwvm_runtime.h>
 #include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#include "../0014.llvm_jit/fixtures/fp_rounding_oracle.h"
 namespace strict = uwvm2test::uwvm_int_strict;
 namespace runtime = uwvm2::runtime::lib;
 namespace mode = uwvm2::uwvm::runtime::runtime_mode;
@@ -32,7 +33,7 @@ struct bit_provider
 };
 
 static_assert(type::has_local_global_tuple<bit_provider>);
-constexpr unsigned operations = 14;
+constexpr unsigned operations = 18;
 
 strict::byte_vec build_bits_module()
 {
@@ -137,6 +138,10 @@ strict::byte_vec build_bits_module()
                     emit(strict::wasm_op::global_get);
                     imm(4 + wide);
                     break;
+                case 14: emit(wide ? strict::wasm_op::f64_ceil : strict::wasm_op::f32_ceil); break;
+                case 15: emit(wide ? strict::wasm_op::f64_floor : strict::wasm_op::f32_floor); break;
+                case 16: emit(wide ? strict::wasm_op::f64_trunc : strict::wasm_op::f32_trunc); break;
+                case 17: emit(wide ? strict::wasm_op::f64_nearest : strict::wasm_op::f32_nearest); break;
             }
             emit(strict::wasm_op::end);
             m.add_func(
@@ -195,7 +200,10 @@ unsigned check_bits(UInt bits, bool lazy)
                     expected = 0x7f800001u;
                 }
             }
-            if(result != expected)
+            using Float = std::conditional_t<sizeof(UInt) == 4, value::wasm_f32, value::wasm_f64>;
+            if(op >= 14) { expected = fp_rounding_oracle::expected<Float>(bits, op - 14); }
+            bool const okay{op >= 14 ? fp_rounding_oracle::matches<Float>(bits, result, op - 14) : result == expected};
+            if(!okay)
             {
                 ++errors;
                 std::fprintf(stderr,
@@ -234,8 +242,8 @@ unsigned run_bits(mode::runtime_compiler_t backend, bool lazy)
     mode::global_runtime_llvm_jit_cache_path_mode = mode::runtime_llvm_jit_cache_path_mode_t::disabled;
 #endif
     unsigned errors{};
-    for(std::uint32_t bits: {0u, 0x80000000u, 1u, 0x7f800001u, 0xff800123u, 0x7fc00123u}) { errors += check_bits(bits, lazy); }
-    for(std::uint64_t bits: {0ull, 0x8000000000000000ull, 1ull, 0x7ff0000000000001ull, 0xfff0000000000123ull}) { errors += check_bits(bits, lazy); }
+    for(std::uint32_t bits: {0u, 0x80000000u, 1u, 0x7f800001u, 0xff800123u, 0x7fc00123u, 0x3f000000u, 0xbfc00000u}) { errors += check_bits(bits, lazy); }
+    for(std::uint64_t bits: {0ull, 0x8000000000000000ull, 1ull, 0x7ff0000000000001ull, 0xfff0000000000123ull, 0x3fe0000000000000ull, 0xbff8000000000000ull}) { errors += check_bits(bits, lazy); }
     std::printf("Production FP bits backend=%u lazy=%d: %u failures\n", static_cast<unsigned>(backend), lazy, errors);
     return errors;
 }

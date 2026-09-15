@@ -20,12 +20,23 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
 #else
     inline constexpr bool needs_bit_preserving_abi{false};
 #endif
-    inline constexpr bool needs_lowering{fp::needs_extended_rounding || needs_bit_preserving_abi};
+    inline constexpr bool needs_lowering{fp::needs_extended_rounding || needs_bit_preserving_abi || fp::needs_nan_canonicalization};
 
     template <typename Float>
     [[nodiscard]] inline fp::u64 evaluate(fp::u64 left, fp::u64 right, unsigned opcode) noexcept
     {
         using bits = fp::bits_t<Float>;
+        if constexpr(fp::uses_integer_rounding)
+        {
+            auto const raw{static_cast<bits>(left)};
+            switch(opcode)
+            {
+                case 9: return fp::round_integral_bits<fp::integral_rounding::ceil>(raw);
+                case 10: return fp::round_integral_bits<fp::integral_rounding::floor>(raw);
+                case 11: return fp::round_integral_bits<fp::integral_rounding::trunc>(raw);
+                case 12: return fp::round_integral_bits<fp::integral_rounding::nearest>(raw);
+            }
+        }
         Float const lhs{::std::bit_cast<Float>(static_cast<bits>(left))};
         Float const rhs{::std::bit_cast<Float>(static_cast<bits>(right))};
         if((opcode & 15u) == 13u || (opcode & 15u) == 14u)
@@ -57,14 +68,16 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
             case 5: result = fp::convert<Float>(::std::bit_cast<::std::int64_t>(left)); break;
             case 6: result = fp::convert<Float>(left); break;
             case 7: result = fp::convert<Float>(::std::bit_cast<double>(left)); break;
-            case 8: result = static_cast<Float>(::std::bit_cast<float>(static_cast<fp::u32>(left))); break;
-            case 9: result = ::std::ceil(lhs); break;
-            case 10: result = ::std::floor(lhs); break;
-            case 11: result = ::std::trunc(lhs); break;
+            case 8: result = fp::convert<Float>(::std::bit_cast<float>(static_cast<fp::u32>(left))); break;
+            // Host rounding builtins may preserve sNaNs (notably SSE2 and RISC-V).
+            // The integer bridge must provide arithmetic-NaN semantics too.
+            case 9: result = fp::quiet_arithmetic_nan(::std::ceil(lhs)); break;
+            case 10: result = fp::quiet_arithmetic_nan(::std::floor(lhs)); break;
+            case 11: result = fp::quiet_arithmetic_nan(::std::trunc(lhs)); break;
             // The public Wasm scope establishes RN-even and callbacks restore it.
-            case 12: result = ::std::nearbyint(lhs); break;
+            case 12: result = fp::quiet_arithmetic_nan(::std::nearbyint(lhs)); break;
         }
-        return ::std::bit_cast<bits>(result);
+        return ::std::bit_cast<bits>(fp::canonicalize_native_nan(result));
     }
 
     // Integer-only C ABI: x87/68881 parameter and return registers must not introduce a second rounding.

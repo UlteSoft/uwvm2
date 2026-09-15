@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cmath>
 #include <type_traits>
+#include "fp_rounding_oracle.h"
 namespace fp = uwvm2::runtime::compiler::shared::strict_float_jit;
 
 extern "C" std::uint64_t uwvm_strict_float_bits_v1(std::uint64_t a, std::uint64_t b, std::uint32_t op) { return fp::bridge(a, b, op); }
@@ -13,12 +14,14 @@ extern "C" std::uint64_t uwvm_strict_float_bits_v1(std::uint64_t a, std::uint64_
 #define DECL(W, O) extern "C" void bits_##W##_##O(void const*, void const*, void*);
 #define EACH(M, W)                                                                                                                                             \
     M(W, 0)                                                                                                                                                    \
-    M(W, 1) M(W, 2) M(W, 3) M(W, 4) M(W, 5) M(W, 6) M(W, 7) M(W, 8) M(W, 9) M(W, 10) M(W, 11) M(W, 12) M(W, 13) M(W, 14) M(W, 15) M(W, 16) M(W, 17) M(W, 18)   \
-        M(W, 19) M(W, 20) M(W, 21) M(W, 22) M(W, 23) M(W, 24)
+    M(W, 1)                                                                                                                                                    \
+    M(W, 2)                                                                                                                                                    \
+    M(W, 3) M(W, 4) M(W, 5) M(W, 6) M(W, 7) M(W, 8) M(W, 9) M(W, 10) M(W, 11) M(W, 12) M(W, 13) M(W, 14) M(W, 15) M(W, 16) M(W, 17) M(W, 18) M(W, 19) M(W, 20) \
+        M(W, 21) M(W, 22) M(W, 23) M(W, 24)
 EACH(DECL, 32)
 EACH(DECL, 64)
 #undef DECL
-    using function = void (*)(void const*, void const*, void*);
+using function = void (*)(void const*, void const*, void*);
 #define ITEM(W, O) bits_##W##_##O,
 function calls[2][25]{{EACH(ITEM, 32)}, {EACH(ITEM, 64)}};
 #undef ITEM
@@ -56,6 +59,34 @@ unsigned sign_suite(UInt value)
 
 extern "C" void compare_32(void const*, void const*, void*);
 extern "C" void compare_64(void const*, void const*, void*);
+extern "C" void mixed_direct(void const*, void*);
+extern "C" void mixed_indirect(void const*, void*);
+
+unsigned aggregate_suite()
+{
+    unsigned errors{};
+    for(std::uint32_t a: {0u, 0x80000000u, 1u, 0x7f800001u, 0xffc00123u})
+    {
+        for(std::uint64_t b: {0ull, 0x8000000000000000ull, 1ull, 0x7ff0000000000001ull, 0xfff8000000000123ull})
+        {
+            unsigned char input[24], output[24];
+            std::uint64_t integer64{0xfedcba9876543210ull};
+            std::uint32_t integer32{0x87654321u};
+            std::memcpy(input, &a, 4);
+            std::memcpy(input + 4, &b, 8);
+            std::memcpy(input + 12, &integer64, 8);
+            std::memcpy(input + 20, &integer32, 4);
+            for(auto call: {mixed_direct, mixed_indirect})
+            {
+                std::memset(output, 0xaa, sizeof(output));
+                call(input, output);
+                if(std::memcmp(input, output, sizeof(input))) { ++errors; }
+            }
+        }
+    }
+    if(errors) { std::fprintf(stderr, "LLVM mixed-return failures=%u\n", errors); }
+    return errors;
+}
 
 template <class UInt>
 unsigned comparison_suite()
@@ -113,6 +144,130 @@ unsigned comparison_suite()
                 }
             }
         }
+    }
+    return errors;
+}
+
+template <class UInt>
+unsigned rounding_suite()
+{
+    using Float = std::conditional_t<sizeof(UInt) == 4, float, double>;
+    constexpr unsigned fraction_bits = sizeof(UInt) == 4 ? 23 : 52;
+    constexpr unsigned exponent_count = sizeof(UInt) == 4 ? 256 : 2048;
+    constexpr UInt sign = UInt{1} << (sizeof(UInt) * 8 - 1);
+    unsigned errors{};
+    auto sample = [&](UInt input)
+    {
+        for(unsigned op{}; op != 4; ++op)
+        {
+            UInt actual{};
+            calls[sizeof(UInt) == 8][10 + op](&input, &input, &actual);
+            if(!fp_rounding_oracle::matches<Float>(input, actual, op))
+            {
+                if(errors < 8)
+                {
+                    std::fprintf(stderr,
+                                 "LLVM rounding f%zu op=%u in=%llx actual=%llx\n",
+                                 sizeof(UInt) * 8,
+                                 op,
+                                 (unsigned long long)input,
+                                 (unsigned long long)actual);
+                }
+                ++errors;
+            }
+        }
+    };
+    for(unsigned e{}; e != exponent_count; ++e)
+    {
+        UInt base = UInt{e} << fraction_bits;
+        for(UInt v: {base, UInt(base + 1), UInt(base - (e != 0)), UInt(base | (UInt{1} << (fraction_bits - 1)))})
+        {
+            sample(v);
+            sample(v | sign);
+        }
+    }
+    for(unsigned i{}; i != 32; ++i)
+    {
+        UInt base = std::bit_cast<UInt>(static_cast<Float>(i + 0.5));
+        for(UInt v: {UInt(base - 1), base, UInt(base + 1)})
+        {
+            sample(v);
+            sample(v | sign);
+        }
+    }
+    std::uint64_t state{0x6a09e667f3bcc909ull};
+    for(unsigned i{}; i != 4096; ++i)
+    {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        sample(static_cast<UInt>(state));
+    }
+    return errors;
+}
+
+template <class UInt>
+unsigned conversion_suite()
+{
+    constexpr unsigned frac = sizeof(UInt) == 4 ? 23 : 52;
+    constexpr unsigned bias = sizeof(UInt) == 4 ? 127 : 1023;
+    constexpr UInt sign = UInt{1} << (sizeof(UInt) * 8 - 1);
+    unsigned errors{};
+    auto sample = [&](UInt input)
+    {
+        for(unsigned op = 17; op != 25; ++op)
+        {
+            bool result64 = op == 19 || op == 20 || op == 23 || op == 24;
+            auto expected = fp_rounding_oracle::to_integer(input, result64 ? 64 : 32, (op & 1) != 0);
+            if(op < 21 && !expected.valid) { continue; }
+            std::uint64_t out64{};
+            std::uint32_t out32{};
+            calls[sizeof(UInt) == 8][op](&input, &input, result64 ? static_cast<void*>(&out64) : &out32);
+            auto actual = result64 ? out64 : out32;
+            if(actual != expected.value)
+            {
+                if(errors < 8)
+                {
+                    std::fprintf(stderr,
+                                 "LLVM integer f%zu op=%u in=%llx expected=%llx actual=%llx\n",
+                                 sizeof(UInt) * 8,
+                                 op,
+                                 (unsigned long long)input,
+                                 (unsigned long long)expected.value,
+                                 (unsigned long long)actual);
+                }
+                ++errors;
+            }
+        }
+    };
+    // Around zero, +/-1, and both integer-width limits, including negative fractions.
+    for(unsigned e{}; e != (sizeof(UInt) == 4 ? 256u : 2048u); ++e)
+    {
+        UInt base = UInt{e} << frac;
+        for(UInt v: {base, UInt(base + 1), UInt(base - (e != 0)), UInt(base | (UInt{1} << (frac - 1)))})
+        {
+            sample(v);
+            sample(v | sign);
+        }
+    }
+    for(unsigned e: {bias, bias + 31, bias + 32, bias + 63, bias + 64})
+    {
+        UInt base = UInt{e} << frac;
+        for(unsigned delta{}; delta != 256; ++delta)
+        {
+            sample(base + delta);
+            sample(base - delta);
+            sample((base + delta) | sign);
+            sample((base - delta) | sign);
+        }
+    }
+    std::uint64_t state{0xbb67ae8584caa73bull};
+    for(unsigned i{}; i != 16384; ++i)
+    {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        sample(static_cast<UInt>(state));
     }
     return errors;
 }
@@ -192,6 +347,9 @@ int main()
         }
     }
     errors += comparison_suite<std::uint32_t>() + comparison_suite<std::uint64_t>();
+    errors += rounding_suite<std::uint32_t>() + rounding_suite<std::uint64_t>();
+    errors += conversion_suite<std::uint32_t>() + conversion_suite<std::uint64_t>();
+    errors += aggregate_suite();
     std::printf("LLVM FP bits: %u failures\n", errors);
     return errors != 0;
 }

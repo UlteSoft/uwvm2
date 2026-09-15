@@ -127,6 +127,48 @@ int main(int argc, char** argv)
         }
         b.CreateRetVoid();
     }
+    // Mixed multi-value returns must not reintroduce ST0 through aggregate
+    // legalization. Exercise both direct and genuinely indirect fastcalls.
+    {
+        auto result_type = llvm::StructType::get(context, {b.getFloatTy(), b.getDoubleTy(), b.getInt64Ty(), b.getInt32Ty()});
+        auto signature = llvm::FunctionType::get(result_type, {b.getFloatTy(), b.getDoubleTy(), b.getInt64Ty(), b.getInt32Ty()}, false);
+        auto typed = llvm::Function::Create(signature, llvm::Function::ExternalLinkage, "mixed_typed", module);
+        typed->setCallingConv(llvm::CallingConv::X86_FastCall);
+        typed->addFnAttr(llvm::Attribute::NoInline);
+        typed->addFnAttr("target-features", argv[1]);
+        b.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", typed));
+        llvm::Value* aggregate = llvm::PoisonValue::get(result_type);
+        for(unsigned i{}; i != 4; ++i) { aggregate = b.CreateInsertValue(aggregate, typed->getArg(i), i); }
+        b.CreateRet(aggregate);
+        auto target = new llvm::GlobalVariable(module, b.getPtrTy(), false, llvm::GlobalValue::ExternalLinkage, typed, "mixed_target");
+        for(unsigned indirect{}; indirect != 2; ++indirect)
+        {
+            auto raw = llvm::Function::Create(llvm::FunctionType::get(b.getVoidTy(), {b.getPtrTy(), b.getPtrTy()}, false),
+                                              llvm::Function::ExternalLinkage,
+                                              indirect ? "mixed_indirect" : "mixed_direct",
+                                              module);
+            raw->addFnAttr("target-features", argv[1]);
+            b.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", raw));
+            llvm::SmallVector<llvm::Value*, 4> args;
+            unsigned offsets[]{0, 4, 12, 20};
+            for(unsigned i{}; i != 4; ++i)
+            {
+                auto load = b.CreateLoad(result_type->getElementType(i), b.CreateGEP(b.getInt8Ty(), raw->getArg(0), b.getInt32(offsets[i])));
+                load->setAlignment(llvm::Align(1));
+                args.push_back(load);
+            }
+            llvm::Value* callee = typed;
+            if(indirect) { callee = b.CreateLoad(b.getPtrTy(), target, true); }
+            auto call = b.CreateCall(signature, callee, args);
+            call->setCallingConv(llvm::CallingConv::X86_FastCall);
+            for(unsigned i{}; i != 4; ++i)
+            {
+                auto store = b.CreateStore(b.CreateExtractValue(call, i), b.CreateGEP(b.getInt8Ty(), raw->getArg(1), b.getInt32(offsets[i])));
+                store->setAlignment(llvm::Align(1));
+            }
+            b.CreateRetVoid();
+        }
+    }
     if(llvm::verifyModule(module, &llvm::errs())) { return 5; }
     uwvm2::runtime::compiler::shared::strict_float_jit::lower(module, true, true);
     if(llvm::verifyModule(module, &llvm::errs())) { return 3; }

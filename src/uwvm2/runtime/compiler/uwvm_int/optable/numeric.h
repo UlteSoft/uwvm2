@@ -420,8 +420,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <float_unop Op, typename FloatT>
-        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop_native(FloatT v) noexcept
         {
+# if defined(__riscv)
+            if constexpr(Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc)
+            { v = ::uwvm2::runtime::compiler::shared::strict_float::quiet_arithmetic_nan(v); }
+# endif
             if constexpr(Op == float_unop::abs)
             {
 # if defined(__GNUC__) || defined(__clang__)
@@ -679,6 +683,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
+        template <float_unop Op, typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
+        {
+            namespace strict = ::uwvm2::runtime::compiler::shared::strict_float;
+            if constexpr(strict::uses_integer_rounding &&
+                         (Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc || Op == float_unop::nearest))
+            {
+                constexpr auto mode{Op == float_unop::ceil ? strict::integral_rounding::ceil : Op == float_unop::floor ? strict::integral_rounding::floor :
+                                    Op == float_unop::trunc ? strict::integral_rounding::trunc : strict::integral_rounding::nearest};
+                return ::std::bit_cast<FloatT>(strict::round_integral_bits<mode>(::std::bit_cast<strict::bits_t<FloatT>>(v)));
+            }
+            auto result{eval_float_unop_native<Op>(v)};
+            // abs/neg are bit operations, not arithmetic: do not canonicalize them.
+            if constexpr(Op != float_unop::abs && Op != float_unop::neg)
+            { return ::uwvm2::runtime::compiler::shared::strict_float::canonicalize_native_nan(result); }
+            else { return result; }
+        }
+
         template <float_binop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_binop(FloatT lhs, FloatT rhs) noexcept
         {
@@ -723,13 +745,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else if constexpr(Op == float_binop::min)
             {
-                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return strict::canonical_nan<FloatT>(); }
                 if(lhs == rhs) { return float_signbit(lhs) ? lhs : rhs; }
                 return ::std::min(lhs, rhs);
             }
             else if constexpr(Op == float_binop::max)
             {
-                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return strict::canonical_nan<FloatT>(); }
                 if(lhs == rhs) { return float_signbit(lhs) ? rhs : lhs; }
                 return ::std::max(lhs, rhs);
             }

@@ -1,5 +1,7 @@
 # 浮点环境边界、契约快路径与跨架构验证
 
+后续的舍入、原生 NaN 编码与 LLVM 指令生成检查见 [补充审计](floating-point-native-nan.md)。
+
 ## 2026-09-15：NaN 位模式与浮点 ABI 补充审计
 
 环境控制正确并不足以保证位模式正确。x87 的原生 f32/f64 返回寄存器，以及某些编译器生成的浮点临时值，会把 signaling NaN 静默变成 quiet NaN。Wasm 的纯搬运、reinterpret、abs、neg、copysign 必须保留相应非符号位；不能把算术指令允许的 NaN 变化套用到这些操作上。

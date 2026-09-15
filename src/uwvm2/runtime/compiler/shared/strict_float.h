@@ -24,11 +24,106 @@ namespace uwvm2::runtime::compiler::shared::strict_float
 #endif
     inline constexpr bool needs_extended_rounding{UWVM2_STRICT_FLOAT_EXTENDED != 0};
 
+    // These ABIs use the pre-IEEE-754-2008, inverted signaling bit. Wasm always
+    // uses the 2008 encoding, including on an older host or with software FP.
+#if defined(__hppa__) || defined(__hppa) || defined(__sh__) || (defined(__mips__) && !defined(__mips_nan2008))
+# define UWVM2_STRICT_FLOAT_LEGACY_NAN 1
+#else
+# define UWVM2_STRICT_FLOAT_LEGACY_NAN 0
+#endif
+    // 68881 and SPARC also produce an all-ones default NaN for invalid
+    // operations; Wasm requires a canonical NaN when no noncanonical input exists.
+#if UWVM2_STRICT_FLOAT_LEGACY_NAN || defined(__m68k__) || defined(__sparc__) || defined(__sparc)
+    inline constexpr bool needs_nan_canonicalization{true};
+#else
+    inline constexpr bool needs_nan_canonicalization{false};
+#endif
+
     enum class operation { add, sub, mul, div, sqrt };
     using u64 = ::std::uint64_t;
     using u32 = ::std::uint32_t;
 
     template <typename Float> using bits_t = ::std::conditional_t<sizeof(Float) == 4, u32, u64>;
+
+    template <typename Float>
+    [[nodiscard]] inline constexpr Float canonical_nan() noexcept
+    {
+        return ::std::bit_cast<Float>(static_cast<bits_t<Float>>(sizeof(Float) == 4 ? 0x7fc00000ull : 0x7ff8000000000000ull));
+    }
+
+    template <typename Float>
+    [[nodiscard]] inline constexpr Float quiet_arithmetic_nan(Float value) noexcept
+    {
+        using bits = bits_t<Float>;
+        constexpr bits signless{sizeof(Float) == 4 ? bits{0x7fffffffu} : static_cast<bits>(0x7fffffffffffffffull)};
+        constexpr bits infinity{sizeof(Float) == 4 ? bits{0x7f800000u} : static_cast<bits>(0x7ff0000000000000ull)};
+        constexpr bits quiet{bits{1} << (sizeof(Float) == 4 ? 22u : 51u)};
+        auto raw{::std::bit_cast<bits>(value)};
+        if((raw & signless) > infinity)
+        {
+            // Legacy hardware can change a canonical input's payload. Merely
+            // setting the quiet bit again would not satisfy Wasm's canonical-NaN rule.
+            if constexpr(needs_nan_canonicalization) { raw = infinity | quiet; }
+            else { raw |= quiet; }
+        }
+        return ::std::bit_cast<Float>(raw);
+    }
+
+    template <typename Float>
+    [[nodiscard]] inline constexpr Float canonicalize_native_nan(Float value) noexcept
+    {
+        if constexpr(needs_nan_canonicalization) { return quiet_arithmetic_nan(value); }
+        else { return value; }
+    }
+
+    enum class integral_rounding { ceil, floor, trunc, nearest };
+
+#if ((defined(__i386__) || defined(__x86_64__)) && defined(__SSE2__) && !defined(__SSE4_1__)) || UWVM2_STRICT_FLOAT_LEGACY_NAN
+    inline constexpr bool uses_integer_rounding{true};
+#else
+    inline constexpr bool uses_integer_rounding{false};
+#endif
+
+    // Without a native IEEE rounding instruction, work directly on the binary
+    // representation. This also handles signed zero and arithmetic NaNs without
+    // a libm call or an extra floating-point classification/quieting operation.
+    template <integral_rounding Mode, typename UInt>
+    [[nodiscard]] inline constexpr UInt round_integral_bits(UInt raw) noexcept
+    {
+        static_assert(::std::is_unsigned_v<UInt> && (sizeof(UInt) == 4 || sizeof(UInt) == 8));
+        constexpr unsigned fraction{sizeof(UInt) == 4 ? 23u : 52u};
+        constexpr unsigned bias{sizeof(UInt) == 4 ? 127u : 1023u};
+        constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+        constexpr UInt one{UInt{bias} << fraction};
+        constexpr UInt infinity{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+        UInt const magnitude{raw & ~sign};
+        if(magnitude >= (UInt{bias + fraction} << fraction))
+        {
+            if(magnitude > infinity) { raw |= UInt{1} << (fraction - 1u); }
+            return raw;
+        }
+        if(magnitude < one)
+        {
+            if(magnitude == 0u) { return raw; }
+            UInt const zero{raw & sign};
+            if constexpr(Mode == integral_rounding::ceil) { return zero != 0u ? zero : one; }
+            else if constexpr(Mode == integral_rounding::floor) { return zero != 0u ? (zero | one) : zero; }
+            else if constexpr(Mode == integral_rounding::trunc) { return zero; }
+            else { return magnitude > (UInt{bias - 1u} << fraction) ? (zero | one) : zero; }
+        }
+        unsigned const shift{bias + fraction - static_cast<unsigned>(magnitude >> fraction)};
+        UInt const step{UInt{1} << shift};
+        UInt const mask{step - 1u}, remainder{raw & mask};
+        UInt result{raw & ~mask};
+        if constexpr(Mode == integral_rounding::ceil) { if((raw & sign) == 0u && remainder != 0u) { result += step; } }
+        else if constexpr(Mode == integral_rounding::floor) { if((raw & sign) != 0u && remainder != 0u) { result += step; } }
+        else if constexpr(Mode == integral_rounding::nearest)
+        {
+            UInt const halfway{step >> 1u};
+            if(remainder > halfway || (remainder == halfway && (result & step) != 0u)) { result += step; }
+        }
+        return result;
+    }
 
     struct extended_value
     {
@@ -257,27 +352,45 @@ namespace uwvm2::runtime::compiler::shared::strict_float
             if(!::std::is_constant_evaluated())
             {
                 Float result;
-                if(try_nearest_fast<Op>(lhs, rhs, result)) { return result; }
+                if(try_nearest_fast<Op>(lhs, rhs, result)) { return canonicalize_native_nan(result); }
                 return slow_operation<Op>(lhs, rhs);
             }
         }
-        if constexpr(Op == operation::add) { return lhs + rhs; }
-        else if constexpr(Op == operation::sub) { return lhs - rhs; }
-        else if constexpr(Op == operation::mul) { return lhs * rhs; }
-        else { return lhs / rhs; }
+        if constexpr(Op == operation::add) { return canonicalize_native_nan(static_cast<Float>(lhs + rhs)); }
+        else if constexpr(Op == operation::sub) { return canonicalize_native_nan(static_cast<Float>(lhs - rhs)); }
+        else if constexpr(Op == operation::mul) { return canonicalize_native_nan(static_cast<Float>(lhs * rhs)); }
+        else { return canonicalize_native_nan(static_cast<Float>(lhs / rhs)); }
     }
 
     template <typename Float>
     [[nodiscard]] inline Float square_root(Float value) noexcept
     {
         Float result;
-        if(try_nearest_fast<operation::sqrt>(value, Float{}, result)) { return result; }
+        if(try_nearest_fast<operation::sqrt>(value, Float{}, result)) { return canonicalize_native_nan(result); }
         return slow_operation<operation::sqrt>(value);
     }
 
     template <typename Out, typename In>
     [[nodiscard]] inline constexpr Out convert(In value) noexcept
     {
+        if constexpr(needs_nan_canonicalization && ::std::is_floating_point_v<In> && ::std::is_floating_point_v<Out>)
+        {
+            using bits = bits_t<In>;
+            constexpr bits magnitude{static_cast<bits>(sizeof(In) == 4 ? 0x7fffffffull : 0x7fffffffffffffffull)};
+            constexpr bits infinity{static_cast<bits>(sizeof(In) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+            // A legacy demotion can discard every payload bit and produce infinity.
+            // Classify the input before the host conversion, not just its result.
+            if((::std::bit_cast<bits>(value) & magnitude) > infinity) { return canonical_nan<Out>(); }
+        }
+#if defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+        if constexpr(::std::is_floating_point_v<In> && ::std::is_floating_point_v<Out> && sizeof(In) == 4 && sizeof(Out) == 8)
+        {
+            // Scalar PPC lfs/xscvspdpn promotion does not quiet a signaling NaN.
+            // Bit classification survives optimization and leaves finite values on the native conversion path.
+            if((::std::bit_cast<u32>(value) & 0x7fffffffu) > 0x7f800000u)
+            { return ::std::bit_cast<Out>(u64{0x7ff8000000000000ull}); }
+        }
+#endif
         if constexpr(needs_extended_rounding)
         {
             if constexpr(::std::is_integral_v<In>)
