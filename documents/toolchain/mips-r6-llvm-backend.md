@@ -4,6 +4,16 @@ Validated on 2026-09-16 against LLVM 22.1.8 and LLVM 23 commit
 `4c4c1db7c69a6fda6cfa6bc6066bb09a433edc89`. This is a **downstream LLVM backend
 patch**, not a change to Wasm semantics or a test-only `noinline` workaround.
 
+Upstream submission: [llvm/llvm-project#223905](https://github.com/llvm/llvm-project/pull/223905),
+targeting `main` (LLVM trunk). The fork branch is
+[`MacroModel:fix-mips32-bug`](https://github.com/MacroModel/llvm-project/tree/fix-mips32-bug),
+commit `a830ec0e085d364e72a5126a9f866bae5b0fb09c`, based on trunk
+`182ca95eed3feb7c7ba83ed2b35a0c5f29517b9b`. Submission is not acceptance or a
+released-toolchain fix; continue applying the downstream patch until the actual
+dependency includes it. The PR adds three LLVM IR/MIR regression files: all ten
+RUN lines pass on each patched LLVM 22/23 backend and fail on the unpatched
+LLVM 22 negative control. Current-trunk whole-suite validation is not claimed.
+
 ## Why two changes are necessary
 
 1. After allocation, a scalar condition can be copied from a GPR32 into an
