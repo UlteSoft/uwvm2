@@ -146,7 +146,7 @@ namespace
 
     struct nonconstant_fp_policy_declaration
     {
-        inline static wasm_type::local_imported_wasm_fp_control_policy_t wasm_fp_control_policy;
+        [[maybe_unused]] inline static wasm_type::local_imported_wasm_fp_control_policy_t wasm_fp_control_policy;
     };
 
     static_assert(wasm_type::is_local_imported_function<poison_environment_import>);

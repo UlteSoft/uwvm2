@@ -5,6 +5,7 @@
 #include <llvm/Passes/PassBuilder.h>
 
 #include <memory>
+#include "optimization_level_test_policy.h"
 
 namespace
 {
@@ -43,7 +44,7 @@ namespace
         return ::llvm::verifyModule(module, ::std::addressof(::llvm::errs())) ? 12 : 0;
     }
 
-    [[nodiscard]] int check_optimized_wasm_call_boundary(::llvm::OptimizationLevel level) noexcept
+    [[nodiscard]] int check_optimized_wasm_call_boundary(uwvm2test::optimization_test_policy policy) noexcept
     {
         ::llvm::LLVMContext context{};
         ::llvm::Module module{"llvm-aot-noinline-o3", context};
@@ -55,6 +56,8 @@ namespace
         if(callee == nullptr || caller == nullptr) { return 20; }
         details::apply_llvm_jit_wasm_calling_conv(*callee);
         details::apply_llvm_jit_wasm_calling_conv(*caller);
+        uwvm2test::apply_size_test_policy(*callee, policy.size_level);
+        uwvm2test::apply_size_test_policy(*caller, policy.size_level);
 
         auto callee_block{::llvm::BasicBlock::Create(context, "entry", callee)};
         ::llvm::IRBuilder<> callee_builder{callee_block};
@@ -81,7 +84,7 @@ namespace
         pass_builder.registerFunctionAnalyses(function_analysis_manager);
         pass_builder.registerLoopAnalyses(loop_analysis_manager);
         pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager, module_analysis_manager);
-        auto module_pass_manager{pass_builder.buildPerModuleDefaultPipeline(level)};
+        auto module_pass_manager{pass_builder.buildPerModuleDefaultPipeline(policy.level)};
         module_pass_manager.run(module, module_analysis_manager);
 
         if(::llvm::verifyModule(module, ::std::addressof(::llvm::errs()))) { return 22; }
@@ -108,10 +111,9 @@ int main()
     // alone cannot establish the mandatory boundary for O1/O2 or size-tuned
     // future policies. The unoptimized policy is checked above; each pipeline
     // here must retain the actual call, not merely the attribute's spelling.
-    for(auto const level: {::llvm::OptimizationLevel::O1, ::llvm::OptimizationLevel::O2,
-                          ::llvm::OptimizationLevel::O3, ::llvm::OptimizationLevel::Os, ::llvm::OptimizationLevel::Oz})
+    for(auto const policy: uwvm2test::optimization_test_policies())
     {
-        if(auto const status{check_optimized_wasm_call_boundary(level)}; status != 0) { return status; }
+        if(auto const status{check_optimized_wasm_call_boundary(policy)}; status != 0) { return status; }
     }
     return 0;
 }

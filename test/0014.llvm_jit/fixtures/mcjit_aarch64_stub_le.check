@@ -1,0 +1,1 @@
+# rtdyld-check: *{4}(stub_addr(stub.o/.text, external_target) + 16) = 0xd61f0200

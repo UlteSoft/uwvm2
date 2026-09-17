@@ -1,0 +1,21 @@
+[
+  {"name":"x86_64-no-sse","triple":"x86_64-linux-gnu","cpu":"x86-64","features":"-sse,-sse2,+x87","fp_mode":"x86-extended"},
+  {"name":"i686-x87","triple":"i686-linux-gnu","cpu":"i686","features":"-sse,-sse2,+x87","fp_mode":"i386"},
+  {"name":"aarch64-no-simd","triple":"aarch64-linux-gnu","cpu":"generic","features":"-neon,-sve,+fp-armv8"},
+  {"name":"aarch64-sve2","triple":"aarch64-linux-gnu","cpu":"generic","features":"+neon,+sve2"},
+  {"name":"ppc64-no-vsx","triple":"powerpc64-linux-gnu","cpu":"pwr8","features":"-altivec,-vsx"},
+  {"name":"ppc64le-no-vsx","triple":"powerpc64le-linux-gnu","cpu":"pwr8","features":"-altivec,-vsx"},
+  {"name":"loongarch-no-simd","triple":"loongarch64-linux-gnu","cpu":"generic-la64","features":"+f,+d,-lsx,-lasx"},
+  {"name":"loongarch-lasx","triple":"loongarch64-linux-gnu","cpu":"la464","features":"+f,+d,+lsx,+lasx"},
+  {"name":"mips32r2-legacy","triple":"mips-linux-gnu","cpu":"mips32r2","features":"","fp_mode":"native-nan"},
+  {"name":"mipsel32r2-legacy","triple":"mipsel-linux-gnu","cpu":"mips32r2","features":"","fp_mode":"native-nan"},
+  {"name":"mips-n32-be","triple":"mips64-linux-gnuabin32","cpu":"mips64r6","features":"","llc_flags":["-target-abi=n32"]},
+  {"name":"mips-n32-le","triple":"mips64el-linux-gnuabin32","cpu":"mips64r6","features":"","llc_flags":["-target-abi=n32"]},
+  {"name":"rv32-soft-float","triple":"riscv32-linux-gnu","cpu":"generic-rv32","features":"+m,+a,-f,-d"},
+  {"name":"rv64-vector","triple":"riscv64-linux-gnu","cpu":"generic-rv64","features":"+m,+a,+f,+d,+c,+v"},
+  {"name":"armv5-soft-float","triple":"armv5te-linux-gnueabi","cpu":"arm926ej-s","features":""},
+  {"name":"x86_64-win64","triple":"x86_64-pc-windows-msvc","cpu":"x86-64","features":"+sse2"},
+  {"name":"aarch64-win64","triple":"aarch64-pc-windows-msvc","cpu":"generic","features":"+neon"},
+  {"name":"x86_64-darwin","triple":"x86_64-apple-macosx12.0","cpu":"x86-64","features":"+sse2"},
+  {"name":"aarch64-darwin","triple":"aarch64-apple-macosx12.0","cpu":"generic","features":"+neon"}
+]

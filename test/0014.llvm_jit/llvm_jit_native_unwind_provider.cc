@@ -16,6 +16,7 @@
 #include <array>
 #include <cstdio>
 #include <memory>
+#include "optimization_level_test_policy.h"
 
 #if defined(_WIN32) || !__has_include(<unwind.h>)
 int main() { return 77; }
@@ -86,8 +87,7 @@ int main(int argc, char** argv)
     if(argc > 1) { objects.path = argv[1]; }
     for(unsigned lifetime{}; lifetime != 4u; ++lifetime)
     {
-        for(auto level : {llvm::OptimizationLevel::O1, llvm::OptimizationLevel::O2,
-                          llvm::OptimizationLevel::O3, llvm::OptimizationLevel::Os, llvm::OptimizationLevel::Oz})
+        for(auto policy : uwvm2test::optimization_test_policies())
         {
             llvm::LLVMContext context;
             auto module{std::make_unique<llvm::Module>("native-provider-recursion", context)};
@@ -131,6 +131,8 @@ int main(int argc, char** argv)
             b.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", wrapper));
             d::apply_llvm_jit_wasm_calling_conv(b.CreateCall(recursive, {b.getInt32(3u)}));
             b.CreateRetVoid();
+            uwvm2test::apply_size_test_policy(*recursive, policy.size_level);
+            uwvm2test::apply_size_test_policy(*wrapper, policy.size_level);
 
             llvm::LoopAnalysisManager loops;
             llvm::FunctionAnalysisManager functions;
@@ -142,7 +144,7 @@ int main(int argc, char** argv)
             passes.registerFunctionAnalyses(functions);
             passes.registerLoopAnalyses(loops);
             passes.crossRegisterProxies(loops, functions, cgscc, modules);
-            auto pipeline{passes.buildPerModuleDefaultPipeline(level)};
+            auto pipeline{passes.buildPerModuleDefaultPipeline(policy.level)};
             pipeline.run(*module, modules);
             if(llvm::verifyModule(*module, &llvm::errs())) { return 1; }
 

@@ -135,11 +135,26 @@ namespace uwvm2test::uwvm_int_strict
         auto& para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out);
         para.disable_multi_value = false;
         para.disable_reference_types = false;
+        para.disable_table_instructions = false;
+        para.disable_multiple_tables = false;
         para.disable_bulk_memory = false;
         para.disable_sign_extension = false;
         para.disable_nontrapping_float_to_int = false;
         para.disable_simd = false;
         para.controllable_allow_multi_result_vector = false;
+        para.controllable_allow_multi_table = false;
+        return out;
+    }
+
+    [[nodiscard]] inline wasm_feature_parameter_t make_wasm2_feature_parameter() noexcept
+    {
+        auto out{make_wasm1p1_feature_parameter()};
+        using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
+        auto& para = ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out);
+        para.cli_mode = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode::direct_wasm2;
+        para.explicit_feature_wasm2 = true;
+        para.disable_table_instructions = false;
+        para.disable_multiple_tables = false;
         para.controllable_allow_multi_table = false;
         return out;
     }
@@ -514,8 +529,8 @@ namespace uwvm2test::uwvm_int_strict
     constexpr ::std::uint8_t k_val_i64 = 0x7eu;
     constexpr ::std::uint8_t k_val_f32 = 0x7du;
     constexpr ::std::uint8_t k_val_f64 = 0x7cu;
-    constexpr ::std::uint8_t k_ref_externref = 0x6fu;
     constexpr ::std::uint8_t k_ref_funcref = 0x70u;
+    constexpr ::std::uint8_t k_ref_externref = 0x6fu;
 
     struct func_type
     {
@@ -560,6 +575,14 @@ namespace uwvm2test::uwvm_int_strict
         bool has_max{};
     };
 
+    struct local_table_entry
+    {
+        ::std::uint8_t elem_type{k_ref_funcref};
+        ::std::uint32_t min{};
+        ::std::uint32_t max{};
+        bool has_max{};
+    };
+
     struct import_memory_entry
     {
         byte_vec module_utf8{};
@@ -589,6 +612,12 @@ namespace uwvm2test::uwvm_int_strict
         ::std::vector<::std::uint32_t> func_indices{};
     };
 
+    struct passive_element_expr_segment
+    {
+        ::std::uint8_t ref_type{k_ref_funcref};
+        ::std::vector<byte_vec> init_exprs{};  // each expression includes its final 0x0b
+    };
+
     struct passive_data_segment
     {
         byte_vec bytes{};
@@ -607,9 +636,11 @@ namespace uwvm2test::uwvm_int_strict
         ::std::vector<export_entry> exports{};
 
         bool has_table{};
+        ::std::uint8_t table_elem_type{k_ref_funcref};
         ::std::uint32_t table_min{};
         ::std::uint32_t table_max{};
         bool table_has_max{};
+        ::std::vector<local_table_entry> extra_tables{};
 
         bool has_memory{};
         ::std::uint32_t memory_min{};
@@ -620,7 +651,9 @@ namespace uwvm2test::uwvm_int_strict
         ::std::vector<global_entry> globals{};
         ::std::vector<element_segment> elements{};
         ::std::vector<passive_element_segment> passive_elements{};
+        ::std::vector<passive_element_expr_segment> passive_element_exprs{};
         ::std::vector<passive_data_segment> passive_datas{};
+        bool emit_data_count_section{true};
 
         static void encode_name_utf8(byte_vec& out, char const* ascii)
         {
@@ -818,15 +851,26 @@ namespace uwvm2test::uwvm_int_strict
             }
 
             // table section (4)
-            if(has_table)
+            if(has_table || !extra_tables.empty())
             {
                 byte_vec sec{};
-                append_u32_leb(sec, 1u);
-                append_u8(sec, k_ref_funcref);
-                ::std::uint8_t flags = table_has_max ? 0x01u : 0x00u;
-                append_u8(sec, flags);
-                append_u32_leb(sec, table_min);
-                if(table_has_max) { append_u32_leb(sec, table_max); }
+                append_u32_leb(sec, static_cast<::std::uint32_t>((has_table ? 1uz : 0uz) + extra_tables.size()));
+                if(has_table)
+                {
+                    append_u8(sec, table_elem_type);
+                    ::std::uint8_t flags = table_has_max ? 0x01u : 0x00u;
+                    append_u8(sec, flags);
+                    append_u32_leb(sec, table_min);
+                    if(table_has_max) { append_u32_leb(sec, table_max); }
+                }
+                for(auto const& table : extra_tables)
+                {
+                    append_u8(sec, table.elem_type);
+                    ::std::uint8_t flags = table.has_max ? 0x01u : 0x00u;
+                    append_u8(sec, flags);
+                    append_u32_leb(sec, table.min);
+                    if(table.has_max) { append_u32_leb(sec, table.max); }
+                }
                 emit_section(4u, sec);
             }
 
@@ -871,10 +915,10 @@ namespace uwvm2test::uwvm_int_strict
             }
 
             // element section (9)
-            if(!elements.empty() || !passive_elements.empty())
+            if(!elements.empty() || !passive_elements.empty() || !passive_element_exprs.empty())
             {
                 byte_vec sec{};
-                append_u32_leb(sec, static_cast<::std::uint32_t>(elements.size() + passive_elements.size()));
+                append_u32_leb(sec, static_cast<::std::uint32_t>(elements.size() + passive_elements.size() + passive_element_exprs.size()));
                 for(auto const& seg : elements)
                 {
                     append_u32_leb(sec, seg.table_index);
@@ -889,11 +933,18 @@ namespace uwvm2test::uwvm_int_strict
                     append_u32_leb(sec, static_cast<::std::uint32_t>(seg.func_indices.size()));
                     for(auto const idx : seg.func_indices) { append_u32_leb(sec, idx); }
                 }
+                for(auto const& seg : passive_element_exprs)
+                {
+                    append_u32_leb(sec, 5u);  // passive reference-expression segment
+                    append_u8(sec, seg.ref_type);
+                    append_u32_leb(sec, static_cast<::std::uint32_t>(seg.init_exprs.size()));
+                    for(auto const& expr : seg.init_exprs) { append_bytes(sec, expr); }
+                }
                 emit_section(9u, sec);
             }
 
             // data count section (12)
-            if(!passive_datas.empty())
+            if(!passive_datas.empty() && emit_data_count_section)
             {
                 byte_vec sec{};
                 append_u32_leb(sec, static_cast<::std::uint32_t>(passive_datas.size()));

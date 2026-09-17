@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 #include "native_unwind_test_policy.h"
+#include "simd_full_fixtures.h"
 
 namespace
 {
@@ -139,9 +140,7 @@ namespace
         0x09u, 0x01u, 0x01u, 0x06u, 0x0au, 0x14u, 0x1eu, 0x28u, 0x32u, 0x3cu};
 
     // A minimal passive data segment whose only proposal instruction is
-    // data.drop.  Keeping it separate from the larger bulk-memory fixture
-    // verifies that the preflight reports the actual first unsupported
-    // subopcode rather than a generic materialization failure.
+    // data.drop. Keep it separate to exercise passive-segment state without a memory.init first.
     inline constexpr ::std::array<unsigned char, 53uz> wasm1p1_data_drop_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
         0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x03u, 0x01u, 0x00u, 0x01u, 0x07u,
@@ -149,9 +148,7 @@ namespace
         0x01u, 0x01u, 0x0au, 0x07u, 0x01u, 0x05u, 0x00u, 0xfcu, 0x09u, 0x00u, 0x0bu, 0x0bu,
         0x04u, 0x01u, 0x01u, 0x01u, 0x78u};
 
-    // A minimal reference-types instruction fixture.  This distinguishes the
-    // unsupported ref.null lowering from table and bulk-memory capability
-    // misses.
+    // A minimal reference-types instruction fixture independent of tables and bulk memory.
     inline constexpr ::std::array<unsigned char, 39uz> wasm1p1_ref_null_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
         0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u,
@@ -160,7 +157,7 @@ namespace
 
     // The target of ref.func is declared solely by its function export.  The
     // reconstructed runtime-validation module must preserve that declaration
-    // before the reduced backend rejects ref.func in capability preflight.
+    // so native ref.func lowering can resolve it without an element segment.
     inline constexpr ::std::array<unsigned char, 52uz> wasm1p1_export_declared_ref_func_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
         0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x00u, 0x07u, 0x13u, 0x02u, 0x06u, 0x5fu,
@@ -179,8 +176,7 @@ namespace
         0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u,
         0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x00u, 0x25u, 0x00u, 0x1au, 0x0bu};
 
-    // Even without a reference instruction, an externref local cannot be
-    // represented by the current scalar-only LLVM local/entry ABI.
+    // An otherwise unused externref local must be representable and initialized by the native ABI.
     inline constexpr ::std::array<unsigned char, 38uz> wasm1p1_externref_local_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
         0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u,
@@ -223,9 +219,7 @@ namespace
         0x20u, 0x00u, 0x41u, 0x08u, 0x46u, 0x71u, 0x45u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
     // WebAssembly 1.1 multi-value fixture. The helper returns two i32s and
-    // `_start` consumes them. The current native LLVM ABI is scalar, so pure
-    // AOT must reject this module during capability preflight instead of
-    // routing it through the interpreter.
+    // `_start` consumes them through the native tuple-return ABI.
     inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
         0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
@@ -609,38 +603,6 @@ namespace
         return run_command(command, "runtime-aot shortcut");
     }
 
-    [[nodiscard]] bool run_aot_compile_failure(::std::filesystem::path const& uwvm_path,
-                                               ::std::filesystem::path const& wasm_path,
-                                               ::std::string_view expected_reason,
-                                               ::std::string_view expected_detail = {},
-                                               ::std::string_view extra_args = {})
-    {
-        auto command{quote_argument(uwvm_path) + " -Raot"};
-        append_default_llvm_cache_disable_arg(command, extra_args);
-        append_extra_args(command, extra_args);
-        command += " --run " + quote_argument(wasm_path);
-
-        auto output_path{wasm_path};
-        output_path += ".aot-compile-failure.out";
-        if(!run_trap_command(command, output_path, "unsupported native AOT lowering")) [[unlikely]] { return false; }
-
-        ::std::string output{};
-        if(!read_text_file(output_path, output)) [[unlikely]] { return false; }
-        auto const plain_output{strip_ansi_codes(output)};
-        if(plain_output.find("LLVM AOT capability preflight rejected") != ::std::string::npos &&
-           plain_output.find(expected_reason) != ::std::string::npos &&
-           (expected_detail.empty() || plain_output.find(expected_detail) != ::std::string::npos) &&
-           plain_output.find("LLVM AOT materialization failed") == ::std::string::npos) [[likely]]
-        {
-            return true;
-        }
-
-        ::std::cerr << "expected unsupported native AOT lowering to fail during capability preflight with '" << expected_reason << "'";
-        if(!expected_detail.empty()) { ::std::cerr << " and '" << expected_detail << "'"; }
-        ::std::cerr << ":\n" << output << '\n';
-        return false;
-    }
-
     [[nodiscard]] bool run_aot_validation_failure(::std::filesystem::path const& uwvm_path,
                                                   ::std::filesystem::path const& wasm_path,
                                                   ::std::string_view expected_diagnostic,
@@ -682,20 +644,6 @@ namespace
 
         if(!run_aot_shortcut(uwvm_path, wasm_path, extra_args)) [[unlikely]] { return false; }
         return true;
-    }
-
-    template <::std::size_t N>
-    [[nodiscard]] bool run_unsupported_aot_fixture(::std::filesystem::path const& uwvm_path,
-                                                   ::std::filesystem::path const& executable_dir,
-                                                   ::std::string_view file_name,
-                                                   ::std::array<unsigned char, N> const& wasm_bytes,
-                                                   ::std::string_view expected_reason,
-                                                   ::std::string_view expected_detail = {},
-                                                   ::std::string_view extra_args = {})
-    {
-        auto const wasm_path{llvm_jit_fixture_path(executable_dir, file_name)};
-        if(!write_fixture(wasm_path, wasm_bytes)) [[unlikely]] { return false; }
-        return run_aot_compile_failure(uwvm_path, wasm_path, expected_reason, expected_detail, extra_args);
     }
 
     template <::std::size_t N>
@@ -816,107 +764,92 @@ int main(int argc, char** argv)
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_bulk_memory_start.wasm",
                                     wasm1p1_bulk_memory_start_wasm,
-                                    "memory.init has no LLVM lowering",
-                                    "function=0, byte-offset=15, opcode=252, subopcode=8",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_data_drop_start.wasm",
                                     wasm1p1_data_drop_start_wasm,
-                                    "data.drop has no LLVM lowering",
-                                    "function=0, byte-offset=0, opcode=252, subopcode=9",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_ref_null_start.wasm",
                                     wasm1p1_ref_null_start_wasm,
-                                    "ref.null has no LLVM lowering",
-                                    "function=0, byte-offset=0, opcode=208",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_export_declared_ref_func_start.wasm",
                                     wasm1p1_export_declared_ref_func_start_wasm,
-                                    "ref.func has no LLVM lowering",
-                                    "function=1, byte-offset=0, opcode=210",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_table_get_start.wasm",
                                     wasm1p1_table_get_start_wasm,
-                                    "table.get has no LLVM lowering",
-                                    "function=0, byte-offset=2, opcode=37",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_externref_local_start.wasm",
                                     wasm1p1_externref_local_start_wasm,
-                                    "local type is not an LLVM scalar",
-                                    "function=0, detail=111",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_table_ref_bulk_start.wasm",
                                     wasm1p1_table_ref_bulk_start_wasm,
-                                    "table.size has no LLVM lowering",
-                                    "function=2, byte-offset=0, opcode=252, subopcode=16",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_simd_basic_start.wasm",
                                     wasm1p1_simd_basic_start_wasm,
-                                    "SIMD instruction has no LLVM lowering",
-                                    "function=0, byte-offset=2, opcode=253, subopcode=12",
                                     wasm1p1_all_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_multivalue_start.wasm",
                                     wasm1p1_multivalue_start_wasm,
-                                    "function signature has multiple results",
-                                    "function=0, detail=2",
                                     wasm1p1_multivalue_runtime_args)) [[unlikely]]
     {
         return 1;
     }
-    if(!run_unsupported_aot_fixture(uwvm_path,
+    if(!run_fixture(uwvm_path,
                                     executable_dir,
                                     "wasm1p1_type_index_block_start.wasm",
                                     wasm1p1_type_index_block_start_wasm,
-                                    "block uses a type-index/reference/SIMD signature",
-                                    "function=0, byte-offset=0, opcode=2, detail=0",
                                     wasm1p1_multivalue_runtime_args)) [[unlikely]]
     {
         return 1;
     }
     if(!run_native_unwind_trap_fixture(uwvm_path, executable_dir)) [[unlikely]] { return 1; }
+
+    if(!run_fixture(uwvm_path, executable_dir, "simd_vector_abi.wasm",
+                    ::uwvm2test::llvm_full_fixture::vector_abi, "--wasm-feature-wasm2")) { return 1; }
+    if(!run_fixture(uwvm_path, executable_dir, "simd_table_mutation.wasm",
+                    ::uwvm2test::llvm_full_fixture::table_mutation, "--wasm-feature-wasm2")) { return 1; }
 
     return 0;
 }

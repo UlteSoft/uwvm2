@@ -36,7 +36,7 @@ case "${BACKEND}" in
     exit 2
     ;;
 esac
-COMMON=(--wasm-feature-wasm2 "${BACKEND_OPTION}")
+COMMON=(--wasm-feature-wasm2 "${BACKEND_OPTION}" -Rct 0 -Rllvm-cache-path disable)
 
 run_global_consumer() {
   "${UWVM_BIN}" "${COMMON[@]}" \
@@ -60,40 +60,14 @@ run_forwarded_global_consumer() {
     --run "${WORK_DIR}/funcref_global_consumer.wasm"
 }
 
-expect_aot_reference_rejection() {
-  local expected_reason="$1"
-  local output status
-  shift
-  set +e
-  output="$("$@" 2>&1)"
-  status=$?
-  set -e
+# ROS removes lazy/tiered/OSR execution, not Wasm 2.0 value types.
+# Both retained backends must execute these modules and preserve reference identity.
+run_global_consumer
+run_element_consumer
+run_forwarded_global_consumer
 
-  if [[ "${status}" -eq 0 ]]; then
-    echo "LLVM AOT unexpectedly accepted a reference-valued instruction without a native lowering" >&2
-    return 1
-  fi
-  if [[ "${output}" != *"LLVM AOT capability preflight rejected"* ||
-        "${output}" != *"${expected_reason}"* ]]; then
-    printf '%s\n' "${output}" >&2
-    echo "LLVM AOT did not fail through the expected capability preflight" >&2
-    return 1
-  fi
-}
-
-if [[ "${BACKEND}" == int ]]; then
-  run_global_consumer
-  run_element_consumer
-  run_forwarded_global_consumer
-else
-  # The LLVM AOT backend deliberately has no LLVM value representation for funcref/externref. These modules are valid
-  # Wasm 2, but their function bodies use reference-valued global.get or table.init and must fail closed during the
-  # capability preflight. This is distinct from the imported-table case below, whose executable code needs only scalar
-  # call_indirect lowering and therefore remains a supported AOT ownership test.
-  expect_aot_reference_rejection "global.get result is not an LLVM scalar" run_global_consumer
-  expect_aot_reference_rejection "table.init has no LLVM lowering" run_element_consumer
-  expect_aot_reference_rejection "global.get result is not an LLVM scalar" run_forwarded_global_consumer
-fi
+"${UWVM_BIN}" "${COMMON[@]}" --run "${WORK_DIR}/global_reference_storage.wasm"
+"${UWVM_BIN}" "${COMMON[@]}" --run "${WORK_DIR}/global_v128_storage.wasm"
 
 "${UWVM_BIN}" "${COMMON[@]}" \
   --wasm-set-main-module-name C \
@@ -101,8 +75,4 @@ fi
   --wasm-preload-library "${WORK_DIR}/imported_table_writer.wasm" B \
   --run "${WORK_DIR}/imported_table_caller.wasm"
 
-if [[ "${BACKEND}" == aot ]]; then
-  echo "OK: cross-module funcref identity (aot supported path; reference-valued paths rejected by capability preflight)"
-else
-  echo "OK: cross-module funcref identity (${BACKEND})"
-fi
+echo "OK: cross-module funcref identity and non-scalar global storage (${BACKEND})"

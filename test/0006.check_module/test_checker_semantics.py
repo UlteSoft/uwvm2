@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -71,6 +73,53 @@ class PragmaOnceGuardTests(unittest.TestCase):
 
 
 class ModuleDependencyTests(unittest.TestCase):
+    def test_implementation_coroutine_header_is_checked_by_main(self) -> None:
+        previous_root = MODULE_CHECKER.SRC_ROOT
+        previous_repo = MODULE_CHECKER.REPO_ROOT
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                MODULE_CHECKER.SRC_ROOT = MODULE_CHECKER.REPO_ROOT = directory
+                source = Path(directory) / 'entry.module.cpp'
+                (Path(directory) / 'entry.default.cpp').write_text(
+                    '#ifndef UWVM_MODULE\n#include <coroutine>\n#endif\n')
+                for supplied, status in ((False, 1), (True, 0)):
+                    source.write_text(('#include <coroutine>\n' if supplied else '') +
+                                      'import task;\n#include "entry.default.cpp"\n')
+                    output = io.StringIO()
+                    with contextlib.redirect_stdout(output):
+                        self.assertEqual(MODULE_CHECKER.main(), status)
+                    self.assertEqual('[STANDARD HEADER]' in output.getvalue(), not supplied)
+        finally:
+            MODULE_CHECKER.SRC_ROOT = previous_root
+            MODULE_CHECKER.REPO_ROOT = previous_repo
+
+    def test_standalone_api_and_simd_headers_require_their_modules(self) -> None:
+        for header, owner in MODULE_CHECKER.STANDALONE_MODULE_HEADERS.items():
+            with self.subTest(header=header):
+                required = guarded_dependencies(f"#ifndef UWVM_MODULE\n#include <{header}>\n#endif\n")
+                self.assertEqual(required, [owner])
+                self.assertFalse(MODULE_CHECKER.compare_dependency_coverage([], required)[0])
+                self.assertTrue(MODULE_CHECKER.compare_dependency_coverage([owner], required)[0])
+
+    def test_runtime_api_cannot_be_textual_in_consumer_global_fragment(self) -> None:
+        for quote in ('"', '<'):
+            close = '"' if quote == '"' else '>'
+            with self.subTest(quote=quote):
+                text = f"module;\n#include {quote}{MODULE_CHECKER.RUNTIME_API_HEADER}{close}\nexport module test;\n"
+                self.assertEqual(MODULE_CHECKER.find_textual_runtime_api_in_global_fragment(text), [2])
+
+    def test_runtime_owner_header_and_consumer_import_are_allowed(self) -> None:
+        for text in (
+            'module;\nexport module uwvm2.runtime;\n#include "uwvm_runtime.h"\n',
+            'module;\nexport module test;\nimport uwvm2.runtime;\n',
+        ):
+            self.assertEqual(MODULE_CHECKER.find_textual_runtime_api_in_global_fragment(text), [])
+
+    def test_runtime_api_guard_ignores_comments_and_raw_strings(self) -> None:
+        include = f"#include <{MODULE_CHECKER.RUNTIME_API_HEADER}>\n"
+        text = 'module;\n/*\n' + include + '*/\nR"tag(\n' + include + ')tag";\nexport module test;\n'
+        self.assertEqual(MODULE_CHECKER.find_textual_runtime_api_in_global_fragment(text), [])
+
     def test_standard_headers_missing_from_global_fragment_are_reported(self) -> None:
         self.assertEqual(
             MODULE_CHECKER.missing_standard_headers(

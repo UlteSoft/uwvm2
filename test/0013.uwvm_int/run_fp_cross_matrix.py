@@ -4,7 +4,7 @@
 The JSON config is a list of {name, cxx: [...], run: [...], flags: [...],
 optimizations: ["O0", "O3"], suites: ["scalar", "boundary", "simd"]} objects.
 Use a matching SDK/ABI and QEMU CPU; a build failure is never counted as a pass.
-ROS configs must omit the removed SIMD suite. This tests actual opfuncs and
+Select only suites present in the product snapshot. This tests actual opfuncs and
 guards, not a full runtime/JIT process; use the production-entry tests as well.
 All inputs/results for transport tests stay in integer bits. O0 is deliberate:
 optimized inlining can hide the native FP ABI that quietly changes an sNaN.
@@ -13,6 +13,7 @@ import argparse
 import concurrent.futures
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import time
@@ -34,9 +35,13 @@ parser.add_argument("--build-dir", type=Path, required=True)
 parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[2])
 parser.add_argument("--only", help="Comma-separated configured target names")
 parser.add_argument("--jobs", type=int, default=4)
+parser.add_argument("--build-timeout", type=int, default=600, help="seconds per complete compiler process group")
+parser.add_argument("--run-timeout", type=int, default=300, help="seconds per complete test process group")
 args = parser.parse_args()
 if args.jobs < 1:
     parser.error("--jobs must be positive")
+if args.build_timeout < 1 or args.run_timeout < 1:
+    parser.error("timeouts must be positive")
 repo, build = args.source_root.resolve(), args.build_dir.resolve()
 build.mkdir(parents=True, exist_ok=True)
 targets = json.loads(args.config.read_text())
@@ -87,11 +92,29 @@ def execute(job):
               "build_command": command, "run_command": run_command, "source_root": str(repo)}
     environment = {**os.environ, **target.get("env", {})}
     start = time.monotonic()
-    for phase, invocation, timeout in (("build", command, 600), ("run", run_command, 300)):
+    for phase, invocation, timeout in (("build", command, args.build_timeout), ("run", run_command, args.run_timeout)):
         try:
-            result = subprocess.run(invocation, capture_output=True, text=True, env=environment, timeout=timeout)
-            text = result.stdout + result.stderr
-            record[phase] = result.returncode
+            # A compiler driver can spawn cc1/assembler/linker children. Killing
+            # only that driver on timeout leaves those children consuming the
+            # campaign's memory/CPU budget and may prevent pipe EOF forever.
+            # Give each invocation its own POSIX process group, not the whole
+            # parallel test campaign, and reap it before scheduling another job.
+            with subprocess.Popen(invocation, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True, env=environment, start_new_session=os.name == "posix") as process:
+                try:
+                    stdout, stderr = process.communicate(timeout=timeout)
+                    record[phase] = process.returncode
+                except subprocess.TimeoutExpired:
+                    if os.name == "posix":
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass  # The whole group exited at the timeout boundary.
+                    else:
+                        process.kill()
+                    stdout, stderr = process.communicate()
+                    record[phase] = "timeout"
+                text = stdout + stderr
         except subprocess.TimeoutExpired as error:
             text = str(error)
             record[phase] = "timeout"

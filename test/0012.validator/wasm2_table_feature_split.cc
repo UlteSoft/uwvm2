@@ -96,7 +96,12 @@ namespace
         ::uwvm2::validation::error::code_validation_error_impl err{};
         try
         {
+#if defined(UWVM_TEST_LEGACY_TABLE_POLICY)
+            ::uwvm2::validation::standard::wasm1p1::validate_code(
+                ::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
+#else
             ::uwvm2::validation::concepts::dispatch_validate_code(
+#endif
                 module,
                 importsec.importdesc.index_unchecked(0u).size(),
                 reinterpret_cast<::std::byte const*>(code.body.expr_begin),

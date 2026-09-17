@@ -1,0 +1,3 @@
+# AArch64 BR X16 bytes are 00 02 1f d6. The checker reads a BE object's data
+# words as big-endian, so those four instruction bytes have this numeric value.
+# rtdyld-check: *{4}(stub_addr(stub.o/.text, external_target) + 16) = 0x00021fd6

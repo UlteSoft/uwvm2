@@ -12,6 +12,7 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include "simd_full_fixtures.h"
 
 namespace
 {
@@ -381,7 +382,7 @@ namespace
     {
         // Locate the versioned schema structurally so this corruption test keeps exercising context rejection after a
         // deliberate runtime ABI bump instead of silently failing to mutate the cache blob.
-        auto const needle{::std::string_view{"uwvm2-runtime-abi-v"}};
+        auto const needle{::std::string_view{"uwvm2ros-runtime-abi-v"}};
         auto const iter{::std::search(bytes.begin(), bytes.end(), needle.begin(), needle.end())};
         if(iter == bytes.end()) { return false; }
         auto const offset{static_cast<::std::size_t>(iter - bytes.begin())};
@@ -1012,8 +1013,17 @@ namespace
             return false;
         }
 
-        // Multi-value functions are not part of the current native LLVM ABI and therefore must not produce cacheable
-        // interpreter-backed AOT objects. The verifier suite covers the required compile failure explicitly.
+        // Exercise native vector/tuple ABI relocations, globals, and refreshed indirect-call targets on a cache hit.
+        auto const vector_path{artifact_dir / "simd_vector_abi.wasm"};
+        auto const& vector_bytes{::uwvm2test::llvm_full_fixture::vector_abi};
+        if(!write_fixture(vector_path, vector_bytes.data(), vector_bytes.size()) ||
+           !run_cached_mode_twice(uwvm_path, artifact_dir, vector_path, artifact_dir / "cache-simd-vector-abi",
+                                 "-Raot --wasm-feature-wasm2", "simd_vector_abi")) { return false; }
+        auto const table_path{artifact_dir / "simd_table_mutation.wasm"};
+        auto const& table_bytes{::uwvm2test::llvm_full_fixture::table_mutation};
+        if(!write_fixture(table_path, table_bytes.data(), table_bytes.size()) ||
+           !run_cached_mode_twice(uwvm_path, artifact_dir, table_path, artifact_dir / "cache-simd-table-mutation",
+                                 "-Raot --wasm-feature-wasm2", "simd_table_mutation")) { return false; }
         return true;
     }
 
