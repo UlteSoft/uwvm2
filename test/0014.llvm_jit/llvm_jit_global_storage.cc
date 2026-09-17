@@ -31,7 +31,7 @@ int main()
         auto llvm_type{llvm_details::get_llvm_type_from_wasm_value_type(context, type)};
         auto pointer{llvm_details::get_llvm_global_storage_pointer(context, builder, runtime_module, index, ::std::addressof(globals[index]), type)};
         if(llvm_type == nullptr || pointer == nullptr) { return 1; }
-        if(type == value_type::v128 && !llvm_type->isIntegerTy(128u)) { return 2; }
+        if(type == value_type::v128 && llvm_type != ::llvm::FixedVectorType::get(::llvm::Type::getInt8Ty(context), 16u)) { return 2; }
         if((type == value_type::funcref || type == value_type::externref) &&
            !llvm_type->isIntegerTy(static_cast<unsigned>(sizeof(::uwvm2::object::global::wasm_global_ref_t) * CHAR_BIT)))
         {

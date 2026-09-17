@@ -33,27 +33,31 @@
 # include <fast_io_dsal/tuple.h>
 # include <uwvm2/parser/wasm_custom/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
-# include <uwvm2/uwvm/wasm/storage/impl.h>
 #else
 # error "Module testing is not currently supported"
 #endif
 
+#include "error_output_test_stream.h"
+
 int main()
 {
     {
-        ::fast_io::basic_obuf<::fast_io::u8native_io_observer> obuf_u8err{::fast_io::u8err()};
+        auto obuf_u8err{error_test_u8err()};
 
-        ::fast_io::obuf_file cf{u8"name_error_code_test_c.log"};
-        ::fast_io::wobuf_file wcf{u8"name_error_code_test_wc.log"};
-        ::fast_io::u8obuf_file u8cf{u8"name_error_code_test_u8c.log"};
-        ::fast_io::u16obuf_file u16cf{u8"name_error_code_test_u16c.log"};
-        ::fast_io::u32obuf_file u32f{u8"name_error_code_test_u32c.log"};
+        error_test_output_file<char> cf{u8"name_error_code_test_c.log", ::fast_io::open_mode::out};
+        error_test_output_file<wchar_t> wcf{u8"name_error_code_test_wc.log", ::fast_io::open_mode::out};
+        error_test_output_file<char8_t> u8cf{u8"name_error_code_test_u8c.log", ::fast_io::open_mode::out};
+        error_test_output_file<char16_t> u16cf{u8"name_error_code_test_u16c.log", ::fast_io::open_mode::out};
+        error_test_output_file<char32_t> u32f{u8"name_error_code_test_u32c.log", ::fast_io::open_mode::out};
         ::uwvm2::parser::wasm_custom::customs::name_error_output_t errout{};
+        ::std::byte name_bytes[64]{};
+        errout.name_begin = name_bytes;
 
         for(::std::uint_least32_t i{};
             i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit) + 1u;
             ++i)
         {
+            errout.name_err.curr = name_bytes + i % sizeof(name_bytes);
             switch(static_cast<::uwvm2::parser::wasm_custom::customs::name_err_type_t>(i))
             {
                 case ::uwvm2::parser::wasm_custom::customs::name_err_type_t::illegal_char_sequence:
@@ -83,14 +87,26 @@ int main()
 #  if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
                 obuf_u8err_errout.flag.win32_use_text_attr = static_cast<::std::uint_least8_t>(!::uwvm2::uwvm::utils::ansies::log_win32_use_ansi_b);
 #  endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 3
                 ::fast_io::io::perrln(obuf_u8err, obuf_u8err_errout);
+#endif
             }
 
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 1
             ::fast_io::io::perrln(cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 2
             ::fast_io::io::perrln(wcf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 3
             ::fast_io::io::perrln(u8cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 4
             ::fast_io::io::perrln(u16cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 5
             ::fast_io::io::perrln(u32f, errout);
+#endif
         }
     }
 }

@@ -108,6 +108,22 @@ namespace
 
     inline constexpr ::std::array compare_policies{"unwind", "unwind-uncheck", "auto"};
 
+    [[nodiscard]] bool exhaustive_policies() noexcept
+    {
+        auto const* value{::std::getenv("UWVM_TRAP_MATRIX_ALL_POLICIES")};
+        return value != nullptr && ::std::string_view{value} == "1";
+    }
+
+    [[nodiscard]] bool full_only() noexcept
+    {
+#ifdef UWVM2TEST_TRAP_FULL_ONLY
+        return true; // ROS exposes the full JIT through -Raot, not -Rcm/-Rcc.
+#else
+        auto const* value{::std::getenv("UWVM_TRAP_MATRIX_FULL_ONLY")};
+        return value != nullptr && ::std::string_view{value} == "1";
+#endif
+    }
+
     [[nodiscard]] ::std::uint_least64_t policy_seed() noexcept
     {
         auto seed{default_policy_seed};
@@ -152,6 +168,36 @@ namespace
             "-Rtiered -Rtiered-disable-t0",
             "-Rtiered -Rtiered-disable-t2",
             "-Rtiered -Rtiered-disable-t0 -Rtiered-disable-t2"};
+
+        if(exhaustive_policies())
+        {
+            // Seeded smoke tests cannot prove that every optimizer preserves
+            // trap PCs and native frames. Enumerate the policy/entry-mode
+            // product for the audit path; every mode below runs every fixture.
+            for(auto const policy: full_policies)
+            {
+                for(auto const& base: {base_modes[0], base_modes[1]})
+                {
+                    result.push_back({"all_" + ::std::string{base.name} + "_" + policy_label(policy),
+                                      ::std::string{base.args} + " -Rllvm-full-policy " + ::std::string{policy}});
+                }
+            }
+            for(auto const policy: lazy_policies)
+            {
+                result.push_back({"all_lazy_" + policy_label(policy), "-Rjit -Rllvm-lazy-policy " + ::std::string{policy}});
+                result.push_back({"all_lazy_verification_" + policy_label(policy),
+                                  "-Rcm lazy+verification -Rcc jit -Rllvm-lazy-policy " + ::std::string{policy}});
+            }
+            for(::std::size_t index{}; index != tiered_modes.size(); ++index)
+            {
+                for(auto const policy: tiered_policies)
+                {
+                    result.push_back({"all_tiered_" + ::std::to_string(index) + "_" + policy_label(policy),
+                                      ::std::string{tiered_modes[index]} + " -Rllvm-policy " + ::std::string{policy}});
+                }
+            }
+            return result;
+        }
 
         auto random_state{policy_seed()};
         for(::std::size_t index{}; index != seeded_policy_mode_count; ++index)
@@ -577,14 +623,18 @@ int main(int argc, char** argv)
 
     auto const executable{::std::filesystem::absolute(argv[0])};
     auto const executable_dir{executable.parent_path()};
-    auto const project_root{find_parent_with(executable_dir, "test/0014.llvm_jit/wat/trap_matrix/oob_load.wat")};
+    auto const project_root{env_string("UWVM_TRAP_MATRIX_PROJECT_ROOT").empty()
+                                ? find_parent_with(executable_dir, "test/0014.llvm_jit/wat/trap_matrix/oob_load.wat")
+                                : ::std::filesystem::path{env_string("UWVM_TRAP_MATRIX_PROJECT_ROOT")}};
     if(project_root.empty())
     {
         ::std::cerr << "failed to locate project root from " << executable << '\n';
         return 1;
     }
 
-    auto const uwvm_path{find_uwvm_binary(executable_dir)};
+    auto const uwvm_path{env_string("UWVM_TRAP_MATRIX_BINARY").empty()
+                             ? find_uwvm_binary(executable_dir)
+                             : ::std::filesystem::path{env_string("UWVM_TRAP_MATRIX_BINARY")}};
     if(uwvm_path.empty())
     {
         ::std::cerr << "failed to locate uwvm next to test executable: " << executable << '\n';
@@ -616,8 +666,11 @@ int main(int argc, char** argv)
     bool authoritative_win64_unwind{};
     bool native_unwind_backend_available{};
     ::std::size_t mismatch_count{};
+    ::std::size_t executed_cases{};
+    ::std::size_t unavailable_policy_cases{};
     auto const modes{make_modes()};
-    ::std::cout << "[trap-matrix] deterministic policy seed=" << policy_seed() << " randomized_modes=" << seeded_policy_mode_count << '\n';
+    ::std::cout << "[trap-matrix] exhaustive=" << exhaustive_policies() << " full_only=" << full_only()
+                << " deterministic policy seed=" << policy_seed() << " modes=" << modes.size() << '\n';
     auto const fixture_filter{::std::getenv("UWVM_TRAP_MATRIX_FIXTURE")};
     ::std::size_t selected_fixtures{};
     for(auto const& fixture: fixtures)
@@ -638,6 +691,11 @@ int main(int argc, char** argv)
                 return 1;
             }
             call_stack_capability_probed = true;
+            if(env_string("UWVM_TRAP_MATRIX_REQUIRE_NATIVE") == "1" && !authoritative_win64_unwind)
+            {
+                ::std::cerr << "[trap-matrix] checked native replacement was required but auto selected instruction fallback\n";
+                return 1;
+            }
             ::std::cout << (authoritative_win64_unwind
                                 ? "[trap-matrix] checked native unwind owns generated Wasm frames\n"
                                 : "[trap-matrix] native self-check unavailable; auto retains logical instruction frames\n");
@@ -645,14 +703,16 @@ int main(int argc, char** argv)
 
         for(::std::size_t mode_index{}; mode_index != modes.size(); ++mode_index)
         {
-            if(mode_index >= base_modes.size() &&
+            if(!exhaustive_policies() && mode_index >= base_modes.size() &&
                ::std::string_view{fixture.name} != seeded_policy_fixtures[mode_index - base_modes.size()])
             {
                 continue;
             }
 
             auto const& mode{modes[mode_index]};
+            if(full_only() && mode.args.find("-Raot") == ::std::string::npos) { continue; }
             auto const instruction{run_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "instruction")};
+            ++executed_cases;
             if(!instruction.valid)
             {
                 ++mismatch_count;
@@ -663,10 +723,15 @@ int main(int argc, char** argv)
             for(auto const* policy: compare_policies)
             {
                 auto const policy_name{::std::string_view{policy}};
-                if(policy_name == "unwind" && !authoritative_win64_unwind) { continue; }
-                if(policy_name == "unwind-uncheck" && !native_unwind_backend_available) { continue; }
+                if((policy_name == "unwind" && !authoritative_win64_unwind) ||
+                   (policy_name == "unwind-uncheck" && !native_unwind_backend_available))
+                {
+                    ++unavailable_policy_cases;
+                    continue;
+                }
 
                 auto const compared{run_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, policy)};
+                ++executed_cases;
                 if(same_result(instruction, compared)) { continue; }
 
                 ++mismatch_count;
@@ -689,7 +754,9 @@ int main(int argc, char** argv)
     }
     if(ok && mismatch_count == 0uz)
     {
-        ::std::cout << "[trap-matrix] all trap outputs matched instruction baselines\n";
+        // A fallback pass is useful but is not proof that a native unwinder ran.
+        ::std::cout << "[trap-matrix] all trap outputs matched instruction baselines; executed=" << executed_cases
+                    << " unavailable_policy_cases=" << unavailable_policy_cases << '\n';
         return 0;
     }
 

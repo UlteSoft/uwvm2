@@ -7,7 +7,7 @@ Rules:
   every module-correlated dependency included by the header must be imported
   by the module unit or included in its global module fragment.
 - For each pair (*.module.cpp, *.default.cpp) in the same directory with the
-  same basename, apply the same dependency-coverage rule.
+  same basename, apply the same dependency-coverage and std-header rules.
 - Additional explicit module imports are permitted. Named modules do not see
   dependencies that a textual header obtained transitively, so module units
   may legitimately need a larger direct dependency surface.
@@ -42,7 +42,10 @@ Rules:
 Notes:
 - In .cppm/.module.cpp, we read `import ...;` lines and module-correlated
   includes in the global module fragment.
-- In .h/.default.cpp, we read `#include <.../impl.h>`, `#include <fast_io.h>`, and relative `#include "*.h"`
+- The runtime API and shared SIMD standalone headers also map to named modules.
+  Runtime API consumers must import its owner, not include it in a global fragment.
+- In .h/.default.cpp, we read `#include <.../impl.h>`, mapped standalone headers,
+  `#include <fast_io.h>`, and relative `#include "*.h"`
   within the `#ifndef UWVM_MODULE` guarded region, ignoring other includes (e.g., macros, std headers).
 - We normalize imports to canonical names so that, for example:
   `#include <uwvm2/utils/container/impl.h>` == `import uwvm2.utils.container;`
@@ -85,6 +88,13 @@ BACKEND_CONFIG_GUARD_RE = re.compile(
     re.MULTILINE,
 )
 RUNTIME_CONFIG_PUSH_HEADER = "uwvm2/uwvm/runtime/macro/push_macros.h"
+RUNTIME_API_HEADER = "uwvm2/runtime/lib/uwvm_runtime.h"
+# These standalone public interfaces do not follow the usual */impl.h naming.
+# Omitting them hid real run/API and interpreter SIMD dependency failures.
+STANDALONE_MODULE_HEADERS = {
+    RUNTIME_API_HEADER: "uwvm2.runtime",
+    "uwvm2/runtime/compiler/shared/wasm1p1_simd.h": "uwvm2.runtime.compiler.shared.wasm1p1_simd",
+}
 FEATURE_CONFIG_PUSH_HEADER = "uwvm2/utils/macro/push_macros.h"
 STANDARD_CXX_HEADERS = frozenset(
     "algorithm any array atomic barrier bit bitset cassert ccomplex cctype cerrno "
@@ -199,7 +209,10 @@ def normalize_header_to_import_name(
     if header == "fast_io.h" or header.startswith("fast_io_") or header.startswith("fast_io/"):
         return "fast_io"
 
-    # Only consider impl.h and local .h as module-correlated
+    if header in STANDALONE_MODULE_HEADERS:
+        return STANDALONE_MODULE_HEADERS[header]
+
+    # Other conventional module-correlated headers.
     if header.endswith("/impl.h"):
         core = header[:-len("/impl.h")]
         return core.replace("/", ".")
@@ -314,6 +327,30 @@ def preprocessing_lines(text: str) -> List[str]:
         text,
     )
     return text.splitlines()
+
+
+def find_textual_runtime_api_in_global_fragment(text: str) -> List[int]:
+    """Reject the API placement that hides module-owned configuration types.
+
+    This narrow project rule does not ban arbitrary textual dependencies. The
+    runtime API consumer must import uwvm2.runtime, as its implementation does;
+    including the API before imports cannot see u8string_view and including its
+    dependencies textually instead would mix global/named-module type ownership.
+    The owner's own paired-header include after `export module` is intentional.
+    """
+    in_global_fragment = False
+    findings: List[int] = []
+    for line_number, line in enumerate(preprocessing_lines(text), start=1):
+        if not in_global_fragment:
+            if GLOBAL_MODULE_FRAGMENT_RE.match(line):
+                in_global_fragment = True
+            continue
+        if NAMED_MODULE_DECL_RE.match(line):
+            break
+        include = INCLUDE_RE.match(line)
+        if include is not None and include.group(2).strip() == RUNTIME_API_HEADER:
+            findings.append(line_number)
+    return findings
 
 
 def find_feature_macro_tests(text: str) -> List[str]:
@@ -774,6 +811,11 @@ def main() -> int:
     for path in files:
         if not is_cppm(path):
             continue
+        for line_number in find_textual_runtime_api_in_global_fragment(read_text(path)):
+            problems.append(
+                f"[API OWNERSHIP] {path}:{line_number}: import uwvm2.runtime instead of "
+                "including its API in the global module fragment"
+            )
         for line_number, imported_name in find_conditionally_exported_imports(read_text(path)):
             problems.append(
                 f"[CONDITIONAL IMPORT] {path}:{line_number}: export import {imported_name}; "
@@ -851,6 +893,16 @@ def main() -> int:
     for pair in mod_def_pairs:
         mod_txt = read_text(pair.a)
         def_txt = read_text(pair.b)
+
+        # Implementation TUs also define coroutines and instantiate templates;
+        # an imported task/container type does not expose its std header.
+        missing_std = missing_standard_headers("module;\n" + mod_txt, def_txt)
+        if missing_std:
+            problems.append(
+                f"[STANDARD HEADER] {pair.a}: textual preamble is missing "
+                + ", ".join(f"<{header}>" for header in missing_std)
+                + f" explicitly included by {pair.b}"
+            )
 
         imports_mod = extract_imports_from_cppm_or_module_cpp(mod_txt)
         dependencies_mod = imports_mod + extract_global_fragment_includes(mod_txt, source_path=pair.a)

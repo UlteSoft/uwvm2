@@ -707,9 +707,11 @@ namespace
         }
         if(!first_cache_context_contains(cache_dir, "uwvm2-runtime-abi-v") ||
            !first_cache_context_contains(cache_dir, "llvm-wasm-typed-result-abi") ||
-           !first_cache_context_contains(cache_dir, "void-scalar-tuple-struct-v1"))
+           !first_cache_context_contains(cache_dir, "void-scalar-tuple-struct-v1") ||
+           !first_cache_context_contains(cache_dir, "ssa-byte-vector16-v1") ||
+           !first_cache_context_contains(cache_dir, "cross-custom-page-last-byte-preflight-v1"))
         {
-            ::std::cerr << "cache context is missing the native-only typed multi-result ABI fingerprint\n";
+            ::std::cerr << "cache context is missing the typed result/vector ABI or guarded-store fingerprint\n";
             return false;
         }
         if(!expect_clean_cache_hit(uwvm_path, artifact_dir, wasm_path, cache_args, "signed_integrity_clean_hit")) { return false; }

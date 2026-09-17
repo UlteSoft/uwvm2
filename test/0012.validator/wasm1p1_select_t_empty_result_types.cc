@@ -63,6 +63,7 @@ namespace
         auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<wasm1_feature, wasm1p1_feature>>(module_storage.sections)};
 
+        bool rejected_zero_result_arity{};
         for(::std::size_t local_idx{}; local_idx != codesec.codes.size(); ++local_idx)
         {
             auto const& code{codesec.codes.index_unchecked(local_idx)};
@@ -82,13 +83,20 @@ namespace
             }
             catch(::fast_io::error const&)
             {
+                if(local_idx == 1uz &&
+                   validate_err.err_code == ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate)
+                {
+                    rejected_zero_result_arity = true;
+                    continue;
+                }
                 return 10 + static_cast<int>(local_idx);
             }
 
+            if(local_idx == 1uz) { return 30; }
             if(validate_err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) { return 20 + static_cast<int>(local_idx); }
         }
 
-        return 0;
+        return rejected_zero_result_arity ? 0 : 31;
     }
 }  // namespace
 

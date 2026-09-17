@@ -64,8 +64,8 @@ run_forwarded_global_consumer() {
     --run "${WORK_DIR}/funcref_global_consumer.wasm"
 }
 
-# Full uwvm2 lowers reference values and table.init. Only the separately maintained ROS backend intentionally rejects
-# these operations; accepting its capability-rejection diagnostic here would conceal a Full code-generation regression.
+# Both products retain full Wasm 2.0 reference values and table.init support.
+# Capability rejection here is a regression, including in the full-only ROS product.
 run_global_consumer
 run_element_consumer
 run_forwarded_global_consumer
