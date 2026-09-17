@@ -1,0 +1,2 @@
+# rtdyld-check: first = 0x20000
+# rtdyld-check: *{4}(section_addr(local-symbols.o, .eh_frame) + 28) = 0xfffdffe4

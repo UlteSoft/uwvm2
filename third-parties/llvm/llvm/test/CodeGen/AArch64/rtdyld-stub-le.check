@@ -1,0 +1,5 @@
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-le.o/.text, external_target) + 0) = 0xd2e00010
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-le.o/.text, external_target) + 4) = 0xf2c00010
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-le.o/.text, external_target) + 8) = 0xf2a22450
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-le.o/.text, external_target) + 12) = 0xf2866890
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-le.o/.text, external_target) + 16) = 0xd61f0200

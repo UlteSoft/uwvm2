@@ -1,0 +1,7 @@
+# The checker reads data words as BE; these constants represent LE instruction
+# bytes, including the complete four-part construction of 0x11223344 in X16.
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-be.o/.text, external_target) + 0) = 0x1000e0d2
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-be.o/.text, external_target) + 4) = 0x1000c0f2
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-be.o/.text, external_target) + 8) = 0x5024a2f2
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-be.o/.text, external_target) + 12) = 0x906886f2
+# rtdyld-check: *{4}(stub_addr(uwvm-aarch64-stub-be.o/.text, external_target) + 16) = 0x00021fd6
