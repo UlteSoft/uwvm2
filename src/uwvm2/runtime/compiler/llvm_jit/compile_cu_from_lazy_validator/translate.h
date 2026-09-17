@@ -49,6 +49,8 @@
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/MC/TargetRegistry.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 #  include <llvm/PassRegistry.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
@@ -771,7 +773,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline ::llvm::Triple get_llvm_jit_mcjit_target_triple()
         {
-            ::llvm::Triple triple{::llvm::sys::getDefaultTargetTriple()};
+            // N32/x32 have 32-bit pointers but execute a 64-bit ISA. Do not
+            // regress to EngineBuilder's implicit getProcessTriple() narrowing.
+            ::llvm::Triple triple{::llvm::Triple::normalize(::llvm::sys::getDefaultTargetTriple())};
 #  if defined(__aarch64__) && defined(__linux__) && !defined(__ANDROID__)
             if(triple.getArch() == ::llvm::Triple::aarch64 && triple.isOSLinux())
             {
@@ -790,8 +794,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::llvm::SmallVector<::std::string, 16> host_target_attribute_strings{};
             append_llvm_jit_host_target_attribute_strings(target_config.feature_storage, host_target_attribute_strings);
             auto target_triple{get_llvm_jit_mcjit_target_triple()};
-            return ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{target_builder.selectTarget(
-                target_triple, {}, all_details::get_llvm_string_ref(target_config.cpu_name), host_target_attribute_strings)};
+            // Match full/probe selection. RuntimeDyld's MIPS far-call stubs
+            // jump through $at, not the PIC host callee's required $t9. Use
+            // full-width C-ABI register calls. O32/N32 ignore long-calls while
+            // ABICalls is enabled, so both features are required for MCJIT's
+            // static model. This also avoids relying on separately allocated
+            // lazy objects sharing one JAL 256-MiB address region.
+            if(target_triple.isMIPS())
+            {
+                host_target_attribute_strings.emplace_back("+noabicalls");
+                host_target_attribute_strings.emplace_back("+long-calls");
+            }
+            // Match full materialization: an AOT backend is not automatically
+            // an in-process MCJIT loader. Refuse before unsupported relocations
+            // can abort LLVM; never turn this into an AOT inventory skip.
+            // LLVM's EngineBuilder warning on !hasJIT() does not stop creation.
+            ::std::string error{};
+            // The empty-architecture overload preserves the explicit triple
+            // and is also available before LLVM 23's two-argument API change.
+            auto const target{::llvm::TargetRegistry::lookupTarget({}, target_triple, error)};
+            // BPF bytecode needs a different loader/execution ABI despite its JIT flag.
+            if(target_triple.isBPF() || target == nullptr || !target->hasJIT() || !target->hasMCAsmBackend() ||
+               !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_object_format_supported(target_triple)) { return {}; }
+            auto machine{::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{target_builder.selectTarget(
+                target_triple, {}, all_details::get_llvm_string_ref(target_config.cpu_name), host_target_attribute_strings)}};
+            if(machine != nullptr && !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_subtarget_supported(*machine)) { return {}; }
+            // Match full/probe emission: an external RuntimeDyld must not alias
+            // repeated ELF local labels when lazy modules are materialized.
+            if(machine != nullptr && ::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_needs_unique_temp_labels(target_triple))
+            { machine->Options.MCOptions.MCSaveTempLabels = true; }
+            return machine;
         }
 
         inline constexpr void apply_llvm_jit_native_target_function_attrs(::llvm::Module& module,
@@ -1513,7 +1545,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::uwvm2::runtime::compiler::shared::strict_float_jit::lower(module);
             if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
-            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None)
+            {
+                all_details::legalize_llvm_jit_native_vectors(module);
+                return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
+            }
 
             ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
             function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
@@ -1530,6 +1566,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
             function_pass_manager.doFinalization();
 
+            all_details::legalize_llvm_jit_native_vectors(module);
             return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
         }
 

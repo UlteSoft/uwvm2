@@ -54,6 +54,8 @@ module;
 # include <llvm/InitializePasses.h>
 # include <llvm/IR/LegacyPassManager.h>
 # include <llvm/IR/Verifier.h>
+# include <llvm/MC/TargetRegistry.h>
+# include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 # include <llvm/PassRegistry.h>
 # include <llvm/Support/TargetSelect.h>
 # include <llvm/Target/TargetMachine.h>

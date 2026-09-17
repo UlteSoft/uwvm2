@@ -631,6 +631,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             act.sa_sigaction = posix_signal_handler;
             sigemptyset(::std::addressof(act.sa_mask));
             act.sa_flags = SA_SIGINFO;
+#ifdef SA_ONSTACK
+            // A later memory-provider installation may sit above the runtime's
+            // native-stack handler. Preserve alternate-stack delivery so a
+            // stack fault can still be forwarded with an exhausted native SP.
+            act.sa_flags |= SA_ONSTACK;
+#endif
 
             if(posix::sigaction(SIGSEGV, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigsegv)) != 0) [[unlikely]]
             {

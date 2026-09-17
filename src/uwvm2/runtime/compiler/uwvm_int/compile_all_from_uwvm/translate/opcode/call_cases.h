@@ -76,6 +76,7 @@ case wasm1_code::return_:
     auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
     operand_stack_truncate_to(curr_frame_base);
     is_polymorphic = true;
+    codegen_reachable = false;
 
     break;
 }
@@ -1582,6 +1583,13 @@ case wasm1_code::select:
         {
             push_unknown_operand();
         }
+    }
+    else if(v1_is_unknown && v2_from_stack && !v2_is_unknown)
+    {
+        // The known right operand refines the bottom left operand. Use pop/push
+        // to keep byte accounting correct when the placeholder's width changes.
+        operand_stack_pop_unchecked();
+        operand_stack_push(v2_type);
     }
 
     break;

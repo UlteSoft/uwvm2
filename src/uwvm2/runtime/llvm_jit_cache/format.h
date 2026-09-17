@@ -160,6 +160,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::std::byte const* payload{};
     };
 
+    // Product identity is owned by the reader/writer, not supplied by cache_context.
+    // Even embedders using identical keys, ABI strings and a shared custom root
+    // must not exchange ordinary/ROS native objects. Metadata equality remains
+    // mandatory even when the ordinary product disables signature verification.
+    inline constexpr ::uwvm2::utils::container::u8string_view cache_product_name{u8"uwvm2"};
+
     // All multibyte fields are serialized explicitly as little-endian bytes, so the file is host-endian independent.
     inline constexpr ::std::byte cache_magic[8]{::std::byte{'U'},
                                                 ::std::byte{'W'},
@@ -169,7 +175,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                 ::std::byte{'J'},
                                                 ::std::byte{'C'},
                                                 ::std::byte{0x01u}};
-    inline constexpr ::std::uint_least32_t cache_format_version{4u};
+    // v5 adds mandatory product-domain metadata and namespaced storage. Reject
+    // v4 instead of migrating executable objects with no product provenance.
+    inline constexpr ::std::uint_least32_t cache_format_version{5u};
     inline constexpr ::std::size_t cache_fixed_header_size{64uz};
     inline constexpr ::std::size_t cache_sha256_digest_size{32uz};
     inline constexpr ::std::size_t cache_ed25519_signature_size{64uz};
@@ -376,8 +384,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> make_context_metadata(cache_context const& ctx) noexcept
     {
         ::uwvm2::utils::container::vector<::std::byte> out{};
-        out.reserve(details::key_value_size(u8"key", ctx.cache_key.size()) + details::key_value_size(u8"llvm", ctx.llvm_version.size()) +
+        out.reserve(details::key_value_size(u8"product", cache_product_name.size()) +
+                    details::key_value_size(u8"key", ctx.cache_key.size()) + details::key_value_size(u8"llvm", ctx.llvm_version.size()) +
                     details::key_value_size(u8"uwvm_abi", ctx.uwvm_abi.size()) + details::key_value_size(u8"codegen", ctx.codegen_policy.size()));
+        // This fixed product field is authenticated and included in the path
+        // digest; changing only a filename or the public magic cannot bypass it.
+        details::append_key_value(out, u8"product", cache_product_name);
         // Context metadata captures the non-ISA inputs that can silently change symbol layout or object contents.
         details::append_key_value(out, u8"key", ctx.cache_key);
         details::append_key_value(out, u8"llvm", ctx.llvm_version);

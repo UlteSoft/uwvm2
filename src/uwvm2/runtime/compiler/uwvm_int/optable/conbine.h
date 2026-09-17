@@ -10100,7 +10100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10156,7 +10156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10209,7 +10209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), imm);
+            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), imm);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10263,7 +10263,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(v));
+            details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(v));
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10316,7 +10316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(imm));
+            details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(imm));
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10370,7 +10370,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least16_t>(v));
+            details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff), static_cast<::std::uint_least16_t>(v));
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10423,7 +10423,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least16_t>(imm));
+            details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff), static_cast<::std::uint_least16_t>(imm));
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10478,7 +10478,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i64_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+            details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -10533,7 +10533,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_u32_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least32_t>(v));
+            details::store_u32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), static_cast<::std::uint_least32_t>(v));
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -11011,7 +11011,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::size_t const dst_eff{static_cast<::std::size_t>(dst_eff65.offset)};
 
             wasm_i32 const tmp{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, src_eff))};
-            details::store_i32_le(details::ptr_add_u64(memory.memory_begin, dst_eff), tmp);
+            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, dst_eff), tmp);
 
             details::exit_memory_operation_memory_lock(memory);
 
@@ -11083,7 +11083,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::size_t const dst_eff{static_cast<::std::size_t>(dst_eff65.offset)};
 
             wasm_i64 const out{details::load_i64_le(details::ptr_add_u64(memory.memory_begin, src_eff))};
-            details::store_i64_le(details::ptr_add_u64(memory.memory_begin, dst_eff), out);
+            details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, dst_eff), out);
 
             details::exit_memory_operation_memory_lock(memory);
 
@@ -11974,7 +11974,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+        details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
     }
 
     /// @brief Fused memory op with `local.get` + immediate add + `offset` (`i32` store) (byref).
@@ -12018,7 +12018,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+        details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_store_imm_localget_off` (byref).
@@ -12059,7 +12059,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), imm);
+        details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), imm);
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_store8_localget_off` (byref).
@@ -12101,7 +12101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(v));
+        details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(v));
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_store8_imm_localget_off` (byref).
@@ -12142,7 +12142,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(imm));
+        details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(imm));
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_store16_localget_off` (byref).
@@ -12184,7 +12184,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least16_t>(v));
+        details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff), static_cast<::std::uint_least16_t>(v));
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_store16_imm_localget_off` (byref).
@@ -12225,7 +12225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least16_t>(imm));
+        details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff), static_cast<::std::uint_least16_t>(imm));
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i64_store_localget_off` (byref).
@@ -12268,7 +12268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i64_le(details::ptr_add_u64(memory.memory_begin, eff), v);
+        details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), v);
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i64_store32_localget_off` (byref).
@@ -12311,7 +12311,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_u32_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least32_t>(v));
+        details::store_u32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), static_cast<::std::uint_least32_t>(v));
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_load_localget_set_local` (byref).
@@ -12675,7 +12675,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t const dst_eff{static_cast<::std::size_t>(dst_eff65.offset)};
 
         wasm_i32 const tmp{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, src_eff))};
-        details::store_i32_le(details::ptr_add_u64(memory.memory_begin, dst_eff), tmp);
+        details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, dst_eff), tmp);
     }
 
     /// @brief Fused `local.get` + `i64.memcpy.localget` (byref).
@@ -12725,7 +12725,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t const dst_eff{static_cast<::std::size_t>(dst_eff65.offset)};
 
         wasm_i64 const tmp{details::load_i64_le(details::ptr_add_u64(memory.memory_begin, src_eff))};
-        details::store_i64_le(details::ptr_add_u64(memory.memory_begin, dst_eff), tmp);
+        details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, dst_eff), tmp);
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_i32_load_add_imm` (byref).

@@ -27,7 +27,7 @@ case static_cast<wasm1_code>(wasm1p1_code::select_t):
 
     auto const validate_select_condition{[&](concrete_operand_t cond) constexpr UWVM_THROWS
                                          {
-                                             if(cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                             if(cond.from_stack && !cond.is_unknown && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                                              {
                                                  err.err_curr = op_begin;
                                                  err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_diagnostic_value_type(cond.type);
@@ -53,7 +53,7 @@ case static_cast<wasm1_code>(wasm1p1_code::select_t):
     validate_select_condition(cond);
 
     auto const v2{try_pop_concrete_operand()};
-    if(v2.from_stack && v2.type != result_type) [[unlikely]]
+    if(v2.from_stack && !v2.is_unknown && v2.type != result_type) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_diagnostic_value_type(result_type);
@@ -63,7 +63,7 @@ case static_cast<wasm1_code>(wasm1p1_code::select_t):
     }
 
     auto const v1{try_pop_concrete_operand()};
-    if(v1.from_stack && v1.type != result_type) [[unlikely]]
+    if(v1.from_stack && !v1.is_unknown && v1.type != result_type) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_diagnostic_value_type(result_type);
@@ -107,7 +107,7 @@ case static_cast<wasm1_code>(wasm1p1_code::table_get):
     check_table_index(op_begin, table_index, opcode_byte(wasm1p1_code::table_get));
     if(!is_polymorphic && concrete_operand_count() < 1uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.get", 1uz); }
     auto const index{try_pop_concrete_operand()};
-    if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(index.from_stack && !index.is_unknown && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.get";
@@ -147,7 +147,7 @@ case static_cast<wasm1_code>(wasm1p1_code::table_set):
     auto const table_type{get_table_value_type(table_index)};
     if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
     auto const value{try_pop_concrete_operand()};
-    if(value.from_stack && value.type != table_type) [[unlikely]]
+    if(value.from_stack && !value.is_unknown && value.type != table_type) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.set";
@@ -157,7 +157,7 @@ case static_cast<wasm1_code>(wasm1p1_code::table_set):
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
     auto const index{try_pop_concrete_operand()};
-    if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(index.from_stack && !index.is_unknown && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.set";
@@ -228,7 +228,7 @@ case static_cast<wasm1_code>(wasm1p1_code::ref_is_null):
     }
     if(!is_polymorphic && concrete_operand_count() < 1uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"ref.is_null", 1uz); }
     auto const reference{try_pop_concrete_operand()};
-    if(reference.from_stack && reference.type != curr_operand_stack_value_type::funcref &&
+    if(reference.from_stack && !reference.is_unknown && reference.type != curr_operand_stack_value_type::funcref &&
        reference.type != curr_operand_stack_value_type::externref) [[unlikely]]
     {
         err.err_curr = op_begin;
@@ -307,7 +307,7 @@ case static_cast<wasm1_code>(wasm1p1_code::simd_prefix):
     auto const pop_simd_operand{[&](curr_operand_stack_value_type expected) constexpr UWVM_THROWS
                                 {
                                     auto const operand{try_pop_concrete_operand()};
-                                    if(operand.from_stack && operand.type != expected) [[unlikely]]
+                                    if(operand.from_stack && !operand.is_unknown && operand.type != expected) [[unlikely]]
                                     {
                                         fail_simd_operand_type(expected, operand.type);
                                     }
@@ -753,7 +753,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
                                          for(::std::size_t i{}; i != operand_count; ++i)
                                          {
                                              auto const operand{try_pop_concrete_operand()};
-                                             if(operand.from_stack && operand.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                             if(operand.from_stack && !operand.is_unknown && operand.type != curr_operand_stack_value_type::i32) [[unlikely]]
                                              {
                                                  err.err_curr = op_begin;
                                                  err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1018,7 +1018,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
             auto const table_type{get_table_value_type(table_index)};
             if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.grow", 2uz); }
             auto const delta{try_pop_concrete_operand()};
-            if(delta.from_stack && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
+            if(delta.from_stack && !delta.is_unknown && delta.type != curr_operand_stack_value_type::i32) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.grow";
@@ -1028,7 +1028,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
             auto const value{try_pop_concrete_operand()};
-            if(value.from_stack && value.type != table_type) [[unlikely]]
+            if(value.from_stack && !value.is_unknown && value.type != table_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.grow";
@@ -1072,7 +1072,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
             auto const table_type{get_table_value_type(table_index)};
             if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.fill", 3uz); }
             auto const len{try_pop_concrete_operand()};
-            if(len.from_stack && len.type != curr_operand_stack_value_type::i32) [[unlikely]]
+            if(len.from_stack && !len.is_unknown && len.type != curr_operand_stack_value_type::i32) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";
@@ -1082,7 +1082,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
             auto const value{try_pop_concrete_operand()};
-            if(value.from_stack && value.type != table_type) [[unlikely]]
+            if(value.from_stack && !value.is_unknown && value.type != table_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"table.fill";
@@ -1092,7 +1092,7 @@ case static_cast<wasm1_code>(wasm1p1_code::numeric_prefix):
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
             auto const index{try_pop_concrete_operand()};
-            if(index.from_stack && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
+            if(index.from_stack && !index.is_unknown && index.type != curr_operand_stack_value_type::i32) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"table.fill";

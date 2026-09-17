@@ -361,6 +361,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float
     template <operation Op, typename Float>
     [[nodiscard]] inline constexpr Float binary(Float lhs, Float rhs) noexcept
     {
+#if defined(__clang__) && (defined(__arm__) || defined(_M_ARM))
+        // The caller's FP pragma does not apply to arithmetic defined in this helper.
+        // Retain scalar VFP semantics after inlining: ARM32 NEON flushes FP32 subnormals.
+# pragma clang fp exceptions(strict)
+#endif
         if constexpr(needs_extended_rounding)
         {
             if(!::std::is_constant_evaluated())

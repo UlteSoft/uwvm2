@@ -23,12 +23,16 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+// Defining the object-emission coroutine requires coroutine_traits in this TU;
+// importing the task type does not expose its module's standard-library headers.
+#include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <string>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -40,7 +44,9 @@
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 #include "uwvm_runtime_generation.h"
+#include "uwvm_runtime_checked_size.h"
 #include "uwvm_runtime_execution_entry.h"
+#include "uwvm_runtime_native_stack_guard.h"
 #include "uwvm_runtime_generated_wasm_bridge.h"
 #include "uwvm_runtime_imported_function_lookup.h"
 #include "uwvm_runtime_logical_activation_overlap.h"
@@ -53,6 +59,7 @@
 #include "uwvm_runtime_wasm_fp_environment.h"
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "uwvm_runtime_call_indirect_table_views.h"
+# include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 # include "uwvm_runtime_llvm_lazy_worker_policy.h"
 # include "uwvm_runtime_llvm_expanded_lane_unroll_policy.h"
 # include "uwvm_runtime_native_unwind_execution_gate.h"
@@ -86,6 +93,8 @@
 # include <llvm/IR/Module.h>
 # include <llvm/IR/PassManager.h>
 # include <llvm/IR/Verifier.h>
+# include <llvm/MC/TargetRegistry.h>
+# include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 # include <llvm/Linker/Linker.h>
 # include <llvm/Object/ObjectFile.h>
 # include <llvm/PassRegistry.h>
@@ -113,6 +122,10 @@ import uwvm2.parser.wasm.standard.wasm1.features;
 import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.object.memory;
+// Reference ABI types and the trap memory printer are used directly below.
+// Their declarations are not made visible by importing runtime storage alone.
+import uwvm2.object.global;
+import uwvm2.uwvm.utils.memory;
 import uwvm2.validation.error;
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 import uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
@@ -121,6 +134,8 @@ import uwvm2.runtime.compiler.uwvm_int.utils;
 import uwvm2.runtime.compiler.uwvm_int.optable;
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+// Cache-key hashing uses this provider directly, not just the cache API.
+import fast_io_crypto;
 import uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm;
 import uwvm2.runtime.compiler.llvm_jit.compile_cu_from_lazy_validator;
 import uwvm2.runtime.llvm_jit_cache;

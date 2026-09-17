@@ -54,6 +54,17 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+// ARM32 NEON ignores FPSCR.FZ for FP32 arithmetic and comparisons. Keep the affected
+// expressions constrained through inlining and late vectorization, without per-op FPCR work.
+// The pragma is block-scoped: integer-only SIMD instantiations retain ordinary optimizations.
+#pragma push_macro("UWVM2_SIMD_IEEE_FP32")
+#undef UWVM2_SIMD_IEEE_FP32
+#if defined(__clang__) && (defined(__arm__) || defined(_M_ARM))
+# define UWVM2_SIMD_IEEE_FP32 _Pragma("clang fp exceptions(strict)")
+#else
+# define UWVM2_SIMD_IEEE_FP32
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 {
     namespace wasm1p1_details
@@ -83,6 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename WasmOutT, typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr WasmOutT trunc_sat_signed(FloatT x) noexcept
         {
+            UWVM2_SIMD_IEEE_FP32
             static_assert(::std::same_as<WasmOutT, wasm_i32> || ::std::same_as<WasmOutT, wasm_i64>);
             using int_out_t = ::std::conditional_t<::std::same_as<WasmOutT, wasm_i32>, ::std::int_least32_t, ::std::int_least64_t>;
 
@@ -99,6 +111,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename WasmOutT, typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr WasmOutT trunc_sat_unsigned(FloatT x) noexcept
         {
+            UWVM2_SIMD_IEEE_FP32
             static_assert(::std::same_as<WasmOutT, wasm_i32> || ::std::same_as<WasmOutT, wasm_i64>);
             using uint_out_t = ::std::conditional_t<::std::same_as<WasmOutT, wasm_i32>, ::std::uint_least32_t, ::std::uint_least64_t>;
 
@@ -307,7 +320,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 
         template <typename Vec, typename Lane>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr Vec vec_splat(Lane v) noexcept
-        { return Vec{} + static_cast<Lane>(v); }
+        {
+            // Adding zero loses -0's sign and quiets sNaNs; a Wasm splat must preserve the scalar's exact bits.
+            if constexpr(::std::is_floating_point_v<Lane>)
+            {
+                Vec out{};
+                for(::std::size_t i{}; i != sizeof(Vec) / sizeof(Lane); ++i) { out[i] = v; }
+                return out;
+            }
+            else { return Vec{} + static_cast<Lane>(v); }
+        }
 
         template <typename UIntVec, typename MaskVec>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr UIntVec vec_select(UIntVec if_true, UIntVec if_false, MaskVec mask) noexcept
@@ -514,7 +536,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
             else if constexpr(Op == v128_binop::f32x4_add || Op == v128_binop::f32x4_sub || Op == v128_binop::f32x4_mul || Op == v128_binop::f32x4_eq)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
+                UWVM2_SIMD_IEEE_FP32
+                // ARM32 NEON arithmetic/comparisons always flush FP32 subnormals. Scalar VFP honors
+                // the entry-boundary IEEE environment; keep integer, bitwise and memory SIMD enabled.
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !defined(__arm__) && !defined(_M_ARM) && !UWVM2_STRICT_FLOAT_EXTENDED
                 auto const l{v128_to_vec<v128_f32x4>(lhs)};
                 auto const r{v128_to_vec<v128_f32x4>(rhs)};
                 if constexpr(Op == v128_binop::f32x4_add) { return canonicalize_native_float_lanes<u32, 4uz>(vec_to_v128(l + r)); }
@@ -972,6 +997,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_min(FloatT a, FloatT b) noexcept
         {
+            UWVM2_SIMD_IEEE_FP32
             if(::std::isnan(a) || ::std::isnan(b)) { return strict_float::canonical_nan<FloatT>(); }
             if(a == b)
             {
@@ -984,6 +1010,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_max(FloatT a, FloatT b) noexcept
         {
+            UWVM2_SIMD_IEEE_FP32
             if(::std::isnan(a) || ::std::isnan(b)) { return strict_float::canonical_nan<FloatT>(); }
             if(a == b)
             {
@@ -995,11 +1022,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_pmin(FloatT a, FloatT b) noexcept
-        { return b < a ? b : a; }
+        {
+            UWVM2_SIMD_IEEE_FP32
+            return b < a ? b : a;
+        }
 
         template <typename FloatT>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline FloatT wasm_float_pmax(FloatT a, FloatT b) noexcept
-        { return a < b ? b : a; }
+        {
+            UWVM2_SIMD_IEEE_FP32
+            return a < b ? b : a;
+        }
 
         struct shuffle_controls
         {
@@ -1342,6 +1375,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             }
         }
 
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__arm__) && defined(__ARM_NEON) && \
+     UWVM_HAS_BUILTIN(__builtin_neon_vtbl2_v)
+        // Clang recognizes AArch64 qtbl builtins on ARM32 too, but cannot lower them there.
+        // ARM32 instead looks up each eight-byte result in the same pair of D-register tables.
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr v128_u8x16 arm32_table_lookup(v128_u8x16 values, v128_u8x16 indices) noexcept
+        {
+            auto const lo{::std::bit_cast<v64_i8x8>(__builtin_shufflevector(values, values, 0, 1, 2, 3, 4, 5, 6, 7))};
+            auto const hi{::std::bit_cast<v64_i8x8>(__builtin_shufflevector(values, values, 8, 9, 10, 11, 12, 13, 14, 15))};
+            auto const il{::std::bit_cast<v64_i8x8>(__builtin_shufflevector(indices, indices, 0, 1, 2, 3, 4, 5, 6, 7))};
+            auto const ih{::std::bit_cast<v64_i8x8>(__builtin_shufflevector(indices, indices, 8, 9, 10, 11, 12, 13, 14, 15))};
+            auto const rl{__builtin_neon_vtbl2_v(lo, hi, il, 16)};
+            auto const rh{__builtin_neon_vtbl2_v(lo, hi, ih, 16)};
+            return ::std::bit_cast<v128_u8x16>(__builtin_shufflevector(rl, rh, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
+        }
+# endif
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_shuffle(wasm_v128 lhs, wasm_v128 rhs, shuffle_controls const& controls) noexcept
         {
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128)
@@ -1361,7 +1410,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             auto const l{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(lhs), lhs_control)};
             auto const r{__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(rhs), rhs_control)};
             return vec_to_v128(l | r);
-# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vqtbl1q_v)
+# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__aarch64__) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vqtbl1q_v)
             v128_u8x16 lhs_control;  // no init
             v128_u8x16 rhs_control;  // no init
             ::std::memcpy(::std::addressof(lhs_control), controls.lhs, sizeof(lhs_control));
@@ -1371,6 +1420,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             auto const r{::std::bit_cast<v128_u8x16>(
                 __builtin_neon_vqtbl1q_v(::std::bit_cast<v128_i8x16>(v128_to_vec<v128_u8x16>(rhs)), ::std::bit_cast<v128_i8x16>(rhs_control), 48))};
             return vec_to_v128(l | r);
+# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__arm__) && defined(__ARM_NEON) && \
+     UWVM_HAS_BUILTIN(__builtin_neon_vtbl2_v)
+            v128_u8x16 lc, rc;
+            ::std::memcpy(::std::addressof(lc), controls.lhs, sizeof(lc));
+            ::std::memcpy(::std::addressof(rc), controls.rhs, sizeof(rc));
+            return vec_to_v128(arm32_table_lookup(v128_to_vec<v128_u8x16>(lhs), lc) |
+                               arm32_table_lookup(v128_to_vec<v128_u8x16>(rhs), rc));
 # else
             auto const l{load_uint_lanes<u8, 16uz>(lhs)};
             auto const r{load_uint_lanes<u8, 16uz>(rhs)};
@@ -1397,11 +1453,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
 # elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) &&                                                \
      UWVM_HAS_BUILTIN(__builtin_aarch64_qtbl1v16qi_uuu)
             return vec_to_v128(__builtin_aarch64_qtbl1v16qi_uuu(v128_to_vec<v128_u8x16>(lhs), v128_to_vec<v128_u8x16>(rhs)));
-# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vqtbl1q_v)
+# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__aarch64__) && defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vqtbl1q_v)
             auto const values{v128_to_vec<v128_u8x16>(lhs)};
             auto const indices{v128_to_vec<v128_u8x16>(rhs)};
             return vec_to_v128(
                 ::std::bit_cast<v128_u8x16>(__builtin_neon_vqtbl1q_v(::std::bit_cast<v128_i8x16>(values), ::std::bit_cast<v128_i8x16>(indices), 48)));
+# elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__arm__) && defined(__ARM_NEON) && \
+     UWVM_HAS_BUILTIN(__builtin_neon_vtbl2_v)
+            return vec_to_v128(arm32_table_lookup(v128_to_vec<v128_u8x16>(lhs), v128_to_vec<v128_u8x16>(rhs)));
 # else
             auto const values{load_uint_lanes<u8, 16uz>(lhs)};
             auto const indices{load_uint_lanes<u8, 16uz>(rhs)};
@@ -1435,6 +1494,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <simd_code Op>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_unop_native(wasm_v128 v) noexcept
         {
+# if defined(__riscv)
+            // RISC-V rounding expansion can return its input for NaNs. Quiet those lanes
+            // before either the vector builtin or scalar fallback, keeping abs/neg bitwise.
+            if constexpr(Op == simd_code::f32x4_ceil || Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc)
+            {
+                auto lanes{load_uint_lanes<u32, 4uz>(v)};
+                for(auto& lane: lanes.lane) { if((lane & 0x7fffffffu) > 0x7f800000u) { lane |= 0x00400000u; } }
+                v = store_uint_lanes<u32, 4uz>(lanes);
+            }
+            else if constexpr(Op == simd_code::f64x2_ceil || Op == simd_code::f64x2_floor || Op == simd_code::f64x2_trunc)
+            {
+                auto lanes{load_uint_lanes<u64, 2uz>(v)};
+                for(auto& lane: lanes.lane) { if((lane & 0x7fffffffffffffffull) > 0x7ff0000000000000ull) { lane |= 0x0008000000000000ull; } }
+                v = store_uint_lanes<u64, 2uz>(lanes);
+            }
+# endif
             if constexpr(Op == simd_code::v128_not) { return v128_bitwise_not(v); }
             else if constexpr(Op == simd_code::i8x16_abs || Op == simd_code::i8x16_neg || Op == simd_code::i8x16_popcnt)
             {
@@ -1731,6 +1806,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                               Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc || Op == simd_code::f32x4_nearest ||
                               Op == simd_code::f32x4_convert_i32x4_s || Op == simd_code::f32x4_convert_i32x4_u || Op == simd_code::f32x4_demote_f64x2_zero)
             {
+                UWVM2_SIMD_IEEE_FP32
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f32x4_abs) { return vec_to_v128(v128_to_vec<v128_u32x4>(v) & vec_splat<v128_u32x4>(u32{0x7fffffffu})); }
                 else if constexpr(Op == simd_code::f32x4_neg) { return vec_to_v128(v128_to_vec<v128_u32x4>(v) ^ vec_splat<v128_u32x4>(u32{0x80000000u})); }
@@ -1928,6 +2004,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         {
             constexpr bool integral32{Op == simd_code::f32x4_ceil || Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc || Op == simd_code::f32x4_nearest};
             constexpr bool integral64{Op == simd_code::f64x2_ceil || Op == simd_code::f64x2_floor || Op == simd_code::f64x2_trunc || Op == simd_code::f64x2_nearest};
+# if defined(__GNUC__) && !defined(__clang__) && (defined(__i386__) || defined(__x86_64__)) && defined(__SSE4_1__) && \
+     UWVM_HAS_BUILTIN(__builtin_ia32_roundps) && UWVM_HAS_BUILTIN(__builtin_ia32_roundpd)
+            // GCC does not define the __LITTLE_ENDIAN__ macro used by the
+            // general vector paths. Gate this narrow path by the actual x86
+            // ISA instead of enabling unrelated vector operations globally.
+            // Explicit directions ignore MXCSR rounding; bit 3 suppresses the
+            // precision exception. Arithmetic NaNs are quieted by ROUNDPS/PD.
+            if constexpr(integral32 || integral64)
+            {
+                if(!::std::is_constant_evaluated())
+                {
+                    constexpr int mode{Op == simd_code::f32x4_ceil || Op == simd_code::f64x2_ceil ? 10 :
+                                       Op == simd_code::f32x4_floor || Op == simd_code::f64x2_floor ? 9 :
+                                       Op == simd_code::f32x4_trunc || Op == simd_code::f64x2_trunc ? 11 : 8};
+                    if constexpr(integral32)
+                    {
+                        // GCC's builtin requires float/double vectors, not its
+                        // distinct _Float32/_Float64 aliases. Bit-cast the bits;
+                        // no floating-point conversion crosses this boundary.
+                        using packed_float [[__gnu__::__vector_size__(16)]] = float;
+                        return ::std::bit_cast<wasm_v128>(__builtin_ia32_roundps(::std::bit_cast<packed_float>(v), mode));
+                    }
+                    else
+                    {
+                        using packed_float [[__gnu__::__vector_size__(16)]] = double;
+                        return ::std::bit_cast<wasm_v128>(__builtin_ia32_roundpd(::std::bit_cast<packed_float>(v), mode));
+                    }
+                }
+            }
+# endif
             if constexpr(strict_float::uses_integer_rounding && (integral32 || integral64))
             {
                 constexpr auto mode{Op == simd_code::f32x4_ceil || Op == simd_code::f64x2_ceil ? strict_float::integral_rounding::ceil :
@@ -1942,10 +2048,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             auto result{eval_full_unop_native<Op>(v)};
             constexpr bool round32{Op == simd_code::f32x4_ceil || Op == simd_code::f32x4_floor || Op == simd_code::f32x4_trunc};
             constexpr bool round64{Op == simd_code::f64x2_ceil || Op == simd_code::f64x2_floor || Op == simd_code::f64x2_trunc};
-# if defined(__riscv)
-            if constexpr(round32) { return canonicalize_native_float_lanes<u32, 4uz, true>(result); }
-            else if constexpr(round64) { return canonicalize_native_float_lanes<u64, 2uz, true>(result); }
-# endif
+            // RISC-V ceil/floor/trunc already quiet input NaNs in the native
+            // evaluator. Finite inputs cannot become NaN under integral
+            // rounding, so no second result-classification pass is needed.
             if constexpr(round32 || Op == simd_code::f32x4_nearest || Op == simd_code::f32x4_sqrt || Op == simd_code::f32x4_demote_f64x2_zero)
             { return canonicalize_native_float_lanes<u32, 4uz>(result); }
             else if constexpr(round64 || Op == simd_code::f64x2_nearest || Op == simd_code::f64x2_sqrt || Op == simd_code::f64x2_promote_low_f32x4)
@@ -2084,7 +2189,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         template <typename FloatT, typename MaskU, ::std::size_t N, simd_code Op>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_float_compare(wasm_v128 lhs, wasm_v128 rhs) noexcept
         {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
+            UWVM2_SIMD_IEEE_FP32
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !defined(__arm__) && !defined(_M_ARM) && !UWVM2_STRICT_FLOAT_EXTENDED
             if constexpr(::std::same_as<FloatT, wasm_f32> && N == 4uz)
             {
                 auto const l{v128_to_vec<v128_f32x4>(lhs)};
@@ -2496,7 +2602,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
             else if constexpr(Op == simd_code::f32x4_add || Op == simd_code::f32x4_sub || Op == simd_code::f32x4_mul || Op == simd_code::f32x4_div ||
                               Op == simd_code::f32x4_min || Op == simd_code::f32x4_max || Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
             {
-# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !UWVM2_STRICT_FLOAT_EXTENDED
+                UWVM2_SIMD_IEEE_FP32
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && !defined(__arm__) && !defined(_M_ARM) && !UWVM2_STRICT_FLOAT_EXTENDED
                 if constexpr(Op == simd_code::f32x4_add || Op == simd_code::f32x4_sub || Op == simd_code::f32x4_mul || Op == simd_code::f32x4_div ||
                              Op == simd_code::f32x4_pmin || Op == simd_code::f32x4_pmax)
                 {
@@ -3198,11 +3305,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
         }
     }  // namespace wasm1p1_simd_details
 
+#pragma pop_macro("UWVM2_SIMD_IEEE_FP32")
+
     using simd_code = wasm1p1_simd_details::simd_code;
 
     // One canonical opcode taxonomy is shared by LLVM validation, the fallback scanner, and typed SIMD lowering.
     // The 236 entries below are mechanically aligned with uwvm-int's complete SIMD dispatch; Op remains a template
-    // argument so the LLVM path can bind a distinct typed C++ bridge for every instruction without a runtime opcode switch.
+    // argument for exact memory widths and typed operands; LLVM arithmetic lowers directly to vector IR. Provider/moving
+    // allocation memory fallbacks alone need an opcode-specific C++ bridge, with no runtime opcode switch.
     enum class wasm1p1_simd_instruction_kind : ::std::uint_least8_t
     {
         constant,

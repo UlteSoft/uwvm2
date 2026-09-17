@@ -73,6 +73,7 @@ import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.custom;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm.feature;
+import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.uwvm.utils.install_path;
 
 #ifndef UWVM_MODULE

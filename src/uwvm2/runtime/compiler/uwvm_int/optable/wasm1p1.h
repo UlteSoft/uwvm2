@@ -873,7 +873,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                              static_cast<::std::uint_least64_t>(offset),
                                                                                              eff65,
                                                                                              sizeof(value));
-        ::std::memcpy(::uwvm2::runtime::compiler::uwvm_int::optable::details::ptr_add_u64(memory.memory_begin, eff65.offset),
+        ::std::memcpy(::uwvm2::runtime::compiler::uwvm_int::optable::details::prepare_memory_store_pointer<16uz>(memory, eff65.offset),
                       ::std::addressof(value),
                       sizeof(value));
         ::uwvm2::runtime::compiler::uwvm_int::optable::details::exit_memory_operation_memory_lock(memory);
@@ -903,7 +903,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                              static_cast<::std::uint_least64_t>(offset),
                                                                                              eff65,
                                                                                              sizeof(value));
-        ::std::memcpy(::uwvm2::runtime::compiler::uwvm_int::optable::details::ptr_add_u64(memory.memory_begin, eff65.offset),
+        ::std::memcpy(::uwvm2::runtime::compiler::uwvm_int::optable::details::prepare_memory_store_pointer<16uz>(memory, eff65.offset),
                       ::std::addressof(value),
                       sizeof(value));
     }
@@ -1297,7 +1297,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                              static_cast<::std::uint_least64_t>(offset),
                                                                                              eff65,
                                                                                              wasm1p1_simd_details::simd_memory_access_size<Op>());
-        wasm1p1_simd_details::eval_memory_store<Op>(::uwvm2::runtime::compiler::uwvm_int::optable::details::ptr_add_u64(memory.memory_begin, eff65.offset),
+        wasm1p1_simd_details::eval_memory_store<Op>(::uwvm2::runtime::compiler::uwvm_int::optable::details::prepare_memory_store_pointer<wasm1p1_simd_details::simd_memory_access_size<Op>()>(memory, eff65.offset),
                                                     value,
                                                     lane);
         ::uwvm2::runtime::compiler::uwvm_int::optable::details::exit_memory_operation_memory_lock(memory);
@@ -1329,7 +1329,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                              static_cast<::std::uint_least64_t>(offset),
                                                                                              eff65,
                                                                                              wasm1p1_simd_details::simd_memory_access_size<Op>());
-        wasm1p1_simd_details::eval_memory_store<Op>(::uwvm2::runtime::compiler::uwvm_int::optable::details::ptr_add_u64(memory.memory_begin, eff65.offset),
+        wasm1p1_simd_details::eval_memory_store<Op>(::uwvm2::runtime::compiler::uwvm_int::optable::details::prepare_memory_store_pointer<wasm1p1_simd_details::simd_memory_access_size<Op>()>(memory, eff65.offset),
                                                     value,
                                                     lane);
     }

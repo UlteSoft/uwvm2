@@ -44,6 +44,7 @@ module;
 # include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <uwvm2/runtime/compiler/shared/strict_float.h>
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/Attributes.h>
@@ -62,6 +63,13 @@ module;
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/DynamicLibrary.h>
+#  include <llvm/TargetParser/Host.h>
+#  include <llvm/TargetParser/Triple.h>
+#  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/Pass.h>
+#  include <llvm/PassRegistry.h>
+#  include <llvm/InitializePasses.h>
+#  include <llvm/Transforms/Scalar/Scalarizer.h>
 # endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm:translate;

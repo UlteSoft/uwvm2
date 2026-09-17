@@ -69,8 +69,9 @@ case wasm1_code::br:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{target_types.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
@@ -170,7 +171,7 @@ case wasm1_code::br_if:
     }
 
     // cond (must be i32 if present)
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && !cond.is_unknown)
     {
         if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
@@ -190,8 +191,9 @@ case wasm1_code::br_if:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{target_types.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
@@ -202,7 +204,7 @@ case wasm1_code::br_if:
             }
         }
 
-        if(is_polymorphic && concrete_to_check != target_arity)
+        if(is_polymorphic)
         {
             // The fallthrough path retains the complete label tuple even if part of it was abstract in polymorphic code.
             operand_stack_pop_n(concrete_to_check);
@@ -342,7 +344,14 @@ case wasm1_code::br_table:
             auto const comparable_count{expected_arity < actual_arity ? expected_arity : actual_arity};
             for(::std::size_t i{}; i != comparable_count; ++i)
             {
-                if(expected_label_types.begin[i] != actual_types.begin[i])
+                // Core 1 requires identical label types; Core 2 also allows a common bottom
+                // argument. An explicit MVP policy must retain the Core 1 rule in every backend.
+                // The selector is still on top; only missing/unknown arguments may meet.
+                auto const depth_from_top{expected_arity - i};
+                auto const argument_is_bottom{!::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_validation_rules(wasm1p1_para) && is_polymorphic &&
+                    (concrete_operand_count() <= depth_from_top ||
+                     operand_stack[operand_stack.size() - 1uz - depth_from_top].is_unknown)};
+                if(expected_label_types.begin[i] != actual_types.begin[i] && !argument_is_bottom)
                 {
                     mismatch = true;
                     expected_type = expected_label_types.begin[i];
@@ -447,7 +456,7 @@ case wasm1_code::br_table:
         report_operand_stack_underflow(op_begin, u8"br_table", required_stack_size);
     }
 
-    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack && !idx.is_unknown)
     {
         if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
@@ -466,8 +475,9 @@ case wasm1_code::br_table:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{expected_label_types.begin[expected_arity - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
@@ -535,8 +545,9 @@ case wasm1_code::return_:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"return";

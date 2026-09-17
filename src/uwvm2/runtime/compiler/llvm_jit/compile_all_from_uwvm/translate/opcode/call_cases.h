@@ -92,8 +92,9 @@ case wasm1_code::call:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
@@ -248,7 +249,7 @@ case wasm1_code::call_indirect:
     }
 
     // table-element index operand (must be i32 if present)
-    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack && !idx.is_unknown)
     {
         if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
@@ -267,8 +268,9 @@ case wasm1_code::call_indirect:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";

@@ -39,6 +39,7 @@ module;
 export module uwvm2.runtime.compiler.uwvm_int.compile_cu_from_lazy_validator:translate;
 
 import fast_io;
+import uwvm2.object.global;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.utils.thread;

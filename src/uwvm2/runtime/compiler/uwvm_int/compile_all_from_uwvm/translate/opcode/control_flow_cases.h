@@ -27,6 +27,7 @@ case wasm1_code::unreachable:
     }
 
     is_polymorphic = true;
+    codegen_reachable = false;
 
     break;
 }
@@ -491,9 +492,11 @@ case wasm1_code::else_:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(expected_count != 0uz && actual_count >= expected_count)
+    // Unreachable permits missing deeper operands, never a mismatched concrete suffix.
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
@@ -518,8 +521,8 @@ case wasm1_code::else_:
         {
             // If the then-path is reachable, record its stack-top state at the end label.
             // This is required when the else-path becomes unreachable before `end` (only then reaches `end`).
-            if_frame.stacktop_has_then_end_state = !is_polymorphic;
-            if(!is_polymorphic)
+            if_frame.stacktop_has_then_end_state = codegen_reachable && !is_polymorphic;
+            if(if_frame.stacktop_has_then_end_state)
             {
                 if_frame.stacktop_currpos_at_then_end = curr_stacktop;
                 if_frame.stacktop_memory_count_at_then_end = stacktop_memory_count;
@@ -550,6 +553,7 @@ case wasm1_code::else_:
     for(auto curr{if_frame.start.begin}; curr != if_frame.start.end; ++curr) { operand_stack_push(*curr); }
     // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
     is_polymorphic = false;
+    codegen_reachable = if_frame.codegen_entry_reachable;
     if constexpr(stacktop_enabled)
     {
         if(!if_frame.polymorphic_base)
@@ -688,9 +692,11 @@ case wasm1_code::end:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(expected_count != 0uz && actual_count >= expected_count)
+    // Unreachable permits missing deeper operands, never a mismatched concrete suffix.
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
@@ -744,19 +750,12 @@ case wasm1_code::end:
     operand_stack_truncate_to(base);
     for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
 
-    bool const polymorphic_end_before_merge{is_polymorphic};
-    bool new_polymorphic_after_end{};
-    if(frame.type == block_type::else_) { new_polymorphic_after_end = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic); }
-    else if(frame.type == block_type::loop)
-    {
-        // Loop end is only reachable via fallthrough; branches target the loop header, not `end`.
-        // If the fallthrough path is unreachable (polymorphic), code after `end` must remain unreachable.
-        new_polymorphic_after_end = frame.polymorphic_base || is_polymorphic;
-    }
-    else
-    {
-        new_polymorphic_after_end = frame.polymorphic_base;
-    }
+    bool const codegen_fallthrough_before_merge{codegen_reachable};
+    // Validation restores the enclosing frame's bottom flag, not the execution
+    // reachability of this loop/if. Core 2 appendix 7.3 pop_ctrl/end does not
+    // propagate a child's unreachable flag. Keep the codegen merge below separate:
+    // br 0 in both if arms reaches this end, but never supplies a missing operand.
+    bool const new_polymorphic_after_end{frame.polymorphic_base};
     is_polymorphic = new_polymorphic_after_end;
 
     if constexpr(stacktop_enabled)
@@ -778,7 +777,7 @@ case wasm1_code::end:
         {
             // If the current fallthrough path is unreachable at `end`, but the construct is reachable due to
             // an earlier branch to this `end` label, restore the stack-top model to the reachable path state.
-            if(!new_polymorphic_after_end && polymorphic_end_before_merge)
+            if(!new_polymorphic_after_end && !codegen_fallthrough_before_merge)
             {
                 if(frame.type == block_type::if_ && !frame.polymorphic_base)
                 {
@@ -822,6 +821,9 @@ case wasm1_code::end:
         }
     }
 
+    codegen_reachable = codegen_fallthrough_before_merge || frame.stacktop_has_end_state ||
+                        frame.stacktop_has_then_end_state ||
+                        (frame.type == block_type::if_ && frame.codegen_entry_reachable);
     control_flow_stack.pop_back_unchecked();
 
     if(is_function_frame)

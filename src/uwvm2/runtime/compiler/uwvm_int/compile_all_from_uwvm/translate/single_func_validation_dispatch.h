@@ -362,6 +362,7 @@ auto const enter_control_frame{
                                       .type = type,
                                       .polymorphic_base = is_polymorphic,
                                       .then_polymorphic_end = false,
+                                      .codegen_entry_reachable = codegen_reachable,
                                       .start_label_id = start_label_id,
                                       .end_label_id = end_label_id,
                                       .else_label_id = else_label_id,

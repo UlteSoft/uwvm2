@@ -51,12 +51,18 @@ function def_build(opt)
 	set_encodings("utf-8")
 	set_warnings("all", "extra", "pedantic", "error")
 
+	add_rules("native_stack_probes")
+
 	local build_source_id = get_config("build-source-id")
 	if build_source_id and build_source_id ~= "none" then
 		if #build_source_id ~= 71 or not build_source_id:match("^sha256:[0-9a-f]+$") then
 			error("invalid --build-source-id: expected sha256:<64 lowercase hexadecimal digits>")
 		end
-		-- This define is consumed inside the cache policy header, including when that header is built as a module unit.
+		-- This is the builder's assertion of a verified source-manifest identity;
+		-- the syntax check above does not compute or authenticate that manifest.
+		-- Refresh it when the covered sources change. Reusing an old value for
+		-- an incremental diagnostic build does not make its caches distributable.
+		-- Consumed by the cache policy header, also when built as a module unit.
 		add_defines("UWVM2_BUILD_SOURCE_ID=u8\"" .. build_source_id .. "\"")
 	end
 
@@ -64,6 +70,9 @@ function def_build(opt)
 	if enable_cxx_module then
 		add_defines("UWVM_MODULE")
 		set_policy("build.c++.modules", true)
+		-- Check the bootstrap compiler's real initializer code generation, not
+		-- its version string or the unrelated bundled LLVM dependency version.
+		add_rules("module_initializer_check")
 		-- The project uses named modules but does not import `std`. Do not make xmake synthesize a standard-library module:
 		-- its compiler-shipped std.cc must exactly match the selected C++ standard library and is not a project dependency.
 		set_policy("build.c++.modules.std", false)
@@ -443,12 +452,9 @@ target("uwvm")
 	-- third-parties/fast_io
 	add_includedirs("third-parties/fast_io/include")
 
-	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-		if uwvm_uses_llvm_jit then
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-		end
-	end
+	-- Module interfaces and their initializer objects belong to uwvm_runtime.
+	-- Consume its public BMIs through add_deps below; compiling the same .cppm
+	-- here links two strong module initializers, even when all C++ APIs inline.
 
 	-- third-parties/bizwen
 	add_includedirs("third-parties/bizwen/include")
@@ -469,29 +475,6 @@ target("uwvm")
 	add_headerfiles("src/**.h")
 
 	if enable_cxx_module then
-		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-		-- utils
-		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-		-- object
-		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-		-- imported
-		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-		-- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-		-- validation
-		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-		-- uwvm
-		uwvm_add_frontend_module_files(is_debug_mode)
-	end
-
-	if enable_cxx_module then
 		-- uwvm main
 		add_files("src/uwvm2/uwvm/main.module.cpp")
 		add_files("src/uwvm2/uwvm/host_api.module.cpp")
@@ -510,6 +493,11 @@ target_end()
 target("uwvm_runtime")
 	set_kind("object")
 	def_build({ skip_static_libcxx = true })
+	-- Own every production interface once, including backend-neutral frontend
+	-- partitions. Public here means available to dependent xmake targets in
+	-- Release too, not a C++ export of otherwise private declarations. A consumer
+	-- may need its own compatible BMI, but must not add a second initializer
+	-- object. Do not fix duplicate symbols with allow-multiple-definition.
 
 	-- Interpreter/runtime execution unit: disable observable floating-point side effects
 	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
@@ -519,10 +507,10 @@ target("uwvm_runtime")
 	add_includedirs("third-parties/fast_io/include")
 
 	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = true })
 		if uwvm_uses_llvm_jit then
 			-- Only the LLVM object-cache partitions import fast_io_crypto.
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = true })
 		end
 	end
 
@@ -543,25 +531,25 @@ target("uwvm_runtime")
 
 	if enable_cxx_module then
 		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = true })
 
 		-- utils
-		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/utils/**.cppm", { public = true })
 
 		-- object
-		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/object/**.cppm", { public = true })
 
 		-- imported
-		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/imported/**.cppm", { public = true })
 
 		-- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/parser/**.cppm", { public = true })
 
 		-- validation
-		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/validation/**.cppm", { public = true })
 
 		-- uwvm
-		uwvm_add_frontend_module_files(is_debug_mode)
+		uwvm_add_frontend_module_files(true)
 
 		-- The runtime interface is backend-neutral and remains visible in every module build. Compiler/cache partitions are added only
 		-- for enabled backends so int-only builds never parse LLVM modules and LLVM-only builds never compile interpreter optables.
@@ -651,11 +639,16 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_default(false)
 
 		local enable_cxx_module = get_config("use-cxx-module")
+		-- Runtime-backed tests consume the same public interfaces as the CLI.
+		-- Re-registering them here would link duplicate module initializers;
+		-- standalone tests without that dependency still own their interfaces.
+		local test_uses_runtime = (uwvm_uses_llvm_jit and (is_llvm_jit_test or is_0013_uwvm_int)) or
+			(string.find(file, "uwvm_int_fp_bit_environment.cc", 1, true) ~= nil) or is_uwvm_int_fp_environment
 
 		-- third-parties/fast_io
 		add_includedirs("third-parties/fast_io/include")
 
-		if enable_cxx_module then
+		if enable_cxx_module and not test_uses_runtime then
 			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
 			if uwvm_uses_llvm_jit and is_llvm_jit_test then
 				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
@@ -679,7 +672,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- src
 		add_includedirs("src/")
 
-		if enable_cxx_module then
+		if enable_cxx_module and not test_uses_runtime then
 			-- uwvm predefine
 			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
 
@@ -1119,15 +1112,10 @@ if get_config("enable-test-llvm-jit") and uwvm_uses_uwvm_int and uwvm_uses_llvm_
 
 			set_default(false)
 
-			local enable_cxx_module = get_config("use-cxx-module")
-
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")
 
-			if enable_cxx_module then
-				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-			end
+			-- Public module interfaces come from the uwvm_runtime dependency.
 			-- third-parties/bizwen
 			add_includedirs("third-parties/bizwen/include")
 
@@ -1145,28 +1133,6 @@ if get_config("enable-test-llvm-jit") and uwvm_uses_uwvm_int and uwvm_uses_llvm_
 			-- src
 			add_includedirs("src/")
 
-			if enable_cxx_module then
-				-- uwvm predefine
-				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-				-- utils
-				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-				-- object
-				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-				-- imported
-				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-				-- wasm parser
-				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-				-- validation
-				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-				-- uwvm
-				uwvm_add_frontend_module_files(is_debug_mode)
-			end
 
 			set_warnings("all", "extra", "error")
 
@@ -1209,15 +1175,10 @@ if get_config("enable-test-llvm-jit") and uwvm_uses_uwvm_int and uwvm_uses_llvm_
 
 			set_default(false)
 
-			local enable_cxx_module = get_config("use-cxx-module")
-
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")
 
-			if enable_cxx_module then
-				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-			end
+			-- Public module interfaces come from the uwvm_runtime dependency.
 			-- third-parties/bizwen
 			add_includedirs("third-parties/bizwen/include")
 
@@ -1235,28 +1196,6 @@ if get_config("enable-test-llvm-jit") and uwvm_uses_uwvm_int and uwvm_uses_llvm_
 			-- src
 			add_includedirs("src/")
 
-			if enable_cxx_module then
-				-- uwvm predefine
-				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-				-- utils
-				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-				-- object
-				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-				-- imported
-				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-				-- wasm parser
-				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-				-- validation
-				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-				-- uwvm
-				uwvm_add_frontend_module_files(is_debug_mode)
-			end
 
 			set_warnings("all", "extra", "error")
 

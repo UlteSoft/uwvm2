@@ -1,6 +1,5 @@
-    // Parametric and variable opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
-    // The value tags used here are MVP scalar numeric tags.  Typed select, reference types, or wider proposal value spaces must
-    // extend the stack value model and the matching LLVM lowering before these cases are reused for those opcodes.
+// Parametric and variable validation over the shared runtime value tags.
+// Primary select admits numeric/vector types; typed reference select is in wasm1p1_cases.h.
 
 case wasm1_code::drop:
 {
@@ -57,9 +56,7 @@ case wasm1_code::select:
     //        ^^ code_curr
 
     // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
-    // WebAssembly 1.0/MVP `select` is untyped and only reaches the scalar numeric value tags represented by value_type.
-    // The typed-select proposal adds an immediate result type and reference-type values; when enabling it, add immediate
-    // decoding, extend operand tags, and update `try_emit_runtime_local_func_llvm_jit_select` together.
+    // Untyped select admits the enabled numeric/vector types. Concrete references require typed select.
     // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
 
     if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
@@ -67,7 +64,7 @@ case wasm1_code::select:
     // cond (must be i32 if it exists on the concrete stack)
     bool cond_from_stack{};
     curr_operand_stack_value_type cond_type{};
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && !cond.is_unknown)
     {
         cond_from_stack = true;
         cond_type = cond.type;
@@ -84,7 +81,7 @@ case wasm1_code::select:
     // v2
     bool v2_from_stack{};
     curr_operand_stack_value_type v2_type{};
-    if(auto const v2{try_pop_concrete_operand()}; v2.from_stack)
+    if(auto const v2{try_pop_concrete_operand()}; v2.from_stack && !v2.is_unknown)
     {
         v2_from_stack = true;
         v2_type = v2.type;
@@ -93,7 +90,7 @@ case wasm1_code::select:
     // v1
     bool v1_from_stack{};
     curr_operand_stack_value_type v1_type{};
-    if(auto const v1{try_pop_concrete_operand()}; v1.from_stack)
+    if(auto const v1{try_pop_concrete_operand()}; v1.from_stack && !v1.is_unknown)
     {
         v1_from_stack = true;
         v1_type = v1.type;
@@ -108,9 +105,28 @@ case wasm1_code::select:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    // Untyped select accepts numeric/vector values, never concrete references.
+    // A missing/Unknown input does not exempt the other, known input from this rule.
+    auto const is_select_value_type{[](curr_operand_stack_value_type type) constexpr noexcept
+        { return type == curr_operand_stack_value_type::i32 || type == curr_operand_stack_value_type::i64 ||
+                 type == curr_operand_stack_value_type::f32 || type == curr_operand_stack_value_type::f64 ||
+                 type == curr_operand_stack_value_type::v128; }};
+    auto const selected_type{v1_from_stack ? v1_type : v2_type};
+    if((v1_from_stack || v2_from_stack) && !is_select_value_type(selected_type)) [[unlikely]]
+    {
+        err.err_curr = op_begin;
+        err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_diagnostic_value_type(selected_type);
+        err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_diagnostic_value_type(selected_type);
+        err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
     // `select` consumes three inputs and materializes one fresh result register.
     if(v1_from_stack) { operand_stack_push(v1_type); }
     else if(v2_from_stack) { operand_stack_push(v2_type); }
+    // select produces a slot even when both inputs are Unknown. The slot is validation-only
+    // in unreachable code: do not drop it or invent a concrete type for later consumers.
+    else { operand_stack_push(curr_operand_stack_value_type{}, true); }
 
     if(emit_llvm_jit_active)
     {
@@ -249,7 +265,7 @@ case wasm1_code::local_set:
         // Polymorphic stack: underflow is allowed, so local.set becomes a no-op on the concrete stack.
         report_operand_stack_underflow(op_begin, u8"local.set", 1uz);
     }
-    else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
+    else if(auto const value{try_pop_concrete_operand()}; value.from_stack && !value.is_unknown)
     {
         if(value.type != curr_local_type) [[unlikely]]
         {
@@ -339,7 +355,7 @@ case wasm1_code::local_tee:
             operand_stack_push(curr_local_type);
         }
     }
-    else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
+    else if(auto const value{try_peek_concrete_operand()}; value.from_stack && !value.is_unknown)
     {
         if(value.type != curr_local_type) [[unlikely]]
         {
@@ -351,6 +367,10 @@ case wasm1_code::local_tee:
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
     }
+
+    // local.tee refines an explicit Unknown to the declared local type (pop t; push t).
+    operand_stack.back().type = curr_local_type;
+    operand_stack.back().is_unknown = false;
 
     if(emit_llvm_jit_active)
     {
@@ -531,7 +551,7 @@ case wasm1_code::global_set:
         // Polymorphic stack: underflow is allowed, so global.set becomes a no-op on the concrete stack.
         report_operand_stack_underflow(op_begin, u8"global.set", 1uz);
     }
-    else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
+    else if(auto const value{try_pop_concrete_operand()}; value.from_stack && !value.is_unknown)
     {
         if(value.type != curr_global_type) [[unlikely]]
         {

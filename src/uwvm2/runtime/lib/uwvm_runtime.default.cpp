@@ -54,12 +54,14 @@
 # include <algorithm>
 # include <atomic>
 # include <bit>
+# include <coroutine>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
 # include <functional>
 # include <limits>
 # include <memory>
+# include <string>
 # include <string>
 # include <type_traits>
 # include <utility>
@@ -71,7 +73,9 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 # include "uwvm_runtime_generation.h"
+# include "uwvm_runtime_checked_size.h"
 # include "uwvm_runtime_execution_entry.h"
+# include "uwvm_runtime_native_stack_guard.h"
 # include "uwvm_runtime_generated_wasm_bridge.h"
 # include "uwvm_runtime_imported_function_lookup.h"
 # include "uwvm_runtime_logical_activation_overlap.h"
@@ -120,6 +124,8 @@
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/PassManager.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/MC/TargetRegistry.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Object/ObjectFile.h>
 #  include <llvm/PassRegistry.h>
@@ -146,6 +152,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/object/memory/impl.h>
+# include <uwvm2/object/global/impl.h>
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 #  include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/impl.h>
 #  include <uwvm2/runtime/compiler/uwvm_int/compile_cu_from_lazy_validator/impl.h>
@@ -153,6 +160,7 @@
 #  include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <fast_io_crypto.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_cu_from_lazy_validator/impl.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
@@ -163,6 +171,7 @@
 # include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
@@ -2093,6 +2102,13 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept;
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_jit_host_cpu_name_storage() noexcept;
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>
+            get_llvm_jit_host_target_attribute_storage() noexcept;
+        [[nodiscard]] inline ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> select_runtime_llvm_jit_target(
+            ::llvm::EngineBuilder&,
+            ::uwvm2::utils::container::u8string const&,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const&);
 
 # include "uwvm_runtime_posix_unwind_probe.h"
 # include "uwvm_runtime_win64_unwind_probe.h"
@@ -6035,12 +6051,16 @@ namespace uwvm2::runtime::lib
 
         class runtime_execution_entry_scope
         {
+            ::uwvm2::runtime::lib::native_stack::scope native_stack_scope{};
             bool entered{};
 
         public:
-            inline explicit constexpr runtime_execution_entry_scope(
+            inline explicit runtime_execution_entry_scope(
                 runtime_execution_entry_reentry reentry = runtime_execution_entry_reentry::reject) noexcept
             {
+#if (defined(__linux__) || defined(__APPLE__)) && !defined(_WIN32)
+                if(!native_stack_scope.ready()) [[unlikely]] { ::uwvm2::runtime::lib::native_stack::setup_failed(); }
+#endif
                 auto& depth{get_runtime_execution_entry_depth()};
                 // Full/lazy interpreter host entries are not recursively executable. The public LLVM raw API is the
                 // one callback re-entry surface whose nested lifetime is explicitly supported.
@@ -6052,7 +6072,7 @@ namespace uwvm2::runtime::lib
             runtime_execution_entry_scope(runtime_execution_entry_scope const&) = delete;
             runtime_execution_entry_scope& operator= (runtime_execution_entry_scope const&) = delete;
 
-            inline constexpr ~runtime_execution_entry_scope() noexcept
+            inline ~runtime_execution_entry_scope() noexcept
             {
                 if(!entered) { return; }
 
@@ -7515,11 +7535,10 @@ namespace uwvm2::runtime::lib
             ::std::size_t frame_alloc_n{local_alloc_n};
             if(stack_cap_raw != 0uz) [[likely]]
             {
-                if(frame_alloc_n > (::std::numeric_limits<::std::size_t>::max() - (kFrameAlignPad + stack_cap_raw))) [[unlikely]]
+                if(!::uwvm2::runtime::lib::details::try_add_runtime_byte_extents(frame_alloc_n, kFrameAlignPad, stack_cap_raw, frame_alloc_n)) [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
-                frame_alloc_n += kFrameAlignPad + stack_cap_raw;
             }
 
             constexpr ::std::size_t kAllocaMaxBytesPerFrame{4096uz};
@@ -9957,6 +9976,19 @@ namespace uwvm2::runtime::lib
             mattrs.emplace_back(u8"-d");
             mattrs.emplace_back(u8"-v");
 # endif
+            if(::llvm::Triple{::llvm::sys::getProcessTriple()}.getArch() == ::llvm::Triple::ve)
+            {
+                // LLVM 23 VE's VPU legalizer widens Wasm's short vectors to
+                // 256 lanes, has missing widening patterns, and may spill a
+                // kilobyte for a 16-byte operation. Use its scalar backend for
+                // these generated entries, preserving guarded volatile memory
+                // operations rather than splitting them prematurely in IR.
+                // This MUST configure TargetMachine: VE ignores per-function
+                // target-features, so adding -vpu only to IR is ineffective.
+                // Apply to full/lazy preoptimization and final MCJIT alike;
+                // the resulting target feature string is also part of the cache.
+                mattrs.emplace_back(u8"-vpu");
+            }
 # if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
             // Linux generic builds protect VSCR using HWCAP-gated helpers; other OSes need an AltiVec build.
             mattrs.emplace_back(u8"-altivec");
@@ -9999,7 +10031,10 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline ::llvm::Triple get_runtime_llvm_jit_mcjit_target_triple()
         {
-            ::llvm::Triple triple{::llvm::sys::getDefaultTargetTriple()};
+            // Keep N32/x32's 64-bit ISA with its 32-bit pointer ABI. LLVM's
+            // implicit getProcessTriple() narrows the architecture and can
+            // abort N32 codegen. Live unwind probes must use this same target.
+            ::llvm::Triple triple{::llvm::Triple::normalize(::llvm::sys::getDefaultTargetTriple())};
 #  if defined(__aarch64__) && defined(__linux__) && !defined(__ANDROID__)
             if(triple.getArch() == ::llvm::Triple::aarch64 && triple.isOSLinux())
             {
@@ -10023,8 +10058,39 @@ namespace uwvm2::runtime::lib
             ::llvm::SmallVector<::std::string, 16> host_target_attribute_strings{};
             append_llvm_jit_host_target_attribute_strings(host_target_attribute_storage, host_target_attribute_strings);
             auto target_triple{get_runtime_llvm_jit_mcjit_target_triple()};
-            return ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{
-                target_builder.selectTarget(target_triple, {}, llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name), host_target_attribute_strings)};
+            // RuntimeDyld has MIPS far-call stubs, but they jump through $at
+            // without establishing the PIC host callee's required $t9/GP.
+            // Generate full-width C-ABI register calls instead. O32/N32 ignore
+            // long-calls with ABICalls enabled, so explicitly use noabicalls
+            // for MCJIT's static relocation model (N64 already does so).
+            // Append both after host features: these are required JIT ABI
+            // policies, not optional CPU capabilities. Also avoid assuming
+            // separately allocated code shares a JAL 256-MiB address region.
+            if(target_triple.isMIPS())
+            {
+                host_target_attribute_strings.emplace_back("+noabicalls");
+                host_target_attribute_strings.emplace_back("+long-calls");
+            }
+            // AOT object output is not proof of native MCJIT support (e.g. VE,
+            // SPARC, bytecode backends). Reject unsupported loaders before a
+            // fatal LLVM path, including the live unwind probe. Do not apply
+            // this native-only capability gate to cross-codegen inventories.
+            // EngineBuilder::create warns on !hasJIT(), but still continues.
+            ::std::string error{};
+            // The empty-architecture overload preserves the explicit triple
+            // and is also available before LLVM 23's two-argument API change.
+            auto const target{::llvm::TargetRegistry::lookupTarget({}, target_triple, error)};
+            // BPF's advertised JIT does not implement our in-process C ABI.
+            if(target_triple.isBPF() || target == nullptr || !target->hasJIT() || !target->hasMCAsmBackend() ||
+               !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_object_format_supported(target_triple)) { return {}; }
+            auto machine{::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{
+                target_builder.selectTarget(target_triple, {}, llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name), host_target_attribute_strings)}};
+            if(machine != nullptr && !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_subtarget_supported(*machine)) { return {}; }
+            // Apply before MCContext/object emission, identically for full
+            // materialization and the live native-unwind capability probe.
+            if(machine != nullptr && ::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_needs_unique_temp_labels(target_triple))
+            { machine->Options.MCOptions.MCSaveTempLabels = true; }
+            return machine;
         }
 
         inline constexpr void apply_runtime_llvm_jit_native_target_function_attrs(::llvm::Module& module,
@@ -10707,7 +10773,11 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            if(pipeline == runtime_llvm_jit_full_pipeline_kind::none) { return true; }
+            if(pipeline == runtime_llvm_jit_full_pipeline_kind::none)
+            {
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::legalize_llvm_jit_native_vectors(module);
+                return !verify_llvm_jit_ir || !::llvm::verifyModule(module);
+            }
 
             if(pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)
             {
@@ -10723,11 +10793,17 @@ namespace uwvm2::runtime::lib
                 ::llvm::ModuleAnalysisManager module_analysis_manager{};
                 auto const pipeline_opt_level{get_runtime_llvm_jit_pipeline_opt_level(codegen_opt_level)};
                 ::llvm::PipelineTuningOptions pipeline_tuning_options{};
-                auto const pipeline_speed_level{pipeline_opt_level.getSpeedupLevel()};
-                pipeline_tuning_options.LoopUnrolling = pipeline_speed_level > 1u;
+                // LLVM 23.1 changed OptimizationLevel from a class (with
+                // getSpeedupLevel()) to an enum. We select only O0/O1/O2/O3,
+                // so comparing the public levels preserves the previous >1
+                // policy on both APIs without guessing an enum's encoding or
+                // accidentally treating a size-optimization level as O2.
+                auto const optimize_for_speed{pipeline_opt_level == ::llvm::OptimizationLevel::O2 ||
+                                              pipeline_opt_level == ::llvm::OptimizationLevel::O3};
+                pipeline_tuning_options.LoopUnrolling = optimize_for_speed;
                 pipeline_tuning_options.LoopInterleaving = pipeline_tuning_options.LoopUnrolling;
-                pipeline_tuning_options.LoopVectorization = pipeline_speed_level > 1u;
-                pipeline_tuning_options.SLPVectorization = pipeline_speed_level > 1u;
+                pipeline_tuning_options.LoopVectorization = optimize_for_speed;
+                pipeline_tuning_options.SLPVectorization = optimize_for_speed;
                 ::llvm::PassBuilder pass_builder{::std::addressof(target_machine), pipeline_tuning_options};
                 details::register_runtime_llvm_jit_expanded_lane_unroll_policy(pass_builder);
 
@@ -10741,6 +10817,7 @@ namespace uwvm2::runtime::lib
                 module_pass_manager.run(module, module_analysis_manager);
             }
 
+            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::legalize_llvm_jit_native_vectors(module);
             if(verify_llvm_jit_ir)
             {
                 if(::llvm::verifyModule(module)) [[unlikely]]
@@ -14272,8 +14349,8 @@ namespace uwvm2::runtime::lib
         [[maybe_unused]] ::std::size_t result_bytes{};
         if(cfg.entry_function_index < import_n)
         {
-            // An imported entry is allowed only when it ultimately resolves to wasm-defined code; native imports do not have a wasm
-            // frame to serve as the program entry point.
+            // Conventional entries resolve to Wasm. A validated start section
+            // can also name a void host import, just as in full mode.
             if(main_id >= g_import_call_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& cache{g_import_call_cache.index_unchecked(main_id)};
             if(cfg.entry_function_index >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -14281,6 +14358,25 @@ namespace uwvm2::runtime::lib
 
             if(tgt.k != cached_import_target::kind::defined) [[unlikely]]
             {
+                if(cfg.module_start && tgt.param_bytes == 0uz && tgt.result_bytes == 0uz &&
+                   tgt.sig.params.size == 0uz && tgt.sig.results.size == 0uz &&
+                   cfg.entry_abi_buffers.param_bytes == 0uz && cfg.entry_abi_buffers.result_bytes == 0uz)
+                {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    if(runtime_compiler_requests_llvm_jit_translation())
+                    {
+                        llvm_jit_raw_call_cached_import_entry(reinterpret_cast<::std::uintptr_t>(::std::addressof(tgt)),
+                                                               0u, 0uz, 0u, 0uz);
+                        return;
+                    }
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                    ::std::byte empty_stack{};
+                    (void)call_bridge(main_id, cfg.entry_function_index, ::std::addressof(empty_stack));
+                    return;
+#endif
+                }
+
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
@@ -14576,6 +14672,25 @@ namespace uwvm2::runtime::lib
             // For VM entry, only allow imported functions that ultimately resolve to a wasm-defined function.
             if(tgt.k != cached_import_target::kind::defined) [[unlikely]]
             {
+                if(cfg.module_start && tgt.param_bytes == 0uz && tgt.result_bytes == 0uz &&
+                   tgt.sig.params.size == 0uz && tgt.sig.results.size == 0uz &&
+                   cfg.entry_abi_buffers.param_bytes == 0uz && cfg.entry_abi_buffers.result_bytes == 0uz)
+                {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    if(runtime_compiler_requests_llvm_jit_translation())
+                    {
+                        llvm_jit_raw_call_cached_import_entry(reinterpret_cast<::std::uintptr_t>(::std::addressof(tgt)),
+                                                               0u, 0uz, 0u, 0uz);
+                        return;
+                    }
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                    ::std::byte empty_stack{};
+                    (void)call_bridge(main_id, cfg.entry_function_index, ::std::addressof(empty_stack));
+                    return;
+#endif
+                }
+
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",

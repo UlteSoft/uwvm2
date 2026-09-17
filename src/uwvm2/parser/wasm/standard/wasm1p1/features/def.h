@@ -126,6 +126,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         return parameter.cli_mode == wasm_feature_cli_mode::direct_wasmmvp;
     }
 
+    /// Core 1 and Core 2 differ even for some primary opcodes: Core 1 br_table
+    /// requires identical label types, whereas Core 2 can unify them through
+    /// bottom operands. Disabling individual proposals does not select Core 1;
+    /// only the explicit MVP policy does. Keep this decision shared by validators.
+    [[nodiscard]] inline constexpr bool uses_mvp_validation_rules(
+        wasm_binfmt1p1_feature_parameter const& parameter) noexcept
+    {
+        return parameter.cli_mode == wasm_feature_cli_mode::direct_wasmmvp;
+    }
+
     /// @brief Get the const wasm1.1 feature parameter from a parser feature-parameter tuple.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr wasm_binfmt1p1_feature_parameter const& get_wasm1p1_parameter(

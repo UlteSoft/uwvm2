@@ -43,6 +43,7 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <uwvm2/runtime/compiler/shared/strict_float.h>
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/Attributes.h>
@@ -61,6 +62,13 @@
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/DynamicLibrary.h>
+#  include <llvm/TargetParser/Host.h>
+#  include <llvm/TargetParser/Triple.h>
+#  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/Pass.h>
+#  include <llvm/PassRegistry.h>
+#  include <llvm/InitializePasses.h>
+#  include <llvm/Transforms/Scalar/Scalarizer.h>
 # endif
 // import
 # include <fast_io.h>

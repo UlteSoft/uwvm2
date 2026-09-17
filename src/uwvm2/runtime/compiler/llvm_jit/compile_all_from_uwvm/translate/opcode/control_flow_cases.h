@@ -171,7 +171,7 @@ case wasm1_code::if_:
         report_operand_stack_underflow(op_begin, u8"if", required_stack_size);
     }
 
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && !cond.is_unknown && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_diagnostic_value_type(cond.type);
@@ -260,8 +260,9 @@ case wasm1_code::else_:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
@@ -274,8 +275,6 @@ case wasm1_code::else_:
         }
     }
 
-    // Record then-branch reachability to merge with else at `end`.
-    if_frame.then_polymorphic_end = is_polymorphic;
 
     // Start else with the original block parameters above the outer stack height.
     operand_stack_truncate_to(if_frame.operand_stack_base);
@@ -431,8 +430,9 @@ case wasm1_code::end:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.end_result_mismatch.block_kind = block_kind;
@@ -450,16 +450,11 @@ case wasm1_code::end:
     operand_stack_truncate_to(base);
     for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
 
-    // Restore / merge the polymorphic state.
-    if(frame.type == block_type::else_)
-    {
-        // For if-else, continuation is unreachable only when both branches are unreachable.
-        is_polymorphic = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic);
-    }
-    else
-    {
-        is_polymorphic = frame.polymorphic_base;
-    }
+    // Core 1/2 validation restores the enclosing control frame at `end`.
+    // Its unreachable flag is not a control-flow merge: even two terminating
+    // if arms (including br 0, which reaches this end) cannot make a later
+    // missing operand valid. See Core 2, appendix 7.3, pop_ctrl/end.
+    is_polymorphic = frame.polymorphic_base;
 
     // Pop the control frame.
     control_flow_stack.pop_back_unchecked();

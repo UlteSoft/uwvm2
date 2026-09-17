@@ -222,6 +222,8 @@ namespace details
     {
         // MVP scalar type.
         runtime_operand_stack_value_type type{};
+        // Validation-only bottom value; it has stack arity but no concrete type.
+        bool is_unknown{};
 
         // Monotonic id assigned when the value is produced.
         runtime_virtual_register_id virtual_register_id{invalid_runtime_virtual_register_id};
@@ -273,8 +275,6 @@ namespace details
         // True when the construct was entered from an unreachable/polymorphic region.
         bool polymorphic_base{};
 
-        // True when an if-then arm ended polymorphically before else.
-        bool then_polymorphic_end{};
     };
 
     // Runtime module storage should already be finalized by the parser/initializer.  Violations here mean host/runtime
@@ -970,8 +970,8 @@ namespace details
                                              }};
 
         auto const operand_stack_push{
-            [&](curr_operand_stack_value_type type) constexpr noexcept
-            { operand_stack.push_back(runtime_operand_stack_storage_t{.type = type, .virtual_register_id = allocate_virtual_register()}); }};
+            [&](curr_operand_stack_value_type type, bool is_unknown = false) constexpr noexcept
+            { operand_stack.push_back(runtime_operand_stack_storage_t{.type = type, .is_unknown = is_unknown, .virtual_register_id = allocate_virtual_register()}); }};
 
         auto const operand_stack_pop_unchecked{[&]() constexpr noexcept -> runtime_operand_stack_storage_t
                                                {
@@ -995,6 +995,7 @@ namespace details
         {
             bool from_stack{};
             curr_operand_stack_value_type type{};
+            bool is_unknown{};
         };
 
         using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
@@ -1027,13 +1028,13 @@ namespace details
                                             {
                                                 if(concrete_operand_count() == 0uz) { return {}; }
                                                 auto const operand{operand_stack_pop_unchecked()};
-                                                return {.from_stack = true, .type = operand.type};
+                                                return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                             }};
 
         auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                              {
                                                  if(concrete_operand_count() == 0uz) { return {}; }
-                                                 return {.from_stack = true, .type = operand_stack.back().type};
+                                                 return {.from_stack = true, .type = operand_stack.back().type, .is_unknown = operand_stack.back().is_unknown};
                                              }};
 
         // Function block (label/result tuple is the function result tuple).
@@ -1043,7 +1044,6 @@ namespace details
             .operand_stack_base = 0uz,
             .type = block_type::function,
             .polymorphic_base = false,
-            .then_polymorphic_end = false
         });
 
         auto const operand_stack_push_types{[&](runtime_block_result_type types) constexpr noexcept
@@ -1070,8 +1070,9 @@ namespace details
                 for(::std::size_t i{}; i != concrete_to_check; ++i)
                 {
                     auto const expected_type{expected.begin[expected_count - 1uz - i]};
-                    auto const actual_type{operand_stack[stack_size - 1uz - i].type};
-                    if(actual_type != expected_type) [[unlikely]]
+                    auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+                    auto const actual_type{actual_operand.type};
+                    if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.br_value_type_mismatch.op_code_name = op_name;
@@ -1097,8 +1098,7 @@ namespace details
                                               .result = signature.results,
                                               .operand_stack_base = outer_stack_height,
                                               .type = type,
-                                              .polymorphic_base = is_polymorphic,
-                                              .then_polymorphic_end = false});
+                                              .polymorphic_base = is_polymorphic});
                 operand_stack_push_types(signature.params);
                 is_polymorphic = false;
             }};
@@ -1478,7 +1478,7 @@ namespace details
                 // still pushed to keep later validation stack shapes consistent.
                 auto const operand{try_pop_concrete_operand()};
 
-                if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
+                if(operand.from_stack && !operand.is_unknown && operand.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1541,7 +1541,7 @@ namespace details
                 // Check each concrete operand separately so diagnostics can report the actual mismatched type even when
                 // only one side is wrong.
                 auto const rhs{try_pop_concrete_operand()};
-                if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
+                if(rhs.from_stack && !rhs.is_unknown && rhs.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1552,7 +1552,7 @@ namespace details
                 }
 
                 auto const lhs{try_pop_concrete_operand()};
-                if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
+                if(lhs.from_stack && !lhs.is_unknown && lhs.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1632,7 +1632,7 @@ namespace details
                                              report_operand_stack_underflow(op_begin, op_name, 1uz);
                                          }
 
-                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && addr.type != curr_operand_stack_value_type::i32)
+                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && !addr.is_unknown && addr.type != curr_operand_stack_value_type::i32)
                                              [[unlikely]]
                                          {
                                              // MVP linear memory addresses are i32.  Memory64 must relax this to the
@@ -1718,7 +1718,7 @@ namespace details
                                           auto const value{try_pop_concrete_operand()};
                                           auto const addr{try_pop_concrete_operand()};
 
-                                          if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                          if(addr.from_stack && !addr.is_unknown && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
                                           {
                                               // MVP and current LLVM lowering require i32 addresses.  Memory64 support
                                               // must use the selected memory address type.
@@ -1729,7 +1729,7 @@ namespace details
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
 
-                                          if(value.from_stack && value.type != expected_value_type) [[unlikely]]
+                                          if(value.from_stack && !value.is_unknown && value.type != expected_value_type) [[unlikely]]
                                           {
                                               // Store value type is checked after address type so diagnostics follow the
                                               // Wasm operand order: address below value on the stack.

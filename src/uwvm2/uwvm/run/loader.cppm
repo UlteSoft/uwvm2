@@ -30,11 +30,19 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+// Module imports do not carry macros. Match the header-mode feature setup so
+// the loaded-module WASI group validation is not silently compiled out here.
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+#endif
 
 export module uwvm2.uwvm.run:loader;
 
 import fast_io;
 import uwvm2.utils.ansies;
+// loader.h names u8string_view directly. Header builds happened to obtain it
+// transitively; named modules do not re-export another module's private imports.
+import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.utils.madvise;
 import uwvm2.parser.wasm.base;
