@@ -15,7 +15,7 @@ case static_cast<wasm_byte>(wasm1p1_code::table_get):
     }
 
     auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.get")};
-    check_table_index(op_begin, table_index);
+    check_table_index(op_begin, table_index, opcode_u32(wasm1p1_code::table_get));
     validate_i32_operands(op_begin, u8"table.get", 1uz);
     auto const table_type{get_table_value_type(table_index)};
     operand_stack_push(table_type);
@@ -50,7 +50,7 @@ case static_cast<wasm_byte>(wasm1p1_code::table_set):
     }
 
     auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.set")};
-    check_table_index(op_begin, table_index);
+    check_table_index(op_begin, table_index, opcode_u32(wasm1p1_code::table_set));
     auto const table_type{get_table_value_type(table_index)};
 
     if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
@@ -2374,7 +2374,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
             auto const element_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.init.elemidx")};
             check_element_index(op_begin, element_index);
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.init.tableidx")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
 
             auto const element_value_type{static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(
                 curr_module.local_defined_element_vec_storage.index_unchecked(element_index).element_type_ptr->storage.segment.reftype))};
@@ -2435,9 +2435,9 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
             }
             auto const dst_table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.copy.dst")};
-            check_table_index(op_begin, dst_table_index);
+            check_table_index(op_begin, dst_table_index, subopcode);
             auto const src_table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.copy.src")};
-            check_table_index(op_begin, src_table_index);
+            check_table_index(op_begin, src_table_index, subopcode);
 
             auto const dst_type{get_table_value_type(dst_table_index)};
             auto const src_type{get_table_value_type(src_table_index)};
@@ -2470,7 +2470,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                             ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.grow")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             auto const table_type{get_table_value_type(table_index)};
 
             if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.grow", 2uz); }
@@ -2523,7 +2523,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                             ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.size")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             operand_stack_push(curr_operand_stack_value_type::i32);
             auto const table_ptr{resolve_runtime_table(table_index)};
             stacktop_flush_all_to_operand_stack(bytecode);
@@ -2542,7 +2542,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.fill")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             auto const table_type{get_table_value_type(table_index)};
 
             if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.fill", 3uz); }

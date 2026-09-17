@@ -1269,79 +1269,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
 
-    /// @brief Runs the full `test6` sin-table fill loop:
-    /// `for(i=0; i!=end; i+=4) store sin((i+0)*k), sin((i+1)*k), sin((i+2)*k), sin((i+3)*k) into memory` (tail-call).
-    /// @details
-    /// - Stack-top optimization: N/A (operand stack remains unchanged).
-    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
-    /// - Immediates: `local_offset_t` (ptr i32), `local_offset_t` (i i32), `native_memory_t*` (memory0), `wasm_i32` (end).
-    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
-        requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_test6_sin_table_fill_loop_run(Type... type) UWVM_THROWS
-    {
-        using wasm_i32 = conbine_details::wasm_i32;
-        using wasm_u32 = conbine_details::wasm_u32;
-        using wasm_f32 = conbine_details::wasm_f32;
-        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
-
-        static_assert(sizeof...(Type) >= 3uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
-
-        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
-
-        auto const ptr_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
-        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
-        native_memory_t* memory_p{conbine_details::read_imm<native_memory_t*>(type...[0])};
-        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(type...[0])};
-
-        wasm_u32 ptr_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], ptr_off))};
-        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], i_off))};
-        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
-
-        // f32.const 0x1.921fb6p-8 (2*pi/1024) in `test6`.
-        constexpr wasm_u32 k_bits{0x3bc90fdbu};
-        wasm_f32 const k{::std::bit_cast<wasm_f32>(k_bits)};
-
-        auto const& memory{*memory_p};
-        details::enter_memory_operation_memory_lock(memory);
-
-        if(i_u < end_u)
-        {
-            // Each iteration stores 16 bytes (4x f32) into a contiguous region.
-            wasm_u32 const iter_cnt{(end_u - i_u) / wasm_u32{4u}};
-            ::std::size_t const bytes_total{static_cast<::std::size_t>(iter_cnt) * 16uz};
-
-            auto const eff{details::wasm32_effective_offset(::std::bit_cast<wasm_i32>(ptr_u), wasm_u32{0u})};
-            details::check_memory_bounds_unlocked(memory, 0uz, 0uz, eff, bytes_total);
-
-            ::std::byte* p{details::ptr_add_u64(memory.memory_begin, eff.offset)};
-
-            for(wasm_u32 it{}; it != iter_cnt; ++it)
-            {
-                wasm_f32 const fi{static_cast<wasm_f32>(i_u)};
-
-                // Match the store order in the Wasm loop.
-                details::store_f32_le(p + 0uz, static_cast<wasm_f32>(::sinf(fi * k)));
-                details::store_f32_le(p + 12uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{3.f}) * k)));
-                details::store_f32_le(p + 8uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{2.f}) * k)));
-                details::store_f32_le(p + 4uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{1.f}) * k)));
-
-                p += 16uz;
-                i_u += wasm_u32{4u};
-                ptr_u += wasm_u32{16u};
-            }
-        }
-        details::exit_memory_operation_memory_lock(memory);
-
-        conbine_details::store_local(type...[2u], ptr_off, ::std::bit_cast<wasm_i32>(ptr_u));
-        conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-    }
-
     /// @brief Fused combined opcode entrypoint `uwvmint_for_ptr_inc_ne_br_if` (tail-call).
     /// @details
     /// - Stack-top optimization: N/A (no operand stack values are produced).
@@ -1664,7 +1591,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(mem_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const store_word{[&](::std::uint_least64_t off, ::std::uint32_t v) constexpr noexcept
-                              { details::store_u32_le(details::ptr_add_u64(mem_base, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
+                              { details::store_u32_le(details::prepare_memory_store_pointer<4uz>(mem, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
 
         // Store the same 16-word output slice as the Wasm: offsets 0..60.
         store_word(60u, l3);
@@ -1814,17 +1741,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
-            requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_test6_sin_table_fill_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        { return uwvmint_test6_sin_table_fill_loop_run<CompileOption, Type...>; }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
-            requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_test6_sin_table_fill_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_test6_sin_table_fill_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)

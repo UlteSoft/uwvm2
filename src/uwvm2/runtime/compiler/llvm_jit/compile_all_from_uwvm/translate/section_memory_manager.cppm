@@ -28,6 +28,9 @@ module;
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include <llvm/Config/llvm-config.h>
 # include <llvm/ExecutionEngine/SectionMemoryManager.h>
+# if defined(__APPLE__) && defined(__aarch64__)
+#  include "macho_headers.h"
+# endif
 # if defined(__linux__) && defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  include <sys/mman.h>
 #  include <unistd.h>

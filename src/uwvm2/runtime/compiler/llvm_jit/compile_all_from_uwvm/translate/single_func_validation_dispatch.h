@@ -42,14 +42,12 @@ for(;;)
     // well-defined on strict-alignment targets.
     wasm1_code curr_opbase;  // no initialization necessary
     ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
-    // "Inline" here means that this opcode arm emits IR directly while it still owns validation-local immediates.
-    // It is not LLVM function inlining: every generated Wasm/public/raw function receives the NoInline attribute.
     bool llvm_jit_instruction_emitted_inline{};
     auto const disable_inline_llvm_jit_emission{[&]() constexpr noexcept
                                                 {
-                                                    // Validation continues even if native LLVM emission is no longer
-                                                    // possible. Clearing the output storage makes full AOT compilation
-                                                    // fail instead of publishing a partially emitted module.
+                                                    // Validation continues even if inline LLVM emission is no longer
+                                                    // possible. Clearing the output storage makes full materialization
+                                                    // fail closed rather than executing a partially emitted module.
                                                     emit_llvm_jit_active = false;
                                                     if(emitted_llvm_jit_ir_storage != nullptr) { *emitted_llvm_jit_ir_storage = {}; }
                                                 }};
@@ -74,73 +72,6 @@ for(;;)
 #include "opcode/wasm1p1_cases.h"
         [[unlikely]] default:
         {
-            // The standard wasm1p1 validator has already accepted this function. Reaching an opcode outside the
-            // native LLVM dispatch therefore means the AOT backend has no lowering for it, not that the Wasm is
-            // malformed. In an emitting pass, invalidate the whole LLVM module and let materialization report the
-            // backend failure; never route the function through the interpreter.
-            if(capability_failure != nullptr)
-            {
-                auto const primary_opcode{static_cast<::std::uint_least32_t>(static_cast<::std::uint_least8_t>(curr_opbase))};
-                ::uwvm2::utils::container::u8string_view reason{u8"instruction has no LLVM lowering"};
-                ::std::uint_least32_t extended_opcode{};
-                bool has_extended_opcode{};
-
-                switch(static_cast<wasm1p1_code>(curr_opbase))
-                {
-                    case wasm1p1_code::table_get: reason = u8"table.get has no LLVM lowering"; break;
-                    case wasm1p1_code::table_set: reason = u8"table.set has no LLVM lowering"; break;
-                    case wasm1p1_code::ref_null: reason = u8"ref.null has no LLVM lowering"; break;
-                    case wasm1p1_code::ref_is_null: reason = u8"ref.is_null has no LLVM lowering"; break;
-                    case wasm1p1_code::ref_func: reason = u8"ref.func has no LLVM lowering"; break;
-                    case wasm1p1_code::simd_prefix:
-                    {
-                        reason = u8"SIMD instruction has no LLVM lowering";
-
-                        // simd_prefix extended_opcode ...
-                        // [  safe   ] unsafe (could be the section_end)
-                        // ^^ code_curr
-
-                        // The dispatcher has already proved the one-byte prefix at code_curr safe. Therefore code_curr + 1
-                        // is inside the closed range ending at code_end (and may equal code_end); read_leb128 performs the
-                        // remaining bounds check without advancing the main instruction cursor.
-                        auto extended_curr{code_curr + 1u};
-
-                        // simd_prefix extended_opcode ...
-                        // [  safe   ] unsafe (could be the section_end)
-                        // ^^ code_curr
-                        //             ^^ extended_curr
-
-                        extended_opcode = read_leb128.template operator()<validation_module_traits_t::wasm_u32>(
-                            extended_curr, code_end, instruction_begin, u8"simd_prefix");
-
-                        // simd_prefix extended_opcode ...
-                        // [          safe           ] unsafe (could be the section_end)
-                        // ^^ code_curr
-                        //                             ^^ extended_curr
-                        // read_leb128 commits only extended_curr after the complete ULEB128. Failure leaves it at the
-                        // entry position above; success advances only extended_curr, so the main code_curr stays on the prefix.
-
-                        has_extended_opcode = true;
-                        break;
-                    }
-                    default: break;
-                }
-
-                report_capability_failure(llvm_jit_capability_failure_kind::instruction,
-                                          reason,
-                                          instruction_begin,
-                                          primary_opcode,
-                                          true,
-                                          extended_opcode,
-                                          has_extended_opcode);
-                return;
-            }
-            if(emitted_llvm_jit_ir_storage != nullptr)
-            {
-                disable_inline_llvm_jit_emission();
-                return;
-            }
-
             err.err_curr = code_curr;
             err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_opbase;

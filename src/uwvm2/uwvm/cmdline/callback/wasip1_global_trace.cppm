@@ -41,6 +41,7 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.cmdline.params;
+import uwvm2.imported.wasi.wasip1.environment;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;
 
 #ifndef UWVM_MODULE

@@ -176,7 +176,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
         ::std::size_t operand_stack_base{};
         block_type type{};
         bool polymorphic_base{};
-        bool then_polymorphic_end{};  // only meaningful for if/else frames
     };
 
     namespace details
@@ -490,8 +489,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                       .result = curr_func_type.result,
                                       .operand_stack_base = 0uz,
                                       .type = block_type::function,
-                                      .polymorphic_base = false,
-                                      .then_polymorphic_end = false});
+                                      .polymorphic_base = false});
 
         // start parse the code
         auto code_curr{code_begin};
@@ -807,8 +805,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                          .result = signature.result,
                                                                          .operand_stack_base = base,
                                                                          .type = type,
-                                                                         .polymorphic_base = is_polymorphic,
-                                                                         .then_polymorphic_end = false});
+                                                                         .polymorphic_base = is_polymorphic});
                                            push_value_types(signature.start);
 
                                            // Stack-polymorphism is scoped to the current control frame only.
@@ -1091,14 +1088,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                 }
             }};
 
-        auto const check_table_index{[&](::std::byte const* op_begin, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index) constexpr UWVM_THROWS
+        auto const check_table_index{[&](::std::byte const* op_begin,
+                                         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index,
+                                         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 opcode) constexpr UWVM_THROWS
                                      {
                                          if((wasm1p1_para.disable_multiple_tables || wasm1p1_para.controllable_allow_multi_table) && table_index != 0u)
                                              [[unlikely]]
                                          {
                                              details::fail_wasm2_feature_required(op_begin,
                                                                                   err,
-                                                                                  table_index,
+                                                                                  opcode,
                                                                                   ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
                                                                                   ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
                                          }
@@ -1472,9 +1471,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         }
                     }
 
-                    // Record then-branch reachability to merge with else at `end`.
-                    if_frame.then_polymorphic_end = is_polymorphic;
-
                     // Start else branch with the operand stack at if-entry height.
                     while(operand_stack.size() > if_frame.operand_stack_base) { operand_stack.pop_back_unchecked(); }
                     push_value_types(if_frame.start);
@@ -1645,16 +1641,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                     while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
                     for(::std::size_t i{}; i != expected_count; ++i) { operand_stack.push_back({frame.result.begin[i]}); }
 
-                    // Restore / merge the polymorphic state.
-                    if(frame.type == block_type::else_)
-                    {
-                        // For if-else, continuation is unreachable only when both branches are unreachable.
-                        is_polymorphic = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic);
-                    }
-                    else
-                    {
-                        is_polymorphic = frame.polymorphic_base;
-                    }
+                    // Core 1/2 validation restores the enclosing control frame at `end`.
+                    // Its unreachable flag is not a control-flow merge: even two terminating
+                    // if arms (including br 0, which reaches this end) cannot make a later
+                    // missing operand valid. See Core 2, appendix 7.3, pop_ctrl/end.
+                    is_polymorphic = frame.polymorphic_base;
 
                     // Pop the control frame.
                     control_flow_stack.pop_back_unchecked();
@@ -1870,7 +1861,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                 }
                         }
 
-                        if(is_polymorphic && concrete_to_check != target_arity)
+                        // Core pop_vals/push_vals also refines present Unknowns, not only missing slots.
+                        if(is_polymorphic)
                         {
                             // In polymorphic mode, `br_if` still re-establishes the fallthrough stack as if
                             // label arguments had been popped and pushed back.
@@ -2004,7 +1996,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             auto const comparable_count{expected_arity < actual_arity ? expected_arity : actual_arity};
                             for(::std::size_t i{}; i != comparable_count; ++i)
                             {
-                                if(expected_label_types.begin[i] != actual_types.begin[i])
+                                // Core 1 requires identical label types; Core 2 also allows a common bottom
+                                // argument. An explicit MVP policy must retain the Core 1 rule in every backend.
+                                // The selector is still on top; only missing/unknown arguments may meet.
+                                auto const depth_from_top{expected_arity - i};
+                                auto const argument_is_bottom{!::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_validation_rules(wasm1p1_para) && is_polymorphic &&
+                                    (concrete_operand_count() <= depth_from_top ||
+                                     operand_stack.index_unchecked(operand_stack.size() - 1uz - depth_from_top).is_unknown)};
+                                if(expected_label_types.begin[i] != actual_types.begin[i] && !argument_is_bottom)
                                 {
                                     mismatch = true;
                                     expected_type = expected_label_types.begin[i];
@@ -2430,7 +2429,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
                             ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
                     }
-                    check_table_index(op_begin, table_index);
+                    check_table_index(op_begin, table_index, static_cast<wasm_u32>(static_cast<wasm_byte>(wasm1_code::call_indirect)));
 
                     if(get_table_value_type(table_index) !=
                        static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)) [[unlikely]]
@@ -2529,7 +2528,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     auto const table_index{
                         details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"table.get")};
-                    check_table_index(op_begin, table_index);
+                    check_table_index(op_begin, table_index, static_cast<wasm_u32>(static_cast<wasm_byte>(wasm1p1_code::table_get)));
 
                     validate_i32_operands(op_begin, u8"table.get", 1uz);
                     operand_stack.push_back({get_table_value_type(table_index)});
@@ -2565,7 +2564,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
 
                     auto const table_index{
                         details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr, code_end, op_begin, err, u8"table.set")};
-                    check_table_index(op_begin, table_index);
+                    check_table_index(op_begin, table_index, static_cast<wasm_u32>(static_cast<wasm_byte>(wasm1p1_code::table_set)));
                     auto const table_type{get_table_value_type(table_index)};
 
                     if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
@@ -2688,6 +2687,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                         {
                             if(v2.from_stack) { operand_stack.push_back({v2.type, v2.is_unknown}); }
                             else if(is_polymorphic) { push_unknown_operand(); }
+                        }
+                        else if(v1.is_unknown && v2.from_stack && !v2.is_unknown)
+                        {
+                            // The select result is the meet of both operands. Retaining a
+                            // bottom left operand loses the concrete constraint from the right.
+                            operand_stack.back_unchecked() = {.type = v2.type};
                         }
 
                         break;
@@ -3089,6 +3094,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
+
+                    // local.tee consumes t and produces t: a present Unknown is refined,
+                    // not retained for a later consumer of an incompatible concrete type.
+                    operand_stack.back_unchecked().type = curr_local_type;
+                    operand_stack.back_unchecked().is_unknown = false;
 
                     break;
                 }
@@ -4727,7 +4737,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                                                 op_begin,
                                                                                                                                 err,
                                                                                                                                 u8"table.init.tableidx")};
-                            check_table_index(op_begin, table_index);
+                            check_table_index(op_begin, table_index, subopcode);
 
                             auto const element_value_type{
                                 static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(
@@ -4779,13 +4789,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                                                     op_begin,
                                                                                                                                     err,
                                                                                                                                     u8"table.copy.dst")};
-                            check_table_index(op_begin, dst_table_index);
+                            check_table_index(op_begin, dst_table_index, subopcode);
                             auto const src_table_index{details::read_leb128<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(code_curr,
                                                                                                                                     code_end,
                                                                                                                                     op_begin,
                                                                                                                                     err,
                                                                                                                                     u8"table.copy.src")};
-                            check_table_index(op_begin, src_table_index);
+                            check_table_index(op_begin, src_table_index, subopcode);
 
                             auto const dst_type{get_table_value_type(dst_table_index)};
                             auto const src_type{get_table_value_type(src_table_index)};
@@ -4817,7 +4827,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                                                 op_begin,
                                                                                                                                 err,
                                                                                                                                 u8"table.grow")};
-                            check_table_index(op_begin, table_index);
+                            check_table_index(op_begin, table_index, subopcode);
                             auto const table_type{get_table_value_type(table_index)};
 
                             if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
@@ -4865,7 +4875,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                                                 op_begin,
                                                                                                                                 err,
                                                                                                                                 u8"table.size")};
-                            check_table_index(op_begin, table_index);
+                            check_table_index(op_begin, table_index, subopcode);
                             operand_stack.push_back({curr_operand_stack_value_type::i32});
                             break;
                             }
@@ -4884,7 +4894,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1p1
                                                                                                                                 op_begin,
                                                                                                                                 err,
                                                                                                                                 u8"table.fill")};
-                            check_table_index(op_begin, table_index);
+                            check_table_index(op_begin, table_index, subopcode);
                             auto const table_type{get_table_value_type(table_index)};
 
                             if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]]

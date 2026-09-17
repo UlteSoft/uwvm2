@@ -55,6 +55,9 @@ import uwvm2.validation.error;
 import uwvm2.validation.standard.wasm1p1;
 import uwvm2.validation.standard.wasm2;
 import uwvm2.object;
+// Exported SIMD translation templates name entities owned by this module;
+// importing optable alone only exposes the namespace alias.
+import uwvm2.runtime.compiler.shared.wasm1p1_simd;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;

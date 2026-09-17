@@ -352,6 +352,24 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
         for(auto& function: module)
         {
             bool native_arithmetic{}, native_rounding{};
+            bool no_sse_rounding_abi{};
+            // x86_64 libc returns f32/f64 in XMM0 even if generated arithmetic
+            // has SSE disabled. In that configuration ceil/floor/trunc/nearest
+            // must cross the existing INTEGER bridge, not a floating libcall.
+            // This is distinct from i386's private no-x87 result ABI. Determine
+            // it from the destination IR, never from the cross-compiler host.
+            if(::llvm::Triple{module.getTargetTriple()}.isX86())
+            {
+                auto attribute{function.getFnAttribute("target-features")};
+                auto names{attribute.isStringAttribute() ? attribute.getValueAsString() : ::llvm::StringRef{}};
+                while(!names.empty())
+                {
+                    auto item{names.split(',')};
+                    if(item.first == "-sse" || item.first == "-sse2") { no_sse_rounding_abi = true; }
+                    else if(item.first == "+sse2") { no_sse_rounding_abi = false; }
+                    names = item.second;
+                }
+            }
 #if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
             // A portable x87 interpreter may run on an SSE2-capable host. The JIT's actual function
             // features, not the interpreter's compile flags, then permit native arithmetic/demotion.
@@ -368,7 +386,13 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                 features = item.second;
             }
 #endif
-            if(bit_preserving_abi)
+            // No-SSE raw-buffer entries also need integer-only transport:
+            // x87 FLD/FST quiet signaling NaNs even for splat/select/load/store.
+            // Removing floating libcalls alone compiles successfully but is
+            // semantically wrong. This does NOT invent an x86_64 scalar-FP C
+            // return ABI: such native crossings still require the host ABI.
+            bool const integer_fp{bit_preserving_abi || no_sse_rounding_abi};
+            if(integer_fp)
             {
                 // This is a PRIVATE generated-function ABI, not a change to native
                 // C/C++ float returns. SSE2 only changes arithmetic selection; the
@@ -390,7 +414,7 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                 for(auto it{block.begin()}; it != block.end();)
                 {
                     auto& instruction{*it++};
-                    if(bit_preserving_abi)
+                    if(integer_fp)
                     {
                         ::llvm::CmpInst::Predicate predicate{::llvm::CmpInst::BAD_FCMP_PREDICATE};
                         unsigned conversion{};
@@ -459,7 +483,7 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                         case ::llvm::Instruction::SIToFP: opcode = 5u; break;
                         case ::llvm::Instruction::UIToFP: opcode = 6u; break;
                         case ::llvm::Instruction::FPTrunc: opcode = 7u; break;
-                        case ::llvm::Instruction::FPExt: if(bit_preserving_abi) { opcode = 8u; } break;
+                        case ::llvm::Instruction::FPExt: if(integer_fp) { opcode = 8u; } break;
                         default:
                             if(auto call{::llvm::dyn_cast<::llvm::CallInst>(&instruction)}; call != nullptr)
                             {
@@ -474,19 +498,19 @@ namespace uwvm2::runtime::compiler::shared::strict_float_jit
                                     case ::llvm::Intrinsic::experimental_constrained_sitofp: opcode = 5u; break;
                                     case ::llvm::Intrinsic::experimental_constrained_uitofp: opcode = 6u; break;
                                     case ::llvm::Intrinsic::experimental_constrained_fptrunc: opcode = 7u; break;
-                                    case ::llvm::Intrinsic::experimental_constrained_fpext: if(bit_preserving_abi) { opcode = 8u; } break;
+                                    case ::llvm::Intrinsic::experimental_constrained_fpext: if(integer_fp) { opcode = 8u; } break;
                                     case ::llvm::Intrinsic::ceil:
-                                    case ::llvm::Intrinsic::experimental_constrained_ceil: if(bit_preserving_abi) { opcode = 9u; } break;
+                                    case ::llvm::Intrinsic::experimental_constrained_ceil: if(bit_preserving_abi || no_sse_rounding_abi) { opcode = 9u; } break;
                                     case ::llvm::Intrinsic::floor:
-                                    case ::llvm::Intrinsic::experimental_constrained_floor: if(bit_preserving_abi) { opcode = 10u; } break;
+                                    case ::llvm::Intrinsic::experimental_constrained_floor: if(bit_preserving_abi || no_sse_rounding_abi) { opcode = 10u; } break;
                                     case ::llvm::Intrinsic::trunc:
-                                    case ::llvm::Intrinsic::experimental_constrained_trunc: if(bit_preserving_abi) { opcode = 11u; } break;
+                                    case ::llvm::Intrinsic::experimental_constrained_trunc: if(bit_preserving_abi || no_sse_rounding_abi) { opcode = 11u; } break;
                                     case ::llvm::Intrinsic::roundeven:
                                     case ::llvm::Intrinsic::nearbyint:
                                     case ::llvm::Intrinsic::rint:
                                     case ::llvm::Intrinsic::experimental_constrained_roundeven:
                                     case ::llvm::Intrinsic::experimental_constrained_nearbyint:
-                                    case ::llvm::Intrinsic::experimental_constrained_rint: if(bit_preserving_abi) { opcode = 12u; } break;
+                                    case ::llvm::Intrinsic::experimental_constrained_rint: if(bit_preserving_abi || no_sse_rounding_abi) { opcode = 12u; } break;
                                     default: break;
                                 }
                             }

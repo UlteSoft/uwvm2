@@ -1,6 +1,5 @@
-    // Control-flow opcode validation cases for the WebAssembly 1.0/MVP primary opcode set.
-    // This file is included directly inside the validator switch, so proposal/prefixed control opcodes must extend the
-    // dispatch layer and LLVM control-flow lowering at the same time.
+    // Structured-control validation for the WebAssembly primary opcode set. Block signatures retain the complete
+    // parameter/result tuples resolved from inline blocktypes or signed-s33 type indices.
 
 case wasm1_code::unreachable:
 {
@@ -83,40 +82,15 @@ case wasm1_code::block:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
-    runtime_block_result_type block_result{};
-    if(!try_read_llvm_supported_block_result_type(op_begin, block_result)) [[unlikely]]
-    {
-        // Standard validation has already accepted this s33 block signature.  It is therefore an LLVM capability miss
-        // (type-index/multi-value/ref/v128), not malformed Wasm.  Invalidate all previously emitted functions before
-        // returning so materialization fails closed and cannot publish partial IR.
-        if(capability_failure != nullptr)
-        {
-            report_capability_failure(llvm_jit_capability_failure_kind::block_signature,
-                                      u8"block uses a type-index/reference/SIMD signature",
-                                      op_begin,
-                                      static_cast<::std::uint_least32_t>(static_cast<::std::uint_least8_t>(wasm1_code::block)),
-                                      true,
-                                      0u,
-                                      false,
-                                      last_decoded_blocktype,
-                                      true);
-            return;
-        }
-        if(emitted_llvm_jit_ir_storage != nullptr) { disable_inline_llvm_jit_emission(); }
-        return;
-    }
+    runtime_block_signature_type block_signature{};
+    parse_validation_block_signature(op_begin, block_signature);
 
-    control_flow_stack.push_back(
-        {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::block, .polymorphic_base = is_polymorphic});
-
-    // Stack-polymorphism is scoped to the current control frame only.
-    // Entering a nested frame starts it in reachable mode for validation.
-    is_polymorphic = false;
+    enter_control_frame(op_begin, u8"block", block_type::block, block_signature);
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_block(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+        if(!try_emit_runtime_local_func_llvm_jit_block(llvm_jit_emit_state, block_signature)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -146,40 +120,15 @@ case wasm1_code::loop:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
-    runtime_block_result_type block_result{};
-    if(!try_read_llvm_supported_block_result_type(op_begin, block_result)) [[unlikely]]
-    {
-        if(capability_failure != nullptr)
-        {
-            report_capability_failure(llvm_jit_capability_failure_kind::block_signature,
-                                      u8"loop uses a type-index/reference/SIMD signature",
-                                      op_begin,
-                                      static_cast<::std::uint_least32_t>(static_cast<::std::uint_least8_t>(wasm1_code::loop)),
-                                      true,
-                                      0u,
-                                      false,
-                                      last_decoded_blocktype,
-                                      true);
-            return;
-        }
-        if(emitted_llvm_jit_ir_storage != nullptr) { disable_inline_llvm_jit_emission(); }
-        return;
-    }
+    runtime_block_signature_type block_signature{};
+    parse_validation_block_signature(op_begin, block_signature);
 
-    control_flow_stack.push_back({.result = block_result,
-                                  .operand_stack_base = operand_stack.size(),
-                                  .type = block_type::loop,
-                                  .polymorphic_base = is_polymorphic,
-                                  .then_polymorphic_end = false});
-
-    // Stack-polymorphism is scoped to the current control frame only.
-    // Entering a nested frame starts it in reachable mode for validation.
-    is_polymorphic = false;
+    enter_control_frame(op_begin, u8"loop", block_type::loop, block_signature);
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_loop(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+        if(!try_emit_runtime_local_func_llvm_jit_loop(llvm_jit_emit_state, block_signature)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -209,30 +158,20 @@ case wasm1_code::if_:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
-    runtime_block_result_type block_result{};
-    if(!try_read_llvm_supported_block_result_type(op_begin, block_result)) [[unlikely]]
+    runtime_block_signature_type block_signature{};
+    parse_validation_block_signature(op_begin, block_signature);
+
+    // Stack effect before entering the then branch: (params..., i32 cond) -> (params...).
+    auto const param_count{get_runtime_block_result_count(block_signature.params)};
+    constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const required_stack_size_overflows{param_count == max_operand_stack_requirement};
+    auto const required_stack_size{required_stack_size_overflows ? max_operand_stack_requirement : param_count + 1uz};
+    if(!is_polymorphic && (required_stack_size_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        if(capability_failure != nullptr)
-        {
-            report_capability_failure(llvm_jit_capability_failure_kind::block_signature,
-                                      u8"if uses a type-index/reference/SIMD signature",
-                                      op_begin,
-                                      static_cast<::std::uint_least32_t>(static_cast<::std::uint_least8_t>(wasm1_code::if_)),
-                                      true,
-                                      0u,
-                                      false,
-                                      last_decoded_blocktype,
-                                      true);
-            return;
-        }
-        if(emitted_llvm_jit_ir_storage != nullptr) { disable_inline_llvm_jit_emission(); }
-        return;
+        report_operand_stack_underflow(op_begin, u8"if", required_stack_size);
     }
 
-    // Stack effect: (i32 cond) -> () before entering the then branch.
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"if", 1uz); }
-
-    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && !cond.is_unknown && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_diagnostic_value_type(cond.type);
@@ -240,17 +179,12 @@ case wasm1_code::if_:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    control_flow_stack.push_back(
-        {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::if_, .polymorphic_base = is_polymorphic});
-
-    // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
-    // surrounding frame is polymorphic.
-    is_polymorphic = false;
+    enter_control_frame(op_begin, u8"if", block_type::if_, block_signature);
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_if(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+        if(!try_emit_runtime_local_func_llvm_jit_if(llvm_jit_emit_state, block_signature)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -285,7 +219,7 @@ case wasm1_code::else_:
     // Validate the then-branch result before switching to else.
     // Match `end`: polymorphic mode only relaxes underflow, but still rejects extra values
     // and still checks types when enough concrete values are present.
-    auto const expected_count{static_cast<::std::size_t>(if_frame.result.end - if_frame.result.begin)};
+    auto const expected_count{get_runtime_block_result_count(if_frame.result)};
     auto const base{if_frame.operand_stack_base};
     auto const stack_size{operand_stack.size()};
     auto const actual_count{stack_size >= base ? stack_size - base : 0uz};
@@ -320,13 +254,15 @@ case wasm1_code::else_:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(expected_count != 0uz && actual_count >= expected_count)
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
@@ -339,11 +275,10 @@ case wasm1_code::else_:
         }
     }
 
-    // Record then-branch reachability to merge with else at `end`.
-    if_frame.then_polymorphic_end = is_polymorphic;
 
-    // Start else branch with the operand stack at if-entry height.
+    // Start else with the original block parameters above the outer stack height.
     operand_stack_truncate_to(if_frame.operand_stack_base);
+    operand_stack_push_types(if_frame.params);
     // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
     is_polymorphic = false;
 
@@ -425,15 +360,27 @@ case wasm1_code::end:
         }
     }
 
-    auto const expected_count{static_cast<::std::size_t>(frame.result.end - frame.result.begin)};
+    auto const expected_count{get_runtime_block_result_count(frame.result)};
 
-    // Special rule: an `if` with a non-empty result type must have an `else` branch, otherwise the
-    // false branch would not produce the required values.
-    if(frame.type == block_type::if_ && expected_count != 0uz) [[unlikely]]
+    // A missing else is an implicit identity arm over the block parameters. Do not accept merely equal arity:
+    // every parameter type must match its corresponding result type.
+    bool implicit_else_matches_result{true};
+    if(frame.type == block_type::if_)
+    {
+        auto const param_count{get_runtime_block_result_count(frame.params)};
+        implicit_else_matches_result = param_count == expected_count;
+        for(::std::size_t i{}; implicit_else_matches_result && i != expected_count; ++i)
+        {
+            implicit_else_matches_result = frame.params.begin[i] == frame.result.begin[i];
+        }
+    }
+    if(frame.type == block_type::if_ && !implicit_else_matches_result) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_missing_else.expected_count = expected_count;
-        err.err_selectable.if_missing_else.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
+        err.err_selectable.if_missing_else.expected_type =
+            expected_count == 1uz ? static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin) :
+                                   ::uwvm2::parser::wasm::standard::wasm1::type::value_type{};
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_missing_else;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -477,13 +424,15 @@ case wasm1_code::end:
 
     // If the stack has enough values to satisfy the expected results, check their types even in
     // polymorphic (unreachable) mode; only the underflow aspect is suppressed.
-    if(expected_count != 0uz && actual_count >= expected_count)
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.end_result_mismatch.block_kind = block_kind;
@@ -501,16 +450,11 @@ case wasm1_code::end:
     operand_stack_truncate_to(base);
     for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
 
-    // Restore / merge the polymorphic state.
-    if(frame.type == block_type::else_)
-    {
-        // For if-else, continuation is unreachable only when both branches are unreachable.
-        is_polymorphic = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic);
-    }
-    else
-    {
-        is_polymorphic = frame.polymorphic_base;
-    }
+    // Core 1/2 validation restores the enclosing control frame at `end`.
+    // Its unreachable flag is not a control-flow merge: even two terminating
+    // if arms (including br 0, which reaches this end) cannot make a later
+    // missing operand valid. See Core 2, appendix 7.3, pop_ctrl/end.
+    is_polymorphic = frame.polymorphic_base;
 
     // Pop the control frame.
     control_flow_stack.pop_back_unchecked();

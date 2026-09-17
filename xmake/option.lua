@@ -217,10 +217,26 @@ option("execution-jit", function()
     set_values("none", "default", "llvm")
 end)
 
+option("llvm-build-jobs", function()
+    set_default("2")
+    set_description("Bundled LLVM compile jobs (1..16); link jobs are always limited to one. This is not a memory limit.")
+end)
+
+option("llvm-build-targets", function()
+    set_default("Native")
+    set_description("Bundled LLVM code-generation backends: Native, all, or a semicolon-separated LLVM target list.")
+end)
+
+option("llvm-cmake-toolchain", function()
+    set_default("none")
+    set_description("CMake toolchain for bundled LLVM; must match ROS target/ABI and explicitly set LLVM_HOST_TRIPLE.")
+end)
+
 option("llvm-jit-env", function()
     set_default(true)
     set_showmenu(false)
-    add_deps("execution-jit")
+    add_deps("execution-jit", "llvm-build-jobs", "llvm-build-targets", "llvm-cmake-toolchain",
+        "use-llvm-compiler", "stdlib", "rtlib", "unwindlib", "sysroot", "target", "llvm-target")
     after_check(function(option)
         local execution_jit = get_config("execution-jit")
         if execution_jit ~= "default" and execution_jit ~= "llvm" then

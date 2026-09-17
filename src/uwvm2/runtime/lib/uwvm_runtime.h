@@ -35,7 +35,14 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type { struct uwvm_preload_memory_descriptor_t; }
+#ifndef UWVM_MODULE
+// Textual consumers need only an incomplete descriptor for the pointer API.
+// In named-module builds its definition is imported from uwvm2.uwvm.wasm.type:
+// repeating this declaration inside uwvm2.runtime would attach the same type
+// to two modules, rejected when a host API consumer imports both. Keep the
+// descriptor's layout and ABI in preload_api.h; do not duplicate it here.
+namespace uwvm2::uwvm::wasm::type { struct uwvm_preload_memory_descriptor_t; }
+#endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
@@ -51,9 +58,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     {
         /// @brief The first function index to enter in the main module.
         /// @note  This is the WASM function index space (imports first, then local-defined).
-        /// @note  Imported entries are only supported when they resolve to a wasm-defined `() -> ()` function.
+        /// @note  Conventional imported entries must resolve to Wasm; module_start also permits a void host import.
         ::std::size_t entry_function_index{};
         entry_function_abi_buffers entry_abi_buffers{};
+        /// @brief A validated start-section invocation may target a host import with signature () -> ().
+        bool module_start{};
     };
 
     /// @brief Full-compile and run the main module using the configured runtime backend.

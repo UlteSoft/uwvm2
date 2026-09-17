@@ -187,6 +187,9 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    // Retain the exact table mutation in the full-JIT bridge ABI.
+    enum class llvm_jit_call_indirect_table_mutation_kind : unsigned char { set, init, copy, fill, grow };
+
     struct llvm_jit_raw_call_target_t
     {
         ::std::uintptr_t entry_address{};
@@ -717,6 +720,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         // data
         ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
+        // Absence is distinct from an explicitly present zero count for bulk-memory validation.
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_count_section_count{};
+        bool data_count_section_present{};
 
         // LLVM AOT call_indirect uses a compact runtime table-view side structure.
 #if defined(UWVM_RUNTIME_LLVM_JIT)

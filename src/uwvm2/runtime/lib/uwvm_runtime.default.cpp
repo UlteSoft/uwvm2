@@ -51,11 +51,13 @@
 # include <algorithm>
 # include <atomic>
 # include <bit>
+# include <coroutine>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
 # include <limits>
 # include <memory>
+# include <string>
 # include <type_traits>
 # include <utility>
 // macro
@@ -65,7 +67,9 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 # include "uwvm_runtime_generation.h"
+# include "uwvm_runtime_checked_size.h"
 # include "uwvm_runtime_execution_entry.h"
+# include "uwvm_runtime_native_stack_guard.h"
 # include "uwvm_runtime_generated_wasm_bridge.h"
 # include "uwvm_runtime_imported_function_lookup.h"
 # include "uwvm_runtime_local_imported_provider_callbacks.h"
@@ -104,6 +108,8 @@
 #  include <llvm/IR/Module.h>
 #  include <llvm/IR/PassManager.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/MC/TargetRegistry.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 #  include <llvm/Object/ObjectFile.h>
 #  include <llvm/PassRegistry.h>
 #  include <llvm/Passes/OptimizationLevel.h>
@@ -128,11 +134,13 @@
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/object/memory/impl.h>
+# include <uwvm2/object/global/impl.h>
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 #  include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/impl.h>
 #  include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <fast_io_crypto.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/section_memory_manager.h>
 #  include <uwvm2/runtime/llvm_jit_cache/impl.h>
@@ -142,6 +150,7 @@
 # include <uwvm2/utils/hash/impl.h>
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
@@ -1716,6 +1725,13 @@ namespace uwvm2::runtime::lib
         }
 
         inline constexpr bool ensure_llvm_jit_native_target_initialized() noexcept;
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string get_llvm_jit_host_cpu_name_storage() noexcept;
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>
+            get_llvm_jit_host_target_attribute_storage() noexcept;
+        [[nodiscard]] inline ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> select_runtime_llvm_jit_target(
+            ::llvm::EngineBuilder&,
+            ::uwvm2::utils::container::u8string const&,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const&);
 
 # include "uwvm_runtime_posix_unwind_probe.h"
 # include "uwvm_runtime_win64_unwind_probe.h"
@@ -3010,12 +3026,16 @@ namespace uwvm2::runtime::lib
 
         class runtime_execution_entry_scope
         {
+            ::uwvm2::runtime::lib::native_stack::scope native_stack_scope{};
             bool entered{};
 
         public:
-            inline explicit constexpr runtime_execution_entry_scope(
+            inline explicit runtime_execution_entry_scope(
                 runtime_execution_entry_reentry reentry = runtime_execution_entry_reentry::reject) noexcept
             {
+#if (defined(__linux__) || defined(__APPLE__)) && !defined(_WIN32)
+                if(!native_stack_scope.ready()) [[unlikely]] { ::uwvm2::runtime::lib::native_stack::setup_failed(); }
+#endif
                 auto& depth{get_runtime_execution_entry_depth()};
                 // Full/interpreter host entries are not recursively executable. The public LLVM raw API is the one
                 // callback re-entry surface whose nested lifetime is explicitly supported.
@@ -3027,7 +3047,7 @@ namespace uwvm2::runtime::lib
             runtime_execution_entry_scope(runtime_execution_entry_scope const&) = delete;
             runtime_execution_entry_scope& operator= (runtime_execution_entry_scope const&) = delete;
 
-            inline constexpr ~runtime_execution_entry_scope() noexcept
+            inline ~runtime_execution_entry_scope() noexcept
             {
                 if(!entered) { return; }
 
@@ -4458,11 +4478,10 @@ namespace uwvm2::runtime::lib
             ::std::size_t frame_alloc_n{local_alloc_n};
             if(stack_cap_raw != 0uz) [[likely]]
             {
-                if(frame_alloc_n > (::std::numeric_limits<::std::size_t>::max() - (kFrameAlignPad + stack_cap_raw))) [[unlikely]]
+                if(!::uwvm2::runtime::lib::details::try_add_runtime_byte_extents(frame_alloc_n, kFrameAlignPad, stack_cap_raw, frame_alloc_n)) [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
                 }
-                frame_alloc_n += kFrameAlignPad + stack_cap_raw;
             }
 
             constexpr ::std::size_t kAllocaMaxBytesPerFrame{4096uz};
@@ -4911,12 +4930,69 @@ namespace uwvm2::runtime::lib
             details::clear_borrowed_llvm_jit_call_indirect_table_views(g_runtime.modules);
         }
 
+        [[nodiscard]] inline constexpr runtime_llvm_jit_raw_call_target_t make_llvm_jit_call_indirect_target(
+            compiled_module_record const& caller_rec,
+            runtime_table_elem_storage_t const& elem) noexcept
+        {
+            using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
+            runtime_llvm_jit_raw_call_target_t target{};
+            switch(elem.type)
+            {
+                case table_elem_type::func_ref_defined:
+                {
+                    auto const defined_func_ptr{elem.storage.defined_ptr};
+                    if(defined_func_ptr == nullptr) { break; }
+
+                    auto const defined_info{find_defined_func_info(defined_func_ptr)};
+                    if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    // Publish the eagerly materialized native executable address.
+                    ::std::uintptr_t raw_defined_entry_address{};
+                    if(try_get_runtime_llvm_jit_raw_defined_entry_address(defined_info->module_id,
+                                                                          defined_info->function_index,
+                                                                          raw_defined_entry_address))
+                    {
+                        target.entry_address = raw_defined_entry_address;
+                        target.context_address = 0u;
+                        ::std::uintptr_t typed_defined_entry_address{};
+                        if(try_get_runtime_llvm_jit_defined_entry_address(defined_info->module_id,
+                                                                          defined_info->function_index,
+                                                                          typed_defined_entry_address))
+                        {
+                            target.typed_entry_address = typed_defined_entry_address;
+                        }
+                    }
+                    else
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                    target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, func_sig_from_defined(defined_info->runtime_func));
+                    break;
+                }
+                case table_elem_type::func_ref_imported:
+                {
+                    auto const imported_func_ptr{elem.storage.imported_ptr};
+                    if(imported_func_ptr == nullptr) { break; }
+                    auto const cached_target_ptr{find_cached_import_target(imported_func_ptr)};
+                    if(cached_target_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& cached_target{*cached_target_ptr};
+                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
+                    target.context_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(cached_target));
+                    target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, cached_target.signature());
+                    break;
+                }
+                [[unlikely]] default:
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+            return target;
+        }
+
         inline constexpr void populate_llvm_jit_call_indirect_table_views() noexcept
         {
             // LLVM call_indirect lowers through compact table-view arrays. They are rebuilt after initialization/materialization so
             // every table element points at an eagerly materialized raw entry or a runtime import bridge.
-            using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
-
             for(::std::size_t caller_module_id{}; caller_module_id != g_runtime.modules.size(); ++caller_module_id)
             {
                 auto& caller_rec{g_runtime.modules.index_unchecked(caller_module_id)};
@@ -4952,66 +5028,85 @@ namespace uwvm2::runtime::lib
 
                     for(::std::size_t elem_index{}; elem_index != resolved_table->elems.size(); ++elem_index)
                     {
-                        auto& target{target_vec.index_unchecked(elem_index)};
-                        target = {};
-
-                        auto const& elem{resolved_table->elems.index_unchecked(elem_index)};
-                        switch(elem.type)
-                        {
-                            case table_elem_type::func_ref_defined:
-                            {
-                                auto const defined_func_ptr{elem.storage.defined_ptr};
-                                if(defined_func_ptr == nullptr) { break; }
-
-                                auto const defined_info{find_defined_func_info(defined_func_ptr)};
-                                if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                                // Publish the eagerly materialized native executable address.
-                                ::std::uintptr_t raw_defined_entry_address{};
-                                if(try_get_runtime_llvm_jit_raw_defined_entry_address(defined_info->module_id,
-                                                                                      defined_info->function_index,
-                                                                                      raw_defined_entry_address))
-                                {
-                                    target.entry_address = raw_defined_entry_address;
-                                    target.context_address = 0u;
-                                    ::std::uintptr_t typed_defined_entry_address{};
-                                    if(try_get_runtime_llvm_jit_defined_entry_address(defined_info->module_id,
-                                                                                      defined_info->function_index,
-                                                                                      typed_defined_entry_address))
-                                    {
-                                        target.typed_entry_address = typed_defined_entry_address;
-                                    }
-                                }
-                                else
-                                {
-                                    ::fast_io::fast_terminate();
-                                }
-                                target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, func_sig_from_defined(defined_info->runtime_func));
-                                break;
-                            }
-                            case table_elem_type::func_ref_imported:
-                            {
-                                auto const imported_func_ptr{elem.storage.imported_ptr};
-                                if(imported_func_ptr == nullptr) { break; }
-                                auto const cached_target_ptr{find_cached_import_target(imported_func_ptr)};
-                                if(cached_target_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                                auto const& cached_target{*cached_target_ptr};
-                                target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
-                                target.context_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(cached_target));
-                                target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, cached_target.signature());
-                                break;
-                            }
-                            [[unlikely]] default:
-                            {
-                                ::fast_io::fast_terminate();
-                            }
-                        }
+                        target_vec.index_unchecked(elem_index) =
+                            make_llvm_jit_call_indirect_target(caller_rec, resolved_table->elems.index_unchecked(elem_index));
                     }
 
                     table_view.data_address = reinterpret_cast<::std::uintptr_t>(target_vec.data());
                     table_view.size = target_vec.size();
                 }
             }
+        }
+
+        inline constexpr void update_llvm_jit_call_indirect_table_views(
+            runtime_table_storage_t* mutated_table,
+            ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind kind,
+            ::std::size_t begin,
+            ::std::size_t count) noexcept
+        {
+            using mutation_kind = ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind;
+            if(mutated_table == nullptr || mutated_table->table_type_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(mutated_table->table_type_ptr->reftype !=
+               ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            if(count == 0uz) { return; }
+
+            bool grow_mutation{};
+            switch(kind)
+            {
+                case mutation_kind::set: [[fallthrough]];
+                case mutation_kind::init: [[fallthrough]];
+                case mutation_kind::copy: [[fallthrough]];
+                case mutation_kind::fill: break;
+                case mutation_kind::grow: grow_mutation = true; break;
+                [[unlikely]] default: ::fast_io::fast_terminate();
+            }
+
+            auto const table_size{mutated_table->elems.size()};
+            if(begin > table_size || count > table_size - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(grow_mutation && count != table_size - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const affected_view_count{details::for_each_borrowed_llvm_jit_call_indirect_table_view_alias(
+                g_runtime.modules,
+                mutated_table,
+                [](runtime_module_storage_t const& module, ::std::size_t table_index) constexpr noexcept
+                { return resolve_table(module, table_index); },
+                [&](compiled_module_record& caller_rec, runtime_module_storage_t& caller_module, ::std::size_t table_index) constexpr noexcept
+                {
+                    if(caller_rec.llvm_jit_call_indirect_targets.size() != caller_module.llvm_jit_call_indirect_table_views.size()) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto& target_vec{caller_rec.llvm_jit_call_indirect_targets.index_unchecked(table_index)};
+                    if(grow_mutation)
+                    {
+                        // A successful table.grow has already appended exactly [begin, table_size) to the resolved table.
+                        // Keep the old prefix and encode only the new suffix before publishing the relocated view once.
+                        if(target_vec.size() != begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+                        target_vec.resize(table_size);
+                    }
+                    else if(target_vec.size() != table_size) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+
+                    for(::std::size_t elem_index{begin}; elem_index != begin + count; ++elem_index)
+                    {
+                        auto const target{make_llvm_jit_call_indirect_target(
+                            caller_rec, mutated_table->elems.index_unchecked(elem_index))};
+                        target_vec.index_unchecked(elem_index) = target;
+                    }
+
+                    if(grow_mutation)
+                    {
+                        auto& table_view{caller_module.llvm_jit_call_indirect_table_views.index_unchecked(table_index)};
+                        table_view = {reinterpret_cast<::std::uintptr_t>(target_vec.data()), target_vec.size()};
+                    }
+                })};
+            if(affected_view_count == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
         }
 #endif
 
@@ -5697,6 +5792,19 @@ namespace uwvm2::runtime::lib
             mattrs.emplace_back(u8"-d");
             mattrs.emplace_back(u8"-v");
 # endif
+            if(::llvm::Triple{::llvm::sys::getProcessTriple()}.getArch() == ::llvm::Triple::ve)
+            {
+                // LLVM 23 VE's VPU legalizer widens Wasm's short vectors to
+                // 256 lanes, has missing widening patterns, and may spill a
+                // kilobyte for a 16-byte operation. Use its scalar backend for
+                // these generated entries, preserving guarded volatile memory
+                // operations rather than splitting them prematurely in IR.
+                // This MUST configure TargetMachine: VE ignores per-function
+                // target-features, so adding -vpu only to IR is ineffective.
+                // Apply to full/lazy preoptimization and final MCJIT alike;
+                // the resulting target feature string is also part of the cache.
+                mattrs.emplace_back(u8"-vpu");
+            }
 # if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
             mattrs.emplace_back(u8"-altivec");
             mattrs.emplace_back(u8"-vsx");
@@ -5720,6 +5828,74 @@ namespace uwvm2::runtime::lib
             attr_refs.clear();
             attr_refs.reserve(attr_storage.size());
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
+        }
+
+        [[nodiscard]] inline ::llvm::Triple get_runtime_llvm_jit_mcjit_target_triple()
+        {
+            // Do not use EngineBuilder::selectTarget()'s implicit getProcessTriple().
+            // LLVM narrows a 64-bit architecture when sizeof(void*) == 4, but N32
+            // and x32 are ILP32 ABIs on 64-bit ISAs, not MIPS32/i386 code. For
+            // example mips64el-linux-gnuabin32 becomes mipsel-linux-gnuabin32,
+            // which aborts when its N32 ABI requests registers the ISA lacks.
+            // The bundled LLVM build's configured host/default triple retains
+            // the ISA, endian, ABI environment and R6 subarchitecture together.
+            // Reuse this choice for preoptimization, materialization AND live
+            // unwind probes; a probe must not abort before a valid JIT runs.
+            // Normalize three-component spellings too: LLVM's getter itself
+            // does not normalize, and ABI environment parsing must be exact.
+            return ::llvm::Triple{::llvm::Triple::normalize(::llvm::sys::getDefaultTargetTriple())};
+        }
+
+        [[nodiscard]] inline ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> select_runtime_llvm_jit_target(
+            ::llvm::EngineBuilder& target_builder,
+            ::uwvm2::utils::container::u8string const& host_cpu_name,
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage)
+        {
+            namespace emit = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+            // This explicit EngineBuilder overload owns strings, unlike setMAttrs.
+            // Preserve every host feature (including VE -vpu) in the same order.
+            ::llvm::SmallVector<::std::string, 16> attributes{};
+            attributes.reserve(host_target_attribute_storage.size());
+            for(auto const& attribute: host_target_attribute_storage)
+            {
+                auto const ref{emit::get_llvm_string_ref(attribute)};
+                attributes.emplace_back(ref.data(), ref.size());
+            }
+            auto triple{get_runtime_llvm_jit_mcjit_target_triple()};
+            // RuntimeDyld has MIPS far-call stubs, but they jump through $at
+            // without establishing the PIC host callee's required $t9/GP.
+            // Generate full-width C-ABI register calls instead. O32/N32 ignore
+            // long-calls with ABICalls enabled, so explicitly use noabicalls
+            // for MCJIT's static relocation model (N64 already does so).
+            // Append both after host features: these are required JIT ABI
+            // policies, not optional CPU capabilities. Also avoid assuming
+            // separately allocated code shares a JAL 256-MiB address region.
+            // Keep full materialization and the live unwind probe aligned.
+            if(triple.isMIPS())
+            {
+                attributes.emplace_back("+noabicalls");
+                attributes.emplace_back("+long-calls");
+            }
+            // A registered backend (or even a working object encoder) is not
+            // necessarily a native JIT implementation. VE/SPARC and bytecode
+            // targets can pass AOT probes without a supported MCJIT loader.
+            // EngineBuilder::create only warns about hasJIT()==false; it does
+            // not refuse construction, so that warning is not a safety gate.
+            // Fail through the caller's normal materialization/probe handling
+            // before LLVM aborts in an unsupported object/relocation path.
+            // This gate is native-only: AOT inventories must remain unfiltered.
+            ::std::string error{};
+            // The empty-architecture overload preserves the explicit triple
+            // and is also available before LLVM 23's two-argument API change.
+            auto const target{::llvm::TargetRegistry::lookupTarget({}, triple, error)};
+            // BPF advertises hasJIT(), but its bytecode is not CPU code for our
+            // in-process C ABI; UWVM has no BPF loading/execution boundary.
+            if(triple.isBPF() || target == nullptr || !target->hasJIT() || !target->hasMCAsmBackend() ||
+               !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_object_format_supported(triple)) { return {}; }
+            auto machine{::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{
+                target_builder.selectTarget(triple, {}, emit::get_llvm_string_ref(host_cpu_name), attributes)}};
+            if(machine != nullptr && !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_subtarget_supported(*machine)) { return {}; }
+            return machine;
         }
 
         inline constexpr void apply_runtime_llvm_jit_native_target_function_attrs(::llvm::Module& module,
@@ -5933,7 +6109,7 @@ namespace uwvm2::runtime::lib
                 .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                 .setMAttrs(host_target_attributes);
 
-            return ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{target_builder.selectTarget()};
+            return select_runtime_llvm_jit_target(target_builder, host_cpu_name, host_target_attribute_storage);
         }
 
         struct runtime_llvm_jit_legacy_light_task_preopt_context
@@ -6358,7 +6534,11 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            if(pipeline == runtime_llvm_jit_full_pipeline_kind::none) { return true; }
+            if(pipeline == runtime_llvm_jit_full_pipeline_kind::none)
+            {
+                ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::legalize_llvm_jit_native_vectors(module);
+                return !verify_llvm_jit_ir || !::llvm::verifyModule(module);
+            }
 
             if(pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)
             {
@@ -6374,11 +6554,17 @@ namespace uwvm2::runtime::lib
                 ::llvm::ModuleAnalysisManager module_analysis_manager{};
                 auto const pipeline_opt_level{get_runtime_llvm_jit_pipeline_opt_level(codegen_opt_level)};
                 ::llvm::PipelineTuningOptions pipeline_tuning_options{};
-                auto const pipeline_speed_level{pipeline_opt_level.getSpeedupLevel()};
-                pipeline_tuning_options.LoopUnrolling = pipeline_speed_level > 1u;
+                // LLVM 23.1 changed OptimizationLevel from a class (with
+                // getSpeedupLevel()) to an enum. We select only O0/O1/O2/O3,
+                // so comparing the public levels preserves the previous >1
+                // policy on both APIs without guessing an enum's encoding or
+                // accidentally treating a size-optimization level as O2.
+                auto const optimize_for_speed{pipeline_opt_level == ::llvm::OptimizationLevel::O2 ||
+                                              pipeline_opt_level == ::llvm::OptimizationLevel::O3};
+                pipeline_tuning_options.LoopUnrolling = optimize_for_speed;
                 pipeline_tuning_options.LoopInterleaving = pipeline_tuning_options.LoopUnrolling;
-                pipeline_tuning_options.LoopVectorization = pipeline_speed_level > 1u;
-                pipeline_tuning_options.SLPVectorization = pipeline_speed_level > 1u;
+                pipeline_tuning_options.LoopVectorization = optimize_for_speed;
+                pipeline_tuning_options.SLPVectorization = optimize_for_speed;
                 ::llvm::PassBuilder pass_builder{::std::addressof(target_machine), pipeline_tuning_options};
                 details::register_runtime_llvm_jit_expanded_lane_unroll_policy(pass_builder);
 
@@ -6392,6 +6578,7 @@ namespace uwvm2::runtime::lib
                 module_pass_manager.run(module, module_analysis_manager);
             }
 
+            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::legalize_llvm_jit_native_vectors(module);
             if(verify_llvm_jit_ir)
             {
                 if(::llvm::verifyModule(module)) [[unlikely]]
@@ -6485,19 +6672,6 @@ namespace uwvm2::runtime::lib
             auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return false; }
 
-            if(static_cast<bool>(rec.llvm_jit_compiled.llvm_jit_capability_failure)) [[unlikely]]
-            {
-                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                {
-                    llvm_jit_materialize_error(u8"LLVM JIT materialization refused capability-preflight failure for module=\"",
-                                               rec.module_name,
-                                               u8"\": ",
-                                               rec.llvm_jit_compiled.llvm_jit_capability_failure.reason,
-                                               u8".");
-                }
-                return false;
-            }
-
             auto const local_func_count{runtime_module->local_defined_function_vec_storage.size()};
             if(local_func_count == 0uz)
             {
@@ -6560,7 +6734,7 @@ namespace uwvm2::runtime::lib
                 .setMCPU(llvm_jit_translate_details::get_llvm_string_ref(host_cpu_name))
                 .setMAttrs(host_target_attributes);
 
-            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            auto target_machine{select_runtime_llvm_jit_target(target_builder, host_cpu_name, host_target_attribute_storage)};
             if(target_machine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -8108,47 +8282,6 @@ namespace uwvm2::runtime::lib
                 }
 # endif
 
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-                if(compile_llvm_jit_translation && static_cast<bool>(rec.llvm_jit_compiled.llvm_jit_capability_failure)) [[unlikely]]
-                {
-                    auto const& failure{rec.llvm_jit_compiled.llvm_jit_capability_failure};
-                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                        u8"[fatal] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"LLVM AOT capability preflight rejected module=\"",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                        rec.module_name,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"\": ",
-                                        failure.reason,
-                                        u8" (function=",
-                                        failure.function_index);
-                    if(failure.instruction_offset != (::std::numeric_limits<::std::size_t>::max)())
-                    {
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, u8", byte-offset=", failure.instruction_offset);
-                    }
-                    if(failure.has_opcode)
-                    {
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, u8", opcode=", failure.primary_opcode);
-                    }
-                    if(failure.has_extended_opcode)
-                    {
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, u8", subopcode=", failure.extended_opcode);
-                    }
-                    if(failure.has_detail)
-                    {
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, u8", detail=", failure.detail);
-                    }
-                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        u8").\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                    ::fast_io::fast_terminate();
-                }
-# endif
-
                 rec.type_canon_index = build_type_canon_index(*rec.runtime_module);
 
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
@@ -8668,6 +8801,17 @@ namespace uwvm2::runtime::lib
     // - Push/pop callbacks are used only when codegen emitted logical stack frames.
     // - Tail-call disabling keeps the C++ helper visible to platform unwinders.
     // =========================================================================
+    extern "C++" void llvm_jit_refresh_call_indirect_table_views(
+        runtime_table_storage_t* mutated_table,
+        ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind kind,
+        ::std::size_t begin,
+        ::std::size_t count) noexcept
+    {
+        // The bridge receives the already-resolved destination table, so imported aliases in every caller are updated while
+        // unrelated tables retain both their target allocation and contents.
+        update_llvm_jit_call_indirect_table_views(mutated_table, kind, begin, count);
+    }
+
     extern "C++"
 # if UWVM_HAS_CPP_ATTRIBUTE(clang::disable_tail_calls)
         [[clang::disable_tail_calls]]
@@ -8727,6 +8871,11 @@ namespace uwvm2::runtime::lib
             case llvm_jit_trap_kind::memory_out_of_bounds:
             {
                 trap_fatal(trap_kind::memory_out_of_bounds);
+                return;
+            }
+            case llvm_jit_trap_kind::table_out_of_bounds:
+            {
+                trap_fatal(trap_kind::table_out_of_bounds);
                 return;
             }
             case llvm_jit_trap_kind::runtime_invariant_failure:
@@ -8869,6 +9018,25 @@ namespace uwvm2::runtime::lib
             // For VM entry, only allow imported functions that ultimately resolve to a wasm-defined function.
             if(tgt.k != cached_import_target::kind::defined) [[unlikely]]
             {
+                if(cfg.module_start && tgt.param_bytes == 0uz && tgt.result_bytes == 0uz &&
+                   tgt.sig.params.size == 0uz && tgt.sig.results.size == 0uz &&
+                   cfg.entry_abi_buffers.param_bytes == 0uz && cfg.entry_abi_buffers.result_bytes == 0uz)
+                {
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                    if(runtime_compiler_requests_llvm_jit_translation())
+                    {
+                        llvm_jit_raw_call_cached_import_entry(reinterpret_cast<::std::uintptr_t>(::std::addressof(tgt)),
+                                                               0u, 0uz, 0u, 0uz);
+                        return;
+                    }
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                    ::std::byte empty_stack{};
+                    (void)call_bridge(main_id, cfg.entry_function_index, ::std::addressof(empty_stack));
+                    return;
+#endif
+                }
+
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",

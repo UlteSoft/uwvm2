@@ -33,12 +33,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         inline bool wasm_feature_wasm1p1_is_exist{};
         inline bool wasm_feature_wasm2_is_exist{};
 
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 4uz> wasm_feature_mvp_alias{
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 5uz> wasm_feature_mvp_alias{
+            u8"--wasm-feature-mvp",
             u8"-WFmvp",
             u8"-WFwasmmvp",
             u8"-WFwasm1",
             u8"-WF1"};
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 4uz> wasm_feature_wasm1p1_alias{
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 5uz> wasm_feature_wasm1p1_alias{
+            u8"--wasm-feature-wasm1.1",
             u8"-WF1.1",
             u8"-WF1p1",
             u8"-WFwasm1.1",
@@ -90,7 +92,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
     /// @brief Command-line switch that disables the WebAssembly 1.1 feature collection and enforces MVP gates.
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasm_feature_mvp{.name{u8"--wasm-feature-mvp"},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasm_feature_mvp{.name{u8"--wasm-feature-wasmmvp"},
                                                                          .describe{u8"Disable WebAssembly 1.1 features and enforce the WebAssembly MVP feature set."},
                                                                          .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{
                                                                              details::wasm_feature_mvp_alias.data(), details::wasm_feature_mvp_alias.size()}},
@@ -100,7 +102,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     /// @brief Command-line switch that enables the WebAssembly 1.1 feature collection.
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_feature_wasm1p1{
-        .name{u8"--wasm-feature-wasm1.1"},
+        .name{u8"--wasm-feature-wasm1p1"},
         .describe{u8"Enable the WebAssembly 1.1 feature set."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasm_feature_wasm1p1_alias.data(), details::wasm_feature_wasm1p1_alias.size()}},
         .handle{::std::addressof(details::wasm_feature_wasm1p1_callback)},

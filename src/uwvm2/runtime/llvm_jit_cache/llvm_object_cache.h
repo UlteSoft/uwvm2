@@ -229,7 +229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                       load.signature_verified ? u8"1" : u8"0");
             auto const first{reinterpret_cast<char const*>(load.object.data())};
             // LLVM owns the returned MemoryBuffer, so copy from the temporary vector into a stable buffer.
-            return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2-llvm-jit-cache");
+            return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2ros-llvm-jit-cache");
         }
     };
 }  // namespace uwvm2::runtime::llvm_jit_cache

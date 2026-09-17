@@ -1,7 +1,6 @@
-    // Direct and indirect call validation cases for the WebAssembly 1.0/MVP primary opcode set.
-    // Validation keeps callee signatures as ranges, but the current LLVM JIT call ABI is still MVP-oriented for 0/1 results.
-    // Multi-value calls, typed function references, and multi-table call_indirect must update this file and the emitter ABI
-    // paths together.
+    // Direct and indirect call validation cases for the WebAssembly primary opcode set. Validation and emission preserve
+    // complete parameter/result tuples; typed LLVM calls return 0 results as void, 1 as a scalar, and multiple results as
+    // a Wasm-order literal struct. Raw host/import boundaries use the corresponding tightly packed result buffer.
 
 case wasm1_code::call:
 {
@@ -83,8 +82,6 @@ case wasm1_code::call:
     auto const param_count{static_cast<::std::size_t>(callee_type.parameter.end - callee_type.parameter.begin)};
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
 
-    if(reject_unsupported_call_signature(callee_type, op_begin, wasm1_code::call, false)) [[unlikely]] { return; }
-
     if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"call", param_count); }
 
     // Type-check arguments when the stack is non-polymorphic.
@@ -95,8 +92,9 @@ case wasm1_code::call:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call";
@@ -111,9 +109,8 @@ case wasm1_code::call:
     // Consume parameters if present.
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
 
-    // Push results.  This preserves the full result range for future multi-value validation, but the current LLVM JIT
-    // emitter only lowers 0/1 result calls.  Enabling multi-value must extend call ABI/result-buffer lowering before
-    // allowing such functions to remain on the inline JIT path.
+    // Push every result in Wasm source order. The emitter uses the same full tuple signature for direct typed calls and
+    // raw-buffer bridge calls, so validation and LLVM lowering keep identical stack effects.
     if(result_count != 0uz)
     {
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
@@ -216,7 +213,8 @@ case wasm1_code::call_indirect:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if((wasm1p1_para.disable_multiple_tables || wasm1p1_para.controllable_allow_multi_table) && table_index != 0u) [[unlikely]]
+    if(!wasm2_feature_enabled(::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind::multiple_tables) && table_index != 0u)
+        [[unlikely]]
     {
         fail_wasm2_feature_required(
             op_begin,
@@ -240,8 +238,6 @@ case wasm1_code::call_indirect:
     auto const param_count{static_cast<::std::size_t>(callee_type.parameter.end - callee_type.parameter.begin)};
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
 
-    if(reject_unsupported_call_signature(callee_type, op_begin, wasm1_code::call_indirect, true)) [[unlikely]] { return; }
-
     // Stack effect: (args..., i32 table_element_index) -> (results...)
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const param_count_plus_element_index_overflows{param_count == max_operand_stack_requirement};
@@ -253,7 +249,7 @@ case wasm1_code::call_indirect:
     }
 
     // table-element index operand (must be i32 if present)
-    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack && !idx.is_unknown)
     {
         if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
@@ -272,8 +268,9 @@ case wasm1_code::call_indirect:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
-            if(actual_type != expected_type) [[unlikely]]
+            auto const& actual_operand{operand_stack[operand_stack.size() - 1uz - i]};
+            auto const actual_type{actual_operand.type};
+            if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"call_indirect";
@@ -287,8 +284,8 @@ case wasm1_code::call_indirect:
 
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
 
-    // Same result-range rule as direct call: validation can model future multi-value results, while the current LLVM JIT
-    // call lowering remains limited to the existing MVP-style ABI until explicitly extended.
+    // Apply the same complete result tuple as direct call; call_indirect merges typed and raw-buffer paths with the
+    // canonical scalar-or-struct LLVM result type before restoring individual Wasm stack values.
     if(result_count != 0uz)
     {
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }

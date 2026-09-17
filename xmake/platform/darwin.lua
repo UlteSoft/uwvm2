@@ -4,10 +4,9 @@ function darwin_target(opt)
 
 	local use_llvm_compiler = get_config("use-llvm-compiler")
 	if use_llvm_compiler then	
-	    -- On macOS, xmake's `clang` toolchain typically resolves to Apple clang in `/usr/bin/clang`,
-	    -- which can be incompatible with our custom SYSROOT/toolchain (and may crash while compiling).
-	    -- Use xmake's `llvm` toolchain instead so it can pick up the standalone LLVM toolchain
-	    -- from PATH/`llvm-config`.
+	    -- Select the bootstrap C/C++ compiler independently of ROS's dependency.
+	    -- An installed Clang may compile ROS and its bundled LLVM, but llvm-config
+	    -- on PATH must never select the LLVM headers/libraries linked into ROS.
 	    set_toolchains("clang")
 	    add_ldflags("-fuse-ld=lld", {force = true})
 	end

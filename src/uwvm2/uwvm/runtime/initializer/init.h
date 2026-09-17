@@ -3676,6 +3676,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
             using code_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>;
             using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
+            using data_count_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>;
 
             auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t>(module_storage.sections)};
             auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t>(module_storage.sections)};
@@ -3690,6 +3691,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_section_storage_t>(module_storage.sections)};
 
             enforce_wasm1p1_initializer_feature_parameters(module_storage, fs_para);
+            auto const& datacountsec{
+                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_count_section_storage_t>(module_storage.sections)};
+            out.data_count_section_present = datacountsec.present;
+            out.data_count_section_count = datacountsec.count;
 
             // Expose type section range for runtime/compilers (e.g. call_indirect validation).
             if(typesec.types.empty())
@@ -5224,11 +5229,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return page_count * page_size_bytes;
         }
 
-        inline constexpr void apply_wasm1_active_element_and_data_segments_after_linking() noexcept
+        inline constexpr void apply_wasm1_active_element_and_data_segments_for_module(
+            ::uwvm2::utils::container::u8string_view curr_module_name,
+            ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
         {
             using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
 
-            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            // Keep segment validation, writes and implicit drops local to one
+            // instance, so its start can run before the next instance's writes.
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
@@ -5775,6 +5783,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8". ");
                 }
+            }
+        }
+
+        inline constexpr void apply_wasm1_active_element_and_data_segments_after_linking() noexcept
+        {
+            for(auto& [name, rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            {
+                apply_wasm1_active_element_and_data_segments_for_module(name, rt);
             }
         }
 
@@ -7170,7 +7186,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
     }  // namespace details
 
-    inline constexpr void initialize_runtime() noexcept
+    inline constexpr void apply_runtime_active_segments(::uwvm2::utils::container::u8string_view module_name) noexcept
+    {
+        auto& modules{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage};
+        auto const pos{modules.find(module_name)};
+        if(pos == modules.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        details::apply_wasm1_active_element_and_data_segments_for_module(module_name, pos->second);
+    }
+
+    // Embedding callers retain the eager-initialization default. The CLI
+    // defers active segments to its ordered per-module start dispatcher.
+    inline constexpr void initialize_runtime(bool defer_active_segments = false) noexcept
     {
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"Initialize the runtime environment for the WASM module. "); }
 
@@ -7330,7 +7356,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         details::finalize_wasm1_globals_after_linking();
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"initializer: Apply wasm1 active elem/data segments. "); }
-        details::apply_wasm1_active_element_and_data_segments_after_linking();
+        if(!defer_active_segments) { details::apply_wasm1_active_element_and_data_segments_after_linking(); }
 
         // finalize time
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]

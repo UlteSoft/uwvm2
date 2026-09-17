@@ -76,8 +76,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             switch(para.cli_mode)
             {
-                case cli_mode::direct_mvp: return u8"--wasm-feature-mvp";
-                case cli_mode::direct_wasm1p1: return u8"--wasm-feature-wasm1.1";
+                case cli_mode::direct_mvp: return u8"--wasm-feature-wasmmvp";
+                case cli_mode::direct_wasm1p1: return u8"--wasm-feature-wasm1p1";
                 case cli_mode::direct_wasm2: return u8"--wasm-feature-wasm2";
                 case cli_mode::scoped:
                 {

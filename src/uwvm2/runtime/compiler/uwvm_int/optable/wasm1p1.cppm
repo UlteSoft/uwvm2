@@ -44,6 +44,7 @@ import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1;
 import uwvm2.object;
+import uwvm2.runtime.compiler.shared.wasm1p1_simd;
 import uwvm2.uwvm.runtime.storage;
 import :define;
 import :convert;

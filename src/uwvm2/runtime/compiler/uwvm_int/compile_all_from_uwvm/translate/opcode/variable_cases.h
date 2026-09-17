@@ -3188,6 +3188,15 @@ case wasm1_code::local_tee:
         }
     }
 
+    // local.tee has result type t, even when its input was Unknown. Pop/push
+    // through the helpers so changing the placeholder i32 to i64/v128 also
+    // updates operand_stack_bytes; mutating only the tag corrupts accounting.
+    if(operand_stack.back_unchecked().is_unknown)
+    {
+        operand_stack_pop_unchecked();
+        operand_stack_push(curr_local_type);
+    }
+
     auto const local_off{local_offset_from_index(local_index)};
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS

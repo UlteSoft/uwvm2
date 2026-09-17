@@ -130,7 +130,10 @@
             auto module{::uwvm2::utils::container::make_delete_owned<::llvm::Module>("uwvm2_win64_unwind_probe", context)};
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(::llvm::CodeGenOptLevel::None);
-            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            // Probe the actual host ISA/ABI/features, not LLVM's implicit process
+            // triple (which incorrectly narrows N32) or a different generic CPU.
+            auto target_machine{select_runtime_llvm_jit_target(
+                target_builder, get_llvm_jit_host_cpu_name_storage(), get_llvm_jit_host_target_attribute_storage())};
             if(target_machine == nullptr) [[unlikely]] { return false; }
             set_llvm_module_target_triple_from_machine(*module, *target_machine);
             module->setDataLayout(target_machine->createDataLayout());

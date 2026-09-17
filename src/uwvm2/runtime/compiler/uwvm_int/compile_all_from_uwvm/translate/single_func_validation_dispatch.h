@@ -362,6 +362,7 @@ auto const enter_control_frame{
                                       .type = type,
                                       .polymorphic_base = is_polymorphic,
                                       .then_polymorphic_end = false,
+                                      .codegen_entry_reachable = codegen_reachable,
                                       .start_label_id = start_label_id,
                                       .end_label_id = end_label_id,
                                       .else_label_id = else_label_id,
@@ -394,13 +395,13 @@ auto const validate_i32_operands{
         pop_available_concrete_operands(count);
     }};
 
-auto const check_table_index{[&](::std::byte const* op_begin, wasm_u32 table_index) constexpr UWVM_THROWS
+auto const check_table_index{[&](::std::byte const* op_begin, wasm_u32 table_index, wasm_u32 opcode) constexpr UWVM_THROWS
                              {
                                  if((wasm1p1_para.disable_multiple_tables || wasm1p1_para.controllable_allow_multi_table) && table_index != 0u)
                                      [[unlikely]]
                                  {
                                      fail_wasm2_feature_required(op_begin,
-                                                                 table_index,
+                                                                 opcode,
                                                                  ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
                                                                  ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
                                  }
