@@ -97,6 +97,12 @@ fixed-environment 仅省环境保护；不省内存边界、trap、重入、安�
 
 在已经配置资源上限、LLVM 工具及宿主库路径的 shell 内：
 
+LLVM 依赖切换后的说明：下面带 `--llvm-config` 的命令属于历史独立后端实验，
+用于指定外部比较工具链，不是当前 ROS 的构建入口。ROS 的正式依赖只来自
+`third-parties/llvm`，不构建或调用 llvm-config；固定版本的当前结果及直接
+CMake 依赖合同见 [ROS LLVM 验证记录](../toolchain/ros-bundled-llvm23.md)。
+不能把外部 SDK 实验的通过算成当前 vendor／完整 ROS CLI 已通过。
+
 ```sh
 python3 test/0013.uwvm_int/fp_cross_bootlin_config.py --sdk-root /path/to/sdks --qemu-dir /path/to/qemu --clang clang++ --output /tmp/fp-config.json
 python3 test/0013.uwvm_int/run_fp_cross_matrix.py --config /tmp/fp-config.json --build-dir /tmp/fp-matrix --jobs 6

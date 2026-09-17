@@ -33,6 +33,16 @@ Supports over 100 triplet platforms, including DOS series, POSIX series, Windows
 ### Runtime execution backends
 UWVM2 retains two explicit runtime backends: the full-translation interpreter and full-module LLVM AOT. See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the u2 interpreter (“register-ring stack-top cache”) architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
 
+The ROS LLVM backend builds its own pinned **LLVM 23.1.1 stable release** with
+the downstream MIPS R6 repair. It does not use system LLVM, `LLVM_CONFIG`, or
+an `llvm-config` executable; dependency information comes directly from CMake.
+The first LLVM-enabled xmake configuration needs CMake and Ninja; see
+[bundled LLVM provenance and build instructions](third-parties/llvm/README.md).
+The [maintenance rationale](documents/toolchain/ros-llvm-maintenance.md) explains
+the version, FP, ABI, module and cache constraints; the
+[verification record](documents/toolchain/ros-bundled-llvm23.md) distinguishes
+completed test snapshots from remaining platform/build coverage.
+
 ### High-performance, secure, and highly scalable standard parser
 High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
 

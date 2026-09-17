@@ -256,6 +256,11 @@ python3 tools/ci/check_wasm_fp_environment.py \
 
 独立数值 oracle 与 LLVM 降低测试可以这样重现（MPFR/GMP、LLVM 和目标 sysroot 需先配置好；生成端不能启用 fast-math）：
 
+以下 llvm-config／llc 命令保留为历史独立工具链实验的复现方式，并非当前 ROS
+依赖选择方式。ROS 现在仅构建 `third-parties/llvm` 中的固定源码，依赖信息直接
+来自 CMake，既不要求也不信任系统 llvm-config。外部实验必须记录准确工具链，
+不能替代 [固定 vendor 与完整 CLI 的验证](../toolchain/ros-bundled-llvm23.md)。
+
 ```sh
 c++ -std=c++20 -O3 -Isrc -DUWVM_FP_ORACLE_GENERATE \
   tools/ci/probes/strict_float_oracle.cpp -lmpfr -lgmp -o fp-generate

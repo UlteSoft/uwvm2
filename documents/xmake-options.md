@@ -190,9 +190,31 @@ Controls the full-module LLVM AOT backend. The option name is retained for compa
   - `none`: Disable the LLVM AOT backend (`UWVM_DISABLE_JIT`).
   - `default`: Enable the default full-module LLVM backend (`UWVM_USE_DEFAULT_JIT`).
   - `llvm`: Enable the full-module LLVM backend (`UWVM_USE_LLVM_JIT`).
-- **Notes:** When `default` or `llvm` is selected, `xmake` probes LLVM through `llvm-config` and imports the returned include paths, link paths, defines, system libraries, and LLVM libraries automatically. `none` skips this probe entirely. Lazy LLVM compilation and tiered execution are not compiled. This selection is separate from `--use-llvm-compiler`, which only controls the compiler toolchain. Ensure `llvm-config` is discoverable on `PATH`, or point `LLVM_CONFIG` to the executable explicitly.
+- **Notes:** When `default` or `llvm` is selected, ROS builds its pinned, patched LLVM 23.1.1 sources under `third-parties/llvm` using CMake and Ninja. CMake directly exports the include paths, definitions and ordered static-library dependencies; no `llvm-config` executable is built, queried or accepted from the system. `none` skips the LLVM dependency entirely. Lazy LLVM compilation and tiered execution are not compiled. This selection is separate from `--use-llvm-compiler`, which only controls the bootstrap compiler. See [provenance and build policy](../third-parties/llvm/README.md) and [exact changes to the official release](../third-parties/llvm/UPSTREAM_CHANGES.md).
 - **Example:**
   - `xmake f --execution-jit=llvm --use-llvm-compiler=y`
+
+### `--llvm-build-jobs=N`
+
+Controls compilation parallelism for the bundled LLVM library.
+
+- **Default:** `2`; integer range `1..16`. LLVM link parallelism remains one.
+- **Notes:** This is not a memory limit. Use an aggregate cgroup/job limit when several compilers or test campaigns share a machine. It does not select the guest Wasm optimization policy.
+
+### `--llvm-build-targets=TARGETS`
+
+Selects bundled LLVM code-generation backends.
+
+- **Default:** `Native`.
+- **Values:** `Native`, `all`, or a semicolon-separated LLVM backend list, such as `X86;Mips;AArch64`.
+- **Notes:** ROS JIT requires its own runtime host backend even when additional backends are selected for an audit. Omitting it is an error, not a supported interpreter fallback. Quote a semicolon-separated value when passing it through a shell.
+
+### `--llvm-cmake-toolchain=FILE`
+
+Supplies the CMake toolchain for cross-building the bundled LLVM library.
+
+- **Default:** `none`; required for a cross-target LLVM dependency.
+- **Notes:** Compiler, sysroot, ABI and linker must match ROS. The toolchain must explicitly set `LLVM_HOST_TRIPLE` for the machine on which ROS runs; CMake's system processor alone does not override LLVM's build-machine inference. Old inferred host/default triples are cleared before reconfiguration. Dependency discovery needs no target runner or llvm-config executable. See [the cross-build contract](../third-parties/llvm/README.md).
 
 ### `--enable-uwvm-int-combine-ops=MODE`
 
