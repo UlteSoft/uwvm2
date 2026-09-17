@@ -443,3 +443,14 @@ The later MIPS direct-call control additionally required full-width C-ABI calls;
 its measured instruction-size cost and pending ABI coverage are documented in
 the linked repair note. Do not extend the local-label patch's byte-equality
 result to the MIPS call-range change.
+
+## Completed revision-6 production-header follow-through
+
+The final3 revision-6 LLVM/header build and its dependent regression batch have
+now completed. The source manifest, verified binary digest, 49 retained LLVM
+regression steps, seven runtime groups and remaining target failures are
+recorded in the [completed revision-6 replay](elf-local-symbol-unwind.md#completed-revision-6-header-build-and-regression-replay).
+This updates the package/header status only; fresh revision-6 named-module,
+matched performance and remaining foreign-platform execution checks are still
+pending. The historical revision-5 module interruption remains a failed build,
+not a successful module test.

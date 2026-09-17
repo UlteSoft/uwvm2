@@ -208,3 +208,53 @@ The PIC-call evidence, including failed controls and the oomd journal, is
 retained in `ros-mips-pic-regressions-20260917.tar.gz` (SHA-256
 `0705a82b44d9dbd0cf96b9f2fdba5d7b258f88c3489e39adea3160dd378f228c`).
 This is an evidence archive, not a backup of the retired compiler outputs.
+
+## Completed revision-6 header build and regression replay
+
+The previously pending final3 production build and its finite post-build batch
+completed successfully on September 17. This supersedes only the pending
+**header/LLVM** status above; no revision-6 named-module or performance result
+is implied.
+
+- Build evidence: `release6-production-build-01/result.json`, with successful
+  provenance, configure and build steps and `source_unchanged: true`.
+- Frozen source manifest:
+  `4ae092ff46781c763897bef46c5fb4f87a9826f28f0e73d21012051386580afd`.
+- Header CLI SHA-256, independently rechecked after the tests:
+  `b33eab08e6c9c39893f2da4fc8312783c466306188b7a32d03488801dd979ad7`.
+- Before publication, all 15,402 tracked files in `src/`, `xmake/`,
+  `third-parties/` and `xmake.lua` at ROS commit
+  `0f830f66404801b4bed6a534efb6cfb78624a29f` matched the frozen manifest.
+  Subsequent audit-document and test EOF-formatting changes are not a new
+  runtime build. This comparison does not certify ordinary uwvm2's separate
+  external LLVM dependency.
+
+The freshly built revision-6 tools pass all 49 retained backend/RuntimeDyld
+regression steps, 77 optimized native NaN cases, the native SIMD fixture and
+56 target-selection controls. Those controls include expected rejections;
+they are not 56 architecture execution tests. Exact commands and statuses are
+in `release6-codegen-tools/` and `release6-native-selection-01/`.
+
+All seven `release6-header-functional-01/` groups pass on the verified CLI:
+
+| Group | Completed checks |
+| --- | --- |
+| Unwind/cache | 108 CLI runs, including 72 signed-cache recursive trap replays |
+| Core 2 | 2,296 runs / 83,152 assertions, zero failures; 4,673 exclusions remain |
+| Memory | 652 real SIMD boundary/grow checks |
+| Integration | 65 feature/import-alias/DataCount checks |
+| Conversions | 13 runs / 104 assertions / 6 authenticated replays |
+| Exhaustion | 15 cases across 10 profiles, 150 runs |
+| Interpreter assembly | 18 selected scalar/SIMD add functions |
+
+The unfiltered object inventory still records **57/67 contract** and
+**55/67 SIMD** successes, not an all-platform PASS. Contract failures remain
+for `amdgcn`, `amdgpu`, `bpf`, `bpfeb`, `bpfel`, `nvptx`, `nvptx64`,
+`r600`, `spirv` and `xcore`; SIMD additionally fails for `spirv32` and
+`spirv64`. Every inventory row explicitly has `execution_tested: false`.
+VE and forced-no-SSE x86_64 pass these object-generation checks, but that is
+not native OS/runtime execution on those targets. Keep these distinctions when
+interpreting the successful top-level inventory driver.
+
+A fresh revision-6 named-module build, matched performance measurements and
+the remaining foreign-platform execution/unwind coverage are still pending.
