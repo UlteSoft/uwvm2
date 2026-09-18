@@ -24,6 +24,16 @@ namespace uwvm2::runtime::compiler::shared::strict_float
 #endif
     inline constexpr bool needs_extended_rounding{UWVM2_STRICT_FLOAT_EXTENDED != 0};
 
+    // Disabling SSE on x86-64 does not change its C++ FP return convention.
+    // Float-valued helper calls (even unused template fallthroughs at -O0)
+    // therefore cannot implement this target. Keep operands/results in integer
+    // bits and use the same explicitly rounded x87 memory operations instead.
+#if defined(__x86_64__) && !defined(__SSE__) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
+    inline constexpr bool needs_integer_abi{true};
+#else
+    inline constexpr bool needs_integer_abi{false};
+#endif
+
     // Separate three obligations: the runtime guard establishes FP controls, this
     // file implements arithmetic rounding/NaNs, and byte/integer transport preserves
     // non-arithmetic payloads. None replaces the others. In particular these
@@ -88,7 +98,8 @@ namespace uwvm2::runtime::compiler::shared::strict_float
     // repair; targets with suitable native rounding retain their existing path.
     enum class integral_rounding { ceil, floor, trunc, nearest };
 
-#if ((defined(__i386__) || defined(__x86_64__)) && defined(__SSE2__) && !defined(__SSE4_1__)) || UWVM2_STRICT_FLOAT_LEGACY_NAN
+#if ((defined(__i386__) || defined(__x86_64__)) && defined(__SSE2__) && !defined(__SSE4_1__)) || \
+    (defined(__x86_64__) && !defined(__SSE__) && !defined(__arm64ec__) && !defined(_M_ARM64EC)) || UWVM2_STRICT_FLOAT_LEGACY_NAN
     inline constexpr bool uses_integer_rounding{true};
 #else
     inline constexpr bool uses_integer_rounding{false};
@@ -356,6 +367,57 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         static_cast<void>(lhs); static_cast<void>(rhs); static_cast<void>(result);
         return false;
 #endif
+    }
+
+    // Integer ABI adapter, not software arithmetic: try_nearest_fast and
+    // evaluate_extended only use sizeof(T) and explicit memory operands. An
+    // unsigned T supplies the same IEEE bytes without a Float return register.
+    // Retain the fast RN path and the binary64 midpoint/subnormal repair; never
+    // replace this with an ordinary x87 expression, which can double-round.
+    template <operation Op, typename UInt>
+    [[nodiscard]] inline UInt extended_operation_bits(UInt lhs, UInt rhs = {}) noexcept
+    {
+        static_assert(::std::is_unsigned_v<UInt> && (sizeof(UInt) == 4 || sizeof(UInt) == 8));
+        UInt result;
+        if(try_nearest_fast<Op>(lhs, rhs, result)) { return result; }
+        using Float = ::std::conditional_t<sizeof(UInt) == 4, float, double>;
+        return round_extended<Float>(evaluate_extended<Op>(lhs, rhs));
+    }
+
+    // Decode binary32/64 exactly into the packer's representation. No FP load
+    // or return is needed, so width conversions work with -mno-sse at -O0 too.
+    // Infinities remain infinities; every NaN is quieted by round_extended.
+    template <typename UInt>
+    [[nodiscard]] inline constexpr extended_value ieee_bits_to_extended(UInt raw) noexcept
+    {
+        static_assert(::std::is_unsigned_v<UInt> && (sizeof(UInt) == 4 || sizeof(UInt) == 8));
+        constexpr unsigned fraction{sizeof(UInt) == 4 ? 23u : 52u};
+        constexpr unsigned bias{sizeof(UInt) == 4 ? 127u : 1023u};
+        constexpr unsigned max_exp{sizeof(UInt) == 4 ? 255u : 2047u};
+        unsigned const sign{static_cast<unsigned>(raw >> (sizeof(UInt) * 8u - 1u)) << 15u};
+        unsigned const exponent{static_cast<unsigned>((raw >> fraction) & max_exp)};
+        u64 const payload{static_cast<u64>(raw) & ((u64{1} << fraction) - 1u)};
+        if(exponent == max_exp) { return {(u64{1} << 63u) | (payload << (63u - fraction)), sign | 0x7fffu}; }
+        if(exponent == 0u)
+        {
+            if(payload == 0u) { return {0u, sign}; }
+            unsigned const shift{static_cast<unsigned>(::std::countl_zero(payload))};
+            return {payload << shift, sign | (16383u + 64u - shift - bias - fraction)};
+        }
+        return {((u64{1} << fraction) | payload) << (63u - fraction), sign | (exponent + 16383u - bias)};
+    }
+
+    template <bool Minimum, typename UInt>
+    [[nodiscard]] inline constexpr UInt minmax_bits(UInt lhs, UInt rhs) noexcept
+    {
+        constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+        constexpr UInt infinity{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+        constexpr UInt quiet{UInt{1} << (sizeof(UInt) == 4 ? 22u : 51u)};
+        if((lhs & ~sign) > infinity || (rhs & ~sign) > infinity) { return infinity | quiet; }
+        if(((lhs | rhs) & ~sign) == 0u) { return Minimum ? (lhs | rhs) : (lhs & rhs); }
+        auto const lkey{(lhs & sign) != 0u ? ~lhs : (lhs ^ sign)};
+        auto const rkey{(rhs & sign) != 0u ? ~rhs : (rhs ^ sign)};
+        return (Minimum ? lkey < rkey : lkey > rkey) ? lhs : rhs;
     }
 
     template <operation Op, typename Float>
