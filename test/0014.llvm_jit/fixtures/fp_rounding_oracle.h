@@ -6,6 +6,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 
 namespace fp_rounding_oracle
@@ -36,7 +37,11 @@ namespace fp_rounding_oracle
         if((input & ~sign) > infinity) { return input | quiet; }
         if((input & ~sign) == infinity) { return input; }
         long double whole{};
-        auto fraction = std::modf(static_cast<long double>(std::bit_cast<Float>(input)), &whole);
+        // Keep the independent modf-based oracle, but avoid returning Float
+        // from bit_cast: x86-64 -mno-sse cannot implement that ABI at -O0.
+        Float value;
+        std::memcpy(&value, &input, sizeof(value));
+        auto fraction = std::modf(static_cast<long double>(value), &whole);
         if(op == 0 && fraction > 0) { whole += 1; }
         if(op == 1 && fraction < 0) { whole -= 1; }
         if(op == 3 && (std::fabs(fraction) > 0.5L || (std::fabs(fraction) == 0.5L && std::fmod(whole, 2.0L) != 0))) { whole += fraction < 0 ? -1 : 1; }
