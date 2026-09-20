@@ -56,6 +56,7 @@ struct block_t
     block_type type{};
     bool polymorphic_base{};
     bool then_polymorphic_end{};  // only meaningful for if/else frames
+    bool codegen_entry_reachable{true};
 
     // Stack-top cache snapshot at "end label" entry (used when fallthrough is unreachable at `end`,
     // but the construct is reachable via an earlier branch to its end label).
@@ -227,6 +228,9 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     operand_stack.clear();
     codegen_operand_stack.clear();
     bool is_polymorphic{};
+    // Validation resets bottom typing at a nested end even if no execution edge reaches it.
+    // Keep actual fallthrough reachability separate when selecting register-cache merge states.
+    bool codegen_reachable{true};
 
     ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
 
@@ -354,7 +358,10 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     auto const operand_stack_pop_n{[&](::std::size_t n) constexpr noexcept
                                    {
-                                       while(n-- != 0uz && !operand_stack.empty()) { operand_stack_pop_unchecked(); }
+                                       // Unreachable instructions may consume missing (bottom) operands, but
+                                       // must never consume concrete values owned by an enclosing frame.
+                                       auto const base{control_flow_stack.empty() ? 0uz : control_flow_stack.back_unchecked().operand_stack_base};
+                                       while(n-- != 0uz && operand_stack.size() > base) { operand_stack_pop_unchecked(); }
                                    }};
 
     auto const operand_stack_truncate_to{[&](::std::size_t new_size) constexpr noexcept
@@ -698,6 +705,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     }
 
     // Translate: opfunc signature tuple (ip, operand_stack_top_ptr, local_base_ptr, [stack-top cache...]).
+    // Call bridges take slot 1 by value and return its updated pointer; ordinary call opfuncs must store that return in slot 1.
     // Slot types are derived from `CompileOption` to drive ABI packing (GPR vs FP/SIMD regs) correctly.
     static constexpr ::std::size_t interpreter_tuple_size{details::interpreter_tuple_size<CompileOption>()};
     using interpreter_tuple_t = decltype(details::make_interpreter_tuple<CompileOption>(::std::make_index_sequence<interpreter_tuple_size>{}));

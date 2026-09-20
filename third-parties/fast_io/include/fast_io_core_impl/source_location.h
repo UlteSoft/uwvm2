@@ -81,9 +81,49 @@ print_reserve_scatters_define(::fast_io::io_reserve_type_t<char_type, ::std::sou
 	return ::fast_io::details::prrsv_reserve_scatters_source_location_define_impl(pscatters, pbuffer, location);
 }
 
+template <::std::integral char_type>
+	requires(sizeof(char_type) == 1)
+inline constexpr ::std::true_type print_borrowed_reserve_scatters_source(
+	::fast_io::io_reserve_type_t<char_type, ::std::source_location>) noexcept
+{
+	// File/function names have implementation-managed static lifetime, while punctuation and coordinates are written
+	// into the caller's reserve buffer.  No descriptor depends on mutable formatter scratch, so adjacent producers may
+	// be materialized before the final scatter write.
+	return {};
+}
+
+template <::std::integral char_type>
+	requires(sizeof(char_type) == 1)
+inline constexpr ::std::true_type print_copy_stable_borrowed_source(
+	::fast_io::io_reserve_type_t<char_type, ::std::source_location>) noexcept
+{
+	// Copying source_location preserves the implementation-managed file/function strings and the scalar coordinates.
+	// The only generated characters are written into caller-owned reserve storage, so no returned descriptor can name
+	// either the original source_location object or its normalized copy. This stronger proof keeps ABI-small locations
+	// on the value-decay path without weakening the general self-borrowing rule.
+	return {};
+}
+
+template <::std::integral char_type>
+	requires(sizeof(char_type) == 1)
+inline constexpr ::std::true_type
+print_semantic_optional_scatter_status_transparent_leaf(
+	::fast_io::io_reserve_type_t<char_type, ::std::source_location>) noexcept
+{
+	// source_location has no user-extensible associated namespace, and fast_io owns its complete reserve-scatters
+	// protocol. That protocol is non-throwing, preserves the file/line/column/function order, retains only
+	// implementation-lifetime strings, and writes every generated coordinate into caller-owned reserve storage.
+	// Optional descriptor compaction therefore cannot introduce a whole-record status owner, alter an exception-visible
+	// prefix, or invalidate an earlier retained component.
+	return {};
+}
+
 namespace manipulators
 {
 
+/// @brief Captures the caller's current `std::source_location` as a printable value.
+/// @details The default argument is evaluated at the call site; passing an explicit location returns that location
+///          unchanged. Formatting later emits the library-defined file/line/column/function representation.
 inline
 #ifdef __cpp_consteval
 	consteval

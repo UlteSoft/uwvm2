@@ -111,29 +111,59 @@ inline constexpr void append_win32_quoted_arg_common(
 	}
 }
 
+/// @brief Formats one already-normalized Windows process argument without reopening source ownership.
+/// @details The enclosing pack owner has materialized the result of `io_print_alias` followed by `io_print_forward`.
+///          Consequently `t` is the exact stable lvalue modeled by the decayed print predicate below. Re-entering the
+///          public print boundary would normalize that object a second time, while accepting it by value would copy every
+///          suffix once per recursive level. This helper instead borrows the unique owner and performs no lifetime
+///          extension. The `code_cvt` fallback creates a new source wrapper, so only that wrapper enters the source-only
+///          unforwarded bridge exactly once.
 template <::std::integral replace_char_type, typename T>
-inline constexpr void construct_win32_process_args_decay_singal(bool is_first, ::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str, T t)
+inline constexpr void construct_win32_process_args_decay_single_ref(
+	bool is_first,
+	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str,
+	T &t)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<replace_char_type>, T>};
+	using buffer_type = ::fast_io::basic_obuffer_view<replace_char_type>;
+	using output_type = ::fast_io::basic_obuffer_view_ref<replace_char_type>;
+	constexpr bool source_printable{
+		::fast_io::operations::decay::defines::print_freestanding_okay_for_line<
+			false, output_type, T>};
 
-	if constexpr (type_error)
+	if constexpr (source_printable)
 	{
 		replace_char_type buf[32767];
-		::fast_io::basic_obuffer_view<replace_char_type> obf{buf, buf + 32767};
-		::fast_io::operations::decay::print_freestanding_decay<false>(::fast_io::operations::output_stream_ref(obf), t);
-		append_win32_quoted_arg_common<replace_char_type>(is_first, str, obf.cbegin(), obf.cend());
+		buffer_type buffer{buf, buf + 32767};
+		output_type output{__builtin_addressof(buffer)};
+		// The concept names the exact dispatcher template types; execution observes their stable lvalue expressions.
+		::fast_io::operations::decay::print_freestanding_decay_impl<false>(output, t);
+		append_win32_quoted_arg_common<replace_char_type>(is_first, str, buffer.cbegin(), buffer.cend());
 	}
 	else if constexpr (requires { ::fast_io::mnp::code_cvt(t); })
 	{
-		replace_char_type buf[32767];
-		::fast_io::basic_obuffer_view<replace_char_type> obf{buf, buf + 32767};
-		// need decay
-		::fast_io::operations::print_freestanding<false>(obf, ::fast_io::mnp::code_cvt(t));
-		append_win32_quoted_arg_common<replace_char_type>(is_first, str, obf.cbegin(), obf.cend());
+		using codecvt_type = decltype(::fast_io::mnp::code_cvt(::std::declval<T &>()));
+		using codecvt_run = ::fast_io::operations::defines::print_freestanding_named_normalized_run_t<
+			replace_char_type, codecvt_type &>;
+		constexpr bool codecvt_printable{
+			codecvt_run::template output_okay_for_line<false, output_type>};
+		if constexpr (codecvt_printable)
+		{
+			replace_char_type buf[32767];
+			buffer_type buffer{buf, buf + 32767};
+			output_type output{__builtin_addressof(buffer)};
+			auto converted{::fast_io::mnp::code_cvt(t)};
+			::fast_io::operations::decay::print_freestanding_decay_unforwarded<false>(output, converted);
+			append_win32_quoted_arg_common<replace_char_type>(is_first, str, buffer.cbegin(), buffer.cend());
+		}
+		else
+		{
+			static_assert(codecvt_printable,
+						  "the code-converted process argument is not printable to the selected Windows character domain");
+		}
 	}
 	else
 	{
-		static_assert(type_error, "some types are not printable or codecvt printable, so we cannot construct basic_win32_process_args");
+		static_assert(source_printable, "some types are not printable or codecvt printable, so we cannot construct basic_win32_process_args");
 	}
 }
 
@@ -141,33 +171,62 @@ template <bool is_first, ::std::integral replace_char_type, typename T, typename
 inline constexpr void construct_win32_process_args_decay(
 	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str, T t, Args... args)
 {
-	construct_win32_process_args_decay_singal(is_first, str, t);
-
-	if constexpr (sizeof...(Args) != 0)
-	{
-		construct_win32_process_args_decay<false>(str, args...);
-	}
+	// This parameter pack is the sole owner of every normalized proxy. The comma fold is sequenced left-to-right and each
+	// element is borrowed exactly once, so construction count is O(N) and argument ordering remains observable and stable.
+	construct_win32_process_args_decay_single_ref(is_first, str, t);
+	(construct_win32_process_args_decay_single_ref(false, str, args), ...);
 }
 
+/// @brief Appends one already-normalized Windows environment entry and its required NUL terminator.
+/// @details Both the proof and the decayed dispatcher observe the normalized source and the local terminator as stable
+///          lvalues. The terminator is an operation-local value, whereas the source remains owned exclusively by the
+///          enclosing pack frame. No recursive or per-element value boundary is reopened.
 template <::std::integral replace_char_type, typename T>
-inline constexpr void construct_win32_process_envs_decay_singal(
-	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str, T t)
+inline constexpr void construct_win32_process_envs_decay_single_ref(
+	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str, T &t)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<replace_char_type>, T>};
+	using string_type = ::fast_io::containers::basic_string<
+		replace_char_type, ::fast_io::native_global_allocator>;
+	using output_type = ::fast_io::io_strlike_reference_wrapper<
+		replace_char_type, string_type>;
+	using terminator_type = decltype(::fast_io::mnp::chvw(
+		::fast_io::char_literal_v<u8'\0', replace_char_type>));
+	constexpr bool source_printable{
+		::fast_io::operations::decay::defines::print_freestanding_okay_for_line<
+			false, output_type, T, terminator_type>};
 
-	if constexpr (type_error)
+	if constexpr (source_printable)
 	{
-		::fast_io::io_strlike_reference_wrapper<replace_char_type, ::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator>> wrapper{__builtin_addressof(str)};
-		::fast_io::operations::print_freestanding<false>(wrapper, t, ::fast_io::mnp::chvw(::fast_io::char_literal_v<u8'\0', replace_char_type>));
+		output_type wrapper{__builtin_addressof(str)};
+		terminator_type terminator{
+			::fast_io::mnp::chvw(::fast_io::char_literal_v<u8'\0', replace_char_type>)};
+		::fast_io::operations::decay::print_freestanding_decay_impl<false>(wrapper, t, terminator);
 	}
 	else if constexpr (requires { ::fast_io::mnp::code_cvt(t); })
 	{
-		::fast_io::io_strlike_reference_wrapper<replace_char_type, ::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator>> wrapper{__builtin_addressof(str)};
-		::fast_io::operations::print_freestanding<false>(wrapper, ::fast_io::mnp::code_cvt(t), ::fast_io::mnp::chvw(::fast_io::char_literal_v<u8'\0', replace_char_type>));
+		using codecvt_type = decltype(::fast_io::mnp::code_cvt(::std::declval<T &>()));
+		using codecvt_run = ::fast_io::operations::defines::print_freestanding_named_normalized_run_t<
+			replace_char_type, codecvt_type &, terminator_type &>;
+		constexpr bool codecvt_printable{
+			codecvt_run::template output_okay_for_line<false, output_type>};
+		if constexpr (codecvt_printable)
+		{
+			output_type wrapper{__builtin_addressof(str)};
+			auto converted{::fast_io::mnp::code_cvt(t)};
+			terminator_type terminator{
+				::fast_io::mnp::chvw(::fast_io::char_literal_v<u8'\0', replace_char_type>)};
+			::fast_io::operations::decay::print_freestanding_decay_unforwarded<false>(
+				wrapper, converted, terminator);
+		}
+		else
+		{
+			static_assert(codecvt_printable,
+						  "the code-converted environment entry is not printable to the selected Windows character domain");
+		}
 	}
 	else
 	{
-		static_assert(type_error, "some types are not printable or codecvt printable, so we cannot construct basic_win32_process_envs");
+		static_assert(source_printable, "some types are not printable or codecvt printable, so we cannot construct basic_win32_process_envs");
 	}
 }
 
@@ -175,14 +234,10 @@ template <::std::integral replace_char_type, typename T, typename... Args>
 inline constexpr void construct_win32_process_envs_decay(
 	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &str, T t, Args... args)
 {
-	construct_win32_process_envs_decay_singal(str, t);
-
-	if constexpr (sizeof...(Args) != 0)
-	{
-		construct_win32_process_envs_decay(str, args...);
-	}
-
-	// no need to push_back last '\0', str end with '\0'
+	// Each entry contributes one explicit NUL; basic_string contributes the final implicit terminator, yielding the
+	// Windows double-NUL environment block without a second ownership layer.
+	construct_win32_process_envs_decay_single_ref(str, t);
+	(construct_win32_process_envs_decay_single_ref(str, args), ...);
 }
 
 } // namespace details
@@ -421,31 +476,115 @@ struct is_zero_default_constructible<details::cstr_guard<char_type>>
 
 namespace details
 {
+/// @brief Transfers one completed argument string into the owning POSIX C-string array.
+/// @details A nonempty fast_io string already owns a uniquely allocated NUL-terminated range, so ownership can move by
+///          transferring its implementation pointer. The default empty string may instead reference the library's static
+///          empty sentinel; allocating one explicit NUL prevents `cstr_guard` from later deallocating non-owned storage and
+///          distinguishes an empty argument from the null pointer which terminates `argv`.
+template <::std::integral replace_char_type>
+inline constexpr void push_posix_process_arg_string(
+	::fast_io::containers::vector<cstr_guard<replace_char_type>, ::fast_io::native_global_allocator> &arguments,
+	::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator> &&value)
+{
+	cstr_guard<replace_char_type> guard;
+	if (value.empty())
+	{
+		using allocator_type = typename cstr_guard<replace_char_type>::Alloc;
+		guard.cstr = allocator_type::allocate(1u);
+		*guard.cstr = ::fast_io::char_literal_v<u8'\0', replace_char_type>;
+	}
+	else
+	{
+		guard.cstr = value.imp.begin_ptr;
+		value.imp = {};
+	}
+	arguments.push_back(::std::move(guard));
+}
+
+/// @brief Formats one normalized POSIX argument through a stable string-output reference.
+/// @details `source` is owned by the enclosing decay-pack frame and has already completed alias and character forwarding.
+///          The decayed proof names the exact dispatcher template types whose stable lvalue expressions execute below.
+///          A codecvt fallback creates a distinct wrapper and therefore uses the source-only unforwarded bridge once; it
+///          never re-aliases the original normalized proxy. The completed string is then transferred without copying its
+///          character range.
+template <::std::integral replace_char_type, typename T>
+inline constexpr void construct_posix_process_argenvs_decay_single_ref(
+	::fast_io::containers::vector<cstr_guard<replace_char_type>, ::fast_io::native_global_allocator> &arguments,
+	T &source)
+{
+	using string_type = ::fast_io::containers::basic_string<
+		replace_char_type, ::fast_io::native_global_allocator>;
+	using output_type = ::fast_io::io_strlike_reference_wrapper<
+		replace_char_type, string_type>;
+	constexpr bool source_printable{
+		::fast_io::operations::decay::defines::print_freestanding_okay_for_line<
+			false, output_type, T>};
+
+	string_type value;
+	output_type output{__builtin_addressof(value)};
+	if constexpr (source_printable)
+	{
+		::fast_io::operations::decay::print_freestanding_decay_impl<false>(output, source);
+	}
+	else if constexpr (requires { ::fast_io::mnp::code_cvt(source); })
+	{
+		using codecvt_type = decltype(::fast_io::mnp::code_cvt(::std::declval<T &>()));
+		using codecvt_run = ::fast_io::operations::defines::print_freestanding_named_normalized_run_t<
+			replace_char_type, codecvt_type &>;
+		constexpr bool codecvt_printable{
+			codecvt_run::template output_okay_for_line<false, output_type>};
+		if constexpr (codecvt_printable)
+		{
+			auto converted{::fast_io::mnp::code_cvt(source)};
+			::fast_io::operations::decay::print_freestanding_decay_unforwarded<false>(
+				output, converted);
+		}
+		else
+		{
+			static_assert(codecvt_printable,
+						  "the code-converted process argument is not printable to the selected POSIX character domain");
+		}
+	}
+	else
+	{
+		static_assert(source_printable,
+					  "some types are not printable or codecvt printable, so we cannot construct posix_process_args");
+	}
+
+	::fast_io::details::push_posix_process_arg_string(arguments, ::std::move(value));
+}
+
+/// @brief Compatibility entry for direct users of the historical raw-source helper.
+/// @details Normal process construction does not call this function; it enters the normalized reference helper above.
+///          Keeping this single-element raw boundary preserves existing internal callers which intentionally ask concat to
+///          perform source normalization. It owns only one source and contains no recursive suffix, so it cannot recreate
+///          the former quadratic pack-copy behavior.
 template <::std::size_t N, ::std::integral replace_char_type, typename T>
 inline constexpr void construct_posix_process_argenvs_decay_singal(
 	::fast_io::containers::vector<cstr_guard<replace_char_type>, ::fast_io::native_global_allocator> &str, T t)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<replace_char_type>, T>};
+	using string_type = ::fast_io::containers::basic_string<
+		replace_char_type, ::fast_io::native_global_allocator>;
+	constexpr bool source_printable{
+		::fast_io::basic_general_concat_checked_available<
+			false, replace_char_type, string_type, T &>()};
 
-	cstr_guard<replace_char_type> cstrg;
-
-	if constexpr (type_error)
+	if constexpr (source_printable)
 	{
-		auto cstr{::fast_io::basic_general_concat<false, replace_char_type, ::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator>>(t)};
-		cstrg.cstr = cstr.imp.begin_ptr;
-		cstr.imp = {};
-		str.push_back(::std::move(cstrg));
+		// Concat proves and executes its selected string destination. A public print proof against a dummy stream does
+		// not describe concat's raw source normalization or its direct-versus-staging destination choice.
+		auto cstr{::fast_io::basic_general_concat_checked<
+			false, replace_char_type, string_type>(t)};
+		::fast_io::details::push_posix_process_arg_string(str, ::std::move(cstr));
 	}
 	else if constexpr (requires { ::fast_io::mnp::code_cvt(t); })
 	{
 		auto cstr{::fast_io::basic_general_concat<false, replace_char_type, ::fast_io::containers::basic_string<replace_char_type, ::fast_io::native_global_allocator>>(::fast_io::mnp::code_cvt(t))};
-		cstrg.cstr = cstr.imp.begin_ptr;
-		cstr.imp = {};
-		str.push_back(::std::move(cstrg));
+		::fast_io::details::push_posix_process_arg_string(str, ::std::move(cstr));
 	}
 	else
 	{
-		static_assert(type_error, "some types are not printable or codecvt printable, so we cannot construct posix_process_envs");
+		static_assert(source_printable, "some types are not printable or codecvt printable, so we cannot construct posix_process_envs");
 	}
 }
 
@@ -453,12 +592,10 @@ template <::std::size_t N = 0, ::std::integral replace_char_type, typename T, ty
 inline constexpr void construct_posix_process_argenvs_decay(
 	::fast_io::containers::vector<cstr_guard<replace_char_type>, ::fast_io::native_global_allocator> &str, T t, Args... args)
 {
-	construct_posix_process_argenvs_decay_singal<N>(str, t);
-
-	if constexpr (sizeof...(Args) != 0)
-	{
-		construct_posix_process_argenvs_decay<N + 1>(str, args...);
-	}
+	// The function parameters are the sole normalized proxy owners. A sequenced fold borrows each one exactly once and
+	// removes both the suffix recursion and its N + (N - 1) + ... + 1 copy-construction surface.
+	construct_posix_process_argenvs_decay_single_ref(str, t);
+	(construct_posix_process_argenvs_decay_single_ref(str, args), ...);
 }
 
 namespace posix

@@ -46,6 +46,7 @@
 # include <uwvm2/validation/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
+# include <uwvm2/validation/standard/wasm2/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
@@ -84,13 +85,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
             try
 #endif
             {
-                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                                      module_storage,
-                                                                      import_func_count + local_idx,
-                                                                      code_begin_ptr,
-                                                                      code_end_ptr,
-                                                                      v_err,
-                                                                      fs_para);
+                ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(module_storage,
+                                                                                        import_func_count + local_idx,
+                                                                                        code_begin_ptr,
+                                                                                        code_end_ptr,
+                                                                                        v_err,
+                                                                                        fs_para);
             }
 #ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -107,6 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                 errout.flag.win32_use_text_attr = static_cast<::std::uint_least8_t>(!::uwvm2::uwvm::utils::ansies::log_win32_use_ansi_b);
 # endif
 
+#if defined(UWVM2_USE_HUGE_FAST_IO_CPO_OUTPUT)
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     // 1
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -136,6 +137,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                                     memory_printer,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                     u8"\n\n");
+#else
+                {
+                    // Bound each CPO argument pack while holding one lock for the complete diagnostic.
+                    // The opt-in branch above retains the original single-call output verbatim.
+                    auto output_ref{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
+                    ::fast_io::operations::decay::stream_ref_decay_lock_guard output_lock{
+                        ::fast_io::operations::decay::output_stream_mutex_ref_decay(output_ref)};
+                    auto output_unlocked{::fast_io::operations::decay::output_stream_unlocked_ref_decay(output_ref)};
+                    ::fast_io::io::perr(output_unlocked,
+                                        // 1
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        u8"[error] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Validation error in WebAssembly Code (module=\"");
+                    ::fast_io::io::perr(output_unlocked,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\", file=\"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        file_name);
+                    ::fast_io::io::perr(output_unlocked,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\").\n",
+                                        // 2
+                                        errout,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\n"
+                                        // 3
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN));
+                    ::fast_io::io::perr(output_unlocked,
+                                        u8"[info]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Validator Memory Indication: ",
+                                        memory_printer,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                        u8"\n\n");
+                }
+#endif
 
                 return false;
             }
@@ -150,6 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
         ::fast_io::unix_timestamp start_time{};
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
+#if defined(UWVM2_USE_HUGE_FAST_IO_CPO_OUTPUT)
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -164,6 +208,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#else
+            {
+                // Keep one diagnostic lock, but bound each CPO's argument pack in the default build.
+                auto output_ref{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
+                ::fast_io::operations::decay::stream_ref_decay_lock_guard output_lock{
+                    ::fast_io::operations::decay::output_stream_mutex_ref_decay(output_ref)};
+                auto output_unlocked{::fast_io::operations::decay::output_stream_unlocked_ref_decay(output_ref)};
+                ::fast_io::io::perr(output_unlocked,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Start validating all wasm code. ");
+                ::fast_io::io::perr(output_unlocked,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    u8"[",
+                                    ::uwvm2::uwvm::io::get_local_realtime(),
+                                    u8"] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n");
+                ::fast_io::io::perr(output_unlocked,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+#endif
 
 #ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -258,6 +327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
 #endif
 
             // verbose
+#if defined(UWVM2_USE_HUGE_FAST_IO_CPO_OUTPUT)
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -276,6 +346,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#else
+            {
+                // Keep one diagnostic lock, but bound each CPO's argument pack in the default build.
+                auto output_ref{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
+                ::fast_io::operations::decay::stream_ref_decay_lock_guard output_lock{
+                    ::fast_io::operations::decay::output_stream_mutex_ref_decay(output_ref)};
+                auto output_unlocked{::fast_io::operations::decay::output_stream_unlocked_ref_decay(output_ref)};
+                ::fast_io::io::perr(output_unlocked,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Validate all wasm code done. (time=");
+                ::fast_io::io::perr(output_unlocked,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    end_time - start_time,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"s). ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    u8"[");
+                ::fast_io::io::perr(output_unlocked,
+                                    ::uwvm2::uwvm::io::get_local_realtime(),
+                                    u8"] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+#endif
         }
 
         return true;

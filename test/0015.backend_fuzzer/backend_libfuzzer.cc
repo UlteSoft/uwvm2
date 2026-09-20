@@ -32,12 +32,7 @@ namespace
     namespace rtmode = ::uwvm2::uwvm::runtime::runtime_mode;
     namespace int_compiler = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm;
     namespace int_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
-
-#if !defined(UWVM_DISABLE_INT) && (defined(UWVM_USE_DEFAULT_INT) || defined(UWVM_USE_UWVM_INT))
-# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 1
-#else
-# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 0
-#endif
+    namespace wasm_type = ::uwvm2::uwvm::wasm::type;
 
 #if !defined(UWVM_DISABLE_JIT) && (defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT))
 # define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 1
@@ -45,13 +40,7 @@ namespace
 # define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 0
 #endif
 
-#if UWVM_BACKEND_FUZZER_HAS_UWVM_INT && UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
-# define UWVM_BACKEND_FUZZER_HAS_TIERED 1
-#else
-# define UWVM_BACKEND_FUZZER_HAS_TIERED 0
-#endif
-
-    using value_type_t = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    using value_type_t = storage::wasm_binfmt1_final_value_type_t;
     using wasm_byte_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
     using module_t = storage::wasm_module_storage_t;
     using function_type_t = storage::wasm_binfmt1_final_function_type_t;
@@ -61,6 +50,7 @@ namespace
     using memory_type_t = storage::wasm_binfmt1_final_memory_type_t;
     using global_type_t = storage::wasm_binfmt1_final_global_type_t;
     using local_global_type_t = storage::wasm_binfmt1_final_local_global_type_t;
+    using wasm_file_t = wasm_type::wasm_file_t;
     using local_entry_t = typename decltype(::std::declval<code_t&>().locals)::value_type;
     using byte_vec = ::std::vector<::std::byte>;
 
@@ -456,9 +446,6 @@ namespace
         ::std::vector<::std::uint32_t> i32_stack{};
         ::std::uint32_t global_i32{};
         bool grew_memory{};
-        bool enable_tiered_osr_stress{};
-        bool enable_tiered_switch_stress{};
-
         void init_locals()
         {
             for(::std::uint32_t i{}; i != k_i32_local_count; ++i)
@@ -890,93 +877,6 @@ namespace
             append_u8(expr, 0x1au);
         }
 
-        void tiered_switch_pressure_segment()
-        {
-            if(!enable_tiered_switch_stress) { return; }
-            if(!enable_runtime_calls) { return; }
-
-            auto const bound{70000u};
-            ::std::uint32_t acc{};
-            for(::std::uint32_t i{}; i != bound; ++i) { acc = u32(acc + helper_i32_add(out.helpers, i)); }
-
-            emit_i32_const(expr, 0u);
-            emit_local_set(expr, 0u);
-            emit_i32_const(expr, 0u);
-            emit_local_set(expr, 1u);
-            append_u8(expr, 0x02u);
-            append_u8(expr, 0x40u);
-            append_u8(expr, 0x03u);
-            append_u8(expr, 0x40u);
-            emit_local_get(expr, 0u);
-            emit_i32_const(expr, bound);
-            append_u8(expr, 0x4fu);
-            append_u8(expr, 0x0du);
-            append_uleb(expr, 1u);
-            emit_local_get(expr, 1u);
-            emit_local_get(expr, 0u);
-            emit_call(expr, local_function_index_to_function_index(k_local_i32_add_index));
-            append_u8(expr, 0x6au);
-            emit_local_set(expr, 1u);
-            emit_local_get(expr, 0u);
-            emit_i32_const(expr, 1u);
-            append_u8(expr, 0x6au);
-            emit_local_set(expr, 0u);
-            append_u8(expr, 0x0cu);
-            append_uleb(expr, 0u);
-            append_u8(expr, 0x0bu);
-            append_u8(expr, 0x0bu);
-            emit_local_get(expr, 1u);
-            emit_check_i32(expr, acc);
-
-            i32_locals[0] = bound;
-            i32_locals[1] = acc;
-        }
-
-        void tiered_osr_loop_segment()
-        {
-            if(!enable_tiered_osr_stress) { return; }
-
-            for(::std::size_t i{}; i != 1600uz; ++i) { append_u8(expr, 0x01u); }
-
-            constexpr ::std::uint32_t bound{36000u};
-            auto const salt{in.next_u32() & 0xffffu};
-            ::std::uint32_t acc{};
-            for(::std::uint32_t i{}; i != bound; ++i) { acc = u32(acc + (i ^ salt)); }
-
-            emit_i32_const(expr, 0u);
-            emit_local_set(expr, 0u);
-            emit_i32_const(expr, 0u);
-            emit_local_set(expr, 1u);
-            append_u8(expr, 0x02u);
-            append_u8(expr, 0x40u);
-            append_u8(expr, 0x03u);
-            append_u8(expr, 0x40u);
-            emit_local_get(expr, 0u);
-            emit_i32_const(expr, bound);
-            append_u8(expr, 0x4fu);
-            append_u8(expr, 0x0du);
-            append_uleb(expr, 1u);
-            emit_local_get(expr, 1u);
-            emit_local_get(expr, 0u);
-            emit_i32_const(expr, salt);
-            append_u8(expr, 0x73u);
-            append_u8(expr, 0x6au);
-            emit_local_set(expr, 1u);
-            emit_local_get(expr, 0u);
-            emit_i32_const(expr, 1u);
-            append_u8(expr, 0x6au);
-            emit_local_set(expr, 0u);
-            append_u8(expr, 0x0cu);
-            append_uleb(expr, 0u);
-            append_u8(expr, 0x0bu);
-            append_u8(expr, 0x0bu);
-            emit_local_get(expr, 1u);
-            emit_check_i32(expr, acc);
-
-            i32_locals[0] = bound;
-            i32_locals[1] = acc;
-        }
-
         void i64_segment()
         {
             auto const a{in.next_u64()};
@@ -1042,10 +942,8 @@ namespace
             direct_call_segment();
             indirect_call_segment();
             call_boundary_matrix_segment();
-            tiered_switch_pressure_segment();
             hot_direct_call_segment();
             if((in.byte() & 1u) != 0u) { hot_indirect_call_segment(); }
-            tiered_osr_loop_segment();
 
             auto const step_count{static_cast<::std::size_t>(16u + (in.byte() & 0x7fu))};
             for(::std::size_t i{}; i != step_count; ++i)
@@ -1138,11 +1036,7 @@ namespace
         }
     };
 
-    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data,
-                                          ::std::size_t size,
-                                          bool enable_runtime_calls = true,
-                                          bool enable_tiered_osr_stress = false,
-                                          bool enable_tiered_switch_stress = false)
+    [[nodiscard]] fuzz_case project_input(::std::uint8_t const* data, ::std::size_t size, bool enable_runtime_calls = true)
     {
         size = ::std::min(size, k_max_input_bytes);
         input_reader in{data, size, 0uz};
@@ -1157,8 +1051,6 @@ namespace
         build_helper_functions(out);
 
         code_projector p{in, out, enable_runtime_calls};
-        p.enable_tiered_osr_stress = enable_tiered_osr_stress;
-        p.enable_tiered_switch_stress = enable_tiered_switch_stress;
         p.global_i32 = out.global_initial;
         p.init_locals();
         p.finish();
@@ -1206,6 +1098,7 @@ namespace
         ::std::array<memory_type_t, 1uz> memories{};
         ::std::array<global_type_t, 1uz> globals{};
         ::std::array<local_global_type_t, 1uz> local_globals{};
+        wasm_file_t validator_metadata{1u};
 
         void build(fuzz_case const& c, module_t& module)
         {
@@ -1361,10 +1254,6 @@ namespace
         rtmode::runtime_scheduling_policy_existed = true;
         rtmode::global_runtime_scheduling_policy = rtmode::runtime_scheduling_policy_t::function_count;
         rtmode::global_runtime_scheduling_size = 1uz;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-        rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = false;
-        rtmode::runtime_tiered_disable_llvm_full_jit = false;
-#endif
 #if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
         rtmode::global_runtime_llvm_jit_cache_path_mode = rtmode::runtime_llvm_jit_cache_path_mode_t::disabled;
 #endif
@@ -1379,46 +1268,10 @@ namespace
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_only;
             return;
         }
-        if(mode == "uwvm-int-lazy")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_only;
-            return;
-        }
-        if(mode == "llvm-jit-full")
+        if(mode == "llvm-aot")
         {
             rtmode::global_runtime_mode = rtmode::runtime_mode_t::full_compile;
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::llvm_jit_only;
-            return;
-        }
-        if(mode == "llvm-jit-lazy")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::llvm_jit_only;
-            return;
-        }
-        if(mode == "tiered")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-            return;
-        }
-        if(mode == "tiered-no-t0")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-            rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = true;
-#endif
-            return;
-        }
-        if(mode == "tiered-no-t2")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-            rtmode::runtime_tiered_disable_llvm_full_jit = true;
-#endif
             return;
         }
         ::std::cerr << "backend_libfuzzer: unknown runtime mode: " << mode << '\n';
@@ -1433,22 +1286,22 @@ namespace
 #endif
         direct_module_owner owner{};
         storage::wasm_module_runtime_storage.clear();
+        ::uwvm2::uwvm::wasm::storage::all_module.clear();
+        ::uwvm2::uwvm::wasm::storage::all_module_export.clear();
         auto [it, inserted]{storage::wasm_module_runtime_storage.try_emplace(k_main_module_name)};
         static_cast<void>(inserted);
         owner.build(c, it->second);
-        if(mode == "uwvm-int-full" || mode == "llvm-jit-full")
-        {
-            ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-            cfg.entry_function_index = c.entry_function_index;
-            ::uwvm2::runtime::lib::full_compile_and_run_main_module(k_main_module_name, cfg);
-        }
-        else
-        {
-            ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-            cfg.entry_function_index = c.entry_function_index;
-            cfg.assume_full_code_verified = true;
-            ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(k_main_module_name, cfg);
-        }
+        owner.validator_metadata.module_name = k_main_module_name;
+        auto const metadata_inserted{::uwvm2::uwvm::wasm::storage::all_module
+                                         .try_emplace(k_main_module_name,
+                                                      wasm_type::all_module_t{
+                                                          .module_storage_ptr = {.wf = ::std::addressof(owner.validator_metadata)},
+                                                          .type = wasm_type::module_type_t::exec_wasm})
+                                         .second};
+        if(!metadata_inserted) { ::std::abort(); }
+        ::uwvm2::runtime::lib::full_compile_run_config cfg{};
+        cfg.entry_function_index = c.entry_function_index;
+        ::uwvm2::runtime::lib::full_compile_and_run_main_module(k_main_module_name, cfg);
 
         if(it->second.local_defined_global_vec_storage.size() == 0uz) { return 0u; }
         auto const& global{it->second.local_defined_global_vec_storage.index_unchecked(0uz).global};
@@ -1622,17 +1475,10 @@ namespace
 
     ::std::vector<::std::string> g_modes{
         "uwvm-int-ring-matrix",
-        "uwvm-int-lazy",
         "uwvm-int-full",
-        "llvm-jit-lazy",
-        "llvm-jit-full",
-        "tiered",
-        "tiered-no-t0",
-        "tiered-no-t2",
+        "llvm-aot",
     };
     bool g_trace{};
-    bool g_stress_tiered_osr{};
-    bool g_stress_tiered_switch{};
 
     void set_modes_from_env()
     {
@@ -1670,8 +1516,6 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
     set_modes_from_env();
     g_trace = env_enabled("UWVM_BACKEND_LIBFUZZER_TRACE");
-    g_stress_tiered_osr = env_enabled("UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR");
-    g_stress_tiered_switch = env_enabled("UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_SWITCH");
     return 0;
 }
 
@@ -1679,7 +1523,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 {
     if(size == 0uz) { return 0; }
     if(g_trace) { ::std::cerr << "backend-libfuzzer: input-size=" << size << '\n'; }
-    auto c{project_input(data, size, true, g_stress_tiered_osr, g_stress_tiered_switch)};
+    auto c{project_input(data, size)};
     fuzz_case ring_case{};
     bool ring_case_ready{};
     bool have_runtime_observation{};

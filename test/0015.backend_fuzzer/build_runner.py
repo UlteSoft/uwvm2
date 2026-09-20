@@ -28,7 +28,6 @@ REQUIRED_LLVM_COMPONENTS = [
     "bitreader",
     "bitwriter",
     "object",
-    "debuginfodwarf",
 ]
 
 OPTIONAL_LLVM_COMPONENTS = ["targetparser"]
@@ -85,6 +84,21 @@ def llvm_components(tool: str) -> set[str]:
         return set()
 
 
+def llvm_link_name(flag: str) -> str | None:
+    if flag.startswith("-l:"):
+        name = flag[3:]
+    elif flag.startswith("-l") and len(flag) > 2:
+        return flag[2:]
+    else:
+        name = Path(flag).name
+
+    for suffix in (".dll.a", ".dylib", ".so", ".a", ".lib"):
+        if name.lower().endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    return name[3:] if name.startswith("lib") else name
+
+
 def llvm_lib_flags(tool: str) -> list[str]:
     available = llvm_components(tool)
     components = REQUIRED_LLVM_COMPONENTS[:]
@@ -100,7 +114,12 @@ def llvm_lib_flags(tool: str) -> list[str]:
     for candidate in candidates:
         proc = subprocess.run([tool, "--libs", *candidate], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if proc.returncode == 0 and proc.stdout.strip():
-            return shlex.split(proc.stdout)
+            flags = shlex.split(proc.stdout)
+            if run_text([tool, "--shared-mode"], check=False) == "shared":
+                # Shared LLVM component libraries retain their own transitive dependencies. Do not turn the
+                # removed source-level DWARF consumer back into a direct runner dependency via llvm-config's closure.
+                flags = [flag for flag in flags if llvm_link_name(flag) != "LLVMDebugInfoDWARF"]
+            return flags
     raise SystemExit("failed to query LLVM libraries from llvm-config")
 
 
@@ -285,7 +304,6 @@ def main() -> int:
         "-DUWVM_VERSION_S=0",
         "-DUWVM_USE_UWVM_INT",
         "-DUWVM_USE_LLVM_JIT",
-        "-DUWVM_DISABLE_DEBUG_INT",
         "-DUWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519",
     ]
     add_matrix_defines(defines, args.combine, args.delay)

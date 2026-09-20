@@ -36,6 +36,9 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Config/llvm-config.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  if defined(__APPLE__) && defined(__aarch64__)
+#   include "macho_headers.h"
+#  endif
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__linux__) && defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 #  include <sys/mman.h>
@@ -46,12 +49,15 @@
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && !defined(__arm__) && !defined(__thumb__) && __has_include(<unwind.h>)
 #  include <unwind.h>
-extern "C" void __register_frame(void const*);
-extern "C" void __deregister_frame(void const*);
+#  include "dwarf_eh_frame_registration.h"
 # endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
+#endif
+
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
 #endif
 
 #pragma push_macro("UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH")
@@ -87,7 +93,7 @@ extern "C" void __deregister_frame(void const*);
 # define UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER 0
 #endif
 
-namespace uwvm2::runtime::compiler::llvm_jit::details
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_RISCV64_LOW_MAPPER
@@ -100,11 +106,13 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             return static_cast<::std::size_t>(value);
         }
 
-        [[nodiscard]] inline static ::std::size_t align_to_page(::std::size_t value) noexcept
+        [[nodiscard]] inline static bool align_to_page(::std::size_t value, ::std::size_t& aligned) noexcept
         {
             auto const ps{page_size()};
             auto const mask{ps - 1uz};
-            return (value + mask) & ~mask;
+            if(value > (::std::numeric_limits<::std::size_t>::max)() - mask) [[unlikely]] { return false; }
+            aligned = (value + mask) & ~mask;
+            return true;
         }
 
         [[nodiscard]] inline static unsigned mmap_prot(unsigned flags) noexcept
@@ -120,6 +128,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         {
             auto const ps{static_cast<::std::uintptr_t>(page_size())};
             auto const mask{ps - 1u};
+            if(value > (::std::numeric_limits<::std::uintptr_t>::max)() - mask) [[unlikely]] { return 0u; }
             return (value + mask) & ~mask;
         }
 
@@ -143,14 +152,48 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             constexpr ::std::uintptr_t low_end{0x70000000u};
             constexpr ::std::uintptr_t scan_stride{0x01000000u};
 
-            auto const size{align_to_page(num_bytes == 0uz ? page_size() : num_bytes)};
+            ::std::size_t size{};
+            if(!align_to_page(num_bytes == 0uz ? page_size() : num_bytes, size)) [[unlikely]]
+            {
+                ec = ::std::make_error_code(::std::errc::value_too_large);
+                return {};
+            }
             auto const prot{mmap_prot(flags)};
-            auto const map_flags{MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE};
+            auto const base_map_flags{MAP_PRIVATE | MAP_ANONYMOUS};
+            int cleanup_errno{};
 
             auto try_map{[&](::std::uintptr_t hint) noexcept -> void*
                          {
                              if(hint < low_begin || hint > low_end || static_cast<::std::uintptr_t>(size) > low_end - hint) { return MAP_FAILED; }
-                             return ::mmap(reinterpret_cast<void*>(hint), size, prot, map_flags, -1, 0);
+                             auto const requested{reinterpret_cast<void*>(hint)};
+                             auto mapped{::mmap(requested, size, prot, base_map_flags | MAP_FIXED_NOREPLACE, -1, 0)};
+                             if(mapped == requested) { return mapped; }
+                             if(mapped != MAP_FAILED)
+                             {
+                                 // Old kernels may ignore an unknown MAP_FIXED_NOREPLACE bit and treat `hint` as advisory.
+                                 // Never return that unrelated mapping to the low-address allocator.
+                                 if(::munmap(mapped, size) != 0)
+                                 {
+                                     cleanup_errno = errno == 0 ? EIO : errno;
+                                     return MAP_FAILED;
+                                 }
+                                 errno = EEXIST;
+                                 return MAP_FAILED;
+                             }
+                             if(errno != EINVAL) { return MAP_FAILED; }
+
+                             // MAP_FIXED_NOREPLACE was added after the original mmap ABI. On an EINVAL-only kernel, an
+                             // ordinary hint is safe only when the kernel returns the exact requested address.
+                             mapped = ::mmap(requested, size, prot, base_map_flags, -1, 0);
+                             if(mapped == requested) { return mapped; }
+                             if(mapped == MAP_FAILED) { return MAP_FAILED; }
+                             if(::munmap(mapped, size) != 0)
+                             {
+                                 cleanup_errno = errno == 0 ? EIO : errno;
+                                 return MAP_FAILED;
+                             }
+                             errno = EEXIST;
+                             return MAP_FAILED;
                          }};
 
             if(auto const hint{near_block_hint(near_block)}; hint != 0u)
@@ -161,6 +204,11 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
                     ec.clear();
                     return ::llvm::sys::MemoryBlock{mapped, size};
                 }
+                if(cleanup_errno != 0)
+                {
+                    ec = ::std::error_code(cleanup_errno, ::std::generic_category());
+                    return {};
+                }
             }
 
             for(::std::uintptr_t hint{low_begin}; hint <= low_end && static_cast<::std::uintptr_t>(size) <= low_end - hint; hint += scan_stride)
@@ -170,6 +218,11 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
                 {
                     ec.clear();
                     return ::llvm::sys::MemoryBlock{mapped, size};
+                }
+                if(cleanup_errno != 0)
+                {
+                    ec = ::std::error_code(cleanup_errno, ::std::generic_category());
+                    return {};
                 }
             }
 
@@ -213,10 +266,9 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
     template <typename Visit>
     inline constexpr void visit_runtime_llvm_jit_eh_frame_fdes(::std::uint8_t* addr, ::std::size_t size, Visit visit) noexcept
     {
-        // LLVM libunwind's dynamic registration entry points operate on individual FDE records rather than on the whole
-        // .eh_frame payload.  Walk the compact DWARF record stream defensively and skip CIE records, whose ID field is
-        // zero in the emitted section format used here.  Passing the whole section can make libunwind treat a CIE or the
-        // zero-length terminator as an FDE and reject the generated object.
+        // Apple's __register_frame ABI accepts one FDE, unlike GNU libgcc's whole-section ABI. Keep this bounded
+        // parser for the Apple path: a CIE has a zero ID, and a zero-length record terminates .eh_frame. Neither is
+        // itself an FDE. LLVM's RTDyldMemoryManager.cpp documents and selects the other configured unwind ABIs.
         auto const end{addr + size};
         auto curr{addr};
         while(curr < end)
@@ -230,6 +282,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             if(length32 == 0u) { return; }
 
             ::std::size_t length{};
+            ::std::size_t cie_offset_size{sizeof(::std::uint_least32_t)};
             if(length32 == 0xffffffffu)
             {
                 if(static_cast<::std::size_t>(end - curr) < sizeof(::std::uint_least64_t)) [[unlikely]] { return; }
@@ -238,6 +291,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
                 curr += sizeof(length64);
                 if(length64 > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return; }
                 length = static_cast<::std::size_t>(length64);
+                cie_offset_size = sizeof(::std::uint_least64_t);
             }
             else
             {
@@ -246,14 +300,14 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
             if(length > static_cast<::std::size_t>(end - curr)) [[unlikely]] { return; }
             auto const next{curr + length};
-            if(length < sizeof(::std::uint_least32_t)) [[unlikely]]
+            if(length < cie_offset_size) [[unlikely]]
             {
                 curr = next;
                 continue;
             }
 
-            ::std::uint_least32_t cie_offset{};
-            ::std::memcpy(::std::addressof(cie_offset), curr, sizeof(cie_offset));
+            ::std::uint_least64_t cie_offset{};
+            ::std::memcpy(::std::addressof(cie_offset), curr, cie_offset_size);
             if(cie_offset != 0u) { visit(record); }
             curr = next;
         }
@@ -289,6 +343,71 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             return ::llvm::JITSymbol{address, ::llvm::JITSymbolFlags::Exported};
         }
 
+# if defined(__APPLE__) && defined(__aarch64__)
+        using ::llvm::SectionMemoryManager::notifyObjectLoaded;
+
+        inline void notifyObjectLoaded(::llvm::RuntimeDyld& dyld, ::llvm::object::ObjectFile const& object) override
+        {
+            // LLVM 20's MachO/AArch64 loader resolves SUBTRACTOR/UNSIGNED EH
+            // relocations, then its legacy processFDE applies a section delta
+            // again. The resulting FDE can name unmapped memory instead of the
+            // function. Save the exact relocation expression before that pass,
+            // and reapply it immediately before registering CFI. This is also
+            // idempotent on LLVM versions that already produce the right value.
+            // Do not guess a function from an address range or a frame pointer.
+            // https://github.com/llvm/llvm-project/blob/llvmorg-20.1.8/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldMachO.cpp
+            auto const macho{::llvm::dyn_cast<::llvm::object::MachOObjectFile>(&object)};
+            if(macho == nullptr || !macho->is64Bit() || !macho->isLittleEndian() || object.getArch() != ::llvm::Triple::aarch64) { return; }
+            for(auto const& section: object.sections())
+            {
+                auto name{section.getName()};
+                if(!name) { ::llvm::consumeError(name.takeError()); finalization_failure_ = true; return; }
+                if(*name != "__eh_frame") { continue; }
+                auto contents{section.getContents()};
+                if(!contents) { ::llvm::consumeError(contents.takeError()); finalization_failure_ = true; return; }
+                auto const end{section.relocation_end()};
+                for(auto it{section.relocation_begin()}; it != end; ++it)
+                {
+                    if(it->getType() != ::llvm::MachO::ARM64_RELOC_SUBTRACTOR) { continue; }
+                    auto const offset{it->getOffset()};
+                    auto const sub{macho->getRelocation(it->getRawDataRefImpl())};
+                    if(macho->getAnyRelocationLength(sub) != 3u || macho->getAnyRelocationPCRel(sub) ||
+                       offset > contents->size() || contents->size() - offset < sizeof(::std::uint64_t))
+                    { finalization_failure_ = true; return; }
+                    auto const sub_symbol{it->getSymbol()};
+                    if(sub_symbol == object.symbol_end()) { finalization_failure_ = true; return; }
+                    auto sub_section{sub_symbol->getSection()};
+                    if(!sub_section) { ::llvm::consumeError(sub_section.takeError()); finalization_failure_ = true; return; }
+                    if(*sub_section == object.section_end() || **sub_section != section) { finalization_failure_ = true; return; }
+                    auto sub_name{sub_symbol->getName()};
+                    if(!sub_name) { ::llvm::consumeError(sub_name.takeError()); finalization_failure_ = true; return; }
+                    if(++it == end || it->getType() != ::llvm::MachO::ARM64_RELOC_UNSIGNED || it->getOffset() != offset)
+                    { finalization_failure_ = true; return; }
+                    auto const add{macho->getRelocation(it->getRawDataRefImpl())};
+                    if(macho->getAnyRelocationLength(add) != 3u || macho->getAnyRelocationPCRel(add))
+                    { finalization_failure_ = true; return; }
+                    auto const add_symbol{it->getSymbol()};
+                    if(add_symbol == object.symbol_end()) { finalization_failure_ = true; return; }
+                    auto add_name{add_symbol->getName()};
+                    if(!add_name) { ::llvm::consumeError(add_name.takeError()); finalization_failure_ = true; return; }
+                    auto const sub_address{dyld.getSymbol(*sub_name).getAddress()};
+                    auto const add_address{dyld.getSymbol(*add_name).getAddress()};
+                    if(sub_address == 0u || add_address == 0u) { finalization_failure_ = true; return; }
+                    auto const loaded{dyld.getSectionContent(dyld.getSymbolSectionID(*sub_name))};
+                    if(offset > loaded.size() || loaded.size() - offset < sizeof(::std::uint64_t))
+                    { finalization_failure_ = true; return; }
+                    ::std::uint64_t addend{};
+                    ::std::memcpy(&addend, contents->data() + offset, sizeof(addend));
+                    // Mach-O's relocation expression uses modulo-2^64 arithmetic,
+                    // including negative addends. The original object is immutable;
+                    // no already-relocated bytes feed this calculation.
+                    auto const address{reinterpret_cast<::std::uint8_t*>(const_cast<char*>(loaded.data() + offset))};
+                    macho_eh_relocations_.push_back(macho_eh_relocation{address, add_address - sub_address + addend});
+                }
+            }
+        }
+# endif
+
         inline constexpr ::std::uint8_t*
             allocateCodeSection(::std::uintptr_t size, unsigned alignment, unsigned section_id, ::llvm::StringRef section_name) noexcept override
         {
@@ -305,8 +424,43 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         {
             auto const addr{::llvm::SectionMemoryManager::allocateDataSection(size, alignment, section_id, section_name, is_read_only)};
             record_win64_loaded_section(addr, size);
+            record_win64_pdata_section(addr, size, section_name);
             return addr;
         }
+
+        inline bool finalizeMemory(::std::string* error_message = nullptr) override
+        {
+            // MCJIT 20 through current LLVM discards this virtual's bool result. Retain a sticky result that every uwvm2
+            // engine owner can inspect after finalizeObject, before it publishes or executes generated addresses.
+            auto const base_failed{::llvm::SectionMemoryManager::finalizeMemory(error_message)};
+            finalization_failure_ = finalization_failure_ || base_failed;
+
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
+            // RuntimeDyldCOFFAArch64::registerEHFrames is empty in LLVM 20/21/22 and current main. Allocation is the
+            // only stable callback carrying the .pdata name, but registration must wait until RuntimeDyld has copied
+            // the section and applied its image-relative relocations. finalizeMemory is that post-relocation boundary.
+            if(!finalization_failure_)
+            {
+                for(auto& pending: win64_pending_pdata_sections_)
+                {
+                    if(pending.registration_attempted) { continue; }
+                    pending.registration_attempted = true;
+                    if(!register_win64_seh_function_table(pending.addr, 0u, pending.size)) [[unlikely]]
+                    {
+                        finalization_failure_ = true;
+                        break;
+                    }
+                }
+            }
+            if(finalization_failure_ && !base_failed && error_message != nullptr && error_message->empty())
+            {
+                *error_message = "failed to register relocated Win64 JIT unwind metadata";
+            }
+# endif
+            return finalization_failure_;
+        }
+
+        [[nodiscard]] inline constexpr bool has_finalization_failure() const noexcept { return finalization_failure_; }
 
         inline constexpr void registerEHFrames(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) noexcept override
         {
@@ -314,14 +468,37 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             // On Win64 the "EH frame" callback receives the COFF .pdata section, not DWARF CFI.  Windows unwinding is
             // table driven through RUNTIME_FUNCTION entries and the UNWIND_INFO records they reference in .xdata, so
             // registration must go through RtlAddFunctionTable instead of __register_frame/libgcc-style APIs.
-            static_cast<void>(register_win64_seh_function_table(addr, load_addr, size));
-# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
+            if(finalization_failure_) [[unlikely]] { return; }
+            for(auto& pending: win64_pending_pdata_sections_)
+            {
+                if(pending.addr != addr) { continue; }
+                if(pending.registration_attempted) { return; }
+                pending.registration_attempted = true;
+                break;
+            }
+            if(!register_win64_seh_function_table(addr, load_addr, size)) [[unlikely]] { finalization_failure_ = true; }
+# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME && defined(__APPLE__)
             static_cast<void>(load_addr);
-            // LLVM libunwind accepts FDE pointers one at a time for JIT code.  Keep the original section range so the
-            // exact same FDE set can be deregistered before MCJIT releases the underlying memory.
+#  if defined(__aarch64__)
+            if(finalization_failure_) [[unlikely]] { return; }
+            auto const begin{reinterpret_cast<::std::uintptr_t>(addr)};
+            for(auto const& relocation: macho_eh_relocations_)
+            {
+                auto const location{reinterpret_cast<::std::uintptr_t>(relocation.address)};
+                if(location < begin || location - begin > size || size - (location - begin) < sizeof(relocation.value)) { continue; }
+                ::std::memcpy(relocation.address, &relocation.value, sizeof(relocation.value));
+            }
+#  endif
+            // The Apple unwinder accepts FDE pointers one at a time for JIT code. Keep the original section
+            // range so the exact same FDE set can be deregistered before MCJIT releases the underlying memory.
             visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) constexpr noexcept { __register_frame(fde); });
             eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
 # else
+            // Do not infer the registration ABI from the compiler or the presence of <unwind.h>. LLVM's
+            // RTDyldMemoryManager selects per-FDE registration for its configured LLVM libunwind backend and
+            // whole-section registration for GNU libgcc. Registering every suffix as a libgcc section duplicates
+            // overlapping FDE ranges. Delegate this backend choice and its matching ownership to LLVM.
+            // https://github.com/llvm/llvm-project/blob/main/llvm/lib/ExecutionEngine/RuntimeDyld/RTDyldMemoryManager.cpp
             ::llvm::SectionMemoryManager::registerEHFrames(addr, load_addr, size);
 # endif
         }
@@ -331,9 +508,16 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
             // The Windows runtime does not own the JIT memory.  Remove every dynamic function table before the code and
             // .pdata storage can disappear, otherwise a later stack walk may dereference stale unwind metadata.
-            for(auto const& record: win64_seh_records_) { static_cast<void>(::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table)); }
+            for(auto const& record: win64_seh_records_)
+            {
+                // Continuing into SectionMemoryManager destruction after a failed removal would release the .pdata
+                // storage while Windows still has a live dynamic-table pointer.  The destructor is noexcept, so fail
+                // closed before the base class can free that storage.
+                if(!::fast_io::win32::nt::RtlDeleteFunctionTable(record.function_table)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            }
             win64_seh_records_.clear();
-# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
+            win64_pending_pdata_sections_.clear();
+# elif UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME && defined(__APPLE__)
             for(auto const& frame: eh_frame_records_)
             {
                 visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) constexpr noexcept { __deregister_frame(fde); });
@@ -345,6 +529,19 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         }
 
     private:
+        bool finalization_failure_{};
+
+# if defined(__APPLE__) && defined(__aarch64__)
+        struct macho_eh_relocation
+        {
+            ::std::uint8_t* address{};
+            ::std::uint64_t value{};
+        };
+        // Load-time bookkeeping only: it changes neither generated instructions
+        // nor per-call overhead, and remains owned by the engine with its CFI.
+        ::uwvm2::utils::container::vector<macho_eh_relocation> macho_eh_relocations_{};
+# endif
+
 # if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_WIN64_SEH
         struct runtime_llvm_jit_win64_loaded_section
         {
@@ -356,10 +553,20 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         {
             ::fast_io::win32::win_current_runtime_function* function_table{};
             ::std::uint32_t function_count{};
+            ::std::uintptr_t image_base{};
+        };
+
+        struct runtime_llvm_jit_win64_pending_pdata_section
+        {
+            ::std::uint8_t* addr{};
+            ::std::size_t size{};
+            bool registration_attempted{};
         };
 
         ::uwvm2::utils::container::vector<runtime_llvm_jit_win64_loaded_section> win64_loaded_sections_{};
         ::uwvm2::utils::container::vector<runtime_llvm_jit_win64_seh_record> win64_seh_records_{};
+        ::uwvm2::utils::container::vector<runtime_llvm_jit_win64_pending_pdata_section> win64_pending_pdata_sections_{};
+        ::std::uintptr_t win64_image_base_{(::std::numeric_limits<::std::uintptr_t>::max)()};
 
         inline constexpr void record_win64_loaded_section(::std::uint8_t* addr, ::std::uintptr_t size) noexcept
         {
@@ -371,20 +578,42 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
             win64_loaded_sections_.push_back(runtime_llvm_jit_win64_loaded_section{address, size});
         }
 
-        [[nodiscard]] inline constexpr ::std::uintptr_t get_win64_image_base(::std::uintptr_t fallback) const noexcept
+        inline constexpr void record_win64_pdata_section(::std::uint8_t* addr,
+                                                         ::std::size_t size,
+                                                         ::llvm::StringRef section_name) noexcept
         {
-            auto image_base{(::std::numeric_limits<::std::uintptr_t>::max)()};
+            if(addr == nullptr || size == 0uz || section_name != ".pdata") [[unlikely]] { return; }
+            win64_pending_pdata_sections_.push_back(runtime_llvm_jit_win64_pending_pdata_section{addr, size, false});
+        }
+
+        [[nodiscard]] inline constexpr ::std::uintptr_t get_win64_image_base(::std::uintptr_t fallback) noexcept
+        {
+            if(win64_image_base_ != (::std::numeric_limits<::std::uintptr_t>::max)()) { return win64_image_base_; }
             for(auto const& section: win64_loaded_sections_)
             {
-                if(section.address != 0u && section.address < image_base) { image_base = section.address; }
+                if(section.address != 0u && section.address < win64_image_base_) { win64_image_base_ = section.address; }
             }
-            if(image_base != (::std::numeric_limits<::std::uintptr_t>::max)()) { return image_base; }
-            return fallback;
+            if(win64_image_base_ == (::std::numeric_limits<::std::uintptr_t>::max)()) { win64_image_base_ = fallback; }
+            return win64_image_base_;
+        }
+
+        [[nodiscard]] inline constexpr bool win64_loaded_sections_fit_image_base(::std::uintptr_t image_base) const noexcept
+        {
+            constexpr auto max_rva{static_cast<::std::uintptr_t>((::std::numeric_limits<::std::uint32_t>::max)())};
+            for(auto const& section: win64_loaded_sections_)
+            {
+                if(section.address < image_base) [[unlikely]] { return false; }
+                auto const section_rva{section.address - image_base};
+                if(section_rva > max_rva) [[unlikely]] { return false; }
+                if(section.size != 0u && section.size - 1u > max_rva - section_rva) [[unlikely]] { return false; }
+            }
+            return true;
         }
 
         inline constexpr bool register_win64_seh_function_table(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) noexcept
         {
             if(addr == nullptr || size == 0uz) [[unlikely]] { return false; }
+            if(reinterpret_cast<::std::uintptr_t>(addr) % alignof(::fast_io::win32::win_current_runtime_function) != 0u) [[unlikely]] { return false; }
             if(size % sizeof(::fast_io::win32::win_current_runtime_function) != 0uz) [[unlikely]] { return false; }
 
             auto const count{size / sizeof(::fast_io::win32::win_current_runtime_function)};
@@ -392,12 +621,18 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
 
             // COFF x64 encodes .pdata RVAs relative to RuntimeDyld's synthetic __ImageBase.  LLVM computes that base as
             // the lowest loaded section address; RtlAddFunctionTable must receive the same value or Windows unwinding
-            // will not be able to resolve JIT PCs back to their UNWIND_INFO, especially after inlining or code layout
-            // changes move the active PC away from the public entry symbol.
+            // will not be able to resolve JIT PCs back to their UNWIND_INFO when code layout changes move the active PC
+            // away from the public entry symbol.
             auto const fallback_base{load_addr == 0u ? reinterpret_cast<::std::uintptr_t>(addr) : static_cast<::std::uintptr_t>(load_addr)};
             auto const image_base{get_win64_image_base(fallback_base)};
             auto const function_table{reinterpret_cast<::fast_io::win32::win_current_runtime_function*>(addr)};
             auto const function_count{static_cast<::std::uint32_t>(count)};
+            if(!win64_loaded_sections_fit_image_base(image_base)) [[unlikely]] { return false; }
+            for(auto const& record: win64_seh_records_)
+            {
+                if(record.function_table != function_table) { continue; }
+                return record.function_count == function_count && record.image_base == image_base;
+            }
             if(!::fast_io::win32::nt::RtlAddFunctionTable(function_table,
                                                           function_count,
                                                           static_cast<::fast_io::win32::win_current_unwind_address>(image_base))) [[unlikely]]
@@ -405,14 +640,15 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
                 return false;
             }
 
-            win64_seh_records_.push_back(runtime_llvm_jit_win64_seh_record{function_table, function_count});
+            win64_seh_records_.push_back(runtime_llvm_jit_win64_seh_record{function_table, function_count, image_base});
             return true;
         }
 # else
         inline constexpr void record_win64_loaded_section(::std::uint8_t*, ::std::uintptr_t) noexcept {}
+        inline constexpr void record_win64_pdata_section(::std::uint8_t*, ::std::size_t, ::llvm::StringRef) noexcept {}
 # endif
 
-# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME
+# if UWVM2_RUNTIME_LLVM_JIT_SECTION_MEMORY_MANAGER_HAS_DWARF_EH_FRAME && defined(__APPLE__)
         ::uwvm2::utils::container::vector<runtime_llvm_jit_eh_frame_record> eh_frame_records_{};
 # endif
     };

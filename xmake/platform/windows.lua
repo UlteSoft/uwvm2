@@ -47,10 +47,7 @@ function windows_target()
 
         add_cxflags("-fno-rtti") -- disable rtti
         
-        if not is_mode("debug") then
-            add_cxflags("-fno-unwind-tables") -- disable unwind tables
-            add_cxflags("-fno-asynchronous-unwind-tables") -- disable asynchronous unwind tables
-        end
+        uwvm_add_native_unwind_cxflags()
     
         if is_kind("binary") then
             set_extension(".exe")
@@ -128,7 +125,7 @@ function windows_target()
         -- This option may be changed in a future update of the NT kernel major version.
         
         local march = get_config("march")
-        if not (march == "no" or march == "default") then
+        if not (not march or march == "no" or march == "none" or march == "default") then
             error("windows (unknown-windows-msvc) does not support custom march!")
         end    
     end

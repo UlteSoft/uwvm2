@@ -68,338 +68,172 @@ using u32ostring_ref_fast_io_tlc = ::fast_io::containers::basic_ostring_ref_fast
 
 } // namespace tlc
 
-
+// Public concat wrappers must preserve the caller's original value categories until the checked concat front door.
+// That front door performs aliasing and character-dependent forwarding exactly once, then proves the destination it
+// may actually select. Pre-normalizing named `args` here both erased rvalue categories and made `basic_general_concat`
+// repeat status forwarding on the resulting object; probing a dummy stream also rejected valid destination-specific
+// print definitions. Direct perfect forwarding therefore aligns diagnostics, strategy admission, and CPO execution.
 template <::std::integral char_type, typename... Args>
-constexpr inline ::fast_io::basic_string<char_type> basic_concat_fast_io(Args &&...args)
+constexpr inline ::fast_io::basic_string<char_type>
+basic_concat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char_type>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char_type, ::fast_io::basic_string<char_type>>(::fast_io::io_print_forward<char_type>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::basic_string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<
+		false, char_type, ::fast_io::basic_string<char_type>>(::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
+#if (defined(__GNUC__) && !defined(__clang__) && 11 <= __GNUC__) || \
+	(defined(__clang__) && 13 <= __clang_major__)
+FAST_IO_GNU_ALWAYS_INLINE
+#endif
 constexpr inline ::fast_io::string concat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char, ::fast_io::string>(::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char, ::fast_io::string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::wstring wconcat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<wchar_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, wchar_t, ::fast_io::wstring>(::fast_io::io_print_forward<wchar_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::wstring");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, wchar_t, ::fast_io::wstring>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u8string u8concat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char8_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char8_t, ::fast_io::u8string>(::fast_io::io_print_forward<char8_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::u8string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char8_t, ::fast_io::u8string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u16string u16concat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char16_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char16_t, ::fast_io::u16string>(::fast_io::io_print_forward<char16_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::u16string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char16_t, ::fast_io::u16string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u32string u32concat_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char32_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char32_t, ::fast_io::u32string>(::fast_io::io_print_forward<char32_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::u32string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char32_t, ::fast_io::u32string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::string concatln_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char, ::fast_io::string>(::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char, ::fast_io::string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::wstring wconcatln_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<wchar_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, wchar_t, ::fast_io::wstring>(::fast_io::io_print_forward<wchar_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::wstring");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, wchar_t, ::fast_io::wstring>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u8string u8concatln_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char8_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char8_t, ::fast_io::u8string>(::fast_io::io_print_forward<char8_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::u8string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char8_t, ::fast_io::u8string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u16string u16concatln_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char16_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char16_t, ::fast_io::u16string>(::fast_io::io_print_forward<char16_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::u16string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char16_t, ::fast_io::u16string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::u32string u32concatln_fast_io(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char32_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char32_t, ::fast_io::u32string>(::fast_io::io_print_forward<char32_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::u32string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char32_t, ::fast_io::u32string>(
+		::std::forward<Args>(args)...);
 }
 
 namespace tlc
 {
 
 template <::std::integral char_type, typename... Args>
-constexpr inline ::fast_io::tlc::basic_string<char_type> basic_concat_fast_io_tlc(Args &&...args)
+constexpr inline ::fast_io::tlc::basic_string<char_type>
+basic_concat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char_type>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char_type, ::fast_io::tlc::basic_string<char_type>>(::fast_io::io_print_forward<char_type>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::basic_string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<
+		false, char_type, ::fast_io::tlc::basic_string<char_type>>(::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::string concat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char, ::fast_io::tlc::string>(::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char, ::fast_io::tlc::string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::wstring wconcat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<wchar_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, wchar_t, ::fast_io::tlc::wstring>(::fast_io::io_print_forward<wchar_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::wstring");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, wchar_t, ::fast_io::tlc::wstring>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u8string u8concat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char8_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char8_t, ::fast_io::tlc::u8string>(::fast_io::io_print_forward<char8_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::u8string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char8_t, ::fast_io::tlc::u8string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u16string u16concat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char16_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char16_t, ::fast_io::tlc::u16string>(::fast_io::io_print_forward<char16_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::u16string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char16_t, ::fast_io::tlc::u16string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u32string u32concat_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char32_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char32_t, ::fast_io::tlc::u32string>(::fast_io::io_print_forward<char32_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::tlc::u32string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<false, char32_t, ::fast_io::tlc::u32string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::string concatln_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char, ::fast_io::tlc::string>(::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::tlc::string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char, ::fast_io::tlc::string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::wstring wconcatln_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<wchar_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, wchar_t, ::fast_io::tlc::wstring>(::fast_io::io_print_forward<wchar_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::tlc::wstring");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, wchar_t, ::fast_io::tlc::wstring>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u8string u8concatln_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char8_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char8_t, ::fast_io::tlc::u8string>(::fast_io::io_print_forward<char8_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::tlc::u8string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char8_t, ::fast_io::tlc::u8string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u16string u16concatln_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char16_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char16_t, ::fast_io::tlc::u16string>(::fast_io::io_print_forward<char16_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::tlc::u16string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char16_t, ::fast_io::tlc::u16string>(
+		::std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 constexpr inline ::fast_io::tlc::u32string u32concatln_fast_io_tlc(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char32_t>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<true, char32_t, ::fast_io::tlc::u32string>(::fast_io::io_print_forward<char32_t>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concatln ::fast_io::tlc::u32string");
-		return {};
-	}
+	return ::fast_io::basic_general_concat_compiler_constant_checked_entry<true, char32_t, ::fast_io::tlc::u32string>(
+		::std::forward<Args>(args)...);
 }
 
 } // namespace tlc

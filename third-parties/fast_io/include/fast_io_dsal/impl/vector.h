@@ -409,13 +409,7 @@ public:
 		imp.begin_ptr = typed_allocator_type::allocate(vecsize);
 		if constexpr (::std::is_trivially_copyable_v<value_type>)
 		{
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-#if __cpp_if_consteval >= 202106L
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				::fast_io::freestanding::nonoverlapped_bytes_copy(
 					reinterpret_cast<::std::byte const *>(vec.imp.begin_ptr),
@@ -485,13 +479,7 @@ private:
 	{
 		if constexpr (::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<value_type>)
 		{
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-#if __cpp_if_consteval >= 202106L
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				return reinterpret_cast<pointer>(::fast_io::containers::details::vector::grow_to_size_iter_impl<allocator_type, sizeof(value_type), alignof(value_type)>(*reinterpret_cast<::fast_io::containers::details::vector_model *>(__builtin_addressof(imp)),
 																																										 iter, n));
@@ -525,13 +513,7 @@ private:
 	{
 		if constexpr (::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<value_type>)
 		{
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-#if __cpp_if_consteval >= 202106L
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				return reinterpret_cast<pointer>(::fast_io::containers::details::vector::grow_twice_iter_impl<allocator_type, sizeof(value_type), alignof(value_type)>(*reinterpret_cast<::fast_io::containers::details::vector_model *>(__builtin_addressof(imp)),
 																																									   iter));
@@ -544,11 +526,7 @@ private:
 	{
 		if constexpr (::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<value_type>)
 		{
-#ifdef __cpp_if_consteval
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				return reinterpret_cast<pointer>(::fast_io::containers::details::vector::move_backward_impl<allocator, sizeof(value_type), alignof(value_type)>(
 					*reinterpret_cast<::fast_io::containers::details::vector_model *>(__builtin_addressof(imp)),
@@ -569,13 +547,7 @@ private:
 	{
 		if constexpr (::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<value_type>)
 		{
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-#if __cpp_if_consteval >= 202106L
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				::fast_io::containers::details::vector::grow_to_size_impl<allocator_type, sizeof(value_type), alignof(value_type)>(
 					*reinterpret_cast<::fast_io::containers::details::vector_model *>(__builtin_addressof(imp)), newcap);
@@ -591,13 +563,7 @@ private:
 	{
 		if constexpr (::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<value_type>)
 		{
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-#if __cpp_if_consteval >= 202106L
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 				::fast_io::containers::details::vector::grow_twice_impl<allocator_type, sizeof(value_type), alignof(value_type)>(
 					*reinterpret_cast<::fast_io::containers::details::vector_model *>(__builtin_addressof(imp)));
@@ -1202,21 +1168,21 @@ inline constexpr void swap(vector<T, allocator> &lhs, vector<T, allocator> &rhs)
 }
 
 template <typename ValueType, typename Alloc, typename U>
-inline constexpr ::fast_io::containers::vector<ValueType, Alloc>::size_type erase(::fast_io::containers::vector<ValueType, Alloc> &c, U const &value)
+inline constexpr typename ::fast_io::containers::vector<ValueType, Alloc>::size_type erase(::fast_io::containers::vector<ValueType, Alloc> &c, U const &value)
 {
 	auto it = ::std::remove(c.begin(), c.end(), value);
 	auto r = c.end() - it;
 	c.erase(it, c.end());
-	return static_cast<::fast_io::containers::vector<ValueType, Alloc>::size_type>(r);
+	return static_cast<typename ::fast_io::containers::vector<ValueType, Alloc>::size_type>(r);
 }
 
 template <typename ValueType, typename Alloc, typename Pred>
-inline constexpr ::fast_io::containers::vector<ValueType, Alloc>::size_type erase_if(::fast_io::containers::vector<ValueType, Alloc> &c, Pred pred)
+inline constexpr typename ::fast_io::containers::vector<ValueType, Alloc>::size_type erase_if(::fast_io::containers::vector<ValueType, Alloc> &c, Pred pred)
 {
 	auto it = ::std::remove_if(c.begin(), c.end(), pred);
 	auto r = c.end() - it;
 	c.erase(it, c.end());
-	return static_cast<::fast_io::containers::vector<ValueType, Alloc>::size_type>(r);
+	return static_cast<typename ::fast_io::containers::vector<ValueType, Alloc>::size_type>(r);
 }
 
 

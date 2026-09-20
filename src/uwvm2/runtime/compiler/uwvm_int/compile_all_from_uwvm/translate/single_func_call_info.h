@@ -1,11 +1,10 @@
 // Complete the per-local-function call metadata after all local bodies have been translated.
-// This include fragment is shared by the eager and lazy compilation paths; the caller has already
-// sized `storage.local_defined_call_info` and initialized module/function identity fields.
-// The runtime call bridge consumes these records for direct local calls, optional tiered-JIT entry,
-// and the interpreter-side trivial-call fast path.
+// The caller has already sized `storage.local_defined_call_info` and initialized module/function
+// identity fields. The runtime call bridge consumes these records for direct local calls and the
+// interpreter-side trivial-call fast path.
 if(local_func_count != 0uz)
 {
-    // Translate a WebAssembly scalar value type to the byte footprint used by the UWVM stack ABI.
+    // Translate a WebAssembly value type to the byte footprint used by the UWVM stack ABI.
     // Unsupported or unexpected value types deliberately map to zero so the caller can reject the
     // record instead of publishing inconsistent call-frame sizes.
     auto const abi_bytes{[](wasm_value_type t) constexpr noexcept -> ::std::size_t
@@ -19,7 +18,13 @@ if(local_func_count != 0uz)
                                  case wasm_value_type::i64:
                                  case wasm_value_type::f64:
                                      return 8uz;
-                                 // Keep the metadata writer fail-closed when a non-scalar type reaches this path.
+                                 case wasm_value_type::v128:
+                                     return sizeof(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128);
+                                 case wasm_value_type::funcref:
+                                     return sizeof(::uwvm2::object::global::wasm_funcref_t);
+                                 case wasm_value_type::externref:
+                                     return sizeof(::uwvm2::object::global::wasm_externref_t);
+                                 // Keep the metadata writer fail-closed when an unknown value type reaches this path.
                                  [[unlikely]] default:
                                      return 0uz;
                              }

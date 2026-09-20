@@ -101,17 +101,51 @@ struct heap_typed_allocate_guard
 
 } // namespace details
 
+namespace details
+{
+
+/// @brief Extracts one optional directional character type without coupling the opposite stream concept.
+/// @details A lockable output-only handle is not required to declare `input_char_type`, and conversely for an
+///          input-only handle. Substituting `void` for an absent direction keeps the observer layout unchanged while
+///          making that direction fail its existing `integral` character proof naturally. A joint I/O reference still
+///          requires both real aliases, so this helper cannot accidentally upgrade a one-way device to two-way I/O.
+template <typename T, typename = void>
+struct io_lockable_input_char
+{
+	using type = void;
+};
+
+template <typename T>
+struct io_lockable_input_char<T, ::std::void_t<typename T::input_char_type>>
+{
+	using type = typename T::input_char_type;
+};
+
+template <typename T, typename = void>
+struct io_lockable_output_char
+{
+	using type = void;
+};
+
+template <typename T>
+struct io_lockable_output_char<T, ::std::void_t<typename T::output_char_type>>
+{
+	using type = typename T::output_char_type;
+};
+
+} // namespace details
+
 template <typename T, typename Mutex>
 struct basic_general_io_lockable_ref
 {
-	using input_char_type = typename T::input_char_type;
-	using output_char_type = typename T::output_char_type;
+	using input_char_type = typename ::fast_io::details::io_lockable_input_char<T>::type;
+	using output_char_type = typename ::fast_io::details::io_lockable_output_char<T>::type;
 	using native_handle_type = basic_general_io_lockable_nonmovable<T, Mutex> *;
 	native_handle_type ptr{};
 };
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex>
 output_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex> &m) noexcept
 {
@@ -119,7 +153,7 @@ output_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mute
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex>
 output_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
 {
@@ -127,7 +161,7 @@ output_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) n
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex>
 input_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex> &m) noexcept
 {
@@ -135,7 +169,7 @@ input_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex>
 input_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
 {
@@ -143,14 +177,14 @@ input_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) no
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex> io_stream_ref_define(::fast_io::basic_general_io_lockable_nonmovable<T, Mutex> &m) noexcept
 {
 	return {__builtin_addressof(m)};
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_io_stream_ref_define<T &>
 inline constexpr basic_general_io_lockable_ref<T, Mutex> io_stream_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> m) noexcept
 {
 	return m;
@@ -308,21 +342,23 @@ inline constexpr decltype(auto) io_stream_mutex_ref_define(::fast_io::basic_gene
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_output_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_output_or_io_stream_ref_define<T &>
 inline constexpr decltype(auto) output_stream_unlocked_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> mtx)
 {
-	return output_stream_ref_define(mtx.ptr->handle);
+	// The stored handle is a named lvalue, and directional normalization must preserve the same dedicated-or-joint
+	// fallback admitted by the outer lockable projection.
+	return ::fast_io::operations::output_stream_ref(mtx.ptr->handle);
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_input_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_input_or_io_stream_ref_define<T &>
 inline constexpr decltype(auto) input_stream_unlocked_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> mtx)
 {
-	return input_stream_ref_define(mtx.ptr->handle);
+	return ::fast_io::operations::input_stream_ref(mtx.ptr->handle);
 }
 
 template <typename T, typename Mutex>
-	requires ::fast_io::operations::defines::has_io_stream_ref_define<T>
+	requires ::fast_io::operations::defines::has_io_stream_ref_define<T &>
 inline constexpr decltype(auto) io_stream_unlocked_ref_define(::fast_io::basic_general_io_lockable_ref<T, Mutex> mtx)
 {
 	return io_stream_ref_define(mtx.ptr->handle);

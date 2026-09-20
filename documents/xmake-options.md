@@ -1,6 +1,6 @@
 # UWVM Xmake Project Options (`xmake/option.lua`)
 
-This document describes the **project-specific** configuration options defined in `xmake/option.lua` and how they affect compilation/linking when using Xmake.
+This document describes the **project-specific** configuration options defined in `xmake/option.lua` and how they affect compilation/linking when using Xmake. The historical `jit` option and source-directory names are retained for build compatibility, but this fork builds only the full-module LLVM AOT path.
 These flags are specific to this repository (they are not part of upstream Xmake).
 
 To see the authoritative list as your local Xmake prints it, run:
@@ -28,14 +28,15 @@ Notes on syntax:
 
 Controls the CPU instruction-set tuning by adding a `-march=...` compiler flag (GCC/Clang).
 
-- **Default:** `default`
+- **Default:** `none` (the compiler/toolchain baseline; no host-specific tuning flag is injected).
 - **Values:**
   - `none`: Do not add `-march=...` (use the compiler/toolchain default).
-  - `default`: Prefer `-march=native` if supported by the compiler; otherwise fall back to the toolchain default.
+  - `native`: Add `-march=native`; use only for an explicit developer-local build.
+  - `default`: Legacy explicit alias that prefers `-march=native` if supported; otherwise falls back to the toolchain default.
   - Any other string (e.g. `x86-64-v3`, `znver4`, `armv8-a`): Adds `-march=<value>`.
-- **Impact:** Affects code generation, portability, and performance. `native` produces binaries optimized for the build machine and is usually **not portable** to older CPUs.
+- **Impact:** Affects code generation, portability, and performance. `native` produces binaries optimized for the build machine and is usually **not portable** to older CPUs. Release artifacts must name and test a fixed target baseline explicitly (for example `--march=x86-64-v2` or `--march=armv8-a`); the default `none` is portable only to the baseline selected by the configured toolchain and is not by itself a distribution-portability proof.
 - **Example:**
-  - `xmake f --march=default`
+  - `xmake f --march=native` (developer-local tuning)
   - `xmake f --march=x86-64-v3`
   - `xmake f --march=none`
 
@@ -134,7 +135,7 @@ Selects the static linking policy.
   - `none`: Use dynamic/default linking for libraries that have a dynamic default.
   - `non-system`: Link non-system/non-platform libraries through explicit static archives when available, while leaving platform/system libraries to the platform default. This is the intended release-oriented policy and avoids global `-static` on platforms such as Darwin.
   - `compiler`: Use the compiler/toolchain global static strategy, including `-static` where supported.
-- **Impact:** `compiler` may produce highly self-contained binaries on platforms that support full static linking, but can be incompatible with toolchains such as Darwin. `non-system` is more portable: LLVM JIT libraries and other non-platform libraries are resolved as static archives, while system libraries such as libc and platform frameworks remain dynamic/default.
+- **Impact:** `compiler` may produce highly self-contained binaries on platforms that support full static linking, but can be incompatible with toolchains such as Darwin. `non-system` is more portable: LLVM backend libraries and other non-platform libraries are resolved as static archives, while system libraries such as libc and platform frameworks remain dynamic/default.
 - **Example:**
   - `xmake f --static=none`
   - `xmake f --static=non-system`
@@ -146,7 +147,7 @@ Switches to Clang-based toolchains (Clang-CL on Windows, Clang elsewhere) and ma
 
 - **Default:** `n`
 - **Impact:** Changes the compiler/linker frontend, warning behaviors, available flags, and runtime defaults. Combine with `--llvm-target` for cross-targeting.
-- **Note:** This flag only selects the LLVM/Clang compiler toolchain. It does not enable LLVM JIT by itself.
+- **Note:** This flag only selects the LLVM/Clang compiler toolchain. It does not enable the LLVM AOT backend by itself.
 - **Example:**
   - `xmake f --use-llvm-compiler=y`
 
@@ -182,38 +183,50 @@ Controls the execution int backend selection.
 
 ### `--execution-jit=EXECUTION-JIT`
 
-Controls the execution jit backend selection.
+Controls the full-module LLVM AOT backend. The option name is retained for compatibility with existing build scripts.
 
 - **Default:** `default`
 - **Values:**
-  - `none`: Disable the execution jit backend (`UWVM_DISABLE_JIT`).
-  - `default`: Enable and use the default execution jit backend (`UWVM_USE_DEFAULT_JIT`).
-  - `llvm`: Enable and use LLVM as the execution jit backend (`UWVM_USE_LLVM_JIT`).
-- **Notes:** When `default` or `llvm` is selected, `xmake` probes LLVM through `llvm-config` and imports the returned include paths, link paths, defines, system libraries, and LLVM libraries automatically. `none` skips this probe entirely. This JIT selection is separate from `--use-llvm-compiler`, which only controls the compiler toolchain. Ensure `llvm-config` is discoverable on `PATH`, or point `LLVM_CONFIG` to the executable explicitly.
+  - `none`: Disable the LLVM AOT backend (`UWVM_DISABLE_JIT`).
+  - `default`: Enable the default full-module LLVM backend (`UWVM_USE_DEFAULT_JIT`).
+  - `llvm`: Enable the full-module LLVM backend (`UWVM_USE_LLVM_JIT`).
+- **Notes:** When `default` or `llvm` is selected, ROS builds its pinned, patched LLVM 23.1.1 sources under `third-parties/llvm` using CMake and Ninja. CMake directly exports the include paths, definitions and ordered static-library dependencies; no `llvm-config` executable is built, queried or accepted from the system. `none` skips the LLVM dependency entirely. Lazy LLVM compilation and tiered execution are not compiled. This selection is separate from `--use-llvm-compiler`, which only controls the bootstrap compiler. See [provenance and build policy](../third-parties/llvm/README.md) and [exact changes to the official release](../third-parties/llvm/UPSTREAM_CHANGES.md).
 - **Example:**
   - `xmake f --execution-jit=llvm --use-llvm-compiler=y`
 
-### `--debug-int=[y|n]`
+### `--llvm-build-jobs=N`
 
-Controls whether the debug int backend is enabled (build-time define `UWVM_ENABLE_DEBUG_INT`).
+Controls compilation parallelism for the bundled LLVM library.
 
-- **Default:** `n`
-- **Impact:** Disabled by default because the debug interpreter executable runtime path is not implemented yet. Enabling it exposes `--runtime-debug-int` and `-Rcc debug-int` for implementation work, but executable dispatch still rejects the backend until that runtime path is completed.
-- **Example:**
-  - `xmake f --debug-int=y`
-  - `xmake f --debug-int=n`
+- **Default:** `2`; integer range `1..16`. LLVM link parallelism remains one.
+- **Notes:** This is not a memory limit. Use an aggregate cgroup/job limit when several compilers or test campaigns share a machine. It does not select the guest Wasm optimization policy.
+
+### `--llvm-build-targets=TARGETS`
+
+Selects bundled LLVM code-generation backends.
+
+- **Default:** `Native`.
+- **Values:** `Native`, `all`, or a semicolon-separated LLVM backend list, such as `X86;Mips;AArch64`.
+- **Notes:** ROS JIT requires its own runtime host backend even when additional backends are selected for an audit. Omitting it is an error, not a supported interpreter fallback. Quote a semicolon-separated value when passing it through a shell.
+
+### `--llvm-cmake-toolchain=FILE`
+
+Supplies the CMake toolchain for cross-building the bundled LLVM library.
+
+- **Default:** `none`; required for a cross-target LLVM dependency.
+- **Notes:** Compiler, sysroot, ABI and linker must match ROS. The toolchain must explicitly set `LLVM_HOST_TRIPLE` for the machine on which ROS runs; CMake's system processor alone does not override LLVM's build-machine inference. Old inferred host/default triples are cleared before reconfiguration. Dependency discovery needs no target runner or llvm-config executable. See [the cross-build contract](../third-parties/llvm/README.md).
 
 ### `--enable-uwvm-int-combine-ops=MODE`
 
 Controls “combined opcode” optimizations for `uwvm-int`.
 
-- **Default:** `heavy`
+- **Default:** `soft`
 - **Values:**
   - `none`: Disable combine-op optimizations.
   - `soft`: Enable only soft/light combinations.
   - `heavy`: Enable soft + heavy combinations.
   - `extra`: Enable soft + heavy + extra-heavy combinations.
-- **Impact:** Trades compiler/build complexity and code size for potential interpreter performance improvements.
+- **Impact:** The default keeps the broadly useful light combinations while compiling out the much larger heavy pattern set. Use `heavy` explicitly for interpreter-performance-focused builds; `none` is intended for diagnostics because it causes large execution regressions on dispatch-heavy workloads. See [uwvm-int Compile Policy](uwvm-int-compile-policy.md) for the u2bench measurements.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --enable-uwvm-int-combine-ops=soft`
 
@@ -226,7 +239,7 @@ Controls delay-local variantization for `uwvm-int`.
   - `none`: Disable delay-local fusions.
   - `soft`: Enable minimal delay-local fusions.
   - `heavy`: Enable soft + extended delay-local fusions.
-- **Impact:** Trades compiler/build complexity and code size for more specialized local-get/local-set interpreter paths.
+- **Impact:** Heavy remains the default because delay-local is a high-value provider/consumer optimization. `soft` and `none` remain available for diagnostics and size experiments, but are not production defaults.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --enable-uwvm-int-delay-local=soft`
 
@@ -295,7 +308,7 @@ Registers the shell-driven backend differential fuzzer target in `test/0015.back
 
 - **Default:** `n`
 - **Prerequisite:** `--execution-int=uwvm-int/default` and `--execution-jit=llvm/default`.
-- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases plus fixed tiered strategy cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full and tiered runtime outcomes. The compile-time combine/delay-local matrix is available as `test/0015.backend_fuzzer/run_backend_fuzzer_matrix.sh`.
+- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm cases, and compares WABT `wasm-interp` with UWVM full interpreter and LLVM AOT outcomes. The compile-time combine/delay-local matrix is available as `test/0015.backend_fuzzer/run_backend_fuzzer_matrix.sh`.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y`
   - `xmake f -m debug --use-llvm-compiler=y --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined`

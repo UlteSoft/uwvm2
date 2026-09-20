@@ -7,6 +7,16 @@
 namespace fast_io::details::string_hack
 {
 
+// The model below is the libstdc++ C++11 ABI representation.  The legacy ABI is intentionally not inferred from a
+// similar object size: its copy-on-write representation has different ownership and cursor-publication semantics.
+inline constexpr bool standard_string_runtime_put_area_available{
+#if defined(_GLIBCXX_USE_CXX11_ABI) && _GLIBCXX_USE_CXX11_ABI
+	true
+#else
+	false
+#endif
+};
+
 /*
 https://github.com/gcc-mirror/gcc/blob/47fe96341d28ff9e68990038b1beb8a760ff26d0/libstdc%2B%2B-v3/include/bits/basic_string.h#L150
 */
@@ -58,10 +68,13 @@ struct
 	};
 };
 
+/// @brief Accesses libstdc++ basic_string's data pointer through the audited C++11 ABI representation.
 template <typename T>
 inline decltype(auto) hack_M_data(T &str) noexcept
 {
 	using model_t = model<T>;
+	static_assert(sizeof(model_t) == sizeof(T) && alignof(model_t) == alignof(T),
+				  "libstdc++ changed basic_string's C++11 ABI representation; the fast_io model must be re-audited");
 	using alloc_hider = typename model_t::_Alloc_hider;
 	using pointer = typename T::pointer;
 	return *reinterpret_cast<pointer *>(reinterpret_cast<::std::byte *>(__builtin_addressof(str)) +

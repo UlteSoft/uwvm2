@@ -571,7 +571,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::vector<::std::byte> bytes{};
             bytes.reserve(ctx.cache_key.size() + isa.size() + context.size() + 48uz);
             // The path key includes metadata as well as the logical key to avoid opening obviously incompatible blobs.
-            append_key_value(bytes, u8"format", u8"uwvm-ljc-path-key-v1");
+            append_key_value(bytes, u8"format", u8"uwvm-ljc-path-key-v2");
             append_key_value(bytes, u8"cache-key", ctx.cache_key);
             append_key_value(bytes, u8"isa", isa);
             append_key_value(bytes, u8"context", context);
@@ -587,10 +587,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string
             cache_file_name_from_hash(::uwvm2::utils::container::u8string const& key_hash) noexcept
         {
-            auto name{key_hash};
-            name.reserve(name.size() + 9uz);
+            ::uwvm2::utils::container::u8string name{};
+            name.reserve(cache_product_name.size() + 1uz + key_hash.size() + 9uz);
             ::uwvm2::utils::container::u8string_ref_uwvm ref{::std::addressof(name)};
-            ::fast_io::io::print(ref, u8".uwvm-ljc");
+            ::fast_io::io::print(ref, cache_product_name, u8"-", key_hash, u8".uwvm-ljc");
             return name;
         }
 
@@ -608,12 +608,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             auto root{open_cache_dir(::uwvm2::utils::container::u8string_view{ctx.cache_dir.cbegin(), ctx.cache_dir.size()}, create)};
 
-            ::uwvm2::utils::container::u8string objects_component{u8"objects"};
+            // Namespace even explicit embedder contexts, not only CLI defaults.
+            // Old layouts are neither probed nor migrated: executable cache
+            // compatibility cannot be inferred from a matching user path.
+            ::uwvm2::utils::container::u8string product_component{};
+            ::uwvm2::utils::container::u8string_ref_uwvm product_ref{::std::addressof(product_component)};
+            ::fast_io::io::print(product_ref, cache_product_name);
             ::uwvm2::utils::container::u8string display_path{ctx.cache_dir};
+            append_cache_path_component(display_path, product_component);
+            if(create) { try_make_directory_at(root, product_component, display_path); }
+            auto product_dir{
+                ::fast_io::dir_file{::fast_io::at(root), product_component, ::fast_io::open_mode::follow}
+            };
+
+            ::uwvm2::utils::container::u8string objects_component{u8"objects"};
             append_cache_path_component(display_path, objects_component);
-            if(create) { try_make_directory_at(root, objects_component, display_path); }
+            if(create) { try_make_directory_at(product_dir, objects_component, display_path); }
             auto objects_dir{
-                ::fast_io::dir_file{::fast_io::at(root), objects_component, ::fast_io::open_mode::follow}
+                ::fast_io::dir_file{::fast_io::at(product_dir), objects_component, ::fast_io::open_mode::follow}
             };
 
             auto shard_component{cache_key_shard(key_hash)};
@@ -799,6 +811,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         auto const key_hash{details::cache_key_hash(ctx)};
         auto const shard{details::cache_key_shard(key_hash)};
         // Public path construction mirrors the storage layout for diagnostics and tests.
+        ::fast_io::io::print(ref, cache_product_name);
+        details::append_path_separator_if_needed(path);
         ::fast_io::io::print(ref, u8"objects");
         details::append_path_separator_if_needed(path);
         ::fast_io::io::print(ref, shard);
@@ -1040,6 +1054,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 
     inline constexpr void flush_async_store_objects() noexcept { details::async_cache_store_worker_instance().flush(); }
+
+    inline constexpr void shutdown_async_store_objects() noexcept
+    {
+        // fast_exit terminates only the calling thread on Linux. Stop and join the writer explicitly before a WASI proc_exit so a
+        // sleeping cache thread cannot keep the process alive after the main thread has already exited.
+        details::async_cache_store_worker_instance().stop_and_join();
+    }
 
     [[nodiscard]] inline constexpr cache_load_result load_object(cache_context const& ctx, cache_policy const& policy) noexcept
     {

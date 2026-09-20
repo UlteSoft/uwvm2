@@ -59,96 +59,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
                                                                                 para_end) noexcept
     {
-        // [... curr] ...
-        // [  safe  ] unsafe (could be the module_end)
-        //      ^^ para_curr
-
-        if(::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_mode_existed || ::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_compiler_existed)
-            [[unlikely]]
-        {
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Conflicting runtime parameters: \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                u8"--runtime-aot",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\" conflicts with custom runtime parameters (--runtime-custom-mode/--runtime-custom-compiler).\n" u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Use \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"--help runtime",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\" for details.\n\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
-        }
-
-        if(
+        bool const conflicting_runtime_shortcut{
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
 # endif
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed ||
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
-# endif
-            false) [[unlikely]]
+            false};
+        if(conflicting_runtime_shortcut) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Conflicting runtime parameters: only one shortcut runtime mode parameter is allowed "
-                                u8"("
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                                u8"--runtime-int"
-#  if defined(UWVM_RUNTIME_LLVM_JIT)
-                                ,
-                                u8"|"
-#  endif
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-                                u8"--runtime-jit"
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                                ,
-                                u8"|",
-                                u8"--runtime-tiered"
-#  endif
-                                ,
-                                u8"|",
-                                u8"--runtime-aot"
-# endif
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-                                ,
-                                u8"|"
-#  endif
-                                ,
-                                u8"--runtime-debug-int"
-# endif
-                                u8").\n"
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Use \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"--help runtime",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\" for details.\n\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                u8"uwvm: [error] only one runtime backend shortcut may be selected (-Rint or -Raot).\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 

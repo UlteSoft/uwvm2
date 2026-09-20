@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Extra-heavy FP fusion is not exempt from Wasm rounding and bit-preservation.
+// Copysign with immediate/local operands must use integer masks on uncached
+// profiles before any Float temporary can quiet an sNaN. Arithmetic still routes
+// through the shared evaluator, preventing a fused-only double-rounding/NaN bug.
+// Preserve the fused dispatch and compile-time native-cache fast paths.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel
@@ -44,13 +50,14 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <concepts>
 # include <cstddef>
 # include <bit>
 # include <cstdint>
 # include <cstring>
-# include <cmath>
 # include <limits>
 # include <memory>
+# include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -154,7 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             i = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step);
 
-            wasm_f64 const i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(i))};
+            wasm_f64 const i_d{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(i))};
             bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, i_d)};
             if(!lt) { continue; }
             break;
@@ -214,7 +221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             i = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step);
 
-            wasm_f64 const i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(i))};
+            wasm_f64 const i_d{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(i))};
             bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, i_d)};
             if(!lt) { continue; }
             break;
@@ -279,7 +286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(type...[0])};
 
         wasm_f64 const v{conbine_details::load_local<wasm_f64>(type...[2u], src_off)};
-        wasm_f64 const out{v * mul + add};
+        wasm_f64 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add)};
         conbine_details::store_local(type...[2u], dst_off, out);
 
         conbine_details::push_operand<CompileOption, wasm_f64, curr_f64_stack_top>(out, type...);
@@ -309,7 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(typeref...[0])};
 
         wasm_f64 const v{conbine_details::load_local<wasm_f64>(typeref...[2u], src_off)};
-        wasm_f64 const out{v * mul + add};
+        wasm_f64 const out{numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add)};
         conbine_details::store_local(typeref...[2u], dst_off, out);
 
         conbine_details::push_operand_byref<CompileOption>(out, typeref...);
@@ -670,10 +677,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 acc{conbine_details::load_local<wasm_f64>(type...[2u], acc_off)};
         wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
 
-        constexpr wasm_f64 add_k{static_cast<wasm_f64>(0.000001)};
-        constexpr wasm_f64 mul_k{static_cast<wasm_f64>(1.0000001)};
-        constexpr wasm_f64 sub_k{static_cast<wasm_f64>(0.5)};
-        constexpr wasm_f64 neg_one{static_cast<wasm_f64>(-1.0)};
+        constexpr wasm_f64 add_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(0.000001)};
+        constexpr wasm_f64 mul_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(1.0000001)};
+        constexpr wasm_f64 sub_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(0.5)};
+        constexpr wasm_f64 neg_one{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(-1.0)};
 
         while(i_u < end_u)
         {
@@ -735,9 +742,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 x{conbine_details::load_local<wasm_f64>(type...[2u], x_off)};
         wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
 
-        constexpr wasm_f64 add_k{static_cast<wasm_f64>(1.0)};
-        constexpr wasm_f64 mul_k{static_cast<wasm_f64>(1.0000001)};
-        constexpr wasm_f64 sub_k{static_cast<wasm_f64>(0.5)};
+        constexpr wasm_f64 add_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(1.0)};
+        constexpr wasm_f64 mul_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(1.0000001)};
+        constexpr wasm_f64 sub_k{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(0.5)};
 
         while(i_u < end_u)
         {
@@ -793,13 +800,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(type...[0])};
 
         wasm_f64 v{conbine_details::load_local<wasm_f64>(type...[2u], src_off)};
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(type...[2u], dst1_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(type...[2u], dst2_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(type...[2u], dst3_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(type...[2u], dst4_off, v);
 
         conbine_details::push_operand<CompileOption, wasm_f64, curr_f64_stack_top>(v, type...);
@@ -832,13 +839,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const add{conbine_details::read_imm<wasm_f64>(typeref...[0])};
 
         wasm_f64 v{conbine_details::load_local<wasm_f64>(typeref...[2u], src_off)};
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(typeref...[2u], dst1_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(typeref...[2u], dst2_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(typeref...[2u], dst3_off, v);
-        v = v * mul + add;
+        v = numeric_details::eval_float_binop<numeric_details::float_binop::add>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(v, mul), add);
         conbine_details::store_local(typeref...[2u], dst4_off, v);
 
         conbine_details::push_operand_byref<CompileOption>(v, typeref...);
@@ -1047,15 +1054,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         while(i_u != end_u)
         {
             wasm_u32 const denom_even{i_u * i_u};
-            wasm_f32 const term_even{wasm_f32{1.f} / static_cast<wasm_f32>(denom_even)};
+            wasm_f32 const term_even{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(denom_even))};
 
             wasm_u32 const im1{i_u - wasm_u32{1u}};
             wasm_u32 const denom_odd{im1 * im1};
-            wasm_f32 const term_odd{wasm_f32{1.f} / static_cast<wasm_f32>(denom_odd)};
+            wasm_f32 const term_odd{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(denom_odd))};
 
             // Match the Wasm evaluation order: (sum + term_odd) + term_even.
-            sum += term_odd;
-            sum += term_even;
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, term_odd);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, term_even);
 
             i_u += wasm_u32{2u};
         }
@@ -1097,16 +1104,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_u32 denom_even{i_u * i_u};
             denom_even *= i_u;
-            wasm_f32 const term_even{wasm_f32{1.f} / static_cast<wasm_f32>(denom_even)};
+            wasm_f32 const term_even{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(denom_even))};
 
             wasm_u32 const im1{i_u - wasm_u32{1u}};
             wasm_u32 denom_odd{im1 * im1};
             denom_odd *= im1;
-            wasm_f32 const term_odd{wasm_f32{1.f} / static_cast<wasm_f32>(denom_odd)};
+            wasm_f32 const term_odd{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(denom_odd))};
 
             // Match the Wasm evaluation order: (sum + term_odd) + term_even.
-            sum += term_odd;
-            sum += term_even;
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, term_odd);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, term_even);
 
             i_u += wasm_u32{2u};
         }
@@ -1155,21 +1162,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_u32 ip4_u{};
         for(;;)
         {
-            wasm_f32 const a{(prod * wasm_f32{0.5f}) * static_cast<wasm_f32>(i_u)};
-            wasm_f32 const b{(a * wasm_f32{0.5f}) * static_cast<wasm_f32>(i_u + wasm_u32{1u})};
-            wasm_f32 const c{(b * wasm_f32{0.5f}) * static_cast<wasm_f32>(i_u + wasm_u32{2u})};
-            wasm_f32 const d{(c * wasm_f32{0.5f}) * static_cast<wasm_f32>(i_u + wasm_u32{3u})};
+            wasm_f32 const a{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(prod, wasm_f32{0.5f}), ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i_u))};
+            wasm_f32 const b{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(a, wasm_f32{0.5f}), ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i_u + wasm_u32{1u}))};
+            wasm_f32 const c{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(b, wasm_f32{0.5f}), ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i_u + wasm_u32{2u}))};
+            wasm_f32 const d{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(c, wasm_f32{0.5f}), ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i_u + wasm_u32{3u}))};
             ip4_u = i_u + wasm_u32{4u};
-            wasm_f32 const e{(d * wasm_f32{0.5f}) * static_cast<wasm_f32>(ip4_u)};
+            wasm_f32 const e{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(numeric_details::eval_float_binop<numeric_details::float_binop::mul>(d, wasm_f32{0.5f}), ::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(ip4_u))};
 
             prod = e;
 
             // Match the Wasm evaluation order: sum + a + b + c + d + e (e added last).
-            sum += a;
-            sum += b;
-            sum += c;
-            sum += d;
-            sum += e;
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, a);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, b);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, c);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, d);
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, e);
 
             i_u += wasm_u32{5u};
             if(ip4_u != end_u) { continue; }
@@ -1228,21 +1235,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         for(;;)
         {
             // term(i): 1 / (1 + (i*k))^2
-            wasm_f32 const fi{static_cast<wasm_f32>(i_u)};
-            wasm_f32 const t0{fi * k};
-            wasm_f32 const x0{t0 + wasm_f32{1.f}};
-            wasm_f32 const term0{wasm_f32{1.f} / (x0 * x0)};
-            sum_out = sum + term0;
+            wasm_f32 const fi{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i_u)};
+            wasm_f32 const t0{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(fi, k)};
+            wasm_f32 const x0{numeric_details::eval_float_binop<numeric_details::float_binop::add>(t0, wasm_f32{1.f})};
+            wasm_f32 const term0{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x0, x0))};
+            sum_out = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum, term0);
 
             i1_u = i_u + wasm_u32{1u};
             if(i1_u == end_u) { break; }
 
             // term(i+1)
-            wasm_f32 const fi1{static_cast<wasm_f32>(i1_u)};
-            wasm_f32 const t1{fi1 * k};
-            wasm_f32 const x1{t1 + wasm_f32{1.f}};
-            wasm_f32 const term1{wasm_f32{1.f} / (x1 * x1)};
-            sum = sum_out + term1;
+            wasm_f32 const fi1{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(i1_u)};
+            wasm_f32 const t1{numeric_details::eval_float_binop<numeric_details::float_binop::mul>(fi1, k)};
+            wasm_f32 const x1{numeric_details::eval_float_binop<numeric_details::float_binop::add>(t1, wasm_f32{1.f})};
+            wasm_f32 const term1{numeric_details::eval_float_binop<numeric_details::float_binop::div>(wasm_f32{1.f}, numeric_details::eval_float_binop<numeric_details::float_binop::mul>(x1, x1))};
+            sum = numeric_details::eval_float_binop<numeric_details::float_binop::add>(sum_out, term1);
 
             i_u = i1_u + wasm_u32{1u};
         }
@@ -1256,79 +1263,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::store_local(type...[2u], sum_off, sum);
         conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
         conbine_details::store_local(type...[2u], i1_off, ::std::bit_cast<wasm_i32>(i1_u));
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-    }
-
-    /// @brief Runs the full `test6` sin-table fill loop:
-    /// `for(i=0; i!=end; i+=4) store sin((i+0)*k), sin((i+1)*k), sin((i+2)*k), sin((i+3)*k) into memory` (tail-call).
-    /// @details
-    /// - Stack-top optimization: N/A (operand stack remains unchanged).
-    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
-    /// - Immediates: `local_offset_t` (ptr i32), `local_offset_t` (i i32), `native_memory_t*` (memory0), `wasm_i32` (end).
-    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
-        requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_test6_sin_table_fill_loop_run(Type... type) UWVM_THROWS
-    {
-        using wasm_i32 = conbine_details::wasm_i32;
-        using wasm_u32 = conbine_details::wasm_u32;
-        using wasm_f32 = conbine_details::wasm_f32;
-        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
-
-        static_assert(sizeof...(Type) >= 3uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
-
-        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
-
-        auto const ptr_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
-        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
-        native_memory_t* memory_p{conbine_details::read_imm<native_memory_t*>(type...[0])};
-        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(type...[0])};
-
-        wasm_u32 ptr_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], ptr_off))};
-        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], i_off))};
-        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
-
-        // f32.const 0x1.921fb6p-8 (2*pi/1024) in `test6`.
-        constexpr wasm_u32 k_bits{0x3bc90fdbu};
-        wasm_f32 const k{::std::bit_cast<wasm_f32>(k_bits)};
-
-        auto const& memory{*memory_p};
-        details::enter_memory_operation_memory_lock(memory);
-
-        if(i_u < end_u)
-        {
-            // Each iteration stores 16 bytes (4x f32) into a contiguous region.
-            wasm_u32 const iter_cnt{(end_u - i_u) / wasm_u32{4u}};
-            ::std::size_t const bytes_total{static_cast<::std::size_t>(iter_cnt) * 16uz};
-
-            auto const eff{details::wasm32_effective_offset(::std::bit_cast<wasm_i32>(ptr_u), wasm_u32{0u})};
-            details::check_memory_bounds_unlocked(memory, 0uz, 0uz, eff, bytes_total);
-
-            ::std::byte* p{details::ptr_add_u64(memory.memory_begin, eff.offset)};
-
-            for(wasm_u32 it{}; it != iter_cnt; ++it)
-            {
-                wasm_f32 const fi{static_cast<wasm_f32>(i_u)};
-
-                // Match the store order in the Wasm loop.
-                details::store_f32_le(p + 0uz, static_cast<wasm_f32>(::sinf(fi * k)));
-                details::store_f32_le(p + 12uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{3.f}) * k)));
-                details::store_f32_le(p + 8uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{2.f}) * k)));
-                details::store_f32_le(p + 4uz, static_cast<wasm_f32>(::sinf((fi + wasm_f32{1.f}) * k)));
-
-                p += 16uz;
-                i_u += wasm_u32{4u};
-                ptr_u += wasm_u32{16u};
-            }
-        }
-        details::exit_memory_operation_memory_lock(memory);
-
-        conbine_details::store_local(type...[2u], ptr_off, ::std::bit_cast<wasm_i32>(ptr_u));
-        conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -1657,7 +1591,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(mem_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const store_word{[&](::std::uint_least64_t off, ::std::uint32_t v) constexpr noexcept
-                              { details::store_u32_le(details::ptr_add_u64(mem_base, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
+                              { details::store_u32_le(details::prepare_memory_store_pointer<4uz>(mem, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
 
         // Store the same 16-word output slice as the Wasm: offsets 0..60.
         store_word(60u, l3);
@@ -1807,17 +1741,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
-            requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_test6_sin_table_fill_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        { return uwvmint_test6_sin_table_fill_loop_run<CompileOption, Type...>; }
-
-        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
-            requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_test6_sin_table_fill_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_test6_sin_table_fill_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)

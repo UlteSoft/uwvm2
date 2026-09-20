@@ -61,7 +61,7 @@ xmake i -o ./out/none-riscv
 
 ### Additional Options
 - `--static=none|non-system|compiler` Static linking policy (`compiler` is typical for bare-metal)
-- `--march` Tune for your MCU/SoC architecture if needed
+- `--march` defaults to `none`; release firmware must select and test its fixed MCU/SoC baseline explicitly, while `native` is developer-local only.
 - `--use-cxx-module=y` Only if your toolchain supports C++ modules
 
 ## Caveats

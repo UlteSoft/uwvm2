@@ -84,6 +84,7 @@ inline constexpr void print_perm_per_check(char_type *i, perms p, perms checked)
 }
 
 } // namespace details::perm
+/// @feature concept:static_precise_size
 template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, perms>) noexcept
 {

@@ -11,10 +11,10 @@ template <bool isfirst, bool uppercase, ::std::integral char_type>
 #endif
 inline constexpr char_type *uprsv_hex_handle8_impl(char_type *iter, ::std::uint_least32_t first4) noexcept
 {
-	constexpr ::std::uint_least32_t onex2{UINT32_C(0x100)};
-	constexpr ::std::uint_least32_t mask8{onex2 - UINT32_C(1)};
-	constexpr ::std::uint_least32_t onex4{UINT32_C(0x10000)};
-	constexpr ::std::uint_least32_t onex6{UINT32_C(0x1000000)};
+	constexpr ::std::uint_least32_t onex2{static_cast<::std::uint_least32_t>(0x100)};
+	constexpr ::std::uint_least32_t mask8{onex2 - static_cast<::std::uint_least32_t>(1)};
+	constexpr ::std::uint_least32_t onex4{static_cast<::std::uint_least32_t>(0x10000)};
+	constexpr ::std::uint_least32_t onex6{static_cast<::std::uint_least32_t>(0x1000000)};
 
 	constexpr auto const *digitstb{digits_table<char_type, 16, uppercase>};
 	constexpr ::std::size_t tocopybytes{sizeof(char_type) * 2u};
@@ -24,7 +24,7 @@ inline constexpr char_type *uprsv_hex_handle8_impl(char_type *iter, ::std::uint_
 		{
 			if (first4 < onex2)
 			{
-				bool const lessthan16{first4 < UINT32_C(0x10)};
+				bool const lessthan16{first4 < static_cast<::std::uint_least32_t>(0x10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan16 + (first4 << 1), tocopybytes);
 				iter += 1 + (!lessthan16);
 			}
@@ -32,7 +32,7 @@ inline constexpr char_type *uprsv_hex_handle8_impl(char_type *iter, ::std::uint_
 			{
 				::std::uint_least32_t const f0{static_cast<::std::uint_least32_t>(first4 >> 8)};
 				::std::uint_least32_t const f2{static_cast<::std::uint_least32_t>(f0 & mask8)};
-				bool const lessthan16{f0 < UINT32_C(0x10)};
+				bool const lessthan16{f0 < static_cast<::std::uint_least32_t>(0x10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan16 + (f0 << 1), tocopybytes);
 				iter += 1 + (!lessthan16);
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + f2, tocopybytes);
@@ -47,7 +47,7 @@ inline constexpr char_type *uprsv_hex_handle8_impl(char_type *iter, ::std::uint_
 				::std::uint_least32_t const f2{static_cast<::std::uint_least32_t>((first4 >> 8) & mask8)};
 				::std::uint_least32_t const f4{static_cast<::std::uint_least32_t>(first4 & mask8)};
 
-				bool const lessthan16{f0 < UINT32_C(0x10)};
+				bool const lessthan16{f0 < static_cast<::std::uint_least32_t>(0x10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan16 + (f0 << 1), tocopybytes);
 				iter += 1 + (!lessthan16);
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (f2 << 1), tocopybytes);
@@ -61,7 +61,7 @@ inline constexpr char_type *uprsv_hex_handle8_impl(char_type *iter, ::std::uint_
 				::std::uint_least32_t const f4{static_cast<::std::uint_least32_t>((first4 >> 8) & mask8)};
 				::std::uint_least32_t const f6{static_cast<::std::uint_least32_t>(first4 & mask8)};
 
-				bool const lessthan16{f0 < UINT32_C(0x10)};
+				bool const lessthan16{f0 < static_cast<::std::uint_least32_t>(0x10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan16 + (f0 << 1), tocopybytes);
 				iter += 1 + (!lessthan16);
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (f2 << 1), tocopybytes);

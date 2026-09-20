@@ -12,4 +12,5 @@
 #include "prrsv.h"
 #include "is_all_zeros.h"
 #include "mask_countr.h"
+#include "mask_to_bitset.h"
 #include "zero_spec.h"

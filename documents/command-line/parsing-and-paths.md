@@ -44,16 +44,16 @@ When the parser sees `--run`:
 Examples:
 
 ```bash
-uwvm --runtime-jit --run app.wasm --guest-flag -x
+uwvm --runtime-aot --run app.wasm --guest-flag -x
 ```
 
 `--guest-flag` and `-x` are guest arguments.
 
 ```bash
-uwvm --run app.wasm --runtime-jit
+uwvm --run app.wasm --runtime-aot
 ```
 
-`--runtime-jit` is not a runtime selector here; it is guest `argv[1]`.
+`--runtime-aot` is not a runtime selector here; it is guest `argv[1]`.
 
 `--run` with no following token is a usage error. A host option that appears after `--run` cannot fix that, because host parsing has already ended.
 

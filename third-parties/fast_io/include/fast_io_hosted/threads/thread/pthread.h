@@ -68,7 +68,11 @@ inline constexpr void *thread_start_routine(void *args) noexcept
 	try
 #endif
 	{
-		::std::invoke(::fast_io::containers::get<Is>(*reinterpret_cast<Tuple *>(args))...);
+		auto &stored{*reinterpret_cast<Tuple *>(args)};
+		// A thread consumes its decay-copied launch state exactly once. Selecting every element from an xvalue tuple
+		// therefore preserves `operator() &&` and transfers move-only by-value arguments; the guard subsequently destroys
+		// the valid moved-from storage without extending any caller-side reference category.
+		::std::invoke(::fast_io::containers::get<Is>(::std::move(stored))...);
 	}
 #ifdef FAST_IO_CPP_EXCEPTIONS
 	catch (...)
@@ -103,13 +107,15 @@ public:
 	inline constexpr pthread_thread() noexcept = default;
 
 	template <typename Func, typename... Args>
-		requires(::std::invocable<Func, Args...>)
+		requires(::fast_io::details::thread_decay_invocable<Func, Args...>)
 	inline constexpr pthread_thread(Func &&func, Args &&...args)
 	{
 		using start_routine_tuple_type = ::fast_io::containers::tuple<::std::decay_t<Func>, ::std::decay_t<Args>...>;
 		using alloc = ::fast_io::native_typed_global_allocator<start_routine_tuple_type>;
 
 		auto start_routine_tuple{alloc::allocate(1u)};
+		::fast_io::details::thread_start_storage_guard<start_routine_tuple_type> storage_guard{
+			start_routine_tuple};
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
@@ -118,6 +124,7 @@ public:
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
+		storage_guard.mark_constructed();
 		auto start_routine = ::fast_io::posix::details::get_thread_start_routine<start_routine_tuple_type>(
 			::std::make_index_sequence<sizeof...(Args) + 1>{});
 #if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
@@ -135,12 +142,10 @@ public:
 #endif
 		if (ec != 0) [[unlikely]]
 		{
-			// Creation failed; manual release is required.
-			::std::destroy_at(reinterpret_cast<start_routine_tuple_type *>(start_routine_tuple));
-			alloc::deallocate_n(start_routine_tuple, 1u);
-
+			// The guard still owns the complete tuple and releases it while the platform error propagates.
 			::fast_io::throw_posix_error(ec);
 		}
+		(void)storage_guard.release();
 		this->joinable_ = true;
 	}
 

@@ -7,9 +7,9 @@
 /**
  * @file        impl.cppm
  * @brief       Primary C++20 module interface for UWVM diagnostic color policy helpers.
- * @details     This module exports `uwvm2.uwvm_predefine.utils.ansies` and re-exports the `no_color` partition.  After
- *              defining module-build macros, it includes the umbrella header so module and non-module builds share the
- *              same color-control declarations.
+ * @details     This module exports `uwvm2.uwvm_predefine.utils.ansies`, re-exports the low-level ANSI/manipulator module and
+ *              the `no_color` partition.  After defining module-build macros, it includes the umbrella header so module and
+ *              non-module builds share the same color-control declarations.
  *
  * @author      MacroModel
  * @version     2.0.0
@@ -29,6 +29,9 @@
 module;
 
 export module uwvm2.uwvm_predefine.utils.ansies;
+// Module consumers include the color push/pop headers textually for macros, but the Win32 manipulator itself must retain one
+// owning module instead of being redefined in every consumer's global module fragment.
+export import uwvm2.utils.ansies;
 export import :no_color;
 
 #ifndef UWVM_MODULE

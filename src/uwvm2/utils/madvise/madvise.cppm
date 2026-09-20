@@ -33,6 +33,8 @@ module;
 # include <unistd.h>
 # include <sys/mman.h>
 #endif
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
 
 export module uwvm2.utils.madvise:madvise;
 

@@ -8,6 +8,7 @@
 
 #ifndef UWVM_MODULE
 # include "parser_limit.h"
+# include "call_indirect_immediate.h"
 # include "def.h"
 # include "feature_def.h"
 # include "types.h"

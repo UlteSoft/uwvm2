@@ -46,21 +46,15 @@
 # include "wasm_feature.h"
 
 // runtime
-# include "runtime_custom_mode.h"
-# include "runtime_custom_compiler.h"
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
 # include "runtime_scheduling_policy.h"
 # include "runtime_llvm_jit_policy.h"
-# include "runtime_llvm_jit_lazy_policy.h"
 # include "runtime_llvm_jit_full_policy.h"
 # include "runtime_llvm_jit_call_stack.h"
 # include "runtime_llvm_jit_cache_path.h"
-# include "runtime_debug_int.h"
 # include "runtime_int.h"
-# include "runtime_jit.h"
 # include "runtime_aot.h"
-# include "runtime_tiered.h"
 # include "runtime_uwvm_int_set_opcode_conbination_level.h"
 # include "runtime_uwvm_int_loop_unwind_max_size.h"
 

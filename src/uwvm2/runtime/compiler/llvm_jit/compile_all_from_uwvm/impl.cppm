@@ -25,6 +25,7 @@ module;
 export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm;
 
 export import :translate;
+export import :section_memory_manager;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

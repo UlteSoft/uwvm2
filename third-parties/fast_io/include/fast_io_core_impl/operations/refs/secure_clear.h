@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+/*
+ * Sensitive-buffer clearing policy query (CPO level).
+ *
+ * These directional markers let a normalized stream require secure clearing of
+ * temporary IO storage. They are policy capabilities consumed by buffer-owning
+ * algorithms, not clearing operations themselves. The actual allocation,
+ * lifetime, and erasure point remain responsibilities of the operation that
+ * owns the temporary storage.
+ */
+
 namespace fast_io
 {
 

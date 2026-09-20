@@ -19,10 +19,13 @@ simd_lf_crlf_process_chars(char_type const *fromfirst, char_type const *fromlast
 
 	constexpr char_type tofdch{cr ? lfchr : lfchct};
 #if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
-	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(characters_array_impl<tofdch, char_type, N>)};
+	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(tofdch))};
 #else
 	simd_vector_type charsvec;
-	charsvec.load(characters_array_impl<tofdch, char_type, N>.data());
+	constexpr auto chars_array{
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(tofdch)};
+	charsvec.load(chars_array.data());
 #endif
 	simd_vector_type vec;
 	for (; fromfirst != fromlast && tofirst != tolast; ++fromfirst)
@@ -42,8 +45,9 @@ simd_lf_crlf_process_chars(char_type const *fromfirst, char_type const *fromlast
 			for (; fromdiff; --fromdiff)
 			{
 				vec.load(fromfirst);
-				auto comres{vec != charsvec};
-				if (!::fast_io::intrinsics::is_all_zeros(comres))
+				// Equality is the searched predicate: an all-zero mask proves that the entire block is ordinary text.
+				auto matches{vec == charsvec};
+				if (!::fast_io::intrinsics::is_all_zeros(matches))
 				{
 					break;
 				}
@@ -77,6 +81,12 @@ simd_lf_crlf_process_chars(char_type const *fromfirst, char_type const *fromlast
 				break;
 			}
 		}
+		if (tofirst + 1 == tolast)
+		{
+			// A delimiter expands to two output code units. Leave it unconsumed when only one slot remains so the
+			// scalar state machine can publish the prefix and resume the expansion without crossing `tolast`.
+			break;
+		}
 		if constexpr (cr)
 		{
 			*tofirst = lfchct;
@@ -107,10 +117,13 @@ simd_crlf_lf_process_chars(char_type const *fromfirst, char_type const *fromlast
 	constexpr char_type lfchct{char_literal_v<u8'\n', ::std::remove_cvref_t<char_type>>};
 	constexpr char_type lfchr{char_literal_v<u8'\r', ::std::remove_cvref_t<char_type>>};
 #if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
-	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(characters_array_impl<lfchr, char_type, N>)};
+	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(lfchr))};
 #else
 	simd_vector_type charsvec;
-	charsvec.load(characters_array_impl<lfchr, char_type, N>.data());
+	constexpr auto chars_array{
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(lfchr)};
+	charsvec.load(chars_array.data());
 #endif
 	for (simd_vector_type vec;;)
 	{
@@ -121,15 +134,24 @@ simd_crlf_lf_process_chars(char_type const *fromfirst, char_type const *fromlast
 			break;
 		}
 		vec.load(fromfirst);
-		auto comres{vec != charsvec};
-		vec.store(tofirst);
-		if (::fast_io::intrinsics::is_all_zeros(comres))
+		// Keep a direct CR-match mask so the no-match proof and first-match lane calculation use the same polarity.
+		auto matches{vec == charsvec};
+		if (::fast_io::intrinsics::is_all_zeros(matches))
 		{
+			// Only an all-plain vector may be committed as a whole. A matching vector has a shorter logical output
+			// prefix and must not overwrite storage beyond the cursor returned to the decorator driver.
+			vec.store(tofirst);
 			fromfirst += N;
 			tofirst += N;
 			continue;
 		}
-		unsigned pos{::fast_io::intrinsics::vector_mask_countr_one(comres)};
+		// mask_countr reports element lanes (not bytes) and preserves address order on every supported endianness.
+		// The preceding nonzero proof also establishes `pos < N`, leaving source element N live for pair lookahead.
+		unsigned pos{::fast_io::intrinsics::vector_mask_countr_zero(matches)};
+		FAST_IO_ASSUME(pos < N);
+		// Copy exactly the committed prefix, including the CR at `pos`; the following pair-resolution step may
+		// replace that final code unit but cannot expose or modify any byte beyond the returned output cursor.
+		::fast_io::details::non_overlapped_copy_n(fromfirst, static_cast<::std::size_t>(pos) + 1u, tofirst);
 		fromfirst += pos + 1;
 		tofirst += pos + 1;
 		if (*fromfirst != lfchct)
@@ -161,11 +183,14 @@ simd_lf_cr_process_chars(char_type const *fromfirst, char_type const *fromlast, 
 	constexpr char_type lfchr{char_literal_v<u8'\r', ::std::remove_cvref_t<char_type>>};
 	constexpr char_type tofdch{cr ? lfchr : lfchct};
 #if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
-	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(characters_array_impl<tofdch, char_type, N>)};
+	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(tofdch))};
 	constexpr simd_vector_type threevec{::std::bit_cast<simd_vector_type>(characters_array_impl<3, char_type, N>)};
 #else
 	simd_vector_type charsvec;
-	charsvec.load(characters_array_impl<tofdch, char_type, N>.data());
+	constexpr auto chars_array{
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(tofdch)};
+	charsvec.load(chars_array.data());
 	simd_vector_type threevec;
 	threevec.load(characters_array_impl<3, char_type, N>.data());
 #endif

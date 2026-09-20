@@ -29,6 +29,7 @@
 # include <cstring>
 # include <cstdlib>
 # include <limits>
+# include <type_traits>
 # include <utility>
 # include <atomic>
 // macro

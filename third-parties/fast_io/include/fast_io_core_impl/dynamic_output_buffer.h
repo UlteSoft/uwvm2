@@ -47,6 +47,34 @@ public:
 	native_handle_type dob_ptr{};
 };
 
+/// @brief Proves the writable domain of the inline-first dynamic output owner.
+/// @details The embedded array is ordinary automatic/object storage, but it is not the owner's only possible backing
+///          domain: every overflow can replace it with storage supplied by `allocatortype`. Consequently the inline
+///          member alone is not sufficient evidence, even when `buffersize` is large enough for a particular caller.
+///          Requiring the allocator's exact provenance marker proves both states of the owner without making a
+///          run-time current-capacity test part of concept selection. This is deliberately a write-only marker. The
+///          type exposes an output put area; consuming its populated prefix later is a separate operation which must
+///          transport an explicit readable-range proof rather than infer one from an output-stream shape.
+template <::std::integral char_type, ::std::size_t buffersize, typename allocatortype>
+	requires(::fast_io::prfch_cacheable_allocator_provenance<allocatortype>)
+inline constexpr ::std::true_type prfch_cacheable_write_provenance_define(
+	io_type_t<basic_generic_dynamic_output_buffer<char_type, buffersize, allocatortype>>) noexcept
+{
+	return {};
+}
+
+/// @brief Preserves the dynamic output owner's write proof through its exact non-owning stream adapter.
+/// @details The adapter merely retains the owner's address and every output cursor CPO dereferences that same object.
+///          It cannot improve an unproved allocator, so propagation is conditional on the underlying exact marker.
+///          Stream-reference lifetime rules independently require the owner to outlive the synchronous operation.
+template <typename T>
+	requires(::fast_io::prfch_cacheable_write_provenance<T>)
+inline constexpr ::std::true_type prfch_cacheable_write_provenance_define(
+	io_type_t<basic_dynamic_output_buffer_ref<T>>) noexcept
+{
+	return {};
+}
+
 template <::std::integral char_type, ::std::size_t buffersize, typename allocatortype>
 inline constexpr basic_dynamic_output_buffer_ref<
 	basic_generic_dynamic_output_buffer<char_type, buffersize, allocatortype>>

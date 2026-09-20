@@ -6,6 +6,9 @@ namespace fast_io
 namespace manipulators
 {
 
+/// @brief Hidden carrier for signed or unsigned LEB128 serialization and deserialization.
+/// @details A value payload denotes output; a pointer payload denotes an input destination. Signedness of the integral
+///          type selects signed versus unsigned LEB128 semantics.
 template <typename value_type>
 struct basic_leb128_get_put
 {
@@ -20,6 +23,9 @@ struct basic_leb128_get_put
 	value_type reference;
 };
 
+/// @brief Serializes an integer using signed or unsigned LEB128 according to its type.
+/// @details Output is variable-length base-128 binary with continuation bits. Signed inputs use sign-preserving LEB128;
+///          unsigned inputs use unsigned LEB128. This is binary output, not decimal text.
 template <::fast_io::details::my_integral T>
 inline constexpr auto leb128_put(T t) noexcept
 {
@@ -55,6 +61,9 @@ inline constexpr auto leb128_put(T t) noexcept
 	}
 }
 
+/// @brief Deserializes one signed or unsigned LEB128 integer into `t`.
+/// @details Destination signedness selects the decoding variant. The destination is borrowed and is updated only under
+///          the scanner's success/overflow contract; malformed or overlong encodings report parse failure.
 template <::fast_io::details::my_integral T>
 inline constexpr auto leb128_get(T &t) noexcept
 {
@@ -82,6 +91,7 @@ inline constexpr ::std::size_t leb128_length_val{print_reserve_size_leb128_lengt
 
 } // namespace details
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, ::fast_io::details::my_integral T>
 inline constexpr ::std::size_t
 print_reserve_size(io_reserve_type_t<char_type, ::fast_io::manipulators::basic_leb128_get_put<T>>) noexcept

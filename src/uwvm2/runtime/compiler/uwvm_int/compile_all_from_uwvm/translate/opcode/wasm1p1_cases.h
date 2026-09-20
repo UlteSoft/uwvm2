@@ -6,16 +6,16 @@ case static_cast<wasm_byte>(wasm1p1_code::table_get):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(wasm1p1_para.disable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_table_instructions) [[unlikely]]
     {
-        fail_wasm1p1_feature_required(op_begin,
-                                      opcode_u32(wasm1p1_code::table_get),
-                                      ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                      ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+        fail_wasm2_feature_required(op_begin,
+                                    opcode_u32(wasm1p1_code::table_get),
+                                    ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                    ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
     }
 
     auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.get")};
-    check_table_index(op_begin, table_index);
+    check_table_index(op_begin, table_index, opcode_u32(wasm1p1_code::table_get));
     validate_i32_operands(op_begin, u8"table.get", 1uz);
     auto const table_type{get_table_value_type(table_index)};
     operand_stack_push(table_type);
@@ -23,7 +23,14 @@ case static_cast<wasm_byte>(wasm1p1_code::table_get):
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     auto const table_ptr{resolve_runtime_table(table_index)};
     stacktop_flush_all_to_operand_stack(bytecode);
-    emit_opfunc_to(bytecode, translate::get_uwvmint_table_get_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    if(table_type == curr_operand_stack_value_type::externref)
+    {
+        emit_opfunc_to(bytecode, translate::get_uwvmint_table_get_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    }
+    else
+    {
+        emit_opfunc_to(bytecode, translate::get_uwvmint_table_get_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    }
     emit_imm_to(bytecode, table_ptr);
     stacktop_after_pop_n_push1_memory_typed_if_reachable(bytecode, 1uz, table_type);
     break;
@@ -34,16 +41,16 @@ case static_cast<wasm_byte>(wasm1p1_code::table_set):
     auto const op_begin{code_curr};
     ++code_curr;
 
-    if(wasm1p1_para.disable_reference_types) [[unlikely]]
+    if(wasm1p1_para.disable_table_instructions) [[unlikely]]
     {
-        fail_wasm1p1_feature_required(op_begin,
-                                      opcode_u32(wasm1p1_code::table_set),
-                                      ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                      ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+        fail_wasm2_feature_required(op_begin,
+                                    opcode_u32(wasm1p1_code::table_set),
+                                    ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                    ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
     }
 
     auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.set")};
-    check_table_index(op_begin, table_index);
+    check_table_index(op_begin, table_index, opcode_u32(wasm1p1_code::table_set));
     auto const table_type{get_table_value_type(table_index)};
 
     if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.set", 2uz); }
@@ -72,11 +79,17 @@ case static_cast<wasm_byte>(wasm1p1_code::table_set):
 
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     auto const table_ptr{resolve_runtime_table(table_index)};
-    auto const module_ptr{::std::addressof(curr_module)};
     stacktop_flush_all_to_operand_stack(bytecode);
-    emit_opfunc_to(bytecode, translate::get_uwvmint_table_set_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    if(table_type == curr_operand_stack_value_type::externref)
+    {
+        emit_opfunc_to(bytecode, translate::get_uwvmint_table_set_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    }
+    else
+    {
+        emit_opfunc_to(bytecode, translate::get_uwvmint_table_set_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+    }
     emit_imm_to(bytecode, table_ptr);
-    emit_imm_to(bytecode, module_ptr);
+    if(table_type != curr_operand_stack_value_type::externref) { emit_imm_to(bytecode, ::std::addressof(curr_module)); }
     stacktop_after_pop_n_if_reachable(bytecode, 2uz);
     break;
 }
@@ -86,7 +99,19 @@ case static_cast<wasm_byte>(wasm1p1_code::select_t):
     auto const op_begin{code_curr};
     ++code_curr;
 
+    if(wasm1p1_para.disable_reference_types) [[unlikely]]
+    {
+        fail_wasm1p1_feature_required(op_begin,
+                                      opcode_u32(wasm1p1_code::select_t),
+                                      ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                      ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+    }
+
     auto const result_type_count{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"select.result_types")};
+
+    // select_t result_type_count result_type ...
+    // [           safe         ] unsafe (could be the section_end)
+    //                            ^^ code_curr
 
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     auto const emit_select_for_type{
@@ -120,66 +145,16 @@ case static_cast<wasm_byte>(wasm1p1_code::select_t):
             }
         }};
 
-    if(result_type_count == 0u)
-    {
-        if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
-
-        auto const cond{try_pop_concrete_operand()};
-        if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.select_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
-            err.err_code = code_validation_error_code::select_cond_type_not_i32;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-
-        auto const v2{try_pop_concrete_operand()};
-        auto const v1{try_peek_concrete_operand()};
-
-        if(v1.from_stack && v2.from_stack && !v1.is_unknown && !v2.is_unknown && v1.type != v2.type) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(v1.type);
-            err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(v2.type);
-            err.err_code = code_validation_error_code::select_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-
-        bool const have_known_select_value_type{(v1.from_stack && !v1.is_unknown) || (v2.from_stack && !v2.is_unknown)};
-        auto const select_value_type{(v1.from_stack && !v1.is_unknown) ? v1.type : v2.type};
-        if(have_known_select_value_type && !is_untyped_select_value_type(select_value_type)) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.select_type_mismatch.type_v1 = to_wasm1_value_type(select_value_type);
-            err.err_selectable.select_type_mismatch.type_v2 = to_wasm1_value_type(select_value_type);
-            err.err_code = code_validation_error_code::select_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-
-        if(v1.from_stack && !v1.is_unknown)
-        {
-            emit_select_for_type(v1.type);
-            stacktop_after_pop_n_if_reachable(bytecode, 2uz);
-        }
-        else if(!v1.from_stack)
-        {
-            if(v2.from_stack)
-            {
-                if(v2.is_unknown) { push_unknown_operand(); }
-                else
-                {
-                    operand_stack_push(v2.type);
-                }
-            }
-            else if(is_polymorphic) { push_unknown_operand(); }
-        }
-
-        break;
-    }
-
     if(result_type_count != 1u) [[unlikely]] { fail_invalid_immediate(op_begin, u8"select.result_types"); }
 
     auto const result_type_byte{read_u8_immediate(code_curr, code_end, op_begin, u8"select.result_type")};
+
+    // select_t result_type_count result_type ...
+    // [                 safe               ] unsafe (could be the section_end)
+    //                                        ^^ code_curr
+
+    // Field commits are transactional: a count-LEB decode failure leaves the cursor after the opcode; a decoded-count
+    // arity rejection or result-type decode failure leaves it after the count; a type-policy rejection follows the type byte.
     auto const result_type{static_cast<curr_operand_stack_value_type>(result_type_byte)};
     ensure_wasm1p1_value_type_enabled(op_begin, result_type, ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
 
@@ -2399,7 +2374,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
             auto const element_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.init.elemidx")};
             check_element_index(op_begin, element_index);
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.init.tableidx")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
 
             auto const element_value_type{static_cast<curr_operand_stack_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(
                 curr_module.local_defined_element_vec_storage.index_unchecked(element_index).element_type_ptr->storage.segment.reftype))};
@@ -2419,10 +2394,17 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
             auto element_ptr{const_cast<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t*>(
                 ::std::addressof(curr_module.local_defined_element_vec_storage.index_unchecked(element_index)))};
             stacktop_flush_all_to_operand_stack(bytecode);
-            emit_opfunc_to(bytecode, translate::get_uwvmint_table_init_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            if(table_value_type == curr_operand_stack_value_type::externref)
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_init_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
+            else
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_init_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
             emit_imm_to(bytecode, table_ptr);
             emit_imm_to(bytecode, element_ptr);
-            emit_imm_to(bytecode, ::std::addressof(curr_module));
+            if(table_value_type != curr_operand_stack_value_type::externref) { emit_imm_to(bytecode, ::std::addressof(curr_module)); }
             stacktop_after_pop_n_if_reachable(bytecode, 3uz);
             break;
         }
@@ -2453,9 +2435,9 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
             }
             auto const dst_table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.copy.dst")};
-            check_table_index(op_begin, dst_table_index);
+            check_table_index(op_begin, dst_table_index, subopcode);
             auto const src_table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.copy.src")};
-            check_table_index(op_begin, src_table_index);
+            check_table_index(op_begin, src_table_index, subopcode);
 
             auto const dst_type{get_table_value_type(dst_table_index)};
             auto const src_type{get_table_value_type(src_table_index)};
@@ -2480,15 +2462,15 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
         }
         case wasm1p1_numeric_code::table_grow:
         {
-            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+            if(wasm1p1_para.disable_table_instructions) [[unlikely]]
             {
-                fail_wasm1p1_feature_required(op_begin,
-                                              subopcode,
-                                              ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                              ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                fail_wasm2_feature_required(op_begin,
+                                            subopcode,
+                                            ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                            ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.grow")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             auto const table_type{get_table_value_type(table_index)};
 
             if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.grow", 2uz); }
@@ -2518,23 +2500,30 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
             operand_stack_push(curr_operand_stack_value_type::i32);
             auto const table_ptr{resolve_runtime_table(table_index)};
             stacktop_flush_all_to_operand_stack(bytecode);
-            emit_opfunc_to(bytecode, translate::get_uwvmint_table_grow_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            if(table_type == curr_operand_stack_value_type::externref)
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_grow_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
+            else
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_grow_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
             emit_imm_to(bytecode, table_ptr);
-            emit_imm_to(bytecode, ::std::addressof(curr_module));
+            if(table_type != curr_operand_stack_value_type::externref) { emit_imm_to(bytecode, ::std::addressof(curr_module)); }
             stacktop_after_pop_n_push1_memory_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
             break;
         }
         case wasm1p1_numeric_code::table_size:
         {
-            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+            if(wasm1p1_para.disable_table_instructions) [[unlikely]]
             {
-                fail_wasm1p1_feature_required(op_begin,
-                                              subopcode,
-                                              ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                              ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                fail_wasm2_feature_required(op_begin,
+                                            subopcode,
+                                            ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                            ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.size")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             operand_stack_push(curr_operand_stack_value_type::i32);
             auto const table_ptr{resolve_runtime_table(table_index)};
             stacktop_flush_all_to_operand_stack(bytecode);
@@ -2553,7 +2542,7 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
                                               ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
             }
             auto const table_index{read_leb128.template operator()<wasm_u32>(code_curr, code_end, op_begin, u8"table.fill")};
-            check_table_index(op_begin, table_index);
+            check_table_index(op_begin, table_index, subopcode);
             auto const table_type{get_table_value_type(table_index)};
 
             if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"table.fill", 3uz); }
@@ -2593,9 +2582,16 @@ case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
 
             auto const table_ptr{resolve_runtime_table(table_index)};
             stacktop_flush_all_to_operand_stack(bytecode);
-            emit_opfunc_to(bytecode, translate::get_uwvmint_table_fill_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            if(table_type == curr_operand_stack_value_type::externref)
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_fill_externref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
+            else
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_table_fill_funcref_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+            }
             emit_imm_to(bytecode, table_ptr);
-            emit_imm_to(bytecode, ::std::addressof(curr_module));
+            if(table_type != curr_operand_stack_value_type::externref) { emit_imm_to(bytecode, ::std::addressof(curr_module)); }
             stacktop_after_pop_n_if_reachable(bytecode, 3uz);
             break;
         }

@@ -49,7 +49,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     ///             single instruction multiple data).
     ///             This is only used for storage and will be converted to the type used for computation during computation depending on platform support
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 2.3.2
-#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)  // GNUC, clang
+#if defined(__x86_64__) && !defined(__SSE__) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
+    // The SysV x86-64 vector ABI returns a GNU 16-byte vector in XMM0 even
+    // with -mno-sse. Merely scalarizing its arithmetic therefore still makes
+    // non-inlined loads/stores and evaluator calls impossible to compile.
+    // This type is storage, not an instruction-selection promise: use an
+    // integer aggregate when that ABI register class is unavailable. Preserve
+    // the exact Wasm byte layout and alignment; SIMD-enabled builds keep their
+    // existing vector ABI. ARM64EC may define __x86_64__ but is not x86 code.
+    struct alignas(16uz) wasm_v128
+    {
+        char bytes[16];
+    };
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)  // GNUC, clang
     using wasm_v128 [[__gnu__::__vector_size__(16)]] = char;
 #elif (defined(_MSC_VER) && !defined(__clang__))  // MSVC
 # if defined(__ARM_NEON) || defined(_M_ARM64) || defined(_M_ARM64EC)

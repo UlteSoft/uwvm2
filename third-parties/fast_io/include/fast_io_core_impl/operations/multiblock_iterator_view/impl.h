@@ -1,5 +1,14 @@
 ﻿#pragma once
 
+/*
+ * Segmented-iterator view used by primitive range transfer.
+ *
+ * The structural view exposes the current block and controller position of a
+ * supported segmented iterator so range output can process large contiguous
+ * runs instead of one element at a time. It is an optimization adapter for
+ * already-materialized values, not a container ownership model or IO CPO.
+ */
+
 namespace fast_io
 {
 

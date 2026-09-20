@@ -1,5 +1,14 @@
 ﻿#pragma once
 
+/*
+ * libstdc++ segmented-iterator adapter for primitive range transfer.
+ *
+ * This implementation recognizes the implementation-specific deque iterator
+ * layout and projects it into `multiblock_iterator_view`. The generic write
+ * range engine consumes that view; no device, formatting, or allocation policy
+ * is introduced here.
+ */
+
 namespace fast_io
 {
 

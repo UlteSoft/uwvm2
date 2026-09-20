@@ -22,24 +22,33 @@
 module;
 
 // std
+#include <atomic>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <bit>
 #include <limits>
 #include <memory>
+#include <type_traits>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.optable:memory;
 
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+// The memory optable directly uses rwlock_pause and grow_strict. Imports of
+// their users do not re-export these implementation dependencies.
+import uwvm2.utils.mutex;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
+import uwvm2.object.memory.flags;
 import :define;
+import :storage;
 import :register_ring;
 
 #ifndef UWVM_MODULE

@@ -1,165 +1,175 @@
-﻿#pragma once
+#pragma once
 
 namespace fast_io
 {
 
 namespace details
 {
+
+template <typename char_type, typename T>
+inline constexpr bool lc_condition_scatter_branch =
+	::fast_io::lc_scatter_printable<char_type, T> || ::fast_io::scatter_printable<char_type, T>;
+
+/// @brief Admits a zero-copy locale condition only when both possible branches expose a scatter.
+/// @details Strategy selection occurs before the run-time predicate is known. Requiring both branches proves that the
+///          return representation is valid for either value, while requiring at least one locale scatter prevents this
+///          overload from competing with the ordinary condition protocol for a purely non-locale node.
 template <typename char_type, typename T1, typename T2>
-concept cond_ok_lc_scatter_printable_impl =
-	lc_scatter_printable<char_type, T1> && (lc_scatter_printable<char_type, T2> || scatter_printable<char_type, T2>);
+concept lc_condition_scatter_printable =
+	::std::integral<char_type> &&
+	lc_condition_scatter_branch<char_type, T1> && lc_condition_scatter_branch<char_type, T2> &&
+	(::fast_io::lc_scatter_printable<char_type, T1> ||
+	 ::fast_io::lc_scatter_printable<char_type, T2>);
 
+/// @brief Admits contiguous condition materialization when both branches have a proven locale-or-ordinary protocol.
+/// @details A condition may select an ordinary fallback on one side and a locale formatter on the other. Both sides
+///          must still be measurable before the common dynamic-reserve protocol is advertised. The locale-presence
+///          clause keeps ordinary conditions owned by the ordinary semantic engine.
 template <typename char_type, typename T1, typename T2>
-concept cond_ok_lc_dynamic_reserve_printable_impl =
-	(lc_dynamic_reserve_printable<char_type, T1> || lc_scatter_printable<char_type, T1>) &&
-	(lc_dynamic_reserve_printable<char_type, T2> || lc_scatter_printable<char_type, T2> ||
-	 reserve_printable<char_type, T2> || dynamic_reserve_printable<char_type, T2> ||
-	 scatter_printable<char_type, T2>);
+concept lc_condition_contiguous_printable =
+	::std::integral<char_type> &&
+	::fast_io::details::decay::lc_contiguous_printable<char_type, T1> &&
+	::fast_io::details::decay::lc_contiguous_printable<char_type, T2> &&
+	(::fast_io::lc_scatter_printable<char_type, T1> ||
+	 ::fast_io::lc_dynamic_reserve_printable<char_type, T1> ||
+	 ::fast_io::lc_scatter_printable<char_type, T2> ||
+	 ::fast_io::lc_dynamic_reserve_printable<char_type, T2>);
 
-template <typename char_type, typename T1>
-concept cond_ok_lc_printable_impl = cond_ok_printable_impl<char_type, T1> && lc_printable<char_type, T1>;
-
-template <typename char_type, typename T1>
-concept cond_ok_lc_dynamic_rsv_printable_impl =
-	cond_ok_dynamic_rsv_printable_impl<char_type, T1> || lc_dynamic_reserve_printable<char_type, T1> ||
-	lc_scatter_printable<char_type, T1>;
-} // namespace details
-
-template <::std::integral char_type, typename T1, typename T2>
-	requires(::fast_io::details::cond_ok_lc_scatter_printable_impl<char_type, T1, T2> ||
-			 ::fast_io::details::cond_ok_lc_scatter_printable_impl<char_type, T2, T1>)
-inline constexpr basic_io_scatter_t<char_type> print_scatter_define(basic_lc_all<char_type> const *__restrict all,
-																	::fast_io::manipulators::condition<T1, T2> c)
-{
-	if (c.pred)
+/// @brief Proves the lifetime and repeatability of the scatter branch actually selected by the locale condition CPO.
+/// @details Locale scatter has priority over ordinary scatter in `lc_condition_scatter`; an ordinary marker therefore
+///          cannot repair an unmarked locale customization on the same type. This expression deliberately mirrors that
+///          priority so marker propagation cannot certify a different protocol from the one the adapter executes.
+template <typename char_type, typename T>
+inline constexpr bool lc_condition_retained_scatter_branch = []() constexpr {
+	if constexpr (::fast_io::lc_scatter_printable<char_type, T>)
 	{
-		if constexpr (lc_scatter_printable<char_type, T1>)
-		{
-			return {print_scatter_define(all, c.t1)};
-		}
-		else
-		{
-			return {print_scatter_define(io_reserve_type<char_type, T1>, c.t1)};
-		}
+		return ::fast_io::lc_borrowed_scatter_source<char_type, T>;
 	}
 	else
 	{
-		if constexpr (lc_scatter_printable<char_type, T2>)
-		{
-			return {print_scatter_define(all, c.t2)};
-		}
-		else
-		{
-			return {print_scatter_define(io_reserve_type<char_type, T2>, c.t2)};
-		}
+		return ::fast_io::borrowed_scatter_source<char_type, T>;
 	}
-}
+}();
 
-namespace details
+template <::std::integral char_type, typename T>
+inline constexpr basic_io_scatter_t<char_type> lc_condition_scatter(
+	basic_lc_all<char_type> const *all, T &value)
 {
-
-template <::std::integral char_type, typename T1>
-inline constexpr ::std::size_t cond_lc_print_reserve_size_impl(basic_lc_all<char_type> const *__restrict all, T1 c)
-{
-	if constexpr (lc_scatter_printable<char_type, T1>)
+	using value_type = ::std::remove_cvref_t<T>;
+	if constexpr (::fast_io::lc_scatter_printable<char_type, T &>)
 	{
-		return print_scatter_define(all, c).len;
-	}
-	else if constexpr (lc_dynamic_reserve_printable<char_type, T1>)
-	{
-		return print_reserve_size(all, c);
-	}
-	else if constexpr (scatter_printable<char_type, T1>)
-	{
-		return print_scatter_define(io_reserve_type<char_type, T1>, c).len;
-	}
-	else if constexpr (reserve_printable<char_type, T1>)
-	{
-		constexpr ::std::size_t sz{print_reserve_size(io_reserve_type<char_type, T1>)};
-		return sz;
+		return print_scatter_define(all, value);
 	}
 	else
 	{
-		return print_reserve_size(io_reserve_type<char_type, T1>, c);
-	}
-}
-
-template <::std::integral char_type, typename T1>
-inline constexpr char_type *cond_lc_print_reserve_define_impl(basic_lc_all<char_type> const *__restrict all,
-															  char_type *iter, T1 c)
-{
-	if constexpr (lc_scatter_printable<char_type, T1>)
-	{
-		return copy_scatter(print_scatter_define(all, c), iter);
-	}
-	else if constexpr (lc_dynamic_reserve_printable<char_type, T1>)
-	{
-		return print_reserve_define(all, iter, c);
-	}
-	else if constexpr (scatter_printable<char_type, T1>)
-	{
-		return copy_scatter(print_scatter_define(io_reserve_type<char_type, T1>, c), iter);
-	}
-	else if constexpr (reserve_printable<char_type, T1>)
-	{
-		return print_reserve_define(io_reserve_type<char_type, T1>, iter, c);
-	}
-	else
-	{
-		return print_reserve_define(io_reserve_type<char_type, T1>, iter, c);
+		return print_scatter_define(::fast_io::io_reserve_type<char_type, value_type>, value);
 	}
 }
 
 } // namespace details
 
 template <::std::integral char_type, typename T1, typename T2>
-	requires(::fast_io::details::cond_ok_lc_dynamic_reserve_printable_impl<char_type, T1, T2> ||
-			 ::fast_io::details::cond_ok_lc_dynamic_reserve_printable_impl<char_type, T2, T1>)
-inline constexpr ::std::size_t print_reserve_size(basic_lc_all<char_type> const *__restrict all,
-												  ::fast_io::manipulators::condition<T1, T2> c)
+	requires ::fast_io::details::lc_condition_scatter_printable<char_type, T1 &, T2 &>
+inline constexpr basic_io_scatter_t<char_type> print_scatter_define(
+	basic_lc_all<char_type> const *all, ::fast_io::manipulators::condition<T1, T2> &condition)
 {
-	if (c.pred)
+	// The condition object belongs to the enclosing semantic frame. Borrow it so a scatter into an owning selected
+	// branch retains that branch's lifetime instead of pointing into a destroyed adapter-local copy.
+	if (condition.pred)
 	{
-		return ::fast_io::details::cond_lc_print_reserve_size_impl<char_type, T1>(all, c.t1);
+		return ::fast_io::details::lc_condition_scatter<char_type>(all, condition.t1);
 	}
-	else
-	{
-		return ::fast_io::details::cond_lc_print_reserve_size_impl<char_type, T2>(all, c.t2);
-	}
+	return ::fast_io::details::lc_condition_scatter<char_type>(all, condition.t2);
 }
 
 template <::std::integral char_type, typename T1, typename T2>
-	requires(::fast_io::details::cond_ok_lc_dynamic_reserve_printable_impl<char_type, T1, T2> ||
-			 ::fast_io::details::cond_ok_lc_dynamic_reserve_printable_impl<char_type, T2, T1>)
-inline constexpr char_type *print_reserve_define(basic_lc_all<char_type> const *__restrict all, char_type *iter,
-												 ::fast_io::manipulators::condition<T1, T2> c)
+	requires ::fast_io::details::lc_condition_scatter_printable<char_type, T1 &, T2 &> &&
+			 ::fast_io::details::lc_condition_retained_scatter_branch<char_type, T1 &> &&
+			 ::fast_io::details::lc_condition_retained_scatter_branch<char_type, T2 &>
+inline constexpr ::std::true_type print_lc_borrowed_scatter_source(
+	::fast_io::io_reserve_type_t<
+		char_type, ::fast_io::manipulators::condition<T1, T2>>) noexcept
 {
-	if (c.pred)
-	{
-		return ::fast_io::details::cond_lc_print_reserve_define_impl<char_type, T1>(all, iter, c.t1);
-	}
-	else
-	{
-		return ::fast_io::details::cond_lc_print_reserve_define_impl<char_type, T2>(all, iter, c.t2);
-	}
+	// Selection observes exactly one arm, but the marker is type-level and the run-time predicate is unknown to a
+	// retained planner. Requiring both alternatives proves the descriptor contract for every value of the condition.
+	return {};
 }
 
-// template <::std::integral char_type, typename T1, typename T2, ::fast_io::buffer_output_stream bop>
-//	requires((::fast_io::details::cond_ok_lc_printable_impl<char_type, T1> ||
-//			  ::fast_io::details::cond_ok_lc_printable_impl<char_type, T2>) &&
-//			 (!(::fast_io::details::cond_ok_lc_dynamic_rsv_printable_impl<char_type, T1>) ||
-//			  ::fast_io::details::cond_ok_lc_dynamic_rsv_printable_impl<char_type, T2>))
-// inline constexpr void print_define(basic_lc_all<char_type> const *__restrict all, bop b,
-//								   ::fast_io::manipulators::condition<T1, T2> c)
-//{
-//	if (c.pred)
-//	{
-//		print_freestanding(imbue(all, b), c.t1);
-//	}
-//	else
-//	{
-//		print_freestanding(imbue(all, b), c.t2);
-//	}
-// }
+template <::std::integral char_type, typename T1, typename T2>
+	requires ::fast_io::details::lc_condition_scatter_printable<
+		char_type,
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t1)),
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t2))>
+inline constexpr basic_io_scatter_t<char_type> print_scatter_define(
+	basic_lc_all<char_type> const *all,
+	::fast_io::manipulators::condition<T1, T2> const &condition)
+{
+	if (condition.pred)
+	{
+		return ::fast_io::details::lc_condition_scatter<char_type>(all, condition.t1);
+	}
+	return ::fast_io::details::lc_condition_scatter<char_type>(all, condition.t2);
+}
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires ::fast_io::details::lc_condition_contiguous_printable<char_type, T1 &, T2 &>
+inline constexpr ::std::size_t print_reserve_size(
+	basic_lc_all<char_type> const *all, ::fast_io::manipulators::condition<T1, T2> &condition)
+{
+	if (condition.pred)
+	{
+		return ::fast_io::details::decay::lc_contiguous_size<char_type>(all, condition.t1);
+	}
+	return ::fast_io::details::decay::lc_contiguous_size<char_type>(all, condition.t2);
+}
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires ::fast_io::details::lc_condition_contiguous_printable<
+		char_type,
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t1)),
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t2))>
+inline constexpr ::std::size_t print_reserve_size(
+	basic_lc_all<char_type> const *all,
+	::fast_io::manipulators::condition<T1, T2> const &condition)
+{
+	if (condition.pred)
+	{
+		return ::fast_io::details::decay::lc_contiguous_size<char_type>(all, condition.t1);
+	}
+	return ::fast_io::details::decay::lc_contiguous_size<char_type>(all, condition.t2);
+}
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires ::fast_io::details::lc_condition_contiguous_printable<char_type, T1 &, T2 &>
+inline constexpr char_type *print_reserve_define(
+	basic_lc_all<char_type> const *all, char_type *destination,
+	::fast_io::manipulators::condition<T1, T2> &condition)
+{
+	if (condition.pred)
+	{
+		return ::fast_io::details::decay::lc_contiguous_define<char_type>(
+			all, destination, condition.t1);
+	}
+	return ::fast_io::details::decay::lc_contiguous_define<char_type>(
+		all, destination, condition.t2);
+}
+
+template <::std::integral char_type, typename T1, typename T2>
+	requires ::fast_io::details::lc_condition_contiguous_printable<
+		char_type,
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t1)),
+		decltype((::std::declval<::fast_io::manipulators::condition<T1, T2> const &>().t2))>
+inline constexpr char_type *print_reserve_define(
+	basic_lc_all<char_type> const *all, char_type *destination,
+	::fast_io::manipulators::condition<T1, T2> const &condition)
+{
+	if (condition.pred)
+	{
+		return ::fast_io::details::decay::lc_contiguous_define<char_type>(
+			all, destination, condition.t1);
+	}
+	return ::fast_io::details::decay::lc_contiguous_define<char_type>(
+		all, destination, condition.t2);
+}
 
 } // namespace fast_io

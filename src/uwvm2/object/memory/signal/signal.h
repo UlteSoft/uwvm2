@@ -25,6 +25,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <concepts>
 # include <bit>
@@ -133,6 +134,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @brief  Optional process-wide hook for translating mmap memory faults to a runtime-specific action.
         inline mmap_memory_out_of_bounds_func_t mmap_memory_out_of_bounds_func{};  // [global]
 
+        /// @brief  Internal runtime hook that receives the unchanged public fault report plus a borrowed native context.
+        /// @note   The context is valid only for the synchronous callback. This separate channel preserves the ABI of
+        ///         mmap_memory_error_t and mmap_memory_out_of_bounds_func_t.
+        using mmap_memory_out_of_bounds_with_context_func_t =
+            void (*)(::uwvm2::object::memory::error::mmap_memory_error_t const&, void const*) noexcept;
+        inline mmap_memory_out_of_bounds_with_context_func_t mmap_memory_out_of_bounds_with_context_func{};  // [global]
+
+        /// @brief  Install the runtime-only native-context hook. The most recently installed hook owns fault delivery.
+        inline constexpr void set_mmap_memory_out_of_bounds_with_context_handler(mmap_memory_out_of_bounds_with_context_func_t func) noexcept
+        {
+            mmap_memory_out_of_bounds_func = nullptr;
+            mmap_memory_out_of_bounds_with_context_func = func;
+        }
+
         /// @brief      Previous platform handlers saved when UWVM installs its own fault handler.
         /// @details    The signal layer only consumes faults that belong to registered protected segments.
         ///             Unrelated process faults are forwarded to the saved handlers when possible.
@@ -171,7 +186,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         {
             if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::size_t>(seg.length_p->load(::std::memory_order_acquire)); }
 
-            return static_cast<::std::size_t>(seg.end - seg.begin);
+            // Registered VMAs are raw address-space intervals, not C++ array objects. Integer address arithmetic avoids
+            // imposing unrelated-object pointer subtraction semantics on platform-owned mappings.
+            return static_cast<::std::size_t>(reinterpret_cast<::std::uintptr_t>(seg.end) - reinterpret_cast<::std::uintptr_t>(seg.begin));
         }
 
         /// @brief      Build a user-facing mmap fault report from a segment and a raw fault address.
@@ -187,7 +204,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                                                                                     ::std::uintptr_t frame_address,
                                                                                                     ::std::uintptr_t stack_pointer) noexcept
         {
-            auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
+            auto const offset{static_cast<::std::size_t>(reinterpret_cast<::std::uintptr_t>(fault_addr) -
+                                                         reinterpret_cast<::std::uintptr_t>(seg.begin))};
             auto const memory_length{get_memory_length(seg)};
 
             return {.memory_idx = seg.memory_idx,
@@ -203,21 +221,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         /// @details    For registered protected segments this function is terminal: it invokes the custom
         ///             handler when present, otherwise prints the default mmap memory error, and then
         ///             terminates. The boolean return exists for the platform handler's pass-through path.
-        inline constexpr bool handle_fault_address(::std::byte const* fault_addr,
-                                                   ::std::uintptr_t instruction_address,
-                                                   ::std::uintptr_t frame_address = 0u,
-                                                   ::std::uintptr_t stack_pointer = 0u) noexcept
+        inline constexpr bool handle_fault_address_with_context(::std::byte const* fault_addr,
+                                                                ::std::uintptr_t instruction_address,
+                                                                ::std::uintptr_t frame_address,
+                                                                ::std::uintptr_t stack_pointer,
+                                                                void const* platform_context) noexcept
         {
             if(fault_addr == nullptr) [[unlikely]] { return false; }
 
+            auto const fault_address{reinterpret_cast<::std::uintptr_t>(fault_addr)};
             for(auto const& seg: segments)
             {
-                if(seg.begin <= fault_addr && fault_addr < seg.end)
+                auto const segment_begin{reinterpret_cast<::std::uintptr_t>(seg.begin)};
+                auto const segment_end{reinterpret_cast<::std::uintptr_t>(seg.end)};
+                if(segment_begin <= fault_address && fault_address < segment_end)
                 {
                     auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr, instruction_address, frame_address, stack_pointer)};
+                    // Keep the public callback authoritative if direct internal slot manipulation leaves both hooks set.
+                    // Calls through either setter remain mutually exclusive because each setter clears the other slot.
                     if(auto const handler{mmap_memory_out_of_bounds_func}; handler != nullptr) [[likely]]
                     {
                         handler(mmapmemerr);
+                        ::fast_io::fast_terminate();
+                        ::std::unreachable();
+                    }
+                    if(auto const handler{mmap_memory_out_of_bounds_with_context_func}; handler != nullptr) [[likely]]
+                    {
+                        handler(mmapmemerr, platform_context);
                         ::fast_io::fast_terminate();
                         ::std::unreachable();
                     }
@@ -230,7 +260,58 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return false;
         }
 
+        /// @brief  ABI-stable fault-dispatch entry point for callers without a borrowed native context.
+        inline constexpr bool handle_fault_address(::std::byte const* fault_addr,
+                                                   ::std::uintptr_t instruction_address,
+                                                   ::std::uintptr_t frame_address = 0u,
+                                                   ::std::uintptr_t stack_pointer = 0u) noexcept
+        { return handle_fault_address_with_context(fault_addr, instruction_address, frame_address, stack_pointer, nullptr); }
+
 # if defined(_WIN32) || defined(__CYGWIN__)
+        struct windows_fault_context_view
+        {
+            ::std::uintptr_t instruction_address{};
+            ::std::uintptr_t frame_address{};
+            ::std::uintptr_t stack_pointer{};
+            void const* platform_context{};
+        };
+
+        /// @brief      Extract the architectural program, frame, and stack pointers from a Windows CONTEXT.
+        /// @details    Only layouts defined by the vendored Win32 ABI layer are decoded. Unknown Windows targets and
+        ///             Cygwin deliberately return an empty view rather than interpreting an unverified CONTEXT layout.
+        ///             platform_context remains borrowed from the OS and is valid only during exception dispatch.
+        [[nodiscard]] inline constexpr windows_fault_context_view get_windows_fault_context(void const* context_record) noexcept
+        {
+            if(context_record == nullptr) [[unlikely]] { return {}; }
+
+#  if defined(_WIN32) && !defined(__CYGWIN__) && defined(_WIN64) &&                                                                            \
+      ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+            ::fast_io::win32::win_current_context context{};
+            ::std::memcpy(::std::addressof(context), context_record, sizeof(context));
+            return {.instruction_address = static_cast<::std::uintptr_t>(context.Rip),
+                    .frame_address = static_cast<::std::uintptr_t>(context.Rbp),
+                    .stack_pointer = static_cast<::std::uintptr_t>(context.Rsp),
+                    .platform_context = context_record};
+#  elif defined(_WIN32) && !defined(__CYGWIN__) && defined(_WIN64) &&                                                                         \
+      (defined(__aarch64__) || defined(_M_ARM64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
+            ::fast_io::win32::win_current_context context{};
+            ::std::memcpy(::std::addressof(context), context_record, sizeof(context));
+            return {.instruction_address = static_cast<::std::uintptr_t>(context.Pc),
+                    .frame_address = static_cast<::std::uintptr_t>(context.X[29u]),
+                    .stack_pointer = static_cast<::std::uintptr_t>(context.Sp),
+                    .platform_context = context_record};
+#  elif defined(_WIN32) && !defined(__CYGWIN__) && (defined(__i386__) || defined(_M_IX86))
+            ::fast_io::win32::win_current_context context{};
+            ::std::memcpy(::std::addressof(context), context_record, sizeof(context));
+            return {.instruction_address = static_cast<::std::uintptr_t>(context.Eip),
+                    .frame_address = static_cast<::std::uintptr_t>(context.Ebp),
+                    .stack_pointer = static_cast<::std::uintptr_t>(context.Esp),
+                    .platform_context = context_record};
+#  else
+            return {};
+#  endif
+        }
+
         /// @brief      Windows vectored exception entry point used to intercept access violations.
         /// @details    Access violations are translated only when the fault address falls inside a
         ///             registered protected segment. All other exceptions continue through the normal
@@ -252,11 +333,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                 {
                     auto const fault_addr{reinterpret_cast<::std::byte const*>(exception_pointers->ExceptionRecord->ExceptionInformation[1u])};
 
-                    // Windows reports the faulting instruction address directly in the exception record, so
-                    // the signal/ucontext architecture table below is only needed for POSIX targets.
-                    auto const instruction_address{reinterpret_cast<::std::uintptr_t>(exception_pointers->ExceptionRecord->ExceptionAddress)};
+                    // The exception record is the architecture-neutral IP fallback. A supported CONTEXT supplies the exact
+                    // fault-time IP/SP/FP and the complete native state needed by authoritative Win64 SEH unwinding.
+                    auto const fault_context{get_windows_fault_context(exception_pointers->ContextRecord)};
+                    auto const exception_address{reinterpret_cast<::std::uintptr_t>(exception_pointers->ExceptionRecord->ExceptionAddress)};
+                    auto const instruction_address{fault_context.instruction_address == 0u ? exception_address : fault_context.instruction_address};
 
-                    if(handle_fault_address(fault_addr, instruction_address)) { return -1 /*EXCEPTION_CONTINUE_EXECUTION*/; }
+                    if(handle_fault_address_with_context(fault_addr,
+                                                         instruction_address,
+                                                         fault_context.frame_address,
+                                                         fault_context.stack_pointer,
+                                                         fault_context.platform_context))
+                    {
+                        return -1 /*EXCEPTION_CONTINUE_EXECUTION*/;
+                    }
                 }
             }
 
@@ -463,74 +553,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #  endif
         }
 
-        /// @brief      Extract the frame pointer from a POSIX ucontext, when the platform exposes one.
-        /// @details    Mmap-backed wasm OOB traps arrive as asynchronous signals rather than normal runtime
-        ///             trap calls. Capturing the interrupted frame pointer lets the LLVM-JIT unwind path resume
-        ///             from the generated wasm frame and recover callers that were optimized or inlined.
-        [[nodiscard]] inline constexpr ::std::uintptr_t get_signal_frame_address([[maybe_unused]] void* context) noexcept
-        {
-#  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
-            if(context == nullptr) [[unlikely]] { return 0u; }
-            [[maybe_unused]] auto const uctx{static_cast<::ucontext_t const*>(context)};
-
-#   if defined(__linux__) && defined(__x86_64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RBP]);
-#   elif defined(__linux__) && defined(__i386__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_EBP]);
-#   elif defined(__linux__) && defined(__aarch64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.regs[29u]);
-#   elif defined(__linux__) && defined(__arm__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_fp);
-#   elif defined(__APPLE__) && defined(__x86_64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rbp);
-#   elif defined(__APPLE__) && defined(__i386__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__ebp);
-#   elif defined(__APPLE__) && defined(__aarch64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__fp);
-#   else
-            // static_cast<void>(uctx);
-            return 0u;
-#   endif
-#  else
-            // static_cast<void>(context);
-            return 0u;
-#  endif
-        }
-
-        /// @brief      Extract the stack pointer from a POSIX ucontext, when supported.
-        /// @details    The current non-Windows DWARF path can derive a seed stack pointer from the frame
-        ///             record, but preserving the architectural SP keeps the fault report complete for
-        ///             platforms whose unwinders require an exact interrupted stack pointer.
-        [[nodiscard]] inline constexpr ::std::uintptr_t get_signal_stack_pointer([[maybe_unused]] void* context) noexcept
-        {
-#  ifdef UWVM2_OBJECT_MEMORY_SIGNAL_HAS_UCONTEXT
-            if(context == nullptr) [[unlikely]] { return 0u; }
-            [[maybe_unused]] auto const uctx{static_cast<::ucontext_t const*>(context)};
-
-#   if defined(__linux__) && defined(__x86_64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_RSP]);
-#   elif defined(__linux__) && defined(__i386__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.gregs[REG_ESP]);
-#   elif defined(__linux__) && defined(__aarch64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.sp);
-#   elif defined(__linux__) && defined(__arm__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext.arm_sp);
-#   elif defined(__APPLE__) && defined(__x86_64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__rsp);
-#   elif defined(__APPLE__) && defined(__i386__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__esp);
-#   elif defined(__APPLE__) && defined(__aarch64__)
-            return static_cast<::std::uintptr_t>(uctx->uc_mcontext->__ss.__sp);
-#   else
-            // static_cast<void>(uctx);
-            return 0u;
-#   endif
-#  else
-            // static_cast<void>(context);
-            return 0u;
-#  endif
-        }
-
         /// @brief      Forward an unhandled POSIX signal to the handler that was installed before UWVM.
         /// @details    Both SA_SIGINFO handlers and classic one-argument handlers are supported. Default
         ///             handlers are restored and re-raised so the process observes the platform's normal
@@ -566,16 +588,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
         /// @brief      POSIX SIGSEGV/SIGBUS entry point used to intercept protected-memory faults.
         /// @details    Faults inside registered protected segments are converted to wasm memory diagnostics.
+        ///             POSIX captures only the faulting instruction address; generated frame and stack
+        ///             pointers are deliberately not seeded into the POSIX CFI native replacement path.
         ///             Other faults are delegated to the previous handler, or to the platform default action
         ///             when no previous handler is available.
         inline constexpr void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
             auto const instruction_address{get_signal_instruction_address(context)};
-            auto const frame_address{get_signal_frame_address(context)};
-            auto const stack_pointer{get_signal_stack_pointer(context)};
 
-            if(handle_fault_address(fault_addr, instruction_address, frame_address, stack_pointer)) { return; }
+            if(handle_fault_address_with_context(fault_addr, instruction_address, 0u, 0u, nullptr)) { return; }
 
             if(signal == SIGSEGV && signal_handlers.has_previous_sigsegv)
             {
@@ -609,6 +631,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             act.sa_sigaction = posix_signal_handler;
             sigemptyset(::std::addressof(act.sa_mask));
             act.sa_flags = SA_SIGINFO;
+#ifdef SA_ONSTACK
+            // A later memory-provider installation may sit above the runtime's
+            // native-stack handler. Preserve alternate-stack delivery so a
+            // stack fault can still be forwarded with an exhausted native SP.
+            act.sa_flags |= SA_ONSTACK;
+#endif
 
             if(posix::sigaction(SIGSEGV, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigsegv)) != 0) [[unlikely]]
             {
@@ -655,7 +683,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     /// @note       The callback should be installed before guest execution begins. Updating it concurrently
     ///             with fault handling is not synchronized.
     inline constexpr void set_mmap_memory_out_of_bounds_handler(mmap_memory_out_of_bounds_func_t func) noexcept
-    { detail::mmap_memory_out_of_bounds_func = func; }
+    {
+        detail::mmap_memory_out_of_bounds_with_context_func = nullptr;
+        detail::mmap_memory_out_of_bounds_func = func;
+    }
 
     /// @brief      Register a reserved memory interval whose guard faults should be reported as wasm mmap faults.
     /// @param      begin      First byte of the reserved virtual address interval.
@@ -675,7 +706,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                                      ::std::atomic_size_t const* length_p = nullptr,
                                                      ::std::size_t memory_idx = 0uz) noexcept
     {
-        if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]]
+        if(begin == nullptr || end == nullptr || reinterpret_cast<::std::uintptr_t>(begin) >= reinterpret_cast<::std::uintptr_t>(end)) [[unlikely]]
         {
 # ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

@@ -115,6 +115,9 @@ if constexpr(::std::same_as<char_type, char>)
 }
 else if constexpr(::std::same_as<char_type, wchar_t>)
 {
+    // Keep optional wide-character fields in bounded print records: the
+    // nested conditional pack otherwise explodes during template compilation.
+    // The outer formatter owns stream locking; char/UTF-8 batching is unchanged.
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     if constexpr(::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::wide_nt, char_type>> ||
                  ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::ansi_9x, char_type>> ||
@@ -146,17 +149,24 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              L", actual arity=",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
                                                              bttm.actual_arity,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, L", expected type="),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_YELLOW),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, L", actual type="),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_CYAN),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             L".",
-                                                             UWVM_WIN32_TEXTATTR_RST_ALL);
+                                                             UWVM_WIN32_TEXTATTR_WHITE);
+            if(bttm.expected_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 L", expected type=",
+                                                                 UWVM_WIN32_TEXTATTR_YELLOW,
+                                                                 expected_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            if(bttm.actual_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 L", actual type=",
+                                                                 UWVM_WIN32_TEXTATTR_CYAN,
+                                                                 actual_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L".", UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
     }
@@ -184,17 +194,24 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      L", actual arity=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
                                                      bttm.actual_arity,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, L", expected type="),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW)),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, L", actual type="),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE)),
-                                                     L".",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
+    if(bttm.expected_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         L", expected type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
+                                                         expected_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
+    }
+    if(bttm.actual_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         L", actual type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
+                                                         actual_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
+    }
+    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L".", ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
 else if constexpr(::std::same_as<char_type, char8_t>)
@@ -314,17 +331,24 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              u", actual arity=",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
                                                              bttm.actual_arity,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, u", expected type="),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_YELLOW),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, u", actual type="),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_CYAN),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             u".",
-                                                             UWVM_WIN32_TEXTATTR_RST_ALL);
+                                                             UWVM_WIN32_TEXTATTR_WHITE);
+            if(bttm.expected_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 u", expected type=",
+                                                                 UWVM_WIN32_TEXTATTR_YELLOW,
+                                                                 expected_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            if(bttm.actual_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 u", actual type=",
+                                                                 UWVM_WIN32_TEXTATTR_CYAN,
+                                                                 actual_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u".", UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
     }
@@ -352,17 +376,24 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      u", actual arity=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
                                                      bttm.actual_arity,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, u", expected type="),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW)),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, u", actual type="),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE)),
-                                                     u".",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
+    if(bttm.expected_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         u", expected type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
+                                                         expected_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
+    }
+    if(bttm.actual_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         u", actual type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
+                                                         actual_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
+    }
+    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u".", ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
 else if constexpr(::std::same_as<char_type, char32_t>)
@@ -398,17 +429,24 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              U", actual arity=",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
                                                              bttm.actual_arity,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, U", expected type="),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_YELLOW),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                             ::fast_io::mnp::cond(bttm.expected_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, U", actual type="),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_CYAN),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                             ::fast_io::mnp::cond(bttm.actual_arity == 1u, UWVM_WIN32_TEXTATTR_WHITE),
-                                                             U".",
-                                                             UWVM_WIN32_TEXTATTR_RST_ALL);
+                                                             UWVM_WIN32_TEXTATTR_WHITE);
+            if(bttm.expected_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 U", expected type=",
+                                                                 UWVM_WIN32_TEXTATTR_YELLOW,
+                                                                 expected_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            if(bttm.actual_arity == 1u)
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 U", actual type=",
+                                                                 UWVM_WIN32_TEXTATTR_CYAN,
+                                                                 actual_type_name,
+                                                                 UWVM_WIN32_TEXTATTR_WHITE);
+            }
+            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U".", UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
     }
@@ -436,17 +474,23 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      U", actual arity=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
                                                      bttm.actual_arity,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, U", expected type="),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW)),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, expected_type_name),
-                                                     ::fast_io::mnp::cond(bttm.expected_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, U", actual type="),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN)),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, actual_type_name),
-                                                     ::fast_io::mnp::cond(bttm.actual_arity == 1u, ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE)),
-                                                     U".",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
+                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));
+    if(bttm.expected_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         U", expected type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
+                                                         expected_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));
+    }
+    if(bttm.actual_arity == 1u)
+    {
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                         U", actual type=",
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
+                                                         actual_type_name,
+                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));
+    }
+    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U".", ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }
-

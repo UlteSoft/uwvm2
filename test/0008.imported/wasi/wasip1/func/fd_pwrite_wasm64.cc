@@ -174,7 +174,7 @@ int main()
         constexpr wasi_void_ptr_wasm64_t read_iovs_ptr{3000u};
         constexpr wasi_void_ptr_wasm64_t out1{3500u};
         constexpr wasi_void_ptr_wasm64_t out2{3600u};
-        constexpr wasi_void_ptr_wasm64_t nread_ptr{3700u};
+        constexpr wasi_void_ptr_wasm64_t nread_ptr{3704u};
 
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory, read_iovs_ptr, out1);
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory,
@@ -224,7 +224,7 @@ int main()
                                      ::fast_io::open_mode::out | ::fast_io::open_mode::in | ::fast_io::open_mode::trunc | ::fast_io::open_mode::creat};
 
         constexpr wasi_void_ptr_wasm64_t iovs_ptr{128u};
-        constexpr wasi_void_ptr_wasm64_t nwritten0_ptr{4100u};
+        constexpr wasi_void_ptr_wasm64_t nwritten0_ptr{4104u};
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::fd_pwrite_wasm64(env,
                                                                                  static_cast<wasi_posix_fd_wasm64_t>(5),
                                                                                  iovs_ptr,
@@ -265,7 +265,7 @@ int main()
                                                                             reinterpret_cast<::std::byte const*>(data) + 1);
 
         constexpr wasi_void_ptr_wasm64_t iovs_ptr{5200u};
-        constexpr wasi_void_ptr_wasm64_t nwritten_ptr{5300u};
+        constexpr wasi_void_ptr_wasm64_t nwritten_ptr{5304u};
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory, iovs_ptr, buf);
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory,
                                                                                         static_cast<wasi_void_ptr_wasm64_t>(iovs_ptr + 8u),
@@ -306,7 +306,7 @@ int main()
                                                                             reinterpret_cast<::std::byte const*>(data) + 1);
 
         constexpr wasi_void_ptr_wasm64_t iovs_ptr{6200u};
-        constexpr wasi_void_ptr_wasm64_t nwritten_ptr{6300u};
+        constexpr wasi_void_ptr_wasm64_t nwritten_ptr{6304u};
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory, iovs_ptr, buf);
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory,
                                                                                         static_cast<wasi_void_ptr_wasm64_t>(iovs_ptr + 8u),

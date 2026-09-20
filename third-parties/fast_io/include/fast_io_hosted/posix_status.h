@@ -32,6 +32,7 @@ struct posix_file_status
 	::std::uintmax_t gen;   // file generation number
 };
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, fast_io::posix_file_status>)
 {

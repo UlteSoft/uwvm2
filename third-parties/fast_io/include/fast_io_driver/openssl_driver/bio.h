@@ -534,7 +534,7 @@ inline ::std::byte *bio_pread_impl(BIO *bio, ::std::byte *first, ::std::byte *la
 		throw_posix_error(EINVAL);
 	}
 	::fast_io::posix_io_observer piob{fd};
-	return ::fast_io::operations::decay::pread_some_bytes_decay(piob, first, last, offset);
+	return ::fast_io::operations::decay::pread_some_bytes_decay_dispatch(piob, first, last, offset);
 }
 
 inline ::std::byte const *bio_pwrite_impl(BIO *bio, ::std::byte const *first, ::std::byte const *last,
@@ -546,7 +546,7 @@ inline ::std::byte const *bio_pwrite_impl(BIO *bio, ::std::byte const *first, ::
 		throw_posix_error(EINVAL);
 	}
 	::fast_io::posix_io_observer piob{fd};
-	return ::fast_io::operations::decay::pwrite_some_bytes_decay(piob, first, last, offset);
+	return ::fast_io::operations::decay::pwrite_some_bytes_decay_dispatch(piob, first, last, offset);
 }
 
 } // namespace details

@@ -31,13 +31,8 @@ WABT_MVP_FLAGS=(
 
 DEFAULT_MODES=(
   uwvm-int-ring-matrix
-  uwvm-int-lazy
   uwvm-int-full
-  llvm-jit-lazy
-  llvm-jit-full
-  tiered
-  tiered-no-t0
-  tiered-no-t2
+  llvm-aot
 )
 
 usage() {

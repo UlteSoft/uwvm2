@@ -28,10 +28,20 @@ UlteSoft WebAssembly Virtual Machine 2
 Most wasm standards are supported. See [feature.md](documents/features.md). For detailed changes in each WebAssembly release, see [wasm-release.md](documents/wasm-release.md).
 
 ### Supports multiple platforms
-Supports over 100 triplet platforms, including DOS series, POSIX series, Windows 9x series, Windows NT series, and the Host C Library Series. Supports interpretation execution (INT), just-in-time compilation (JIT), and tiered compilation (TC). See [support.md](documents/support.md) for details.
+Supports over 100 triplet platforms, including DOS series, POSIX series, Windows 9x series, Windows NT series, and the Host C Library Series. Runtime execution is deliberately limited to the full-translation UWVM interpreter and the full-module LLVM AOT mode; lazy and tiered execution are not part of this fork. See [support.md](documents/support.md) for details.
 
 ### Runtime execution backends
-UWVM2 includes multiple runtime execution backends (interpreter and in-memory compilation components). See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the u2 interpreter (“register-ring stack-top cache”) architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
+UWVM2 retains two explicit runtime backends: the full-translation interpreter and full-module LLVM AOT. See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the u2 interpreter (“register-ring stack-top cache”) architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
+
+The ROS LLVM backend builds its own pinned **LLVM 23.1.1 stable release** with
+the downstream MIPS R6 repair. It does not use system LLVM, `LLVM_CONFIG`, or
+an `llvm-config` executable; dependency information comes directly from CMake.
+The first LLVM-enabled xmake configuration needs CMake and Ninja; see
+[bundled LLVM provenance and build instructions](third-parties/llvm/README.md).
+The [maintenance rationale](documents/toolchain/ros-llvm-maintenance.md) explains
+the version, FP, ABI, module and cache constraints; the
+[verification record](documents/toolchain/ros-bundled-llvm23.md) distinguishes
+completed test snapshots from remaining platform/build coverage.
 
 ### High-performance, secure, and highly scalable standard parser
 High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.

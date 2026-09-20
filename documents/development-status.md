@@ -28,13 +28,13 @@ The following components are planned for implementation in the upcoming developm
 
 - **WebAssembly Module Initialization and Validation**: Developing mechanisms for module initialization and validation to ensure compliance with the WebAssembly specification and security requirements.
 
-- **Non-Image Compiler Concepts**: Exploring advanced virtual machine concepts such as virtual threads and tiered compilation algorithms to enhance performance and scalability.
+- **Offline AOT Packaging**: Separating LLVM translation from the device-side loader and defining a stable, validated AOT artifact boundary.
 
 - **High-Performance Interpreter (INT)**: Designing and implementing an efficient interpreter to execute WebAssembly code with optimized performance, serving as the baseline execution engine.
 
-- **Just-In-Time (JIT) Compilation with LLVM**: Integrating LLVM-based JIT compilation to dynamically translate WebAssembly code into native machine code at runtime, improving execution speed.
+- **Full-Module LLVM AOT**: Translating complete validated WebAssembly modules through the retained LLVM backend, with fixed function boundaries and no lazy or tiered execution paths.
 
-- **INT Optable and JIT Code Caching**: Developing a caching mechanism for JIT-compiled code to reduce compilation overhead and enhance runtime efficiency.
+- **INT Optable and AOT Object Caching**: Maintaining interpreter dispatch tables and mandatory context-integrity checks for full-module native object caching. The deterministic cache identity is not a same-user secret-key boundary.
 
 ## Release Preparation Cycle
 
@@ -65,7 +65,7 @@ The project is built around several key architectural principles:
 - **Concept-Oriented Programming (COP)**: Core concepts define the system's extensibility
 - **Modular Design**: Clear separation between parser, execution engine, and system interfaces
 - **Cross-Platform Support**: Over 100 triplet platforms including DOS, POSIX, Windows, and Host C Library Series
-- **Multiple Execution Modes**: Support for interpretation (INT), just-in-time compilation (JIT), and tiered compilation (TC)
+- **Auditable Execution Modes**: Full-translation interpretation (INT) and full-module LLVM AOT only
 
 ## Quality Assurance
 

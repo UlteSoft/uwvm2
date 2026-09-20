@@ -8,7 +8,6 @@ WORK_DIR=${WORK_DIR:-"$ROOT/build/unwind-fuzz-work"}
 LOG_DIR=${LOG_DIR:-"$ROOT/build/unwind-fuzz-logs"}
 MIN_FREE_KB=${MIN_FREE_KB:-1048576}
 UNWIND_CASES=${UNWIND_CASES:-512}
-OSR_CASES=${OSR_CASES:-256}
 LOOP_LIMIT=${LOOP_LIMIT:-0}
 KEEP_PASS_LOGS=${KEEP_PASS_LOGS:-0}
 
@@ -50,9 +49,8 @@ PY
 }
 
 cleanup_pass_artifacts() {
-  rm -rf "$WORK_DIR"/uwvm_unwind_fuzz_* "$WORK_DIR"/uwvm_osr_unwind_fuzz_*
+  rm -rf "$WORK_DIR"/uwvm_unwind_fuzz_*
   prune_pass_logs unwind
-  prune_pass_logs osr
 }
 
 free_kb() {
@@ -99,24 +97,4 @@ while true; do
     exit 1
   fi
   prune_pass_logs unwind
-
-  cleanup_pass_artifacts
-  check_space
-
-  seed=$(rand_seed)
-  log="$LOG_DIR/osr-$seed.pass.log"
-  fail_log="$LOG_DIR/osr-$seed.fail.log"
-  echo "[loop] osr seed=$seed log=$log"
-  if ! python3 -u "$ROOT/tools/unwind_fuzz/uwvm_osr_unwind_fuzzer.py" \
-      --root "$ROOT" \
-      --uwvm "$UWVM" \
-      --wat2wasm "$WAT2WASM" \
-      --work-dir "$WORK_DIR" \
-      --cases "$OSR_CASES" \
-      --seed "$seed" 2>&1 | tee "$log"; then
-    mv -f "$log" "$fail_log"
-    echo "[FOUND] osr failed seed=$seed log=$fail_log"
-    exit 1
-  fi
-  prune_pass_logs osr
 done

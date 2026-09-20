@@ -24,21 +24,11 @@
 #ifndef UWVM_MODULE
 // std
 # include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
 # include <type_traits>
 // macro
-# include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
-# include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
-# include <uwvm2/object/impl.h>
-# include <uwvm2/uwvm/wasm/impl.h>
 # include "mode.h"
 #endif
 
@@ -64,7 +54,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         code_size
     };
 
-#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
     enum class runtime_llvm_jit_policy_t : unsigned
     {
         debug,
@@ -72,14 +62,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         fast_compile,
         balanced,
         max
-    };
-
-    enum class runtime_llvm_jit_lazy_policy_t : unsigned
-    {
-        auto_policy,
-        debug,
-        light,
-        balanced
     };
 
     enum class runtime_llvm_jit_full_policy_t : unsigned
@@ -109,31 +91,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     };
 #endif
 
-    inline bool custom_runtime_mode_existed{};      // [global]
-    inline bool custom_runtime_compiler_existed{};  // [global]
-
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
     /// @brief   Whether the runtime mode is code interpreted.
-    /// @details auto_compile + uwvm_interpreter_only
+    /// @details full_compile + uwvm_interpreter_only
     inline bool is_runtime_mode_code_int_existed{};  // [global]
-#endif
-
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-    /// @brief   Whether the runtime mode is debug interpreter.
-    /// @details full_compile + debug_interpreter
-    inline bool is_runtime_mode_code_debug_existed{};  // [global]
-#endif
-
-#if defined(UWVM_RUNTIME_LLVM_JIT)
-    /// @brief   Whether the runtime mode is code jit.
-    /// @details lazy_compile + llvm_jit_only
-    inline bool is_runtime_mode_code_jit_existed{};  // [global]
-#endif
-
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief   Whether the runtime mode is code jit.
-    /// @details lazy_compile + uwvm_interpreter_llvm_jit_tiered
-    inline bool is_runtime_mode_code_tiered_existed{};  // [global]
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -220,69 +181,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::std::size_t global_runtime_uwvm_int_loop_unwind_max_size{default_runtime_uwvm_int_loop_unwind_max_size};  // [global]
 #endif
 
-#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief Whether the high-level runtime LLVM JIT policy was explicitly configured.
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+    /// @brief Whether the high-level full-module LLVM AOT policy was explicitly configured.
     inline bool runtime_llvm_jit_policy_existed{};  // [global]
 
-    /// @brief High-level LLVM JIT policy preset.
+    /// @brief High-level full-module LLVM AOT policy preset.
     inline runtime_llvm_jit_policy_t global_runtime_llvm_jit_policy{runtime_llvm_jit_policy_t::default_policy};  // [global]
 
-    /// @brief Whether the lazy/tier-1 runtime LLVM JIT policy was explicitly configured.
-    inline bool runtime_llvm_jit_lazy_policy_existed{};  // [global]
-
-    /// @brief Lazy/tier-1 LLVM JIT policy override.
-    inline runtime_llvm_jit_lazy_policy_t global_runtime_llvm_jit_lazy_policy{runtime_llvm_jit_lazy_policy_t::auto_policy};  // [global]
-
-    /// @brief Whether the full/tier-2 runtime LLVM JIT policy was explicitly configured.
+    /// @brief Whether the full runtime LLVM compilation policy was explicitly configured.
     inline bool runtime_llvm_jit_full_policy_existed{};  // [global]
 
-    /// @brief Full/tier-2 LLVM JIT policy override.
+    /// @brief Full-module LLVM compilation policy override.
     inline runtime_llvm_jit_full_policy_t global_runtime_llvm_jit_full_policy{runtime_llvm_jit_full_policy_t::auto_policy};  // [global]
 
-    /// @brief Whether the runtime LLVM JIT call-stack tracking mode was explicitly configured.
+    /// @brief Whether the runtime LLVM AOT call-stack tracking mode was explicitly configured.
     inline bool runtime_llvm_jit_call_stack_existed{};  // [global]
 
-    /// @brief Runtime LLVM JIT call-stack tracking mode.
+    /// @brief Runtime LLVM AOT call-stack tracking mode.
     inline runtime_llvm_jit_call_stack_t global_runtime_llvm_jit_call_stack{runtime_llvm_jit_call_stack_t::auto_policy};  // [global]
 
-    /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
-    inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
-
-    /// @brief Whether runtime LLVM JIT cache signature generation is disabled by command line.
-    inline bool runtime_llvm_jit_cache_no_sign{};  // [global]
-
-    /// @brief Whether runtime LLVM JIT cache signature verification is disabled by command line.
-    inline bool runtime_llvm_jit_cache_no_verify{};  // [global]
-
-    /// @brief Whether runtime LLVM JIT cache path mode was explicitly configured.
+    /// @brief Whether the LLVM AOT cache path mode was explicitly configured.
     inline bool runtime_llvm_jit_cache_path_existed{};  // [global]
 
-    /// @brief Runtime LLVM JIT cache path mode.
+    /// @brief LLVM AOT cache path mode.
     inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
 
-    /// @brief Runtime LLVM JIT custom cache directory path.
+    /// @brief LLVM AOT custom cache directory path.
     inline ::uwvm2::utils::container::u8string global_runtime_llvm_jit_cache_path{};  // [global]
 #endif
 
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief Whether Tier 0 uwvm-int lazy interpreter fallback is disabled in tiered mode.
-    inline bool runtime_tiered_disable_uwvm_int_lazy_interpreter{};  // [global]
-
-    /// @brief Whether Tier 2 background full-module LLVM JIT is disabled in tiered mode.
-    inline bool runtime_tiered_disable_llvm_full_jit{};  // [global]
-#endif
-
     /// @brief   The global runtime mode.
-    /// @details default = lazy_compile
+    /// @details Every backend prepares the complete module before execution.
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile};  // [global]
 
     /// @brief   The global runtime compiler backend.
-    /// @details default = uwvm_interpreter_llvm_jit_tiered when the tiered backend is available
+    /// @details Prefer the full-module LLVM backend when present, otherwise use the full interpreter.
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered
-#elif defined(UWVM_RUNTIME_LLVM_JIT)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
 #elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only
@@ -295,5 +231,4 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>
-# include <uwvm2/utils/macro/pop_macros.h>
 #endif

@@ -124,7 +124,10 @@ inline constexpr ::std::size_t compute_default_buffer_size() noexcept
 	{
 		constexpr ::std::size_t buffersize{
 #ifdef FAST_IO_BUFFER_SIZE
-			(FAST_IO_BUFFER_SIZE < sizeof(char_type)) ? FAST_IO_BUFFER_SIZE : sizeof(char_type)
+			// `FAST_IO_BUFFER_SIZE` is a byte budget, not an already-converted element count.  Preserve the complete
+			// budget here and divide exactly once below; taking its minimum with `sizeof(char_type)` collapsed every
+			// ordinary configured buffer to one element and could otherwise make a too-small budget produce zero.
+			FAST_IO_BUFFER_SIZE
 #elif SIZE_MAX <= UINT_LEAST16_MAX
 			128
 #elif SIZE_MAX <= UINT_LEAST32_MAX
@@ -133,6 +136,7 @@ inline constexpr ::std::size_t compute_default_buffer_size() noexcept
 			131072
 #endif
 		};
+		static_assert(sizeof(char_type) <= buffersize);
 		return buffersize / sizeof(char_type);
 	}
 }
@@ -191,5 +195,40 @@ struct basic_io_buffer_traits
 	static inline constexpr ::std::size_t input_buffer_size = input_buf_size;
 	static inline constexpr ::std::size_t output_buffer_size = output_buf_size;
 };
+
+namespace details
+{
+
+/// @brief Proves the allocator and direction required by an owned input-buffer layer.
+/// @details `basic_io_buffer` obtains its input allocation through
+///          `typed_generic_allocator_adapter<traits_type::allocator_type, input_char_type>`. The historical
+///          `input_buffer_on_stack` policy member is not a storage-domain proof and the current owner contains pointer
+///          state rather than an inline character array. Restricting this refinement to an enabled input mode plus an
+///          exact allocator marker follows the allocation expression actually used by underflow. Null/unallocated
+///          state is harmless; a caller must still prove a nonempty current range before issuing a hint.
+template <typename traits_type>
+concept prfch_cacheable_input_io_buffer_traits = requires {
+	typename ::std::remove_cvref_t<traits_type>::allocator_type;
+	requires((::std::remove_cvref_t<traits_type>::mode & ::fast_io::buffer_mode::in) ==
+			 ::fast_io::buffer_mode::in);
+	requires(::fast_io::prfch_cacheable_allocator_provenance<
+			 typename ::std::remove_cvref_t<traits_type>::allocator_type>);
+};
+
+/// @brief Write-direction counterpart for an owned output-buffer layer.
+/// @details Output allocation and destruction use the same allocator selected by the traits, but read and write
+///          provenance remain separate so an input-only file buffer cannot enter a put-area policy and an output-only
+///          file buffer cannot enter an input-consumption policy. Cursor capacity and lifetime are intentionally not
+///          folded into this type-level proof; the eventual print call site must establish both at run time.
+template <typename traits_type>
+concept prfch_cacheable_output_io_buffer_traits = requires {
+	typename ::std::remove_cvref_t<traits_type>::allocator_type;
+	requires((::std::remove_cvref_t<traits_type>::mode & ::fast_io::buffer_mode::out) ==
+			 ::fast_io::buffer_mode::out);
+	requires(::fast_io::prfch_cacheable_allocator_provenance<
+			 typename ::std::remove_cvref_t<traits_type>::allocator_type>);
+};
+
+} // namespace details
 
 } // namespace fast_io

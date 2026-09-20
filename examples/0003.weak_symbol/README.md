@@ -39,7 +39,7 @@ xmake build uwvm
 ## Run (ELF only)
 
 ```sh
-./build/.../uwvm -Rcc int -Rcm full \
+./build/.../uwvm -Rint \
   --wasip1-expose-host-api \
   --wasm-set-preload-module-attribute weak.example copy all \
   --run ./main.wasm hello world
@@ -48,7 +48,7 @@ xmake build uwvm
 Module-specific exposure works the same way:
 
 ```sh
-./build/.../uwvm -Rcc int -Rcm full \
+./build/.../uwvm -Rint \
   --wasip1-module weak.example expose-host-api \
   --wasm-set-preload-module-attribute weak.example copy all \
   --run ./main.wasm hello world

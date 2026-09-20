@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 #include <concepts>
 
 #ifndef UWVM_MODULE
@@ -36,6 +37,8 @@
     { \
         if(!(expr)) \
         { \
+            ::std::fprintf(stderr, "scan_precise_batch:%d: %s (curr=%zu end=%zu set=%zu)\n", \
+                           __LINE__, #expr, state.curr_calls, state.end_calls, state.set_calls); \
             return __LINE__; \
         } \
     } while(false)
@@ -49,8 +52,8 @@ namespace uwvm2_test_scan_precise_batch
         char* begin{};
         char* curr{};
         char* end{};
-        char const* cold_curr{};
-        char const* cold_end{};
+        char* cold_curr{};
+        char* cold_end{};
         ::std::size_t begin_calls{};
         ::std::size_t curr_calls{};
         ::std::size_t end_calls{};
@@ -92,7 +95,15 @@ namespace uwvm2_test_scan_precise_batch
     inline bool ibuffer_underflow(scan_input_ref in) noexcept
     {
         ++in.state->underflow_calls;
-        return false;
+        if(in.state->cold_curr == in.state->cold_end) { return false; }
+        // This memory-backed test stream can expose the remaining cold range
+        // directly. Reporting EOF here while read_all_underflow_define still has
+        // data would violate the input stream protocol checked by scalar scans.
+        in.state->begin = in.state->cold_curr;
+        in.state->curr = in.state->cold_curr;
+        in.state->end = in.state->cold_end;
+        in.state->cold_curr = in.state->cold_end;
+        return true;
     }
 
     inline void read_all_underflow_define(scan_input_ref in, char* first, char* last) noexcept
@@ -343,6 +354,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
     static_assert(!::fast_io::precise_reserve_scannable_no_error<char, get_u16_may_error>);
     static_assert(::fast_io::details::decay::find_continuous_precise_scan_n<char, get_u8, get_u16, get_u32, get_u64>().position == 4u);
     static_assert(::fast_io::details::decay::find_continuous_precise_scan_n<char, get_u8, get_u16, get_u32, get_u64>().neededspace == 15u);
+    static_assert(!::fast_io::details::decay::find_continuous_precise_scan_n<char, get_u8, get_u16, get_u32, get_u64>().aggregate_commit_safe);
     static_assert(::fast_io::details::decay::find_continuous_precise_scan_n<char, get_u32>().position == 1u);
     static_assert(::fast_io::details::decay::find_continuous_precise_scan_n<char, get_u16_may_error, get_u16_may_error>().position == 0u);
     static_assert(::fast_io::details::decay::find_continuous_precise_scan_n<char16_t, unit_get<char16_t, 2u>, unit_get<char16_t, 3u>>().neededspace == 5u);
@@ -355,7 +367,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         }
     }
 
-    inline scan_input_state make_state(char* first, ::std::size_t n, char const* cold_first = nullptr, ::std::size_t cold_n = 0u) noexcept
+    inline scan_input_state make_state(char* first, ::std::size_t n, char* cold_first = nullptr, ::std::size_t cold_n = 0u) noexcept
     {
         scan_input_state state{first, first, first + n};
         state.cold_curr = cold_first;
@@ -385,7 +397,10 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(state.curr == buffer + 17u);
         UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 4u : 1u));
         UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 4u : 1u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 4u : 1u));
+        // Unmarked precise scanners share the availability check, but the new
+        // protocol publishes each scalar cursor before its CPO. Only an explicit
+        // aggregate-commit-safe marker permits one publication for the whole run.
+        UWVM_TEST_REQUIRE(state.set_calls == 4u);
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -413,9 +428,12 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(c == load_le(buffer + 11u, 8u));
         UWVM_TEST_REQUIRE(d == load_le(buffer + 19u, 8u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 27u);
-        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 5u : 3u));
-        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 5u : 3u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 5u : 3u));
+        // After the first non-precise item, the remaining suffix uses one scalar
+        // continuation instead of recursively detecting further precise batches.
+        // The context scalar path also re-observes its buffer before parsing.
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 6u : 5u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 6u : 5u));
+        UWVM_TEST_REQUIRE(state.set_calls == 5u);
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -458,7 +476,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         return 0;
     }
 
-    int test_may_error_end_of_file_keeps_curr() noexcept
+    int test_may_error_end_of_file_consumes_extent() noexcept
     {
         char buffer[8]{};
         fill_sequence(buffer, sizeof(buffer), 47u);
@@ -471,10 +489,12 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
                                                                                  get_u32{&b}));
         UWVM_TEST_REQUIRE(a == load_le(buffer, 2u));
         UWVM_TEST_REQUIRE(b == 777u);
-        UWVM_TEST_REQUIRE(state.curr == (asan_scan_single_path ? buffer + 2u : buffer));
+        // Precise scans consume their fixed extent before validating it, on both
+        // direct and staging paths. A later scanner must still remain untouched.
+        UWVM_TEST_REQUIRE(state.curr == buffer + 2u);
         UWVM_TEST_REQUIRE(state.curr_calls == 1u);
         UWVM_TEST_REQUIRE(state.end_calls == 1u);
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 1u : 0u));
+        UWVM_TEST_REQUIRE(state.set_calls == 1u);
         UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
@@ -496,9 +516,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(b == load_le(buffer + 2u, 4u));
         UWVM_TEST_REQUIRE(c == load_le(buffer + 6u, 4u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 10u);
-        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 3u : 2u));
-        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 3u : 2u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.curr_calls == 3u);
+        UWVM_TEST_REQUIRE(state.end_calls == 3u);
+        UWVM_TEST_REQUIRE(state.set_calls == 3u);
         return 0;
     }
 
@@ -521,7 +541,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(state.curr == buffer + 10u);
         UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 3u : 2u));
         UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 3u : 2u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(state.set_calls == 3u);
         return 0;
     }
 
@@ -557,16 +577,16 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(g == load_le(buffer + 20u, 4u));
         UWVM_TEST_REQUIRE(h == load_le(buffer + 24u, 4u));
         UWVM_TEST_REQUIRE(state.curr == buffer + 28u);
-        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 8u : 5u));
-        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 8u : 5u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 8u : 5u));
+        UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 8u : 7u));
+        UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 8u : 7u));
+        UWVM_TEST_REQUIRE(state.set_calls == 8u);
         return 0;
     }
 
     int test_buffer_has_first_field_only() noexcept
     {
         char buffer[4]{};
-        char cold[asan_scan_single_path ? 12u : 8u]{};
+        char cold[8]{};
         fill_sequence(buffer, sizeof(buffer), 51u);
         fill_sequence(cold, sizeof(cold), 61u);
         auto state{make_state(buffer, sizeof(buffer), cold, sizeof(cold))};
@@ -578,12 +598,13 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
                                                                                 get_u32{&a},
                                                                                 get_u32{&b},
                                                                                 get_u32{&c}));
-        UWVM_TEST_REQUIRE(a == load_le(asan_scan_single_path ? cold : buffer, 4u));
-        UWVM_TEST_REQUIRE(b == load_le(cold + (asan_scan_single_path ? 4u : 0u), 4u));
-        UWVM_TEST_REQUIRE(c == load_le(cold + (asan_scan_single_path ? 8u : 4u), 4u));
-        UWVM_TEST_REQUIRE(state.curr == (asan_scan_single_path ? buffer : buffer + 4u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 0u : 1u));
-        UWVM_TEST_REQUIRE(state.read_all_calls == (asan_scan_single_path ? 3u : 2u));
+        UWVM_TEST_REQUIRE(a == load_le(buffer, 4u));
+        UWVM_TEST_REQUIRE(b == load_le(cold, 4u));
+        UWVM_TEST_REQUIRE(c == load_le(cold + 4u, 4u));
+        UWVM_TEST_REQUIRE(state.curr == cold + 8u);
+        UWVM_TEST_REQUIRE(state.set_calls == 3u);
+        UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
+        UWVM_TEST_REQUIRE(state.underflow_calls == 1u);
         return 0;
     }
 
@@ -600,11 +621,29 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(::fast_io::operations::decay::scan_freestanding_decay(scan_input_ref{&state},
                                                                                 get_u32{&a},
                                                                                 get_u32{&b}));
-        UWVM_TEST_REQUIRE(a == load_le(cold, 4u));
-        UWVM_TEST_REQUIRE(b == load_le(cold + 4u, 4u));
-        UWVM_TEST_REQUIRE(state.curr == buffer);
-        UWVM_TEST_REQUIRE(state.set_calls == 0u);
-        UWVM_TEST_REQUIRE(state.read_all_calls == 2u);
+        // Staging preserves the current chunk's prefix rather than discarding
+        // it when the first complete field needs a refill.
+        UWVM_TEST_REQUIRE(a == (load_le(buffer, 2u) | (load_le(cold, 2u) << 16u)));
+        UWVM_TEST_REQUIRE(b == load_le(cold + 2u, 4u));
+        UWVM_TEST_REQUIRE(state.curr == cold + 6u);
+        UWVM_TEST_REQUIRE(state.set_calls == 3u);
+        UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
+        UWVM_TEST_REQUIRE(state.underflow_calls == 1u);
+        return 0;
+    }
+
+    int test_precise_short_input_reports_eof() noexcept
+    {
+        char buffer[2]{1, 2};
+        auto state{make_state(buffer, sizeof(buffer))};
+        ::std::uint64_t value{777u};
+        // A real refill EOF is not a parse exception and must not invoke a CPO
+        // with an incomplete extent. The already-read prefix remains consumed.
+        UWVM_TEST_REQUIRE(!::fast_io::operations::decay::scan_freestanding_decay(scan_input_ref{&state}, get_u32{&value}));
+        UWVM_TEST_REQUIRE(value == 777u);
+        UWVM_TEST_REQUIRE(state.curr == buffer + 2u);
+        UWVM_TEST_REQUIRE(state.underflow_calls == 1u);
+        UWVM_TEST_REQUIRE(state.read_all_calls == 0u);
         return 0;
     }
 
@@ -628,7 +667,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(::fast_io::io_res
         UWVM_TEST_REQUIRE(state.curr == buffer + 5u);
         UWVM_TEST_REQUIRE(state.curr_calls == (asan_scan_single_path ? 2u : 1u));
         UWVM_TEST_REQUIRE(state.end_calls == (asan_scan_single_path ? 2u : 1u));
-        UWVM_TEST_REQUIRE(state.set_calls == (asan_scan_single_path ? 2u : 1u));
+        UWVM_TEST_REQUIRE(state.set_calls == 2u);
         return 0;
     }
 
@@ -678,7 +717,7 @@ int main()
     {
         return ret;
     }
-    if(auto const ret{test_may_error_end_of_file_keeps_curr()})
+    if(auto const ret{test_may_error_end_of_file_consumes_extent()})
     {
         return ret;
     }
@@ -699,6 +738,10 @@ int main()
         return ret;
     }
     if(auto const ret{test_buffer_shorter_than_first_field()})
+    {
+        return ret;
+    }
+    if(auto const ret{test_precise_short_input_reports_eof()})
     {
         return ret;
     }

@@ -3,11 +3,12 @@ option("march", function()
     (
         [[Set the "-march" option for gcc and clang.]],
         "The option is automatically added if using our toolchain option.",
-        [[    none: Don't set the "-march" option, use the default march of the toolchain.]],
-        [[    default: Set the "-march" option as "-march=native" if possible, otherwise don't set the "-march" option and use the default march of the toolchain.]],
-        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "no" and "default".]]
+        [[    none: Don't set the "-march" option; this is the toolchain-baseline default.]],
+        [[    native: Set "-march=native" explicitly for developer-local builds.]],
+        [[    default: Legacy explicit alias for "native".]],
+        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "no", "none", and "default".]]
     )
-    set_default("default")
+    set_default("none")
     after_check(function(option)
         import("utility.utility")
         option:add("cxflags", utility.get_march_option())
@@ -157,7 +158,7 @@ option("use-llvm-compiler", function()
     set_description
     (
         "Use the LLVM/Clang compiler toolchain (Clang-CL on Windows, clang on other platforms).",
-        "This only switches the compiler toolchain and does not enable LLVM JIT by itself.",
+        "This only switches the compiler toolchain and does not enable the LLVM AOT backend by itself.",
         "default = false"
     )
     set_default(false)
@@ -170,6 +171,17 @@ option("use-cxx-module", function()
         "default = false"
     )
     set_default(false)
+end)
+
+option("build-source-id", function()
+    set_description
+    (
+        "Declare the verified identity of a source archive for persistent LLVM native-object caching.",
+        "Use sha256:<64 lowercase hexadecimal digits> from a normalized complete-source manifest.",
+        "Leave as none for Git builds or when source provenance cannot be verified.",
+        "default = none"
+    )
+    set_default("none")
 end)
 
 option("use-thread-local", function()
@@ -196,19 +208,35 @@ end)
 option("execution-jit", function()
     set_description
     (
-        "select execution jit backend",
-        [[    none: disable execution jit backend.]],
-        [[    default: use default execution jit backend.]],
-        [[    llvm: use llvm execution jit backend.]]
+        "select the full-module LLVM AOT backend (legacy option name)",
+        [[    none: disable the LLVM AOT backend.]],
+        [[    default: use the default LLVM AOT backend.]],
+        [[    llvm: use the LLVM AOT backend.]]
     )
     set_default("default")
     set_values("none", "default", "llvm")
 end)
 
+option("llvm-build-jobs", function()
+    set_default("2")
+    set_description("Bundled LLVM compile jobs (1..16); link jobs are always limited to one. This is not a memory limit.")
+end)
+
+option("llvm-build-targets", function()
+    set_default("Native")
+    set_description("Bundled LLVM code-generation backends: Native, all, or a semicolon-separated LLVM target list.")
+end)
+
+option("llvm-cmake-toolchain", function()
+    set_default("none")
+    set_description("CMake toolchain for bundled LLVM; must match ROS target/ABI and explicitly set LLVM_HOST_TRIPLE.")
+end)
+
 option("llvm-jit-env", function()
     set_default(true)
     set_showmenu(false)
-    add_deps("execution-jit")
+    add_deps("execution-jit", "llvm-build-jobs", "llvm-build-targets", "llvm-cmake-toolchain",
+        "use-llvm-compiler", "stdlib", "rtlib", "unwindlib", "sysroot", "target", "llvm-target")
     after_check(function(option)
         local execution_jit = get_config("execution-jit")
         if execution_jit ~= "default" and execution_jit ~= "llvm" then
@@ -255,27 +283,16 @@ option("openssl-root", function()
     )
 end)
 
-option("debug-int", function()
-    set_description
-    (
-        "select debug int backend",
-        "default = false",
-        "    false: keep the unimplemented debug interpreter backend disabled.",
-        "    true: enable debug interpreter command-line surface for implementation work only."
-    )
-    set_default(false)
-end)
-
 option("enable-uwvm-int-combine-ops", function()
     set_description
     (
         "Enable combined opcodes for uwvm-int.",
         [[    none: disable all combine ops.]],
-        [[    soft: enable only soft/light combine ops.]],
-        [[    heavy: enable soft + heavy combine ops (default).]],
+        [[    soft: enable only soft/light combine ops (default).]],
+        [[    heavy: enable soft + heavy combine ops (explicit performance profile).]],
         [[    extra: enable soft + heavy + extra-heavy combine ops (ultra-specific mega fusions).]]
     )
-    set_default("heavy")
+    set_default("soft")
     set_values("none", "soft", "heavy", "extra")
 end)
 
@@ -284,8 +301,8 @@ option("enable-uwvm-int-delay-local", function()
     (
         "Enable delay-local variantization for uwvm-int.",
         [[    none: disable delay-local fusions.]],
-        [[    soft: enable minimal delay-local fusions (default).]],
-        [[    heavy: enable soft + extended delay-local fusions.]]
+        [[    soft: enable minimal delay-local fusions.]],
+        [[    heavy: enable soft + extended delay-local fusions (default).]]
     )
     set_default("heavy")
     set_values("none", "soft", "heavy")
@@ -490,10 +507,10 @@ end)
 option("enable-test-llvm-jit", function()
     set_description
     (
-        "Register slow LLVM JIT validation/coverage targets.",
+        "Register slow LLVM AOT validation/coverage targets.",
         "default = false",
-        [[    true: register 0014.llvm_jit targets and 0013 strict LLVM-JIT mirror targets.]],
-        [[    false: skip registering slow LLVM JIT validation/coverage targets.]]
+        [[    true: register the historical 0014.llvm_jit targets and 0013 strict LLVM-AOT mirror targets.]],
+        [[    false: skip registering slow LLVM AOT validation/coverage targets.]]
     )
     set_default(false)
 end)

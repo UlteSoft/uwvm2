@@ -7,7 +7,7 @@ namespace details
 {
 
 template <typename outstmtype, typename outdecotype, ::std::integral output_char_type>
-inline constexpr void decowrite_all_overflow_common_define_impl(outstmtype outstm, outdecotype outdeco,
+inline constexpr void decowrite_all_overflow_common_define_impl(outstmtype &outstm, outdecotype &outdeco,
 																output_char_type const *first,
 																output_char_type const *last,
 																typename outstmtype::output_char_type *bufferfirst,
@@ -16,14 +16,14 @@ inline constexpr void decowrite_all_overflow_common_define_impl(outstmtype outst
 	while (first != last)
 	{
 		auto [it, bufferit] = outdeco.output_process_chars(first, last, bufferfirst, bufferlast);
-		::fast_io::operations::decay::write_all_decay(outstm, bufferfirst, bufferit);
+		::fast_io::operations::decay::write_all_decay_dispatch(outstm, bufferfirst, bufferit);
 		first = it;
 	}
 }
 
 template <typename allocator_type, ::std::size_t output_buffer_size, typename outstmtype, typename outdecotype,
 		  ::std::integral output_char_type>
-inline constexpr void decowrite_all_overflow_define_impl(outstmtype outstm, outdecotype outdeco,
+inline constexpr void decowrite_all_overflow_define_impl(outstmtype &outstm, outdecotype &outdeco,
 														 output_char_type const *first, output_char_type const *last)
 {
 	::std::size_t diff{static_cast<::std::size_t>(last - first)};
@@ -39,7 +39,7 @@ inline constexpr void decowrite_all_overflow_define_impl(outstmtype outstm, outd
 
 template <typename allocator_type, typename outstmtype, typename outdecotype, ::std::integral output_char_type>
 inline constexpr void
-deco_scatter_write_all_overflow_common_define_impl(outstmtype outstm, outdecotype outdeco,
+deco_scatter_write_all_overflow_common_define_impl(outstmtype &outstm, outdecotype &outdeco,
 												   basic_io_scatter_t<output_char_type> const *scatters,
 												   ::std::size_t n, ::std::size_t output_buffer_size)
 {
@@ -59,7 +59,7 @@ deco_scatter_write_all_overflow_common_define_impl(outstmtype outstm, outdecotyp
 
 template <typename allocator_type, ::std::size_t output_buffer_size, typename outstmtype, typename outdecotype,
 		  ::std::integral output_char_type>
-inline constexpr void deco_scatter_write_all_overflow_define_impl(outstmtype outstm, outdecotype outdeco,
+inline constexpr void deco_scatter_write_all_overflow_define_impl(outstmtype &outstm, outdecotype &outdeco,
 																  basic_io_scatter_t<output_char_type> const *scatters,
 																  ::std::size_t n)
 {
@@ -76,10 +76,13 @@ write_all_overflow_define(basic_io_deco_filter_ref<io_buffer_type> filter,
 						  typename basic_io_deco_filter_ref<io_buffer_type>::output_char_type const *last)
 {
 	auto &idoref{*filter.idoptr};
+	// Formatting owns the normalized decorator and observer once for the full conversion loop. The inner helpers borrow
+	// both because neither a character chunk nor a scatter boundary extends their lifetime.
+	decltype(auto) outref = ::fast_io::operations::output_stream_ref(idoref.handle);
+	decltype(auto) outdeco = ::fast_io::operations::refs::output_decorators_ref(idoref.decorators);
 	::fast_io::details::decowrite_all_overflow_define_impl<typename io_buffer_type::traits_type::allocator_type,
-														   io_buffer_type::traits_type::output_buffer_size>(
-		::fast_io::operations::output_stream_ref(idoref.handle),
-		::fast_io::operations::refs::output_decorators_ref(idoref.decorators), first, last);
+																   io_buffer_type::traits_type::output_buffer_size>(
+		outref, outdeco, first, last);
 }
 
 template <typename io_buffer_type>
@@ -89,10 +92,11 @@ inline constexpr void scatter_write_all_overflow_define(
 	::std::size_t n)
 {
 	auto &idoref{*filter.idoptr};
+	decltype(auto) outref = ::fast_io::operations::output_stream_ref(idoref.handle);
+	decltype(auto) outdeco = ::fast_io::operations::refs::output_decorators_ref(idoref.decorators);
 	::fast_io::details::deco_scatter_write_all_overflow_define_impl<
 		typename io_buffer_type::traits_type::allocator_type, io_buffer_type::traits_type::output_buffer_size>(
-		::fast_io::operations::output_stream_ref(idoref.handle),
-		::fast_io::operations::refs::output_decorators_ref(idoref.decorators), scatters, n);
+		outref, outdeco, scatters, n);
 }
 
 } // namespace fast_io

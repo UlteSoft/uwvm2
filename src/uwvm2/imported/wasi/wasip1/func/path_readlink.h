@@ -107,6 +107,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // path_ptrsz and buf_ptrsz point to u8 and therefore both have alignment 1.
+        check_wasip1_guest_pointer_alignment<4uz>(buf_used_ptrsz, u8"path_readlink.buf_used (size)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

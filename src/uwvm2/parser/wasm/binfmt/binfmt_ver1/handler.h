@@ -151,21 +151,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
         bool success{};
 
         // Avoid meaningless copies with references
-#if __cpp_structured_bindings >= 202411L
-        auto const& [... secs]{module_storage.sections};
-        ::uwvm2::parser::wasm::binfmt::ver1::details::check_extensible_section_is_series<::std::remove_cvref_t<decltype(secs)>...>();
-
-        // llvm can gen jump table here
-        details::handle_all_binfmt_ver1_extensible_section_impl<::std::remove_cvref_t<decltype(secs)>...>(success,
-                                                                                                          module_storage,
-                                                                                                          section_id,
-                                                                                                          section_begin,
-                                                                                                          section_end,
-                                                                                                          err,
-                                                                                                          fs_para,
-                                                                                                          wasm_order,
-                                                                                                          sec_id_module_ptr);
-#else
         [&]<typename... Secs> UWVM_ALWAYS_INLINE(::uwvm2::utils::container::tuple<Secs...> const&) constexpr UWVM_THROWS
         {
             ::uwvm2::parser::wasm::binfmt::ver1::details::check_extensible_section_is_series<Secs...>();
@@ -181,7 +166,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
                                                                              wasm_order,
                                                                              sec_id_module_ptr);
         }(module_storage.sections);
-#endif
 
         if(!success) [[unlikely]]
         {

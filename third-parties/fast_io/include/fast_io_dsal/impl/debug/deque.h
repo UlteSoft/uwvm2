@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "../misc/push_macros.h"
 
 namespace fast_io
 {
@@ -164,6 +165,9 @@ inline constexpr char_type *pr_rsv_define_deque_debug_impl(char_type *iter, T co
 
 namespace manipulators
 {
+/// @brief Returns the exact static reserve for a deque diagnostic view.
+/// @details The hidden CPO accounts for every fixed label and the full-width spelling of twelve internal pointers.
+/// @feature concept:static_precise_size
 template <::std::integral char_type, typename T, typename allocator>
 inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type,
 																			   ::fast_io::manipulators::debug_view_t<::fast_io::containers::deque<T, allocator> const &>>) noexcept
@@ -189,12 +193,15 @@ inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<c
 	return literal_total + literal_counts * ptrlen;
 }
 
+/// @brief Emits a deque's implementation-specific controller diagnostic record.
+/// @details The output lists internal block/controller pointers and must not be parsed as a stable ABI or serialization
+///          format. The wrapped deque is only observed.
 template <::std::integral char_type, typename T, typename allocator>
 inline constexpr char_type *print_reserve_define(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::manipulators::debug_view_t<::fast_io::containers::deque<T, allocator> const &>>,
 	char_type *ptr, ::fast_io::manipulators::debug_view_t<::fast_io::containers::deque<T, allocator> const &> val) noexcept
 {
-	if consteval
+	FAST_IO_IF_CONSTEVAL
 	{
 		return ::fast_io::details::pr_rsv_define_deque_debug_impl(ptr, val.reference.controller);
 	}
@@ -211,3 +218,5 @@ inline constexpr char_type *print_reserve_define(
 } // namespace manipulators
 
 } // namespace fast_io
+
+#include "../misc/pop_macros.h"

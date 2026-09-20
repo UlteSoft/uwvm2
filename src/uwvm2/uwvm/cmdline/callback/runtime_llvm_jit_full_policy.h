@@ -47,7 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
 # if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 # else
@@ -80,7 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Conflicting runtime LLVM JIT policy parameters: \"",
+                                u8"Conflicting LLVM AOT policy parameters: \"",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"--runtime-llvm-jit-full-policy",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -126,17 +126,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
         else [[unlikely]]
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+            // A single print pack with 17 conditional colors expanded into a
+            // 3.5-GiB BMI in the full module build; the compiler must instantiate
+            // alternatives even though all colors use the same runtime flag.
+            // Bound each pack, while holding ONE outer lock for the complete
+            // diagnostic. Print through .handle, not the lockable wrapper, to
+            // avoid recursively locking the same non-recursive mutex.
+            // Retain color manipulators: legacy Windows uses console attribute
+            // operations here, not necessarily strings that can become views.
+            // This cold CLI path changes neither policy selection nor JIT code.
+            // fast_io's internal io_lock_guard is not exported by its named
+            // module. Keep this tiny guard local instead of depending on an
+            // internal header or exposing new third-party module declarations.
+            struct diagnostic_lock_guard
+            {
+                decltype(::uwvm2::uwvm::io::u8log_output.mutex)& mutex;
+                explicit diagnostic_lock_guard(decltype(mutex) value) noexcept : mutex{value} { mutex.lock(); }
+                ~diagnostic_lock_guard() { mutex.unlock(); }
+                diagnostic_lock_guard(diagnostic_lock_guard const&) = delete;
+                diagnostic_lock_guard& operator=(diagnostic_lock_guard const&) = delete;
+            };
+            diagnostic_lock_guard diagnostic_lock{::uwvm2::uwvm::io::u8log_output.mutex};
+            auto& diagnostic_output{::uwvm2::uwvm::io::u8log_output.handle};
+            ::fast_io::io::perr(diagnostic_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Invalid runtime LLVM JIT full policy: \"",
+                                u8"Invalid full-module LLVM AOT policy: \"",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 currp1_str,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\". Expected ",
+                                u8"\". Expected ");
+
+            ::fast_io::io::perr(diagnostic_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"auto",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -144,7 +168,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"debug",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8", ",
+                                u8", ");
+
+            ::fast_io::io::perr(diagnostic_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"legacy-light",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -152,7 +178,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"pb-o1",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8", ",
+                                u8", ");
+
+            ::fast_io::io::perr(diagnostic_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"pb-o2",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),

@@ -26,7 +26,11 @@
 // #pragma once
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
 
-# include "win32_text_attr.h"  // pragma once
+// Named-module consumers receive the manipulator from uwvm2.utils.ansies.  Re-including its declaration here would parse it
+// before fast_io is imported and redeclare the same external-linkage entity across the global and owning named modules.
+# ifndef UWVM_MODULE
+#  include "win32_text_attr.h"  // pragma once
+# endif
 # include "ansi_push_macro.h"
 
 # pragma push_macro("UWVM_WIN32_TEXTATTR_RST_ALL")

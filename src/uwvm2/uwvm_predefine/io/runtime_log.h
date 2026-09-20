@@ -60,8 +60,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 
     /// @brief Enables runtime compiler log emission.
     /// @details This flag is set by the `--runtime-compiler-log` command-line parameter.  Runtime backends check it
-    ///          before printing lazy/full compilation records, tiered compilation summaries, and related compiler
-    ///          counters.  It does not affect general verbose diagnostics controlled by `show_verbose`.
+    ///          before printing full-module interpreter or LLVM AOT compilation records and related compiler counters.
+    ///          It does not affect general verbose diagnostics controlled by `show_verbose`.
     /// @see runtime_log_output_target
     /// @see u8runtime_log_output
     /// @see ::uwvm2::uwvm::cmdline::params::runtime_compiler_log
@@ -88,8 +88,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     /// @details The stream is written only by runtime compiler log sites and only when `enable_runtime_log` is true.
     ///          Hosted builds use an owning `u8native_file`, which is opened or rebound by the runtime compiler log
     ///          command-line callback.  Targets without the required file or descriptor support use UTF-8 stdout/stderr
-    ///          observers instead.  The lockable wrapper is required because JIT and tiered compilation can emit records
-    ///          from multiple worker threads.
+    ///          observers instead.  The lockable wrapper is required because full-module translation can emit records
+    ///          from multiple compiler worker threads.
     /// @see enable_runtime_log
     /// @see runtime_log_output_target
     /// @see ::uwvm2::uwvm::cmdline::params::details::runtime_compiler_log_callback

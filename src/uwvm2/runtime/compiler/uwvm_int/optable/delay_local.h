@@ -3,6 +3,13 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// Delayed-local fusion must preserve the same FP contract as ordinary opfuncs.
+// copysign's uncached f32/f64 localget/localset/localtee variants operate directly
+// on bytes; loading a Float rhs first can already quiet an sNaN on x87/68881.
+// Keep the fused stack effects (set consumes, tee retains) and tail dispatch:
+// expanding to several ordinary opfuncs would add dispatch overhead to fix a
+// representation problem. Arithmetic variants still use the strict evaluators.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel
@@ -23,9 +30,12 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <concepts>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <limits>
+# include <memory>
 # include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -179,7 +189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i32 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
             }
@@ -225,7 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i32 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i32 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
@@ -801,7 +811,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i64 binary opcode");
                 }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
             }
@@ -847,7 +857,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else
                 {
-                    static_assert(Op != Op, "unhandled delay-local i64 binary opcode");
+                    static_assert(dependent_false_v<Op>, "unhandled delay-local i64 binary opcode");
                 }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
@@ -1355,6 +1365,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const off{read_imm<local_offset_t>(type...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(type...[1u] - sizeof(wasm_f32), type...[1u] - sizeof(wasm_f32), type...[2u] + off);
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
+
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + off, sizeof(rhs));
 
@@ -1400,6 +1419,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const off{read_imm<local_offset_t>(typeref...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u] - sizeof(wasm_f32), typeref...[1u] - sizeof(wasm_f32), typeref...[2u] + off);
+                return;
+            }
+
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + off, sizeof(rhs));
 
@@ -1428,6 +1454,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{read_imm<local_offset_t>(type...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(type...[2u] + dst_off, type...[1u] - sizeof(wasm_f32), type...[2u] + rhs_off);
+                type...[1u] -= sizeof(wasm_f32);
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
 
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + rhs_off, sizeof(rhs));
@@ -1481,6 +1517,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const dst_off{read_imm<local_offset_t>(typeref...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(typeref...[2u] + dst_off, typeref...[1u] - sizeof(wasm_f32), typeref...[2u] + rhs_off);
+                typeref...[1u] -= sizeof(wasm_f32);
+                return;
+            }
+
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + rhs_off, sizeof(rhs));
 
@@ -1511,6 +1555,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{read_imm<local_offset_t>(type...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(type...[1u] - sizeof(wasm_f32), type...[1u] - sizeof(wasm_f32), type...[2u] + rhs_off);
+                ::std::memcpy(type...[2u] + dst_off, type...[1u] - sizeof(wasm_f32), sizeof(wasm_f32));
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
 
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + rhs_off, sizeof(rhs));
@@ -1564,6 +1618,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const dst_off{read_imm<local_offset_t>(typeref...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u] - sizeof(wasm_f32), typeref...[1u] - sizeof(wasm_f32), typeref...[2u] + rhs_off);
+                ::std::memcpy(typeref...[2u] + dst_off, typeref...[1u] - sizeof(wasm_f32), sizeof(wasm_f32));
+                return;
+            }
+
             wasm_f32 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + rhs_off, sizeof(rhs));
 
@@ -1588,6 +1650,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const off{read_imm<local_offset_t>(type...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(type...[1u] - sizeof(wasm_f64), type...[1u] - sizeof(wasm_f64), type...[2u] + off);
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
 
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + off, sizeof(rhs));
@@ -1634,6 +1705,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const off{read_imm<local_offset_t>(typeref...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u] - sizeof(wasm_f64), typeref...[1u] - sizeof(wasm_f64), typeref...[2u] + off);
+                return;
+            }
+
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + off, sizeof(rhs));
 
@@ -1662,6 +1740,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{read_imm<local_offset_t>(type...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(type...[2u] + dst_off, type...[1u] - sizeof(wasm_f64), type...[2u] + rhs_off);
+                type...[1u] -= sizeof(wasm_f64);
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
 
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + rhs_off, sizeof(rhs));
@@ -1715,6 +1803,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const dst_off{read_imm<local_offset_t>(typeref...[0])};
 
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(typeref...[2u] + dst_off, typeref...[1u] - sizeof(wasm_f64), typeref...[2u] + rhs_off);
+                typeref...[1u] -= sizeof(wasm_f64);
+                return;
+            }
+
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + rhs_off, sizeof(rhs));
 
@@ -1745,6 +1841,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{read_imm<local_offset_t>(type...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(type...[1u] - sizeof(wasm_f64), type...[1u] - sizeof(wasm_f64), type...[2u] + rhs_off);
+                ::std::memcpy(type...[2u] + dst_off, type...[1u] - sizeof(wasm_f64), sizeof(wasm_f64));
+                uwvm_interpreter_opfunc_t<Type...> next;
+                ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
+                UWVM_MUSTTAIL return next(type...);
+            }
 
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), type...[2u] + rhs_off, sizeof(rhs));
@@ -1797,6 +1903,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
             local_offset_t const dst_off{read_imm<local_offset_t>(typeref...[0])};
+
+            if constexpr(Op == numeric_details::float_binop::copysign &&
+                         CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
+            {
+                numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u] - sizeof(wasm_f64), typeref...[1u] - sizeof(wasm_f64), typeref...[2u] + rhs_off);
+                ::std::memcpy(typeref...[2u] + dst_off, typeref...[1u] - sizeof(wasm_f64), sizeof(wasm_f64));
+                return;
+            }
 
             wasm_f64 rhs;  // no init
             ::std::memcpy(::std::addressof(rhs), typeref...[2u] + rhs_off, sizeof(rhs));

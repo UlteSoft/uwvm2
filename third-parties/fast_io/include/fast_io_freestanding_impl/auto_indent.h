@@ -5,6 +5,9 @@ namespace fast_io
 
 namespace manipulators
 {
+/// @brief Hidden carrier for indentation-normalized multiline text.
+/// @details `first`/`last` borrow the source, `container` stores the maximum text width observed before each tab column,
+///          and `total_size` is a conservative rectangular reserve bound for the transformed lines.
 template <::std::integral char_type, typename containe>
 struct auto_indent_t
 {
@@ -181,6 +184,9 @@ print_reserve_define_auto_indent(char_type *iter,
 namespace manipulators
 {
 
+/// @brief Returns the precomputed output reserve bound of an `auto_indent_t` transformation.
+/// @details The bound assumes every counted line may occupy every maximum-width tab column and can exceed the number of
+///          code units actually emitted; this hidden CPO performs no source traversal.
 template <::std::integral char_type, typename containe>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, auto_indent_t<char_type, containe>>,
 												  auto_indent_t<char_type, containe> const &indent) noexcept
@@ -188,6 +194,8 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, a
 	return indent.total_size;
 }
 
+/// @brief Returns the stack staging size used for dynamic auto-indent output.
+/// @details The hidden CPO is type-based and independent of source text.
 template <::std::integral char_type, typename containe>
 inline constexpr ::std::size_t
 print_reserve_static_stack_size(io_reserve_type_t<char_type, auto_indent_t<char_type, containe>>) noexcept
@@ -195,6 +203,11 @@ print_reserve_static_stack_size(io_reserve_type_t<char_type, auto_indent_t<char_
 	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
 }
 
+/// @brief Emits indentation-normalized multiline text into contiguous output.
+/// @details Before each existing tab, spaces are inserted until that field reaches the maximum width observed for its
+///          column, then the original tab is emitted. Line feeds and all non-tab text are preserved; the last field is
+///          not padded and no trailing line feed is synthesized. The returned pointer identifies the actual end, which
+///          may precede the conservative reserved extent.
 template <::std::integral char_type, typename containe>
 inline constexpr char_type *print_reserve_define(io_reserve_type_t<char_type, auto_indent_t<char_type, containe>>,
 												 char_type *iter,

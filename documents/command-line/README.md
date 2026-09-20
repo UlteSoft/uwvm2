@@ -29,7 +29,7 @@ The command set is compiled conditionally. A binary may omit a command entirely 
 - `UWVM_SUPPORT_PRELOAD_DL` for native preload dynamic libraries.
 - `UWVM_SUPPORT_WEAK_SYMBOL` for weak-symbol listing.
 - `UWVM_SUPPORT_MMAP` for preload memory access mode `mmap`.
-- `UWVM_RUNTIME_*` backend macros for interpreter, LLVM JIT, tiered, AOT-style full JIT, and debug interpreter commands.
+- `UWVM_RUNTIME_*` backend macros for the full interpreter and full-module LLVM AOT commands.
 - `UWVM_IMPORT_WASI` and `UWVM_IMPORT_WASI_WASIP1` for WASI commands.
 - `UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET` for WASI socket preopen commands.
 - Windows platform macros for `::NT::` path handling, Windows 9x TOCTOU warnings, and legacy Win32 color mode.

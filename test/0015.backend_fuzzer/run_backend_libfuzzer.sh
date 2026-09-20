@@ -39,10 +39,8 @@ Options:
   -h, --help              Show this help.
 
 Environment:
-  UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix llvm-jit-lazy ..."
+  UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix uwvm-int-full llvm-aot"
   UWVM_BACKEND_LIBFUZZER_TRACE=1
-  UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR=1
-  UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_SWITCH=1
   UWVM_BACKEND_LIBFUZZER_PROGRESS=0
   UWVM_BACKEND_LIBFUZZER_PROGRESS_INTERVAL=10
   CXX=clang++

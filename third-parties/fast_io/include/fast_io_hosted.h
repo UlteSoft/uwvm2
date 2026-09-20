@@ -1,4 +1,15 @@
 ﻿#pragma once
+
+/*
+ * Hosted environment/package umbrella.
+ *
+ * This header adds operating-system, filesystem, process, mapping, native
+ * stream, and standard-library adapters to the freestanding-capable package.
+ * Those providers plug into the same CPO capability plane and the same IO
+ * operation engines; hosted packaging does not create a separate formatting or
+ * print/scan architecture.
+ */
+
 /*
 https://en.cppreference.com/w/cpp/freestanding
 There are two kinds of implementations defined by the C++ standard:

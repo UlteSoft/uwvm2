@@ -12,6 +12,7 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include "simd_full_fixtures.h"
 
 namespace
 {
@@ -71,12 +72,21 @@ namespace
         0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u,
         0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
-    inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
-        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
-        0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
-        0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u, 0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x01u,
-        0x0au, 0x15u, 0x02u, 0x06u, 0x00u, 0x41u, 0x0au, 0x41u, 0x20u, 0x0bu, 0x0cu, 0x00u,
-        0x10u, 0x00u, 0x6au, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+    // These modules intentionally have the same path, function type, and function body. Only the
+    // declared memory maximum differs, which changes the generated memory.grow implementation.
+    // A complete persistent-cache key must therefore cover the authoritative generated LLVM IR,
+    // rather than assuming that a function-body-only/module-count fingerprint is complete.
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_one_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x01u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_two_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x02u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
 
     struct wasm_fixture_def
     {
@@ -370,11 +380,15 @@ namespace
 
     [[nodiscard]] bool flip_context_abi_byte(::std::vector<unsigned char>& bytes)
     {
-        auto const needle{::std::string_view{"uwvm2-runtime-abi-v4"}};
+        // Locate the versioned schema structurally so this corruption test keeps exercising context rejection after a
+        // deliberate runtime ABI bump instead of silently failing to mutate the cache blob.
+        auto const needle{::std::string_view{"uwvm2ros-runtime-abi-v"}};
         auto const iter{::std::search(bytes.begin(), bytes.end(), needle.begin(), needle.end())};
         if(iter == bytes.end()) { return false; }
         auto const offset{static_cast<::std::size_t>(iter - bytes.begin())};
-        bytes[offset + needle.size() - 1uz] ^= 0x01u;
+        auto const version_offset{offset + needle.size()};
+        if(version_offset >= bytes.size()) { return false; }
+        bytes[version_offset] ^= 0x01u;
         return true;
     }
 
@@ -489,6 +503,44 @@ namespace
         return run_uwvm_from(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, label, {});
     }
 
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    [[nodiscard]] bool test_untrusted_source_cache_fail_closed(::std::filesystem::path const& uwvm_path,
+                                                               ::std::filesystem::path const& artifact_dir,
+                                                               ::std::filesystem::path const& wasm_path)
+    {
+        auto const cache_dir{artifact_dir / "cache-untrusted-source-fail-closed"};
+        ::std::filesystem::remove_all(cache_dir);
+        ::std::filesystem::create_directories(cache_dir);
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+
+        // An explicit path must not override the build-identity guard. Running twice proves that the first run neither
+        // publishes an object nor leaves anything that the second run can reuse. Zero extra compile workers keeps this
+        // focused check on the ordinary MCJIT ObjectCache path on every supported host.
+        constexpr ::std::array labels{::std::string_view{"untrusted_source_cache_first"}, ::std::string_view{"untrusted_source_cache_second"}};
+        for(auto const label: labels)
+        {
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rct 0 -Rclog out", cache_args, label)) { return false; }
+            if(output_contains(artifact_dir, label, "object-cache-hit"))
+            {
+                ::std::cerr << "untrusted-source build unexpectedly reused a persistent native object\n";
+                return false;
+            }
+            if(!output_contains(artifact_dir, label, "status=disabled"))
+            {
+                ::std::cerr << "untrusted-source cache decision was not reported as disabled\n";
+                return false;
+            }
+        }
+        if(!snapshot_cache(cache_dir).empty())
+        {
+            ::std::cerr << "untrusted-source build wrote a persistent native object despite the fail-closed policy\n";
+            return false;
+        }
+        return true;
+    }
+#endif
+
     [[nodiscard]] bool run_cached_mode_twice_with_cache_arg(::std::filesystem::path const& uwvm_path,
                                                             ::std::filesystem::path const& artifact_dir,
                                                             ::std::filesystem::path const& wasm_path,
@@ -566,7 +618,7 @@ namespace
         if(!rewrite_first_cache_file(cache_dir, mutate, label)) { return false; }
 
         auto const run_label{::std::string{"tampered_"} + ::std::string{label}};
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, run_label)) { return false; }
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", cache_args, run_label)) { return false; }
 
         ::std::string output{};
         if(!read_output(artifact_dir, run_label, output))
@@ -594,7 +646,7 @@ namespace
                                               ::std::string_view cache_args,
                                               ::std::string_view label)
     {
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, label)) { return false; }
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", cache_args, label)) { return false; }
         if(!output_contains(artifact_dir, label, "object-cache-hit"))
         {
             ::std::cerr << "expected clean cache hit for " << label << '\n';
@@ -612,7 +664,7 @@ namespace
         ::std::filesystem::create_directories(cache_dir);
         auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
 
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, "signed_integrity_write")) { return false; }
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", cache_args, "signed_integrity_write")) { return false; }
         if(snapshot_cache(cache_dir).empty())
         {
             ::std::cerr << "signed cache integrity setup produced no cache file\n";
@@ -684,7 +736,7 @@ namespace
         ::std::filesystem::create_directories(cache_dir);
         auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
 
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, "fuzz_seed_write")) { return false; }
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", cache_args, "fuzz_seed_write")) { return false; }
         if(snapshot_cache(cache_dir).empty())
         {
             ::std::cerr << "cache fuzz setup produced no cache file\n";
@@ -697,7 +749,7 @@ namespace
             if(!fuzz_first_cache_file(cache_dir, iteration)) { return false; }
 
             auto const label{::std::string{"fuzz_recovery_"} + ::std::to_string(iteration)};
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, label)) { return false; }
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", cache_args, label)) { return false; }
 
             ::std::string output{};
             if(!read_output(artifact_dir, label, output))
@@ -726,7 +778,7 @@ namespace
     {
         auto const custom_absolute_cache{artifact_dir / "cache path variants" / "abs space;semi" / "inner"};
         if(!run_cached_mode_twice(
-               uwvm_path, artifact_dir, wasm_path, custom_absolute_cache, "-Rjit", "cache_path_absolute_space_semi"))
+               uwvm_path, artifact_dir, wasm_path, custom_absolute_cache, "-Raot", "cache_path_absolute_space_semi"))
         {
             return false;
         }
@@ -742,7 +794,7 @@ namespace
                                                  wasm_path,
                                                  ::std::filesystem::path{trailing_arg},
                                                  trailing_base,
-                                                 "-Rjit",
+                                                 "-Raot",
                                                  "cache_path_trailing_separator",
                                                  {}))
         {
@@ -753,7 +805,7 @@ namespace
         auto const relative_arg{::std::filesystem::path{"relative cache;semi"} / "nested"};
         auto const relative_cache{relative_cwd / relative_arg};
         if(!run_cached_mode_twice_with_cache_arg(
-               uwvm_path, artifact_dir, wasm_path, relative_arg, relative_cache, "-Rjit", "cache_path_relative_space_semi", relative_cwd))
+               uwvm_path, artifact_dir, wasm_path, relative_arg, relative_cache, "-Raot", "cache_path_relative_space_semi", relative_cwd))
         {
             return false;
         }
@@ -764,7 +816,7 @@ namespace
                                                  wasm_path,
                                                  {},
                                                  empty_path_cwd,
-                                                 "-Rjit",
+                                                 "-Raot",
                                                  "cache_path_empty_uses_cwd",
                                                  empty_path_cwd))
         {
@@ -778,11 +830,11 @@ namespace
             blocked_file << "not a directory";
         }
         auto const blocked_cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(blocked_cache)};
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", blocked_cache_args, "cache_path_blocked_first"))
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", blocked_cache_args, "cache_path_blocked_first"))
         {
             return false;
         }
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", blocked_cache_args, "cache_path_blocked_second"))
+        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot -Rclog out", blocked_cache_args, "cache_path_blocked_second"))
         {
             return false;
         }
@@ -816,7 +868,7 @@ namespace
             env_guard localappdata_guard{"LOCALAPPDATA", disabled_env};
             env_guard userprofile_guard{"USERPROFILE", disabled_env};
             env_guard tmpdir_guard{"TMPDIR", disabled_env};
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit", "--runtime-llvm-jit-cache-path disable", "cache_path_disable")) { return false; }
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot", "--runtime-llvm-jit-cache-path disable", "cache_path_disable")) { return false; }
         }
         if(!snapshot_cache(disabled_cache).empty())
         {
@@ -838,7 +890,7 @@ namespace
             env_guard localappdata_guard{"LOCALAPPDATA", default_env};
             env_guard userprofile_guard{"USERPROFILE", default_env};
             env_guard tmpdir_guard{"TMPDIR", default_env};
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit", "--runtime-llvm-jit-cache-path default", "cache_path_default")) { return false; }
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot", "--runtime-llvm-jit-cache-path default", "cache_path_default")) { return false; }
         }
         if(snapshot_cache(default_env).empty())
         {
@@ -855,7 +907,7 @@ namespace
             env_guard localappdata_guard{"LOCALAPPDATA", implicit_default_env};
             env_guard userprofile_guard{"USERPROFILE", implicit_default_env};
             env_guard tmpdir_guard{"TMPDIR", implicit_default_env};
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit", "", "cache_path_implicit_default")) { return false; }
+            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot", "", "cache_path_implicit_default")) { return false; }
         }
         if(snapshot_cache(implicit_default_env).empty())
         {
@@ -866,96 +918,77 @@ namespace
         return true;
     }
 
-    [[nodiscard]] bool test_shared_cache_key_isolation(::std::filesystem::path const& uwvm_path,
-                                                       ::std::filesystem::path const& artifact_dir,
-                                                       ::std::filesystem::path const& wasm_path)
-    {
-        auto const cache_dir{artifact_dir / "cache-shared"};
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
-
-        ::std::size_t previous_count{};
-        auto const expect_new_cache_entry{[&](::std::string_view label, ::std::string_view args) -> bool
-        {
-            if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, args, cache_args, ::std::string{"shared_"} + ::std::string{label}))
-            {
-                return false;
-            }
-
-            auto const snapshot{snapshot_cache(cache_dir)};
-            if(snapshot.size() <= previous_count)
-            {
-                ::std::cerr << "cache key was not isolated for mode " << label << "; previous_count=" << previous_count
-                            << " current_count=" << snapshot.size() << '\n';
-                print_snapshot(snapshot);
-                return false;
-            }
-            previous_count = snapshot.size();
-            return true;
-        }};
-
-        if(!expect_new_cache_entry("lazy", "-Rjit")) { return false; }
-        if(!expect_new_cache_entry("lazy_verify", "-Rcm lazy+verification -Rcc jit")) { return false; }
-        if(!expect_new_cache_entry("full", "-Rcm full -Rcc jit")) { return false; }
-
-        auto const full_snapshot{snapshot_cache(cache_dir)};
-        ::std::this_thread::sleep_for(::std::chrono::milliseconds{1200});
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Raot", cache_args, "shared_aot")) { return false; }
-        auto const aot_snapshot{snapshot_cache(cache_dir)};
-        if(aot_snapshot != full_snapshot)
-        {
-            ::std::cerr << "AOT did not reuse the existing full LLVM cache object\nfull:\n";
-            print_snapshot(full_snapshot);
-            ::std::cerr << "aot:\n";
-            print_snapshot(aot_snapshot);
-            return false;
-        }
-        previous_count = aot_snapshot.size();
-
-        ::std::this_thread::sleep_for(::std::chrono::milliseconds{1200});
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rtiered -Rtiered-disable-t0", cache_args, "shared_tiered_no_t0"))
-        {
-            return false;
-        }
-        auto const tiered_snapshot{snapshot_cache(cache_dir)};
-        if(tiered_snapshot != aot_snapshot)
-        {
-            ::std::cerr << "tiered/no-T0 did not reuse the existing lazy LLVM cache object\nafter aot:\n";
-            print_snapshot(aot_snapshot);
-            ::std::cerr << "tiered/no-T0:\n";
-            print_snapshot(tiered_snapshot);
-            return false;
-        }
-
-        return true;
-    }
-
-    struct cache_runtime_mode
-    {
-        ::std::string_view label{};
-        ::std::string_view args{};
-    };
-
-    inline constexpr ::std::array cache_runtime_modes{
-        cache_runtime_mode{"lazy", "-Rjit"},
-        cache_runtime_mode{"lazy_verify", "-Rcm lazy+verification -Rcc jit"},
-        cache_runtime_mode{"full", "-Rcm full -Rcc jit"},
-        cache_runtime_mode{"aot", "-Raot"},
-        cache_runtime_mode{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0"}};
-
     [[nodiscard]] bool test_wasm_cache_matrix(::std::filesystem::path const& uwvm_path,
                                               ::std::filesystem::path const& artifact_dir,
                                               ::std::vector<wasm_fixture_file> const& fixtures)
     {
         for(auto const& fixture: fixtures)
         {
-            for(auto const& mode: cache_runtime_modes)
-            {
-                auto const label{::std::string{"matrix_"} + fixture.label + "_" + ::std::string{mode.label}};
-                auto const cache_dir{artifact_dir / ("cache-" + label)};
-                if(!run_cached_mode_twice(uwvm_path, artifact_dir, fixture.path, cache_dir, mode.args, label)) { return false; }
-            }
+            auto const label{::std::string{"matrix_"} + fixture.label + "_aot"};
+            auto const cache_dir{artifact_dir / ("cache-" + label)};
+            if(!run_cached_mode_twice(uwvm_path, artifact_dir, fixture.path, cache_dir, "-Raot", label)) { return false; }
+        }
+
+        return true;
+    }
+
+    [[nodiscard]] bool test_generated_ir_shape_cache_invalidation(::std::filesystem::path const& uwvm_path,
+                                                                  ::std::filesystem::path const& artifact_dir)
+    {
+        auto const wasm_path{artifact_dir / "cache-ir-shape-same-path.wasm"};
+        auto const cache_dir{artifact_dir / "cache-aot-ir-shape"};
+        ::std::filesystem::remove_all(cache_dir);
+        ::std::filesystem::create_directories(cache_dir);
+        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+        // One explicit extra worker exercises the full parallel-object key without inheriting an unbounded
+        // host-dependent compile-thread policy.
+        constexpr ::std::string_view runtime_args{"-Raot -Rct 1 -Rclog out"};
+
+        if(!write_fixture(wasm_path, memory_max_one_wasm.data(), memory_max_one_wasm.size()) ||
+           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_one"))
+        {
+            return false;
+        }
+        auto const first{snapshot_cache(cache_dir)};
+        if(first.empty())
+        {
+            ::std::cerr << "memory-max cache setup produced no object for AOT\n";
+            return false;
+        }
+
+        if(!write_fixture(wasm_path, memory_max_two_wasm.data(), memory_max_two_wasm.size()) ||
+           !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, "aot_ir_shape_max_two"))
+        {
+            return false;
+        }
+        if(output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-hit"))
+        {
+            ::std::cerr << "changed memory limits incorrectly reused stale generated AOT code\n";
+            return false;
+        }
+        if(!output_contains(artifact_dir, "aot_ir_shape_max_two", "object-cache-store"))
+        {
+            ::std::cerr << "changed memory limits did not store a distinct AOT cache object\n";
+            return false;
+        }
+        auto const second{snapshot_cache(cache_dir)};
+        if(second.size() <= first.size())
+        {
+            ::std::cerr << "generated-IR cache identity did not grow after the memory-limit change; before=" << first.size()
+                        << " after=" << second.size() << '\n';
+            return false;
+        }
+
+        if(!run_uwvm(uwvm_path,
+                     artifact_dir,
+                     wasm_path,
+                     runtime_args,
+                     cache_args,
+                     "aot_ir_shape_max_two_reuse") ||
+           !output_contains(artifact_dir, "aot_ir_shape_max_two_reuse", "object-cache-hit"))
+        {
+            ::std::cerr << "new memory-limit AOT cache object was not reusable\n";
+            return false;
         }
 
         return true;
@@ -969,7 +1002,7 @@ namespace
 
         auto const scalar_cache_dir{artifact_dir / "cache-wasm1p1-feature-smoke"};
         constexpr ::std::string_view wasm1p1_feature_args{
-            "-Rjit --wasm-feature-wasm1.1"};
+            "-Raot --wasm-feature-wasm1.1"};
         if(!run_cached_mode_twice(uwvm_path,
                                   artifact_dir,
                                   scalar_wasm_path,
@@ -980,103 +1013,20 @@ namespace
             return false;
         }
 
-        auto const multivalue_wasm_path{artifact_dir / "wasm1p1_multivalue_start.wasm"};
-        if(!write_fixture(multivalue_wasm_path, wasm1p1_multivalue_start_wasm.data(), wasm1p1_multivalue_start_wasm.size())) { return false; }
-
-        auto const multivalue_cache_dir{artifact_dir / "cache-wasm1p1-multivalue-smoke"};
-        constexpr ::std::string_view wasm1p1_multivalue_feature_args{"-Rjit --wasm-feature-wasm1.1"};
-        return run_cached_mode_twice(uwvm_path,
-                                     artifact_dir,
-                                     multivalue_wasm_path,
-                                     multivalue_cache_dir,
-                                     wasm1p1_multivalue_feature_args,
-                                     "wasm1p1_multivalue_smoke");
-    }
-
-    [[nodiscard]] bool test_default_tiered_smoke(::std::filesystem::path const& uwvm_path,
-                                                 ::std::filesystem::path const& artifact_dir,
-                                                 ::std::filesystem::path const& wasm_path)
-    {
-        auto const cache_dir{artifact_dir / "cache-tiered-default"};
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
-        return run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rtiered", cache_args, "tiered_default");
-    }
-
-    [[nodiscard]] bool test_unsigned_cache_policy(::std::filesystem::path const& uwvm_path,
-                                                  ::std::filesystem::path const& artifact_dir,
-                                                  ::std::filesystem::path const& wasm_path)
-    {
-        auto const cache_dir{artifact_dir / "cache-unsigned"};
-        ::std::filesystem::remove_all(cache_dir);
-        ::std::filesystem::create_directories(cache_dir);
-        auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
-
-        if(!run_uwvm(uwvm_path,
-                     artifact_dir,
-                     wasm_path,
-                     "-Rjit -Rclog out",
-                     cache_args + " --runtime-llvm-jit-cache-no-sign",
-                     "unsigned_write"))
-        {
-            return false;
-        }
-        auto const unsigned_snapshot{snapshot_cache(cache_dir)};
-        if(unsigned_snapshot.empty())
-        {
-            ::std::cerr << "unsigned cache write produced no files\n";
-            return false;
-        }
-
-        ::std::this_thread::sleep_for(::std::chrono::milliseconds{1200});
-        if(!run_uwvm(uwvm_path,
-                     artifact_dir,
-                     wasm_path,
-                     "-Rjit -Rclog out",
-                     cache_args + " --runtime-llvm-jit-cache-no-sign --runtime-llvm-jit-cache-no-verify",
-                     "unsigned_no_verify_reuse"))
-        {
-            return false;
-        }
-        if(!output_contains(artifact_dir, "unsigned_no_verify_reuse", "object-cache-hit"))
-        {
-            ::std::cerr << "unsigned cache was not reused when no-verify was enabled\n";
-            return false;
-        }
-        if(!output_contains(artifact_dir, "unsigned_no_verify_reuse", "signature_verified=0"))
-        {
-            ::std::cerr << "unsigned no-verify cache hit did not report signature_verified=0\n";
-            return false;
-        }
-        auto const no_verify_snapshot{snapshot_cache(cache_dir)};
-        if(unsigned_snapshot != no_verify_snapshot)
-        {
-            ::std::cerr << "unsigned cache was rewritten when no-verify was enabled\n";
-            return false;
-        }
-
-        ::std::this_thread::sleep_for(::std::chrono::milliseconds{1200});
-        if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, "-Rjit -Rclog out", cache_args, "unsigned_verify_rewrite")) { return false; }
-        if(output_contains(artifact_dir, "unsigned_verify_rewrite", "object-cache-hit"))
-        {
-            ::std::cerr << "signed verification unexpectedly reused unsigned cache object\n";
-            return false;
-        }
-        if(!output_contains(artifact_dir, "unsigned_verify_rewrite", "object-cache-store"))
-        {
-            ::std::cerr << "signed verification did not rewrite unsigned cache object\n";
-            return false;
-        }
-        auto const verified_snapshot{snapshot_cache(cache_dir)};
-        if(verified_snapshot == no_verify_snapshot)
-        {
-            ::std::cerr << "signed verification did not reject/rewrite an unsigned cache object\n";
-            return false;
-        }
-
+        // Exercise native vector/tuple ABI relocations, globals, and refreshed indirect-call targets on a cache hit.
+        auto const vector_path{artifact_dir / "simd_vector_abi.wasm"};
+        auto const& vector_bytes{::uwvm2test::llvm_full_fixture::vector_abi};
+        if(!write_fixture(vector_path, vector_bytes.data(), vector_bytes.size()) ||
+           !run_cached_mode_twice(uwvm_path, artifact_dir, vector_path, artifact_dir / "cache-simd-vector-abi",
+                                 "-Raot --wasm-feature-wasm2", "simd_vector_abi")) { return false; }
+        auto const table_path{artifact_dir / "simd_table_mutation.wasm"};
+        auto const& table_bytes{::uwvm2test::llvm_full_fixture::table_mutation};
+        if(!write_fixture(table_path, table_bytes.data(), table_bytes.size()) ||
+           !run_cached_mode_twice(uwvm_path, artifact_dir, table_path, artifact_dir / "cache-simd-table-mutation",
+                                 "-Raot --wasm-feature-wasm2", "simd_table_mutation")) { return false; }
         return true;
     }
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -1108,14 +1058,19 @@ int main(int argc, char** argv)
     }
     auto const& wasm_path{fixtures.front().path};
 
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    // The normal integration matrix deliberately requires cache stores and hits. Dirty or unidentified source builds
+    // forbid those operations, so validate the fail-closed contract directly instead of reporting false failures.
+    return test_untrusted_source_cache_fail_closed(uwvm_path, artifact_dir, wasm_path) ? 0 : 1;
+#endif
+
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }
+    if(!test_generated_ir_shape_cache_invalidation(uwvm_path, artifact_dir)) { return 1; }
     if(!test_wasm1p1_feature_cache_smoke(uwvm_path, artifact_dir)) { return 1; }
-    if(!test_default_tiered_smoke(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_signed_cache_integrity(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_cache_fuzz_recovery(uwvm_path, artifact_dir, wasm_path)) { return 1; }
-    if(!test_shared_cache_key_isolation(uwvm_path, artifact_dir, wasm_path)) { return 1; }
-    if(!test_unsigned_cache_policy(uwvm_path, artifact_dir, wasm_path)) { return 1; }
 
     return 0;
 }

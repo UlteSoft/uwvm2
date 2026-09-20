@@ -23,6 +23,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <concepts>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -56,8 +57,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// - Stack-top optimization: not applicable (this is only a thin wrapper around `call_func`; stack-top caching is constrained by `uwvmint_call`).
         /// - `type[0]` layout: not applicable (this helper does not read/advance the bytecode stream pointer).
         /// @note `call_func` must be set during interpreter initialization; debug builds may trap on null.
-        UWVM_GNU_HOT inline constexpr void
-            call(::std::size_t curr_module_id, ::std::size_t call_function, ::std::byte** uwvm_int_operand_stack_top_ptr) UWVM_THROWS
+        [[nodiscard]] UWVM_GNU_HOT inline constexpr ::std::byte*
+            call(::std::size_t curr_module_id, ::std::size_t call_function, ::std::byte* uwvm_int_operand_stack_top) UWVM_THROWS
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::call_func == nullptr) [[unlikely]]
             {
@@ -68,7 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 ::fast_io::fast_terminate();
             }
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func(curr_module_id, call_function, uwvm_int_operand_stack_top_ptr);
+            return ::uwvm2::runtime::compiler::uwvm_int::optable::call_func(curr_module_id, call_function, uwvm_int_operand_stack_top);
         }
 
         /// @brief Runtime call bridge: performs a single Wasm `call_indirect`.
@@ -76,10 +77,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// - Stack-top optimization: not applicable (same constraints as `call`).
         /// - Bytecode layout: not applicable (this helper does not read/advance the bytecode stream pointer).
         /// @note `call_indirect_func` must be set during interpreter initialization; debug builds may trap on null.
-        UWVM_GNU_HOT inline constexpr void call_indirect(::std::size_t curr_module_id,
-                                                         ::std::size_t type_index,
-                                                         ::std::size_t table_index,
-                                                         ::std::byte** uwvm_int_operand_stack_top_ptr) UWVM_THROWS
+        [[nodiscard]] UWVM_GNU_HOT inline constexpr ::std::byte* call_indirect(::std::size_t curr_module_id,
+                                                                               ::std::size_t type_index,
+                                                                               ::std::size_t table_index,
+                                                                               ::std::byte* uwvm_int_operand_stack_top) UWVM_THROWS
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func == nullptr) [[unlikely]]
             {
@@ -89,7 +90,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 ::fast_io::fast_terminate();
             }
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func(curr_module_id, type_index, table_index, uwvm_int_operand_stack_top_ptr);
+            return ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func(
+                curr_module_id, type_index, table_index, uwvm_int_operand_stack_top);
         }
     }  // namespace details
 
@@ -135,8 +137,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // safe
         //                                                ^^ type...[0]
 
-        // call function
-        details::call(curr_module_id, call_function, ::std::addressof(type...[1]));
+        // The bridge returns the updated top by value, so no opfunc parameter address can escape across musttail.
+        type...[1] = details::call(curr_module_id, call_function, type...[1]);
 
         // next op
         ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -147,7 +149,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `call_indirect` opcode (tail-call): calls a function through a table entry and then tail-calls the next interpreter op.
     /// @details
-    /// - Stack-top optimization: requires all arguments (and the table index operand) to reside in the operand stack memory. When stack-top caching is enabled,
+    /// - Stack-top optimization: requires all arguments (and the table-element index operand, distinct from the encoded `table_index`) to reside in the operand stack memory. When stack-top caching is enabled,
     ///   the compiler must emit stack-top spills so `type...[1u]` points at the full operand stack before executing `call_indirect`.
     /// - `type[0]` layout: `[opfunc_ptr][curr_module_id][type_index][table_index][next_opfunc_ptr]`.
     /// @note The actual bounds/null/type checks are performed by `call_indirect_func` provided by the runtime.
@@ -173,7 +175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
         type...[0] += sizeof(table_index);
 
-        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(type...[1]));
+        type...[1] = details::call_indirect(curr_module_id, type_index, table_index, type...[1]);
 
         ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -228,7 +230,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         //                                                ^^ type...[0]
 
         // call function
-        details::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
+        typeref...[1] = details::call(curr_module_id, call_function, typeref...[1]);
 
         // Function calls are initiated by higher-level functions.
     }
@@ -265,7 +267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(table_index), typeref...[0], sizeof(table_index));
         typeref...[0] += sizeof(table_index);
 
-        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(typeref...[1]));
+        typeref...[1] = details::call_indirect(curr_module_id, type_index, table_index, typeref...[1]);
     }
 
     namespace translate

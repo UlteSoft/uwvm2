@@ -374,7 +374,7 @@ Instead:
 - the command line stores an embedder-side override policy;
 - runtime initialization materializes that policy into each module's
   **local-defined** memory effective limits;
-- the interpreter / JIT use those effective limits when enforcing
+- the interpreter / LLVM AOT backend use those effective limits when enforcing
   `memory.grow`.
 
 The selector after `<module:str>` chooses which local-defined memory is

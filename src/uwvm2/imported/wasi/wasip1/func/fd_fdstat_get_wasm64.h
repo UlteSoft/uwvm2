@@ -122,6 +122,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<8uz>(stat_ptrsz, u8"fd_fdstat_get_wasm64.stat (fdstat)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
@@ -278,7 +280,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const oflags{::fast_io::system_call<__NR_fcntl, int>(native_fd, F_GETFL)};
 
-                if(::fast_io::linux_system_call_fails(oflags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(oflags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-oflags)};
                     switch(err)
@@ -457,7 +459,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(__linux__) && defined(__NR_fcntl)
                 int const oflags{::fast_io::system_call<__NR_fcntl, int>(native_fd, F_GETFL)};
 
-                if(::fast_io::linux_system_call_fails(oflags)) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(oflags)) [[unlikely]]
                 {
                     int const err{static_cast<int>(-oflags)};
                     switch(err)

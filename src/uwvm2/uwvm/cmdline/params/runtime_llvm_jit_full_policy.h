@@ -42,7 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
-#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_llvm_jit_full_policy_alias{u8"-Rllvm-full-policy"};
@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_full_policy{
         .name{u8"--runtime-llvm-jit-full-policy"},
-        .describe{u8"Select the full/tier-2 runtime LLVM JIT strategy policy."},
+        .describe{u8"Select the full-module LLVM AOT strategy policy."},
         .usage{u8"[auto|debug|legacy-light|pb-o1|pb-o2|pb-o3]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_full_policy_alias), 1uz}},
         .handle{::std::addressof(details::runtime_llvm_jit_full_policy_callback)},

@@ -68,12 +68,16 @@ namespace fast_io
 namespace manipulators
 {
 
+/// @brief Hidden destination descriptor for a fixed-width endian integer read.
+/// @details `sz` is a bit width supported by the serializer and `pointer` borrows the destination object.
 template <::std::size_t sz, typename value_type>
 struct basic_lebe_get_integral
 {
 	value_type *pointer;
 };
 
+/// @brief Hidden value descriptor for a fixed-width endian integer write.
+/// @details `sz` is the serialized bit width; `value` holds the already range-checked unsigned representation.
 template <::std::size_t sz, typename value_type>
 struct basic_lebe_put_integral
 {
@@ -88,6 +92,9 @@ struct basic_lebe_put_integral
 	value_type value;
 };
 
+/// @brief Unified carrier for fixed-width little- or big-endian binary serialization.
+/// @details `end` selects byte order and `reference` is either a read destination descriptor or an owned write value.
+///          The carrier represents binary bytes, not textual digits.
 template <::std::endian end, typename value_type>
 struct basic_lebe_get_put
 {
@@ -102,6 +109,9 @@ struct basic_lebe_get_put
 	value_type reference;
 };
 
+/// @brief Reads an `sz`-bit integer in byte order `en` into `t`.
+/// @details Exactly `sz / 8` bytes are consumed. `sz` must be a supported width; the destination is borrowed and no
+///          textual prefix, whitespace, or digit syntax is involved.
 template <::std::endian en, ::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires(!::std::is_const_v<int_type> && ::fast_io::details::supported_lebe_size<sz>)
 inline constexpr auto lebe_get(int_type &t) noexcept
@@ -109,6 +119,8 @@ inline constexpr auto lebe_get(int_type &t) noexcept
 	return basic_lebe_get_put<en, basic_lebe_get_integral<sz, int_type>>{{__builtin_addressof(t)}};
 }
 
+/// @brief Reads an `sz`-bit little-endian integer into `t`.
+/// @details This is the little-endian convenience spelling of `lebe_get`; exactly `sz / 8` bytes are consumed.
 template <::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires(!::std::is_const_v<int_type> && ::fast_io::details::supported_lebe_size<sz>)
 inline constexpr auto le_get(int_type &t) noexcept
@@ -116,6 +128,8 @@ inline constexpr auto le_get(int_type &t) noexcept
 	return basic_lebe_get_put<::std::endian::little, basic_lebe_get_integral<sz, int_type>>{{__builtin_addressof(t)}};
 }
 
+/// @brief Reads an `sz`-bit big-endian integer into `t`.
+/// @details This is the big-endian convenience spelling of `lebe_get`; exactly `sz / 8` bytes are consumed.
 template <::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires(!::std::is_const_v<int_type> && ::fast_io::details::supported_lebe_size<sz>)
 inline constexpr auto be_get(int_type &t) noexcept
@@ -123,6 +137,10 @@ inline constexpr auto be_get(int_type &t) noexcept
 	return basic_lebe_get_put<::std::endian::big, basic_lebe_get_integral<sz, int_type>>{{__builtin_addressof(t)}};
 }
 
+/// @brief Writes integer `t` as an `sz`-bit binary field in byte order `en`.
+/// @details Exactly `sz / 8` bytes are emitted. When `sz` is narrower than the source's unsigned width, the value after
+///          conversion to the source unsigned type must be at most `2^sz - 1`; consequently negative signed values are
+///          rejected in that narrowing case instead of being truncated. Byte order changes only emitted byte order.
 template <::std::endian en, ::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires ::fast_io::details::supported_lebe_size<sz>
 inline constexpr auto lebe_put(int_type t) noexcept(
@@ -152,6 +170,8 @@ inline constexpr auto lebe_put(int_type t) noexcept(
 		{static_cast<proxy_type>(static_cast<uint_type>(u))}};
 }
 
+/// @brief Writes integer `t` as an `sz`-bit little-endian binary field.
+/// @details Range and width semantics match `lebe_put`.
 template <::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires ::fast_io::details::supported_lebe_size<sz>
 inline constexpr auto le_put(int_type t) noexcept(noexcept(lebe_put<::std::endian::little, sz>(t)))
@@ -159,6 +179,8 @@ inline constexpr auto le_put(int_type t) noexcept(noexcept(lebe_put<::std::endia
 	return lebe_put<::std::endian::little, sz>(t);
 }
 
+/// @brief Writes integer `t` as an `sz`-bit big-endian binary field.
+/// @details Range and width semantics match `lebe_put`.
 template <::std::size_t sz, ::fast_io::details::my_integral int_type>
 	requires ::fast_io::details::supported_lebe_size<sz>
 inline constexpr auto be_put(int_type t) noexcept(noexcept(lebe_put<::std::endian::big, sz>(t)))
@@ -166,6 +188,9 @@ inline constexpr auto be_put(int_type t) noexcept(noexcept(lebe_put<::std::endia
 	return lebe_put<::std::endian::big, sz>(t);
 }
 
+/// @brief Writes the IEC 60559 object representation of a floating value in byte order `en`.
+/// @details The floating value is bit-cast to its corresponding 8/16/32/64/128-bit binary field; no decimal conversion
+///          occurs. Unsupported non-IEC representations are rejected at compile time.
 template <::std::endian en, ::std::floating_point T>
 inline constexpr auto iec559_lebe_put(T t)
 {
@@ -247,18 +272,25 @@ inline constexpr auto iec559_lebe_put(T t)
 /*
 WASM standard uses this format.
 */
+/// @brief Writes an IEC 60559 floating representation in little-endian byte order.
+/// @details This binary spelling is used by WebAssembly and preserves representation bits rather than decimal value text.
 template <::std::floating_point T>
 inline constexpr auto iec559_le_put(T t)
 {
 	return ::fast_io::manipulators::iec559_lebe_put<::std::endian::little>(t);
 }
 
+/// @brief Writes an IEC 60559 floating representation in big-endian byte order.
+/// @details Representation and support rules match `iec559_lebe_put`.
 template <::std::floating_point T>
 inline constexpr auto iec559_be_put(T t)
 {
 	return ::fast_io::manipulators::iec559_lebe_put<::std::endian::big>(t);
 }
 
+/// @brief Reads an IEC 60559 floating object representation in byte order `en` into `t`.
+/// @details The scanner consumes exactly the destination representation width and reconstructs bits directly; it does
+///          not parse textual `nan`, decimal, or hexadecimal floating syntax.
 template <::std::endian en, ::std::floating_point T>
 	requires(!::std::is_const_v<T>)
 inline constexpr auto iec559_lebe_get(T &t) noexcept
@@ -270,12 +302,16 @@ inline constexpr auto iec559_lebe_get(T &t) noexcept
 		{__builtin_addressof(t)}};
 }
 
+/// @brief Reads a little-endian IEC 60559 floating representation into `t`.
+/// @details This is the little-endian convenience spelling of `iec559_lebe_get`.
 template <::std::floating_point T>
 inline constexpr auto iec559_le_get(T &t)
 {
 	return ::fast_io::manipulators::iec559_lebe_get<::std::endian::little>(t);
 }
 
+/// @brief Reads a big-endian IEC 60559 floating representation into `t`.
+/// @details This is the big-endian convenience spelling of `iec559_lebe_get`.
 template <::std::floating_point T>
 inline constexpr auto iec559_be_get(T &t)
 {
@@ -607,6 +643,7 @@ inline constexpr auto scan_precise_reserve_define(
 	}
 }
 
+/// @feature concept:static_precise_size
 template <::std::integral char_type, ::std::endian end, ::std::size_t sz, typename int_type>
 	requires(((sz % (::std::numeric_limits<char unsigned>::digits)) == 0) &&
 			 (::fast_io::details::my_unsigned_integral<int_type> ||

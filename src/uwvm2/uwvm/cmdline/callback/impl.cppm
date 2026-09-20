@@ -46,23 +46,19 @@ export import :wasm_list_weak_symbol_module;
 export import :wasm_feature;
 
 // runtime
-export import :runtime_custom_mode;
-export import :runtime_custom_compiler;
 export import :runtime_compiler_log;
 export import :runtime_compile_threads;
 export import :runtime_scheduling_policy;
+// Named-module imports do not make macros visible ([module.import]). Keep this
+// partition graph unconditional; backend #if guards belong in each partition's .h.
 export import :runtime_llvm_jit_policy;
-export import :runtime_llvm_jit_lazy_policy;
 export import :runtime_llvm_jit_full_policy;
 export import :runtime_llvm_jit_call_stack;
 export import :runtime_llvm_jit_cache_path;
-export import :runtime_debug_int;
 export import :runtime_int;
-export import :runtime_jit;
-export import :runtime_aot;
-export import :runtime_tiered;
 export import :runtime_uwvm_int_set_opcode_conbination_level;
 export import :runtime_uwvm_int_loop_unwind_max_size;
+export import :runtime_aot;
 
 // wasi
 export import :wasi_disable_utf8_check;

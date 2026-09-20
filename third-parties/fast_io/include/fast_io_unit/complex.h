@@ -5,6 +5,10 @@ namespace fast_io
 
 namespace manipulators
 {
+/// @brief Formats a complex value as `(real,imag)` with shortest unprefixed hexadecimal components.
+/// @details Each component uses a period radix point and a mandatory binary `p`/`P` exponent. `uppercase` controls
+///          hexadecimal digits, exponent markers, and special-value spelling; the three punctuation characters
+///          surrounding and separating the components remain `(`, `,`, and `)`.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat(::std::complex<scalar_type> t) noexcept
@@ -37,6 +41,9 @@ inline constexpr auto hexfloat(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Formats a complex value as `(real,imag)` with shortest `0x`-prefixed hexadecimal components.
+/// @details Each component receives its own `0x`/`0X` prefix and binary exponent. Apart from those prefixes, the
+///          representation and case behavior are identical to complex `hexfloat`.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat0x(::std::complex<scalar_type> t) noexcept
@@ -69,6 +76,11 @@ inline constexpr auto hexfloat0x(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Constructs the legacy unprefixed hexadecimal precision carrier for a complex value.
+/// @details `n` is stored with significant-digit and nearest-to-even flags, but the library currently provides no
+///          reserve-print customization for `scalar_manip_precision_t<..., std::complex<...>>`. The returned object is
+///          therefore not printable/concatenable and has no emitted `(real,imag)` result; do not use this overload as a
+///          working precision formatter.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -102,6 +114,10 @@ inline constexpr auto hexfloat(::std::complex<scalar_type> t, ::std::size_t n) n
 	}
 }
 
+/// @brief Constructs the legacy prefixed hexadecimal precision carrier for a complex value.
+/// @details Although `n` and per-component `0x` intent are recorded, no complex `scalar_manip_precision_t` print CPO is
+///          defined. The returned carrier cannot currently be passed to print/concat successfully and emits no defined
+///          representation.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto hexfloat0x(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -135,6 +151,9 @@ inline constexpr auto hexfloat0x(::std::complex<scalar_type> t, ::std::size_t n)
 	}
 }
 
+/// @brief Formats a complex value with shortest unprefixed hexadecimal components and comma radix points.
+/// @details The result is `(real.imag)`: comma is the radix point inside each component, so a period separates the
+///          real and imaginary components to keep the representation unambiguous. Binary exponents remain mandatory.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t) noexcept
@@ -167,6 +186,9 @@ inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Formats comma-radix complex hexadecimal output with a prefix on each component.
+/// @details The result uses `(real.imag)` punctuation, `0x`/`0X` before both components, comma radix points, and a
+///          binary exponent on each component.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t) noexcept
@@ -199,6 +221,10 @@ inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Constructs the legacy comma-radix hexadecimal precision carrier for a complex value.
+/// @details The carrier records significant precision `n`, comma radix, and nearest-to-even rounding, but no matching
+///          complex precision reserve printer exists. It is not presently a printable/concatenable manipulator and
+///          consequently produces no `(real.imag)` output.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -232,6 +258,10 @@ inline constexpr auto comma_hexfloat(::std::complex<scalar_type> t, ::std::size_
 	}
 }
 
+/// @brief Constructs the legacy prefixed comma-radix hexadecimal precision carrier for a complex value.
+/// @details Prefix, radix, and significant precision flags are stored, but the library has no print customization for
+///          the resulting complex precision carrier. Using it with print/concat is ill-formed; it has no current emitted
+///          representation.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -265,6 +295,9 @@ inline constexpr auto comma_hexfloat0x(::std::complex<scalar_type> t, ::std::siz
 	}
 }
 
+/// @brief Formats a complex value as `(real,imag)` using shortest general decimal notation per component.
+/// @details Each component independently uses fixed notation for scientific exponents in `[-4, 6)` and scientific
+///          notation outside that interval. `uppercase` affects exponent markers and special values.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto general(::std::complex<scalar_type> t) noexcept
@@ -299,6 +332,9 @@ inline constexpr auto general(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Formats shortest general decimal complex output with comma radix points.
+/// @details The result uses `(real.imag)` so that the period separates components while comma is reserved for each
+///          component's fractional radix. General-format notation is selected independently for each component.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_general(::std::complex<scalar_type> t) noexcept
@@ -333,6 +369,10 @@ inline constexpr auto comma_general(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Constructs the legacy general-decimal precision carrier for a complex value.
+/// @details The carrier records `n` as significant precision with nearest-to-even rounding, but no complex precision
+///          reserve printer consumes it. It cannot currently be printed or concatenated, so no fixed/scientific
+///          component selection actually occurs.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto general(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -368,6 +408,10 @@ inline constexpr auto general(::std::complex<scalar_type> t, ::std::size_t n) no
 	}
 }
 
+/// @brief Constructs the legacy comma-general precision carrier for a complex value.
+/// @details Significant precision, comma radix, and nearest-to-even flags are stored, but the resulting complex
+///          `scalar_manip_precision_t` has no reserve-print customization. Print/concat use is ill-formed and no
+///          `(real.imag)` representation is currently produced.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_general(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -403,6 +447,9 @@ inline constexpr auto comma_general(::std::complex<scalar_type> t, ::std::size_t
 	}
 }
 
+/// @brief Formats a complex value as `(real,imag)` with shortest fixed notation for both components.
+/// @details Neither component contains an exponent, even when that makes the representation long. `uppercase`
+///          therefore normally affects only special floating values.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto fixed(::std::complex<scalar_type> t) noexcept
@@ -437,6 +484,9 @@ inline constexpr auto fixed(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Formats both complex components in shortest comma-radix fixed notation.
+/// @details The result is `(real.imag)`: each component uses comma as its radix point and the separating punctuation
+///          changes to period. No exponent is emitted for either component.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_fixed(::std::complex<scalar_type> t) noexcept
@@ -471,6 +521,10 @@ inline constexpr auto comma_fixed(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Constructs the legacy fixed-notation precision carrier for a complex value.
+/// @details The carrier unusually records `n` as significant rather than fractional precision, but no complex precision
+///          reserve printer is defined to materialize it. It is not presently printable/concatenable and therefore does
+///          not produce fixed component text.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto fixed(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -506,6 +560,10 @@ inline constexpr auto fixed(::std::complex<scalar_type> t, ::std::size_t n) noex
 	}
 }
 
+/// @brief Constructs the legacy comma-fixed precision carrier for a complex value.
+/// @details It records significant (not fractional) precision plus comma-radix intent, but there is no complex
+///          `scalar_manip_precision_t` reserve printer. Using the result with print/concat is ill-formed and no field
+///          separator or component spelling is emitted.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_fixed(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -541,6 +599,9 @@ inline constexpr auto comma_fixed(::std::complex<scalar_type> t, ::std::size_t n
 	}
 }
 
+/// @brief Formats a complex value as `(real,imag)` with shortest scientific notation for both components.
+/// @details Each component always contains a decimal exponent, regardless of whether fixed notation would be shorter.
+///          `uppercase` selects `E` and uppercase special-value spelling.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto scientific(::std::complex<scalar_type> t) noexcept
@@ -576,6 +637,9 @@ inline constexpr auto scientific(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Formats both complex components in shortest comma-radix scientific notation.
+/// @details Each component has a mandatory exponent and a comma radix point; a period separates the components, giving
+///          the outer representation `(real.imag)`.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_scientific(::std::complex<scalar_type> t) noexcept
@@ -611,6 +675,10 @@ inline constexpr auto comma_scientific(::std::complex<scalar_type> t) noexcept
 	}
 }
 
+/// @brief Constructs the legacy scientific-notation precision carrier for a complex value.
+/// @details The overload records `n` as significant precision rather than fractional precision. No complex precision
+///          reserve printer currently exists, so the carrier is not printable/concatenable and does not actually emit
+///          exponent-bearing components.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto scientific(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -647,6 +715,11 @@ inline constexpr auto scientific(::std::complex<scalar_type> t, ::std::size_t n)
 	}
 }
 
+/// @brief Constructs the legacy comma-scientific precision carrier for a complex value.
+/// @details Significant precision and comma-scientific intent are encoded, but no reserve-print customization accepts
+///          the resulting complex precision carrier. Print/concat use is currently ill-formed; for some widened scalar
+///          branches even carrier construction is not viable because the implementation attempts a scalar cast of the
+///          complex object.
 template <bool uppercase = false, typename scalar_type>
 	requires(::fast_io::details::my_floating_point<scalar_type>)
 inline constexpr auto comma_scientific(::std::complex<scalar_type> t, ::std::size_t n) noexcept
@@ -714,6 +787,7 @@ inline constexpr char_type *print_reserve_complex_impl(char_type *iter, T real, 
 }
 } // namespace details
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, manipulators::scalar_flags flags, details::my_floating_point flt>
 	requires(flags.base == 10)
 inline constexpr ::std::size_t

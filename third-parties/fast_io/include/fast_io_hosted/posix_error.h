@@ -53,6 +53,14 @@ inline constexpr basic_io_scatter_t<char_type> status_io_print_forward(io_alias_
 	return get_posix_errno_scatter<char_type>(static_cast<int>(perr));
 }
 
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_borrowed_scatter_source(
+	io_reserve_type_t<char_type, ::fast_io::freestanding::errc>) noexcept
+{
+	// Error text is selected from immutable string literals and does not borrow from the errc value.
+	return {};
+}
+
 #if !((defined(_WIN32) && !defined(__WINE__)) || defined(__CYGWIN__))
 
 namespace details

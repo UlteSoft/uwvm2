@@ -192,7 +192,7 @@ Effects include additional progress messages for:
 - Wasm file loading and parsing.
 - Binary format detection.
 - Runtime compile-thread resolution.
-- UWVM interpreter auto lazy/full selection for `--runtime-int` and `--runtime-custom-compiler int` without `--runtime-custom-mode`.
+- Full-module UWVM interpreter translation selected by `--runtime-int`.
 - WASI mounts.
 - Runtime initialization steps that consult the verbose flag.
 - Section-detail mode and other diagnostic flows.

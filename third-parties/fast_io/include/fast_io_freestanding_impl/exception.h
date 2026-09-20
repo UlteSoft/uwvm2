@@ -20,6 +20,9 @@ inline cross_code_cvt_t<char8_t> ehvw_common_impl(char const *c_str) noexcept
 
 namespace manipulators
 {
+/// @brief Presents an exception-like object's `what()` message as UTF-8-oriented text.
+/// @details `what()` must return a non-null terminated `char const*`. The result borrows the exception-owned message and
+///          performs the library's cross-code-unit conversion when written to another character domain.
 template <typename T>
 	requires requires(T const &eh) {
 		{ eh.what() } -> ::std::same_as<char const *>;

@@ -18,7 +18,7 @@
  *              - validate cross-module imports and initialize runtime storage;
  *              - resolve the entry function, including the explicit `--wasm-set-start-func` override;
  *              - resolve the runtime compile-thread policy into the value consumed by runtime compilers;
- *              - dispatch to lazy compilation, lazy compilation with eager validation, or full compilation.
+ *              - dispatch to the selected full-module backend.
  *
  *              The helper functions in this file intentionally keep the interface between the UWVM
  *              front-end and the runtime library narrow: the runtime receives an import-inclusive wasm
@@ -59,9 +59,9 @@
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
-# include <uwvm2/utils/madvise/impl.h>
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
@@ -209,7 +209,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                             auto const idx{static_cast<::std::size_t>(startsec.start_idx)};
                             auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
-                            if(idx < total_n && is_void_to_void_wasm_func_index(idx)) { return idx; }
+                            // The parser validated the start signature. Unlike conventional CLI exports,
+                            // a standard start section may also designate an imported host function.
+                            if(idx < total_n) { return idx; }
                         }
                     }
                 }
@@ -423,11 +425,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // here because fast_io scanners fail quickly on non-matching input, and `wasm_entry_scan_exact` rejects partial
         // matches after each attempted scan.
         //
-        // fast_io scanners only write to the target on a successful scan; no initialization needed.
+        // fast_io scanners write to the target only on a successful scan.  Value-initialize the temporary nonetheless:
+        // this keeps the successful short-circuit path visibly free of indeterminate reads for conservative compiler
+        // data-flow analysis and provides a deterministic defensive value if a future scanner contract regresses.
 
         if constexpr(allow_signed_decimal)
         {
-            Out signed_value;  // no init necessary
+            Out signed_value{};
             if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(signed_value)))
             {
                 out = signed_value;
@@ -435,7 +439,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        Unsigned unsigned_value;  // no init necessary
+        Unsigned unsigned_value{};
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex0x_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin0b_get<true, false>(unsigned_value)) ||
@@ -1106,13 +1110,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     /**
-     * @brief   Compute the default adaptive runtime compile-thread limit.
-     * @details The default policy grows slowly with detected hardware parallelism: roughly `floor(log2(max))`, with a
-     *          minimum of one.  Lower runtime layers may further adapt per-module scheduling below this upper bound.
-     *
-     * @param   max_compile_threads Detected platform concurrency used as the policy input.
-     * @return  Default compile-thread limit selected by policy.
+     * @brief Execute preloaded start sections and the selected main entry using the full backend.
+     * @details Runtime storage and imports are already initialized. Eager compilation is cached across these entries.
      */
+    template <typename RunConfig, typename RunEntry>
+    inline constexpr void run_initialized_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
+                                                       RunConfig cfg, RunEntry run_entry) noexcept
+    {
+        using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
+        // Preloaded Wasm modules are instances too: run each actual start section once, in preload order.
+        // Do not invoke library exports named _start/main, and do not apply the main-module CLI override to libraries.
+        for(auto const& module: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        {
+            if(module.binfmt_ver != 1u) [[unlikely]] { ::fast_io::fast_terminate(); }
+            ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(module.module_name);
+            auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
+                module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
+            if(start.sec_span.sec_begin == nullptr) { continue; }
+            RunConfig start_cfg{};
+            if constexpr(requires { start_cfg.assume_full_code_verified; })
+            { start_cfg.assume_full_code_verified = cfg.assume_full_code_verified; }
+            start_cfg.entry_function_index = static_cast<::std::size_t>(start.start_idx);
+            start_cfg.module_start = true;
+            run_entry(module.module_name, start_cfg);
+        }
+        auto const& main_module{::uwvm2::uwvm::wasm::storage::execute_wasm};
+        ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(main_module_name);
+        auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
+            main_module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
+        cfg.module_start = !::uwvm2::uwvm::wasm::storage::start_func_call.enabled &&
+                           start.sec_span.sec_begin != nullptr && cfg.entry_function_index == start.start_idx;
+        run_entry(main_module_name, cfg);
+    }
+
+    inline constexpr void run_full_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
+                                                 ::uwvm2::runtime::lib::full_compile_run_config cfg) noexcept
+    {
+        run_initialized_module_graph(main_module_name, cfg, ::uwvm2::runtime::lib::full_compile_and_run_main_module);
+    }
+
+    // Default adaptive compilation limit: floor(log2(hardware concurrency)), at least one.
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
     {
         // Follow the default policy upper bound: roughly one compiler thread per log2(N) CPUs.
@@ -1157,9 +1194,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          The resolved value is stored in `global_runtime_compile_threads_resolved` for the runtime library.  Full
      *          compilation scheduling may still reduce effective parallelism per module based on task count and code size.
      *
-     *          Lazy scheduling also treats this as an upper bound: background lazy workers may consume it directly, while
-     *          LLVM/tiered urgent JIT schedulers are separate global lanes with at most one worker each.  A running thread
-     *          may help compile queued lazy work while waiting, but no per-running-thread urgent JIT worker is created here.
+     *          Full-module translation treats this as an upper bound and may reduce parallelism for small modules.
      *
      * @return  The resolved runtime compile-thread value stored globally.
      * @warning Some invalid numeric settings are fatal.  Warnings can also be promoted to fatal errors by the global
@@ -1469,129 +1504,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 #endif
 
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-    // `-Rint` is a shortcut-only auto mode. Prefer full translation for ordinary executable-only uwvm-int runs because full
-    // translation is cheap; prefer lazy for preload-heavy runs so cold preload code is not translated up front.
-    //
-    // The two thresholds intentionally model different costs:
-    // - main-only: the executable module is hot by definition, so full translation usually pays for itself up to a larger size;
-    // - preload-total: full mode translates every loaded Wasm module, including preloads that may never be called, so use a lower cap.
-    inline constexpr ::std::size_t runtime_int_auto_main_full_threshold{1024uz * 1024uz};
-    inline constexpr ::std::size_t runtime_int_auto_preload_total_full_threshold{256uz * 1024uz};
-
-    [[nodiscard]] inline constexpr ::std::size_t saturating_add_size(::std::size_t lhs, ::std::size_t rhs) noexcept
-    {
-        // A malicious or unusual process configuration should not make size accounting wrap and accidentally select the
-        // smaller/full threshold.  Saturating to max keeps overflow on the conservative lazy side.
-        constexpr auto max_size{::std::numeric_limits<::std::size_t>::max()};
-        if(max_size - lhs < rhs) [[unlikely]] { return max_size; }
-        return lhs + rhs;
-    }
-
-    [[nodiscard]] inline constexpr ::std::size_t loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf) noexcept
-    {
-        // Use the parser's module span instead of re-statting paths.  At this point all executable/preload Wasm files have
-        // already been loaded, and the span describes the exact byte range that participated in parsing.
-        switch(wf.binfmt_ver)
-        {
-            case 1u:
-            {
-                auto const& module_storage{wf.wasm_module_storage.wasm_binfmt_ver1_storage};
-                auto const module_begin{module_storage.module_span.module_begin};
-                auto const module_end{module_storage.module_span.module_end};
-                if(module_begin == nullptr || module_end == nullptr || module_end < module_begin) [[unlikely]] { return 0uz; }
-                return static_cast<::std::size_t>(module_end - module_begin);
-            }
-            [[unlikely]] default:
-            {
-                return 0uz;
-            }
-        }
-    }
-
-    inline constexpr void resolve_runtime_int_auto_mode() noexcept
-    {
-        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile) { return; }
-
-        // `auto_compile` is deliberately not a general runtime mode knob.  It is the uwvm-int auto policy used by `-Rint`
-        // and by `-Rcc int` when `-Rcm` is omitted; JIT/tiered invocations must choose their mode explicitly.
-        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler != ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
-            [[unlikely]]
-        {
-            ::fast_io::io::perr(
-                ::uwvm2::uwvm::io::u8log_output,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                u8"uwvm: ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                u8"[fatal] ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint, or -Rcc int without -Rcm). " u8"Use -Rcm lazy|full with -Rcc jit|tiered to select LLVM-JIT or tiered runtime modes explicitly. ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                u8"(runtime)\n\n",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-            ::fast_io::fast_terminate();
-        }
-
-        auto const main_wasm_bytes{loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::storage::execute_wasm)};
-        ::std::size_t preload_wasm_bytes{};
-        for(auto const& preloaded_wasm: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
-        {
-            preload_wasm_bytes = saturating_add_size(preload_wasm_bytes, loaded_wasm_file_byte_size(preloaded_wasm));
-        }
-
-        auto const total_wasm_bytes{saturating_add_size(main_wasm_bytes, preload_wasm_bytes)};
-        auto const has_preload_wasm{!::uwvm2::uwvm::wasm::storage::preloaded_wasm.empty()};
-
-        // With preloads, total loaded Wasm size is the relevant full-compile cost because full mode translates all loaded
-        // Wasm modules.  Without preloads, the executable module size is the useful hot-code proxy.
-        auto const threshold{has_preload_wasm ? runtime_int_auto_preload_total_full_threshold : runtime_int_auto_main_full_threshold};
-        auto const selected_full{has_preload_wasm ? total_wasm_bytes <= threshold : main_wasm_bytes <= threshold};
-
-        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = selected_full ? ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
-                                                                                  : ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
-
-        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-        {
-            // Keep the auto decision visible under verbose logging so benchmark runs can explain why the uwvm-int auto
-            // policy behaved like `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"uwvm-int auto selected ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8" compile for uwvm-int (main-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                main_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8", preload-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                preload_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8", total-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                total_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8", threshold=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                threshold,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                ::fast_io::mnp::cond(has_preload_wasm, u8", policy=preload-total", u8", policy=main-only"),
-                                u8"). ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                                u8"[",
-                                ::uwvm2::uwvm::io::get_local_realtime(),
-                                u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-        }
-    }
-#endif
 
     /**
      * @brief   Execute the requested UWVM action.
@@ -1605,9 +1517,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          3. serve `section_details` and parser `validation` modes without initializing executable runtime state;
      *          4. reject executable mode in builds compiled without runtime backends;
      *          5. check cross-module imports, detect import cycles, and initialize runtime storage;
-     *          6. normalize runtime-mode constraints such as debug-interpreter requiring full compilation;
-     *          7. resolve compile-thread policy and entry invocation;
-     *          8. dispatch to the selected runtime mode/compiler pair.
+     *          6. resolve compile-thread policy and entry invocation;
+     *          7. dispatch to the selected full-module compiler backend.
      *
      * @return  Process-style integer return code from `uwvm2::uwvm::run::retval`.
      * @warning Fatal configuration/runtime invariants can terminate the process through `fast_io::fast_terminate`.
@@ -1707,66 +1618,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         // Initialize runtime storage, link metadata, and backend-visible module data after import resolution succeeds.
-        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
+        ::uwvm2::uwvm::runtime::initializer::initialize_runtime(true);
 
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-        // The debug interpreter backend is modeled as a full-compile backend.  If the command line selected a lazy mode,
-        // preserve compatibility by forcing full compilation, subject to the global warning/fatal policy.
-        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter &&
-           ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile) [[unlikely]]
-        {
-            if(::uwvm2::uwvm::io::show_runtime_warning)
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    u8"[warn]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Debug interpreter requires full compile; forcing full compile.",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                    u8" (runtime)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-
-                if(::uwvm2::uwvm::io::runtime_warning_fatal) [[unlikely]]
-                {
-                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                        u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                        u8"[fatal] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"Convert warnings to fatal errors. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                        u8"(runtime)\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                    ::fast_io::fast_terminate();
-                }
-            }
-
-            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
-        }
-# endif
-
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-        // Resolve uwvm-int auto after loading/import initialization, when executable and preloaded Wasm byte spans are
-        // known, but before the runtime dispatch switch where only concrete lazy/full modes should remain.
-        resolve_runtime_int_auto_mode();
-# endif
 
         // Resolve global execution knobs after runtime storage exists.  Entry resolution needs runtime function type
         // storage, and compile-thread resolution publishes the value consumed by full-translation runtime code.
         resolve_runtime_compile_threads();
         auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name)};
 
-        // Dispatch matrix:
-        //
-        // 1. `execute_wasm_mode` separates executable `run` from non-executing modes.  The latter must have returned
-        //    before runtime initialization and entry-buffer resolution.
-        // 2. `global_runtime_mode` selects the execution strategy: pure lazy, lazy after whole-code validation, or full
-        //    compilation before entry.
-        // 3. Full compilation then dispatches by runtime compiler backend.  Lazy modes use one runtime-library entry point
-        //    after checking that the selected backend can support on-demand compilation/materialization.
+        // Every executable backend now prepares the complete module before entry. Runtime compiler
+        // selection only chooses between the full interpreter and the full-module LLVM backend.
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
             case ::uwvm2::uwvm::wasm::base::mode::section_details: [[fallthrough]];
@@ -1780,249 +1641,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
-                // Only `run` reaches the runtime library.  `runtime_entry` has already been resolved so every branch below
-                // can forward the same packed entry ABI buffers to its selected runtime entry point.
-                // Runtime mode chooses the broad compilation strategy; runtime compiler chooses the backend that realizes
-                // that strategy.  Each branch validates unsupported mode/backend combinations before calling runtime lib.
-                switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode)
+                ::uwvm2::runtime::lib::full_compile_run_config cfg{};
+                configure_runtime_entry_buffers(cfg, runtime_entry);
+
+                switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
                 {
-                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::auto_compile:
-                    {
-                        // `auto_compile` must be resolved before dispatch.  Reaching this branch means a future code path
-                        // introduced auto mode without going through `resolve_runtime_int_auto_mode()`, or tried to combine
-                        // it with a non-int backend.  Fail loudly instead of silently treating it like lazy/full.
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                            u8"uwvm: ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                            u8"[fatal] ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"auto_compile runtime mode was not resolved before runtime dispatch. auto_compile is only supported by the "
-                                            u8"uwvm-int auto policy (-Rint, or -Rcc int without -Rcm), and LLVM-JIT/tiered backends require an explicit "
-                                            u8"runtime mode (-Rcm lazy|full). ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                            u8"(runtime)\n\n",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                        ::fast_io::fast_terminate();
-
-                        break;
-                    }
-                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
-                    {
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-                        // Lazy execution is available for backends that can compile/materialize functions on demand.
-                        // Build-time feature macros determine which backend enum values can actually be selected, so the
-                        // support check is assembled from the backend features present in this binary.
-                        bool lazy_backend_supported{};
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-#  if defined(UWVM_RUNTIME_LLVM_JIT)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-                        if(!lazy_backend_supported) [[unlikely]]
-                        {
-                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                                u8"[fatal] ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"Lazy compilation currently supports the uwvm-int, llvm-jit, and tiered backends (-Rcc int|jit|tiered). ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                                u8"(runtime)\n\n",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                            ::fast_io::fast_terminate();
-                        }
-
-                        // `assume_full_code_verified=false` lets the lazy runtime validate as part of on-demand work.
-                        ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-                        configure_runtime_entry_buffers(cfg, runtime_entry);
-                        cfg.assume_full_code_verified = false;
-                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-# else
-                        ::fast_io::io::perr(
-                            ::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                            u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                            u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"Lazy compilation is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                            u8"(runtime)\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                        ::fast_io::fast_terminate();
-# endif
-
-                        break;
-                    }
-                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
-                    {
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-                        // This mode keeps lazy compilation/materialization, but performs a full validation pass before
-                        // execution.  Backends must still support lazy runtime entry; the only difference from plain lazy
-                        // mode is the `assume_full_code_verified=true` flag passed after validation succeeds.
-                        bool lazy_backend_supported{};
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-#  if defined(UWVM_RUNTIME_LLVM_JIT)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered)
-                        {
-                            lazy_backend_supported = true;
-                        }
-#  endif
-                        if(!lazy_backend_supported) [[unlikely]]
-                        {
-                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                                u8"[fatal] ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"Lazy compilation currently supports the uwvm-int, llvm-jit, and tiered backends (-Rcc int|jit|tiered). ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                                u8"(runtime)\n\n",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                            ::fast_io::fast_terminate();
-                        }
-
-                        // Validate before entering lazy execution, then tell the runtime it can skip duplicate whole-code
-                        // validation work.  Per-function compilation may still occur lazily.
-                        if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
-                        {
-                            return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
-                        }
-
-                        ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-                        configure_runtime_entry_buffers(cfg, runtime_entry);
-                        cfg.assume_full_code_verified = true;
-                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-# else
-                        ::fast_io::io::perr(
-                            ::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                            u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                            u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"Lazy compilation with full code verification is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                            u8"(runtime)\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                        ::fast_io::fast_terminate();
-# endif
-
-                        break;
-                    }
-                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile:
-                    {
-                        // Full compilation hands the complete main module to the selected backend before running the entry.
-                        // The same runtime config shape is used for interpreter translation and LLVM JIT full translation.
-                        switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
-                        {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
-                            {
-                                // Full compile with the uwvm-int interpreter backend.
-                                ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-                                configure_runtime_entry_buffers(cfg, runtime_entry);
-                                ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-
-                                break;
-                            }
-# endif
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter:
-                            {
-                                // The enum can be selected in debug-interpreter builds, but this runtime path is not
-                                // implemented yet, so fail explicitly instead of falling into another backend.
-                                ::fast_io::io::perr(
-                                    ::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Debug Interpreter is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                    u8"(runtime)\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                                ::fast_io::fast_terminate();
-
-                                break;
-                            }
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
-                            {
-                                // Tiered compilation is inherently a lazy/tiered strategy and conflicts with the full
-                                // compile runtime mode.  Report the conflict before runtime library entry.
-                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                    u8"uwvm: ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                                    u8"[fatal] ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                    u8"Tiered compilation conflicts with full compilation. ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                                    u8"(runtime)\n\n",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                                ::fast_io::fast_terminate();
-
-                                break;
-                            }
+                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
-                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
-                            {
-                                // Full compile with the LLVM JIT backend.  LLVM policy details are resolved inside the
-                                // runtime library from the globally configured runtime-mode storage.
-                                ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-                                configure_runtime_entry_buffers(cfg, runtime_entry);
-                                ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-
-                                break;
-                            }
+                    case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
 # endif
-                            [[unlikely]] default:
-                            {
-/// @warning Unhandled runtime compiler value for full compilation.  This indicates a missing implementation branch.
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
-                                ::std::unreachable();
-                            }
-                        }
-
+                    {
+                        run_full_module_graph(
+                            ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
                         break;
                     }
                     [[unlikely]] default:
@@ -2047,16 +1679,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-        // Normal executable-mode exit must release LLVM JIT runtime state before
-        // process teardown. The runtime library intentionally avoids destroying
-        // MCJIT objects from static destructors, because they can run after other
-        // LLVM globals have already started tearing down. Cleaning here keeps
-        // sanitizer builds from reporting the live runtime-owned LLVM graph as a
-        // process-exit leak while preserving the defensive static-destruction
-        // guard for abnormal exit paths.
-        ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
-# endif
+        // Normal executable-mode exit invalidates all backend-neutral caches as well as selected-backend artifacts. This is required
+        // for int-only embedders that invoke run() more than once, and releases LLVM execution engines before process teardown when
+        // LLVM AOT is present. The defensive static-destruction guard still covers abnormal exit paths.
+        ::uwvm2::runtime::lib::reset_runtime_state_host_api();
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
 #endif

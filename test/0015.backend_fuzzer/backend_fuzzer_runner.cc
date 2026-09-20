@@ -37,22 +37,10 @@ namespace
     namespace int_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
     namespace wasm_type = ::uwvm2::uwvm::wasm::type;
 
-#if !defined(UWVM_DISABLE_INT) && (defined(UWVM_USE_DEFAULT_INT) || defined(UWVM_USE_UWVM_INT))
-# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 1
-#else
-# define UWVM_BACKEND_FUZZER_HAS_UWVM_INT 0
-#endif
-
 #if !defined(UWVM_DISABLE_JIT) && (defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT))
 # define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 1
 #else
 # define UWVM_BACKEND_FUZZER_HAS_LLVM_JIT 0
-#endif
-
-#if UWVM_BACKEND_FUZZER_HAS_UWVM_INT && UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
-# define UWVM_BACKEND_FUZZER_HAS_TIERED 1
-#else
-# define UWVM_BACKEND_FUZZER_HAS_TIERED 0
 #endif
 
 #if defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
@@ -64,11 +52,13 @@ namespace
 # define UWVM_BACKEND_FUZZER_INTERPRETER_CALLBACK_ABI
 #endif
 
-    using value_type_t = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    using value_type_t = storage::wasm_binfmt1_final_value_type_t;
     using wasm_byte_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
     using wasm_i32_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
-    using wasm1_t = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
-    using feature_list_t = wasm_type::feature_list<wasm1_t>;
+    using feature_list_t = wasm_type::binfmt_ver1_feature_list_t;
+    using local_import_module_t =
+        decltype(wasm_type::get_local_imported_module_from_feature_list(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+    using wasm_file_t = wasm_type::wasm_file_t;
     using module_t = storage::wasm_module_storage_t;
     using function_type_t = storage::wasm_binfmt1_final_function_type_t;
     using import_type_t = storage::wasm_binfmt1_final_import_type_t;
@@ -173,7 +163,8 @@ namespace
         ::std::vector<::std::vector<wasm_byte_t>> code_bytes{};
         ::std::vector<memory_type_t> memories{};
         ::std::vector<table_type_t> tables{};
-        wasm_type::local_imported_module<wasm1_t> local_import_module{backend_fuzzer_local_import_module{}};
+        local_import_module_t local_import_module{backend_fuzzer_local_import_module{}};
+        wasm_file_t validator_metadata{1u};
 
         void build(::std::size_t case_index, module_t& module)
         {
@@ -372,10 +363,6 @@ namespace
         rtmode::runtime_scheduling_policy_existed = true;
         rtmode::global_runtime_scheduling_policy = rtmode::runtime_scheduling_policy_t::function_count;
         rtmode::global_runtime_scheduling_size = 1uz;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-        rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = false;
-        rtmode::runtime_tiered_disable_llvm_full_jit = false;
-#endif
 #if UWVM_BACKEND_FUZZER_HAS_LLVM_JIT
         rtmode::global_runtime_llvm_jit_cache_path_mode = rtmode::runtime_llvm_jit_cache_path_mode_t::disabled;
 #endif
@@ -391,46 +378,10 @@ namespace
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_only;
             return;
         }
-        if(mode == "uwvm-int-lazy")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_only;
-            return;
-        }
-        if(mode == "llvm-jit-full")
+        if(mode == "llvm-aot")
         {
             rtmode::global_runtime_mode = rtmode::runtime_mode_t::full_compile;
             rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::llvm_jit_only;
-            return;
-        }
-        if(mode == "llvm-jit-lazy")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::llvm_jit_only;
-            return;
-        }
-        if(mode == "tiered")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-            return;
-        }
-        if(mode == "tiered-no-t0")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-            rtmode::runtime_tiered_disable_uwvm_int_lazy_interpreter = true;
-#endif
-            return;
-        }
-        if(mode == "tiered-no-t2")
-        {
-            rtmode::global_runtime_mode = rtmode::runtime_mode_t::lazy_compile;
-            rtmode::global_runtime_compiler = rtmode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
-#if UWVM_BACKEND_FUZZER_HAS_TIERED
-            rtmode::runtime_tiered_disable_llvm_full_jit = true;
-#endif
             return;
         }
 
@@ -447,24 +398,24 @@ namespace
 
         direct_module_owner owner{};
         storage::wasm_module_runtime_storage.clear();
+        ::uwvm2::uwvm::wasm::storage::all_module.clear();
+        ::uwvm2::uwvm::wasm::storage::all_module_export.clear();
         auto [it, inserted]{storage::wasm_module_runtime_storage.try_emplace(k_main_module_name)};
         static_cast<void>(inserted);
         owner.build(case_index, it->second);
+        owner.validator_metadata.module_name = k_main_module_name;
+        auto const metadata_inserted{::uwvm2::uwvm::wasm::storage::all_module
+                                         .try_emplace(k_main_module_name,
+                                                      wasm_type::all_module_t{
+                                                          .module_storage_ptr = {.wf = ::std::addressof(owner.validator_metadata)},
+                                                          .type = wasm_type::module_type_t::exec_wasm})
+                                         .second};
+        if(!metadata_inserted) { die("duplicate validator metadata module name"); }
 
         auto const& c{fuzzer::k_cases[case_index]};
-        if(mode == "uwvm-int-full" || mode == "llvm-jit-full")
-        {
-            ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-            cfg.entry_function_index = c.entry_func_index;
-            ::uwvm2::runtime::lib::full_compile_and_run_main_module(k_main_module_name, cfg);
-        }
-        else
-        {
-            ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-            cfg.entry_function_index = c.entry_func_index;
-            cfg.assume_full_code_verified = true;
-            ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(k_main_module_name, cfg);
-        }
+        ::uwvm2::runtime::lib::full_compile_run_config cfg{};
+        cfg.entry_function_index = c.entry_func_index;
+        ::uwvm2::runtime::lib::full_compile_and_run_main_module(k_main_module_name, cfg);
         return 0;
     }
 
@@ -655,13 +606,8 @@ namespace
     void list_modes()
     {
         ::std::cout << "uwvm-int-ring-matrix\n"
-                    << "uwvm-int-lazy\n"
                     << "uwvm-int-full\n"
-                    << "llvm-jit-lazy\n"
-                    << "llvm-jit-full\n"
-                    << "tiered\n"
-                    << "tiered-no-t0\n"
-                    << "tiered-no-t2\n";
+                    << "llvm-aot\n";
     }
 
     void list_cases()

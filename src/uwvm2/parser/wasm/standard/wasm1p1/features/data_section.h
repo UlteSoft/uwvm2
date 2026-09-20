@@ -64,10 +64,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             static_assert(importdesc_count > 3uz);
             // importdesc has at least four buckets by static_assert; bucket 3 is the global-import bucket.
             auto const& imported_global{importsec.importdesc.index_unchecked(3uz)};
-            auto const& globalsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<global_section_storage_t<Fs...>>(module_storage.sections)};
+            // Wasm 2.0 constant expressions can only read immutable imported globals.
+            // Local globals in segment offsets/initializers require a later proposal.
             auto const imported_global_size{imported_global.size()};
-            auto const all_global_size{imported_global_size + globalsec.local_globals.size()};
 
             expr.begin = section_curr;
             bool has_data_on_type_stack{};
@@ -187,34 +186,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         //                         ^^ section_curr
 
                         auto const global_idx_uz{static_cast<::std::size_t>(global_idx)};
-                        if(global_idx_uz >= all_global_size) [[unlikely]]
+                        if(global_idx_uz >= imported_global_size) [[unlikely]]
                         {
                             err.err_curr = section_curr;
-                            err.err_selectable.u32arr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_global_size);
+                            err.err_selectable.u32arr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_global_size);
                             err.err_selectable.u32arr[1] = global_idx;
                             err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_ref_illegal_imported_global;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
-                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte global_type_byte{};
-                        bool global_is_mutable{};
-
-                        if(global_idx_uz < imported_global_size)
-                        {
-                            auto const curr_imported_global_ptr{imported_global.index_unchecked(global_idx_uz)};
+                        auto const curr_imported_global_ptr{imported_global.index_unchecked(global_idx_uz)};
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                            if(curr_imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                        if(curr_imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-                            auto const& curr_imported_global{curr_imported_global_ptr->imports.storage.global};
-                            global_type_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_imported_global.type);
-                            global_is_mutable = curr_imported_global.is_mutable;
-                        }
-                        else
-                        {
-                            auto const& curr_defined_global{globalsec.local_globals.index_unchecked(global_idx_uz - imported_global_size).global};
-                            global_type_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_defined_global.type);
-                            global_is_mutable = curr_defined_global.is_mutable;
-                        }
+                        auto const& curr_imported_global{curr_imported_global_ptr->imports.storage.global};
+                        auto const global_type_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_imported_global.type)};
+                        auto const global_is_mutable{curr_imported_global.is_mutable};
 
                         if(global_type_byte != static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
                                                    ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)) [[unlikely]]

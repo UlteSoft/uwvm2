@@ -11,8 +11,8 @@ namespace details
 template <::std::integral char_type>
 inline constexpr ::std::size_t cal_stvl2_cstr_reserved_size(::std::size_t sz) noexcept
 {
-	constexpr bool ebcdic{::fast_io::details::is_ebcdic<char_type>};
-	if constexpr (sizeof(char_type) == 1 && !ebcdic)
+	if constexpr (sizeof(char_type) == 1 &&
+				  ::fast_io::details::is_utf8_execution_charset<char_type>)
 	{
 		return sz;
 	}
@@ -637,8 +637,8 @@ inline constexpr ::std::size_t constexpr_stvl2_u8strlen(char8_t const *strlen) n
 template <::std::integral char_type>
 inline constexpr char_type *deal_with_stvl2_cstr(char_type *iter, char8_t const *u8cstr) noexcept
 {
-	constexpr bool ebcdic{::fast_io::details::is_ebcdic<char_type>};
-	if constexpr (sizeof(char_type) == 1 && !ebcdic)
+	if constexpr (sizeof(char_type) == 1 &&
+				  ::fast_io::details::is_utf8_execution_charset<char_type>)
 	{
 		return non_overlapped_copy_n(u8cstr, constexpr_stvl2_u8strlen(u8cstr), iter);
 	}
@@ -1299,6 +1299,7 @@ inline constexpr char_type *print_reserve_define_impl_for_stvl2_struct_tag_smp(c
 
 } // namespace details
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, typename T>
 	requires(::std::same_as<T, stvl2::stvl2_mmap_type> || ::std::same_as<T, stvl2::stvl2_struct_tag> ||
 			 ::std::same_as<T, stvl2::stvl2_header_tag> || ::std::same_as<T, stvl2::stvl2_firmware_flags>)

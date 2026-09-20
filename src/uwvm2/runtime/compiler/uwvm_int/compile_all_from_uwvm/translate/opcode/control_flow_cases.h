@@ -27,6 +27,7 @@ case wasm1_code::unreachable:
     }
 
     is_polymorphic = true;
+    codegen_reachable = false;
 
     break;
 }
@@ -62,52 +63,10 @@ case wasm1_code::block:
 
     // block  blocktype ...
     // [safe] unsafe (could be the section_end)
-    //        ^^ op_begin
+    //        ^^ code_curr
 
     auto const signature{parse_block_type(op_begin, u8"block")};
 
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    // Large functions may enter tiered execution while looping. Emitting the poll at an outer
-    // block boundary keeps the runtime check rare enough for interpreter speed while still giving
-    // hot loops a deterministic OSR handoff point.
-    if constexpr(CompileOption.enable_tiered_loop_osr_poll)
-    {
-        auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
-        if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_poll_should_emit(local_func_count, function_code_size) &&
-           !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
-        {
-            auto const result_begin{curr_func_type.result.begin};
-            auto const result_end{curr_func_type.result.end};
-            auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-            if(result_count <= 1uz)
-            {
-                ::std::size_t result_bytes{};
-                if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
-
-                if(result_count == 0uz || result_bytes != 0uz)
-                {
-                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                    using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                    auto const request_countdown{
-                        ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_block_osr_request_countdown_for_function_size(function_code_size)};
-                    if(request_countdown != ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
-                    {
-                        poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                            .func_index = function_index,
-                                            .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
-                                            .result_bytes = result_bytes,
-                                            .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_bytes,
-                                            .countdown = 8192u,
-                                            .reset_countdown = 8192u,
-                                            .request_countdown = request_countdown};
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        emit_imm(poll_imm);
-                    }
-                }
-            }
-        }
-    }
-#endif
 
     enter_control_frame(op_begin, u8"block", block_type::block, signature, SIZE_MAX, new_label(false), SIZE_MAX);
 
@@ -197,47 +156,6 @@ case wasm1_code::loop:
                  }
              }
              set_label_offset(loop_start, bytecode.size());
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-             if constexpr(CompileOption.enable_tiered_loop_osr_poll)
-             {
-                 auto const function_code_size{static_cast<::std::size_t>(code_end - code_begin)};
-                 if(::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_poll_should_emit(local_func_count, function_code_size) &&
-                    !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
-                 {
-                     auto const result_begin{curr_func_type.result.begin};
-                     auto const result_end{curr_func_type.result.end};
-                     auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-                     if(result_count <= 1uz)
-                     {
-                         ::std::size_t result_bytes{};
-                         if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
-
-                         if(result_count == 0uz || result_bytes != 0uz)
-                         {
-                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                             using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                             auto const poll_policy{::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_counter_policy_for_function_size(
-                                 function_code_size)};
-                             if(poll_policy.request_countdown !=
-                                ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
-                             {
-                                 poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                                     .func_index = function_index,
-                                                     .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
-                                                     .result_bytes = result_bytes,
-                                                     .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_bytes,
-                                                     .countdown = poll_policy.initial_countdown,
-                                                     .reset_countdown = poll_policy.reset_countdown,
-                                                     .request_countdown = poll_policy.request_countdown};
-                                 emit_opfunc_to(bytecode,
-                                                translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                                 emit_imm(poll_imm);
-                             }
-                         }
-                     }
-                 }
-             }
-#endif
              return loop_start;
          }()};
 
@@ -491,9 +409,11 @@ case wasm1_code::else_:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(expected_count != 0uz && actual_count >= expected_count)
+    // Unreachable permits missing deeper operands, never a mismatched concrete suffix.
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
@@ -518,8 +438,8 @@ case wasm1_code::else_:
         {
             // If the then-path is reachable, record its stack-top state at the end label.
             // This is required when the else-path becomes unreachable before `end` (only then reaches `end`).
-            if_frame.stacktop_has_then_end_state = !is_polymorphic;
-            if(!is_polymorphic)
+            if_frame.stacktop_has_then_end_state = codegen_reachable && !is_polymorphic;
+            if(if_frame.stacktop_has_then_end_state)
             {
                 if_frame.stacktop_currpos_at_then_end = curr_stacktop;
                 if_frame.stacktop_memory_count_at_then_end = stacktop_memory_count;
@@ -550,6 +470,7 @@ case wasm1_code::else_:
     for(auto curr{if_frame.start.begin}; curr != if_frame.start.end; ++curr) { operand_stack_push(*curr); }
     // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
     is_polymorphic = false;
+    codegen_reachable = if_frame.codegen_entry_reachable;
     if constexpr(stacktop_enabled)
     {
         if(!if_frame.polymorphic_base)
@@ -638,11 +559,22 @@ case wasm1_code::end:
 
     auto const expected_count{static_cast<::std::size_t>(frame.result.end - frame.result.begin)};
 
-    if(frame.type == block_type::if_ && expected_count != 0uz) [[unlikely]]
+    bool implicit_else_matches_result{true};
+    if(frame.type == block_type::if_)
+    {
+        auto const start_count{static_cast<::std::size_t>(frame.start.end - frame.start.begin)};
+        implicit_else_matches_result = start_count == expected_count;
+        for(::std::size_t i{}; implicit_else_matches_result && i != expected_count; ++i)
+        {
+            implicit_else_matches_result = frame.start.begin[i] == frame.result.begin[i];
+        }
+    }
+    if(frame.type == block_type::if_ && !implicit_else_matches_result) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.if_missing_else.expected_count = expected_count;
-        err.err_selectable.if_missing_else.expected_type = to_wasm1_value_type(*frame.result.begin);
+        err.err_selectable.if_missing_else.expected_type =
+            expected_count == 1uz ? to_wasm1_value_type(*frame.result.begin) : ::uwvm2::parser::wasm::standard::wasm1::type::value_type{};
         err.err_code = code_validation_error_code::if_missing_else;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -677,9 +609,11 @@ case wasm1_code::end:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(expected_count != 0uz && actual_count >= expected_count)
+    // Unreachable permits missing deeper operands, never a mismatched concrete suffix.
+    if(expected_count != 0uz)
     {
-        for(::std::size_t i{}; i != expected_count; ++i)
+        auto const concrete_to_check{actual_count < expected_count ? actual_count : expected_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
@@ -725,26 +659,20 @@ case wasm1_code::end:
     if(frame.end_label_id != SIZE_MAX) { set_label_offset(frame.end_label_id, bytecode.size()); }
     if(frame.type == block_type::if_)
     {
-        // `if` without `else` (only valid for empty result) uses the end as the "else" target.
+        // `if` without `else` uses the end as the false target. Validation above guarantees that the untouched
+        // block parameters on that path are exactly the declared result tuple.
         if(frame.else_label_id != SIZE_MAX) { set_label_offset(frame.else_label_id, bytecode.size()); }
     }
 
     operand_stack_truncate_to(base);
     for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
 
-    bool const polymorphic_end_before_merge{is_polymorphic};
-    bool new_polymorphic_after_end{};
-    if(frame.type == block_type::else_) { new_polymorphic_after_end = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic); }
-    else if(frame.type == block_type::loop)
-    {
-        // Loop end is only reachable via fallthrough; branches target the loop header, not `end`.
-        // If the fallthrough path is unreachable (polymorphic), code after `end` must remain unreachable.
-        new_polymorphic_after_end = frame.polymorphic_base || is_polymorphic;
-    }
-    else
-    {
-        new_polymorphic_after_end = frame.polymorphic_base;
-    }
+    bool const codegen_fallthrough_before_merge{codegen_reachable};
+    // Validation restores the enclosing frame's bottom flag, not the execution
+    // reachability of this loop/if. Core 2 appendix 7.3 pop_ctrl/end does not
+    // propagate a child's unreachable flag. Keep the codegen merge below separate:
+    // br 0 in both if arms reaches this end, but never supplies a missing operand.
+    bool const new_polymorphic_after_end{frame.polymorphic_base};
     is_polymorphic = new_polymorphic_after_end;
 
     if constexpr(stacktop_enabled)
@@ -766,7 +694,7 @@ case wasm1_code::end:
         {
             // If the current fallthrough path is unreachable at `end`, but the construct is reachable due to
             // an earlier branch to this `end` label, restore the stack-top model to the reachable path state.
-            if(!new_polymorphic_after_end && polymorphic_end_before_merge)
+            if(!new_polymorphic_after_end && !codegen_fallthrough_before_merge)
             {
                 if(frame.type == block_type::if_ && !frame.polymorphic_base)
                 {
@@ -810,6 +738,9 @@ case wasm1_code::end:
         }
     }
 
+    codegen_reachable = codegen_fallthrough_before_merge || frame.stacktop_has_end_state ||
+                        frame.stacktop_has_then_end_state ||
+                        (frame.type == block_type::if_ && frame.codegen_entry_reachable);
     control_flow_stack.pop_back_unchecked();
 
     if(is_function_frame)

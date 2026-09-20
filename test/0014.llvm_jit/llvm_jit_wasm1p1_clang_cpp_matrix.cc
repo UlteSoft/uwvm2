@@ -64,11 +64,18 @@ int main()
 )cpp"};
 
     inline constexpr ::std::string_view wasm1p1_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm2"};
 
     inline constexpr ::std::string_view wasm1p1_explicit_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1 "
-        "--wasm-feature-wasm1.1"};
+        "--runtime-llvm-jit-cache-path disable "
+        "--wasm-feature-enable-multi-value "
+        "--wasm-feature-enable-reference-types "
+        "--wasm-feature-enable-table-instructions "
+        "--wasm-feature-enable-multiple-tables "
+        "--wasm-feature-enable-bulk-memory "
+        "--wasm-feature-enable-sign-extension "
+        "--wasm-feature-enable-nontrapping-float-to-int "
+        "--wasm-feature-enable-simd"};
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
@@ -358,15 +365,7 @@ int main()
             char const* args;
         };
 
-        constexpr ::std::array runtime_modes{
-            runtime_mode{"full", "-Rcm full -Rcc jit"},
-            runtime_mode{"aot", "-Raot"},
-            runtime_mode{"lazy", "-Rjit"},
-            runtime_mode{"lazy_verification", "-Rcm lazy+verification -Rcc jit"},
-            runtime_mode{"tiered", "-Rtiered"},
-            runtime_mode{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0"},
-            runtime_mode{"tiered_no_t2", "-Rtiered -Rtiered-disable-t2"},
-            runtime_mode{"tiered_no_t0_no_t2", "-Rtiered -Rtiered-disable-t0 -Rtiered-disable-t2"}};
+        constexpr ::std::array runtime_modes{runtime_mode{"aot", "-Raot"}};
 
         for(auto const& mode: runtime_modes)
         {
@@ -374,14 +373,17 @@ int main()
             if(!run_command(command, mode.label)) [[unlikely]] { return false; }
         }
 
-        auto const explicit_feature_command{make_uwvm_command(uwvm_path, "-Rjit", wasm1p1_explicit_feature_args, wasm_path)};
-        return run_command(explicit_feature_command, "explicit wasm1p1 feature subset");
+        auto const explicit_feature_command{make_uwvm_command(uwvm_path, "-Raot", wasm1p1_explicit_feature_args, wasm_path)};
+        return run_command(explicit_feature_command, "explicit wasm2 feature subset");
     }
 
     [[nodiscard]] bool run_feature_gate_check(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
-        auto const command{make_uwvm_command(uwvm_path, "-Rcm full -Rcc jit", "--runtime-llvm-jit-cache-path disable", wasm_path)};
-        return run_expect_failure(command, "missing wasm1p1 feature flags");
+        auto const command{make_uwvm_command(uwvm_path,
+                                             "-Raot",
+                                             "--runtime-llvm-jit-cache-path disable --wasm-feature-disable-sign-extension",
+                                             wasm_path)};
+        return run_expect_failure(command, "disabled wasm2 sign-extension feature");
     }
 
     [[nodiscard]] bool run_policy_matrix(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
@@ -390,23 +392,16 @@ int main()
             {::std::string_view{"debug"}, ::std::string_view{"legacy-light"}, ::std::string_view{"pb-o1"}, ::std::string_view{"pb-o2"}, ::std::string_view{"pb-o3"}})
         {
             auto extra_args{::std::string{wasm1p1_feature_args} + " --runtime-llvm-jit-full-policy " + ::std::string{policy}};
-            auto const command{make_uwvm_command(uwvm_path, "-Rcm full -Rcc jit", extra_args, wasm_path)};
+            auto const command{make_uwvm_command(uwvm_path, "-Raot", extra_args, wasm_path)};
             if(!run_command(command, (::std::string{"full-policy-"} + ::std::string{policy}).c_str())) [[unlikely]] { return false; }
-        }
-
-        for(::std::string_view policy: {::std::string_view{"debug"}, ::std::string_view{"light"}, ::std::string_view{"balanced"}})
-        {
-            auto extra_args{::std::string{wasm1p1_feature_args} + " --runtime-llvm-jit-lazy-policy " + ::std::string{policy}};
-            auto const command{make_uwvm_command(uwvm_path, "-Rjit", extra_args, wasm_path)};
-            if(!run_command(command, (::std::string{"lazy-policy-"} + ::std::string{policy}).c_str())) [[unlikely]] { return false; }
         }
 
         for(::std::string_view policy:
             {::std::string_view{"debug"}, ::std::string_view{"default"}, ::std::string_view{"fast-compile"}, ::std::string_view{"balanced"}, ::std::string_view{"max"}})
         {
             auto extra_args{::std::string{wasm1p1_feature_args} + " --runtime-llvm-jit-policy " + ::std::string{policy}};
-            auto const command{make_uwvm_command(uwvm_path, "-Rtiered", extra_args, wasm_path)};
-            if(!run_command(command, (::std::string{"tiered-policy-"} + ::std::string{policy}).c_str())) [[unlikely]] { return false; }
+            auto const command{make_uwvm_command(uwvm_path, "-Raot", extra_args, wasm_path)};
+            if(!run_command(command, (::std::string{"aot-policy-"} + ::std::string{policy}).c_str())) [[unlikely]] { return false; }
         }
 
         return true;
@@ -417,14 +412,14 @@ int main()
         for(::std::string_view policy: {::std::string_view{"instruction"}, ::std::string_view{"none"}})
         {
             auto extra_args{::std::string{wasm1p1_feature_args} + " --runtime-llvm-jit-call-stack " + ::std::string{policy}};
-            auto const command{make_uwvm_command(uwvm_path, "-Rcm full -Rcc jit", extra_args, wasm_path)};
+            auto const command{make_uwvm_command(uwvm_path, "-Raot", extra_args, wasm_path)};
             if(!run_command(command, (::std::string{"call-stack-"} + ::std::string{policy}).c_str())) [[unlikely]] { return false; }
         }
 
         for(::std::string_view policy: {::std::string_view{"unwind"}, ::std::string_view{"unwind-uncheck"}})
         {
             auto extra_args{::std::string{wasm1p1_feature_args} + " --runtime-llvm-jit-call-stack " + ::std::string{policy}};
-            auto const command{make_uwvm_command(uwvm_path, "-Rcm full -Rcc jit", extra_args, wasm_path)};
+            auto const command{make_uwvm_command(uwvm_path, "-Raot", extra_args, wasm_path)};
             if(run_system_command(command) != 0)
             {
                 ::std::cout << "[llvm_jit_wasm1p1_cpp] skip unsupported call-stack policy: " << policy << '\n';
@@ -459,9 +454,7 @@ int main()
         }
 
         auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir) + " --wasm-feature-wasm1.1"};
-        for(auto const& mode: {::std::pair{::std::string_view{"cached-full"}, ::std::string_view{"-Rcm full -Rcc jit"}},
-                               ::std::pair{::std::string_view{"cached-lazy-verification"}, ::std::string_view{"-Rcm lazy+verification -Rcc jit"}},
-                               ::std::pair{::std::string_view{"cached-tiered"}, ::std::string_view{"-Rtiered"}}})
+        for(auto const& mode: {::std::pair{::std::string_view{"cached-aot"}, ::std::string_view{"-Raot"}}})
         {
             auto const command{make_uwvm_command(uwvm_path, mode.second, cache_args, wasm_path)};
             if(!run_command(command, ::std::string{mode.first}.c_str())) [[unlikely]] { return false; }

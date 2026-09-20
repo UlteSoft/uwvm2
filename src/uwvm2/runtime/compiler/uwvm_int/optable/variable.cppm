@@ -3,6 +3,9 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// The global module fragment must also make the shared helpers for provider FP control restoration
+// visible. Updating only the non-module header path would leave module builds
+// with missing declarations or inconsistent floating-point behavior.
 
 /**
  * @author      MacroModel
@@ -28,10 +31,14 @@ module;
 #include <concepts>
 #include <limits>
 #include <memory>
+#include <type_traits>
 #include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
+#include <uwvm2/runtime/lib/uwvm_runtime_wasm_fp_environment.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.optable:variable;
 
@@ -40,6 +47,7 @@ import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
+import uwvm2.uwvm.wasm.type;
 import :define;
 import :register_ring;
 

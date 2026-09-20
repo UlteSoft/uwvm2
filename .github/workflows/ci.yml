@@ -22,13 +22,32 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
-      - name: Setup LLVM (Homebrew)
+      - name: Setup bootstrap compiler and bundled LLVM build tools (Homebrew)
         run: |
-          brew install llvm
-          brew install lld
+          brew install llvm lld cmake ninja
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
       - name: Work around LLVM libc++ header bug
         run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
+      - name: Check Windows CRT mapping with real COFF objects
+        run: |
+          # Cross-compile a header-free fixture, never run Windows code. The
+          # bootstrap tools are not the LLVM libraries linked into ROS.
+          python3 test/0018.build/check_bundled_llvm_crt.py \
+            --clang-cl "$(brew --prefix llvm)/bin/clang-cl" \
+            --llvm-lib "$(brew --prefix llvm)/bin/llvm-lib" \
+            --lld-link "$(brew --prefix lld)/bin/lld-link" \
+            --llvm-readobj "$(brew --prefix llvm)/bin/llvm-readobj" \
+            --out "$RUNNER_TEMP/uwvm-msvc-crt"
+          # ROS uses GNU-style clang++ too. MSVC ABI is not synonymous with
+          # clang-cl syntax or CMake's MSVC frontend boolean.
+          python3 test/0018.build/check_bundled_llvm_crt.py \
+            --cxx "$(brew --prefix llvm)/bin/clang++" --frontend gnu \
+            --llvm-lib "$(brew --prefix llvm)/bin/llvm-lib" \
+            --llvm-ar "$(brew --prefix llvm)/bin/llvm-ar" \
+            --llvm-ranlib "$(brew --prefix llvm)/bin/llvm-ranlib" \
+            --lld-link "$(brew --prefix lld)/bin/lld-link" \
+            --llvm-readobj "$(brew --prefix llvm)/bin/llvm-readobj" \
+            --out "$RUNNER_TEMP/uwvm-msvc-crt-gnu"
       - name: Configure
         run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm-compiler=y --sdk="$(brew --prefix llvm)" --static=none
       - name: Build
@@ -71,12 +90,11 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install clang-23 clang-tools-23 lld-23 xmake cmake ninja-build
       - name: Configure
         run: |
           ln -s $(which clang++-23) clang++
           ln -s $(which clang-23) clang
-          ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
           xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=none
       - name: Build
@@ -90,14 +108,15 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-backend-tests:
-    if: ${{ !always() }}
-    name: Linux (x86_64) uwvm-int + llvm-jit
+    name: Linux (x86_64) uwvm-int + llvm-aot
     runs-on: ubuntu-latest
     env:
       XMAKE_JOBS: "4"
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       LSAN_OPTIONS: print_suppressions=0
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      # Dependency selection must remain entirely in third-parties/llvm.
+      LLVM_CONFIG: /deliberately-invalid-system-llvm-config
     steps:
       - uses: actions/checkout@v4
       - name: Setup
@@ -106,13 +125,48 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install clang-23 clang-tools-23 lld-23 xmake cmake ninja-build
+      - name: Check bundled source and CMake dependency contract guards
+        run: |
+          # Cheap direct-dependency checks run even when the expensive whole
+          # named-module CI job is disabled. These do not replace that build.
+          python3 test/0006.check_module/check_uwvm_module.py
+          python3 test/0006.check_module/test_checker_semantics.py
+          python3 test/0013.uwvm_int/check_existing_int_add_codegen_test.py
+          xmake lua test/0018.build/check_bundled_llvm_manifest.lua
+          xmake lua test/0018.build/check_bundled_llvm_contract.lua
+          xmake lua test/0018.build/check_bundled_llvm_paths.lua
+          # Same upstream release number is not the same downstream loader.
+          python3 test/0018.build/check_pinned_llvm_headers.py \
+            --cxx "$(command -v clang++-23)" --out "$RUNNER_TEMP/uwvm-llvm-header-pin"
+          # Imports cannot provide WASI macros. Check that the real loader's
+          # hosted path survives preprocessing, and its disabled path does not.
+          python3 test/0018.build/check_loader_module_features.py \
+            --cxx "$(command -v clang++-23)" --out "$RUNNER_TEMP/uwvm-loader-features"
+          # Macro-selection regression only: native Windows keeps WSA RAII;
+          # POSIX/Cygwin/Wine must not depend on the unexported dummy alias.
+          python3 test/0018.build/check_crt_network_service.py \
+            --cxx "$(command -v clang++-23)" --out "$RUNNER_TEMP/uwvm-crt-network"
+          # A module BMI is not its initializer object. Check one owner across
+          # an object-library dependency, with real duplicate/private negatives.
+          python3 test/0018.build/check_module_object_ownership.py \
+            --cc "$(command -v clang-23)" --cxx "$(command -v clang++-23)" \
+            --out "$RUNNER_TEMP/uwvm-module-ownership"
+          # Keep the bounded diagnostic packs and one outer lock covered in
+          # both declaration forms, with byte-exact and concurrent output.
+          python3 test/0018.build/check_callback_full_policy.py \
+            --clang "$(command -v clang++-23)" --out "$RUNNER_TEMP/uwvm-policy-diagnostic"
+          # Exercise the real deferred hook as well as synthetic JSON: a
+          # toolchain must not silently replace Release with a different ABI.
+          # Configure only; no second LLVM library build or target executable.
+          python3 test/0018.build/check_bundled_llvm_cmake.py \
+            --cc "$(command -v clang-23)" --cxx "$(command -v clang++-23)" \
+            --out "$RUNNER_TEMP/uwvm-llvm-contract-configure"
       - name: Configure
         run: |
           mkdir -p .github/tools
           ln -sf "$(which clang++-23)" .github/tools/clang++
           ln -sf "$(which clang-23)" .github/tools/clang
-          ln -sf "$(which llvm-config-23)" .github/tools/llvm-config
           echo "$PWD/.github/tools" >> "$GITHUB_PATH"
           export PATH="$PWD/.github/tools:$PATH"
           xmake f -m debug \
@@ -123,16 +177,16 @@ jobs:
             --execution-int=uwvm-int \
             --execution-jit=llvm \
             --enable-test-uwvm-int=y \
-            --enable-test-llvm-jit=y
+            --enable-test-llvm-jit=y \
+            --enable-test-backend-fuzzer=n \
+            --test-libfuzzer=n
       - name: Check UWVM version
         run: |
           xmake b -rv -j "${XMAKE_JOBS}" uwvm
           xmake run uwvm --version
-      - name: Run uwvm-int lazy tests
-        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/lazy/run_lazy_full.sh
       - name: Run uwvm-int strict tests
         run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/strict/run_strict_basic_full.sh
-      - name: Run llvm-jit tests
+      - name: Run LLVM AOT tests
         run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0014.llvm_jit/run_llvm_jit_full.sh
 
   # ---------------------------------------------------------------------------
@@ -163,7 +217,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install clang-23 clang-tools-23 lld-23 xmake cmake ninja-build
       - name: Download Intel SDE
         run: |
           mkdir -p /opt/intel-sde
@@ -173,7 +227,6 @@ jobs:
         run: |
           ln -s $(which clang++-23) clang++
           ln -s $(which clang-23) clang
-          ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
           xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=none
       - name: Build
@@ -234,12 +287,11 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install clang-23 clang-tools-23 lld-23 xmake cmake ninja-build
       - name: Configure
         run: |
           ln -s $(which clang++-23) clang++
           ln -s $(which clang-23) clang
-          ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
           xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --static=none
       - name: Build
@@ -269,12 +321,11 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install clang-23 clang-tools-23 lld-23 xmake cmake ninja-build
       - name: Configure
         run: |
           ln -s $(which clang++-23) clang++
           ln -s $(which clang-23) clang
-          ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
           xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y --static=none
       - name: Build
@@ -329,6 +380,8 @@ jobs:
           install: |
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
+            ${{ matrix.env.prefix }}-cmake
+            ${{ matrix.env.prefix }}-ninja
       - name: Configure
         run: xmake f -p mingw --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} --static=compiler
       - name: Build
@@ -367,6 +420,8 @@ jobs:
           install: |
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
+            ${{ matrix.env.prefix }}-cmake
+            ${{ matrix.env.prefix }}-ninja
       - name: Configure
         run: xmake f -p mingw --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} -a i686 --static=compiler
       - name: Build
@@ -420,12 +475,13 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "sudo pkg install -y llvm21 gmake unzip libunwind"
+            bash -c "sudo pkg install -y llvm21 gmake unzip libunwind cmake ninja python3"
             bash -c "sudo pkg clean -ay"
-            bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none --strip=symbol --cxflags=-g1 --includedirs=/usr/local/include --linkdirs=/usr/local/lib --syslinks=unwind"
+            # FreeBSD's llvm21 package installs the bootstrap SDK here; it is
+            # not the LLVM 23.1.1 dependency that ROS builds from its own sources.
+            bash -c "source ~/.xmake/profile && xmake f -y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk=/usr/local/llvm21 --march=none --static=none --strip=symbol --cxflags=-g1 --includedirs=/usr/local/include --linkdirs=/usr/local/lib --syslinks=unwind"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
@@ -434,7 +490,7 @@ jobs:
           version: ${{ env.version }}
           memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "sudo pkg install -y gcc16-devel gmake unzip"
+            bash -c "sudo pkg install -y gcc16-devel gmake unzip cmake ninja python3"
             bash -c "sudo pkg clean -ay"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"

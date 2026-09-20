@@ -139,7 +139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 
     /// @brief Controls emission of general runtime initialization and backend warnings.
     /// @details Category: `runtime`.  Covers runtime-stage advisories such as memory-limit overrides that widen declared
-    ///          limits, debug-interpreter mode normalization, and LLVM JIT call-stack unwind fallback.  Compile-thread
+    ///          limits and LLVM AOT call-stack unwind fallback.  Compile-thread
     ///          policy warnings are controlled by `show_runtime_compile_threads_warning` instead.  Enabled by default.
     /// @see runtime_warning_fatal
     /// @see show_runtime_compile_threads_warning

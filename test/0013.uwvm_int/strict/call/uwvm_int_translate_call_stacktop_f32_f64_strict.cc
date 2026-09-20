@@ -8,11 +8,12 @@ namespace
     using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 
     template <optable::uwvm_interpreter_translate_option_t CompileOption>
-    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
         using info_t = optable::compiled_defined_call_info;
 
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]]
+        if(stack_top == nullptr) [[unlikely]]
         {
             ::fast_io::fast_terminate();
         }
@@ -29,7 +30,7 @@ namespace
             ::fast_io::fast_terminate();
         }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         auto const top_addr = reinterpret_cast<::std::uintptr_t>(top);
         if(top_addr < info->param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::std::byte* const base = reinterpret_cast<::std::byte*>(top_addr - info->param_bytes);
@@ -53,7 +54,7 @@ namespace
         {
             ::std::memcpy(base, rr.results.data(), info->result_bytes);
         }
-        *stack_top_ptr = base + info->result_bytes;
+        return base + info->result_bytes;
     }
 
     [[nodiscard]] byte_vec build_call_stacktop_float_module()

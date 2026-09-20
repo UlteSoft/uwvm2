@@ -114,6 +114,21 @@ using filebuf_io_observer = basic_filebuf_io_observer<char>;
 using wfilebuf_io_observer = basic_filebuf_io_observer<wchar_t>;
 #endif
 
+/// @brief Keeps normalized semantic leaf records on the contiguous coalescing path for std::basic_filebuf.
+/// @details The filebuf adapter has no native scatter operation. Its generic plain-leaf path must first construct a
+///          descriptor plan and then replay that plan through an emulated per-descriptor copy loop. Keeping the run in
+///          the semantic coalescer instead formats the normalized leaves directly into the selected contiguous put area,
+///          removing that descriptor construction/replay pass; measured multi-leaf records establish the cost
+///          preference. This overload is intentionally limited to `basic_filebuf_io_observer`: a stringbuf or user
+///          streambuf can have a different cost model, and an outer fast_io buffer/decorator must make its own decision
+///          rather than inheriting the wrapped device's preference.
+template <::std::integral char_type, typename traits_type>
+inline constexpr ::std::true_type print_semantic_plain_leaf_coalesce_preferred_stream(
+	io_reserve_type_t<char_type, basic_filebuf_io_observer<char_type, traits_type>>) noexcept
+{
+	return {};
+}
+
 template <::std::integral ch_type, typename traits_type>
 	requires requires(basic_c_io_observer<ch_type> piob) { status(piob); }
 inline constexpr auto status(basic_streambuf_io_observer<ch_type, traits_type> ciob)

@@ -1,0 +1,9 @@
+# The numeric reads use BE data order; instruction words are encoded LE.
+# rtdyld-check: load_pos = 0x40000
+# rtdyld-check: load_neg = 0x40004
+# rtdyld-check: adr_pos = 0x40008
+# rtdyld-check: adr_neg = 0x4000c
+# rtdyld-check: *{4}load_pos = 0x00190a58
+# rtdyld-check: *{4}load_neg = 0xe119e958
+# rtdyld-check: *{4}adr_pos = 0xc2180a70
+# rtdyld-check: *{4}adr_neg = 0xa319e970

@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -58,11 +59,7 @@ namespace
     };
 
     inline constexpr ::std::array modes{
-        mode_t{"full",         "-Rcm full -Rcc jit"          },
-        mode_t{"lazy",         "-Rjit"                       },
-        mode_t{"tiered",       "-Rtiered"                    },
-        mode_t{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0"},
-        mode_t{"tiered_no_t2", "-Rtiered -Rtiered-disable-t2"},
+        mode_t{"aot", "-Raot"},
     };
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
@@ -444,7 +441,8 @@ namespace
         return {stack_shape_t{"deep_leaf", {1uz, 2uz, 3uz, 4uz}, make_deep_leaf_wat},
                 stack_shape_t{"post_call_trap", {2uz, 3uz}, make_post_call_trap_wat},
                 stack_shape_t{"indirect_leaf", {0uz, 1uz, 2uz, 3uz}, make_indirect_leaf_wat},
-                stack_shape_t{"recursive_countdown", {0uz, 1uz}, make_recursive_countdown_wat},
+                // Four active recursive calls (n=3,2,1,0) precede _start; equal function indices are distinct frames.
+                stack_shape_t{"recursive_countdown", {0uz, 0uz, 0uz, 0uz, 1uz}, make_recursive_countdown_wat},
                 stack_shape_t{"param_result_chain", {0uz, 1uz, 2uz, 3uz}, make_param_result_chain_wat}};
     }
 
@@ -457,8 +455,12 @@ namespace
                                         char const* policy)
     {
         auto const output_path{artifact_dir / (::std::string{stem} + "." + mode.name + "." + policy + ".out")};
+        auto const log_path{artifact_dir / (::std::string{stem} + "." + mode.name + "." + policy + ".log")};
+        ::std::error_code ec{};
+        ::std::filesystem::remove(log_path, ec);
+        if(ec) { return {.output_path = output_path}; }
         auto command{(run_prefix.empty() ? ::std::string{} : ::std::string{run_prefix} + " ") + quote_argument(uwvm_path) + " " + mode.args +
-                     " -Rllvm-cache-path disable -Rllvm-call-stack " + policy};
+                     " -Rllvm-cache-path disable -Rllvm-call-stack " + policy + " -Rclog file " + quote_argument(log_path)};
         if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
         command += " --run " + quote_argument(wasm_path);
         auto const full_command{command + " > " + quote_argument(output_path) + " 2>&1"};
@@ -476,7 +478,15 @@ namespace
 
         auto const plain_output{strip_ansi_codes(output)};
         auto funcs{parse_func_indices(plain_output)};
-        auto const valid{plain_output.find("Runtime crash (") != ::std::string::npos && !funcs.empty()};
+        ::std::string log{};
+        if(!read_text_file(log_path, log)) { return {.output_path = output_path}; }
+        // Full compilation logs the selected emission policy. Lazy/Tiered runs must still preserve every ordered frame;
+        // verify their policy too whenever that runtime emits the policy record (IR omission has a separate unit test).
+        auto const args{::std::string_view{mode.args}};
+        auto const require_policy{args.find("-Rcm full") != ::std::string_view::npos || args.find("-Raot") != ::std::string_view::npos ||
+                                  log.find("call_stack=") != ::std::string::npos};
+        auto const policy_matches{!require_policy || ::uwvm2test::native_unwind::matches_policy(strip_ansi_codes(log), policy)};
+        auto const valid{plain_output.find("Runtime crash (") != ::std::string::npos && !funcs.empty() && policy_matches};
         if(!valid)
         {
             ::std::cerr << "failed to parse trap output for " << stem << '/' << mode.name << '/' << policy << ":\n" << output << '\n';
@@ -544,7 +554,22 @@ int main(int argc, char** argv)
         return dir / "test-artifacts" / "0014.llvm_jit" / "unwind_call_stack_wat";
     }(executable_dir)};
     auto comparison_policy{env_string("UWVM_UNWIND_COMPARISON_POLICY")};
-    if(comparison_policy.empty()) { comparison_policy = "unwind"; }
+    // Supported native backends must recover the complete physical caller chain with generated logical frames omitted.
+    // Do not silently turn this native-stack regression into an instruction-stack test on a supported target.
+    if(comparison_policy.empty())
+    {
+#if defined(_WIN64) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__) && \
+    (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64))
+        comparison_policy = "unwind";
+#elif ((defined(__APPLE__) && !defined(_WIN32)) ||                                                                                                            \
+       ((defined(__linux__) || defined(__FreeBSD__)) &&                                                                                                      \
+        (defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64)) && !defined(__ILP32__))) &&                                                           \
+    __has_include(<unwind.h>)
+        comparison_policy = "unwind";
+#else
+        comparison_policy = "auto";
+#endif
+    }
     bool ok{true};
 
     for(auto const& shape: make_shapes())

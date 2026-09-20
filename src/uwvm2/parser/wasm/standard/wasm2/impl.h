@@ -25,4 +25,5 @@
 #pragma once
 #ifndef UWVM_MODULE
 # include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm2/features/impl.h>
 #endif

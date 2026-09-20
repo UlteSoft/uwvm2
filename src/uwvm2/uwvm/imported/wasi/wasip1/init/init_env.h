@@ -67,7 +67,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib { extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept; }
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib { extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept; }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
@@ -128,9 +128,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             }
         }
 
-        // The default WASI environment calls this function pointer directly, bypassing host_api.default.cpp wrappers.
-        // Join lazy compiler workers before proc_exit enters the host exit path and starts global destruction.
-        ::uwvm2::runtime::lib::lazy_compile_stop_before_proc_exit_host_api();
+        // The default environment invokes this function pointer directly. Join the asynchronous signed-cache writer before Linux
+        // fast_exit terminates only the current thread.
+        ::uwvm2::runtime::lib::runtime_stop_before_proc_exit_host_api();
 
 #  if defined(__linux__)
         ::fast_io::fast_exit(static_cast<int>(code));

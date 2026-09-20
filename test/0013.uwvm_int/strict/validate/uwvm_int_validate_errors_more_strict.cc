@@ -206,6 +206,25 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_overlong_inline_block_type_module()
+    {
+        module_builder mb{};
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, 0xffu);
+        append_u8(fb.code, 0x7fu);  // overlong signed-LEB spelling of i32
+        op(fb.code, wasm_op::i32_const);
+        append_i32_leb(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_illegal_opbase_module()
     {
         module_builder mb{};
@@ -1216,6 +1235,8 @@ namespace
             compile_expect_truncated_code_end(build_missing_block_type_module(), u8"uwvm2test_validate_missing_block_type", errc::missing_block_type, 1uz) ==
             0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_block_type_module(), u8"uwvm2test_validate_illegal_block_type", errc::illegal_block_type) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect(build_overlong_inline_block_type_module(), u8"uwvm2test_validate_overlong_inline_block_type", errc::illegal_block_type) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_opbase_module(), u8"uwvm2test_validate_illegal_opbase", errc::illegal_opbase) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_select_type_mismatch_module(), u8"uwvm2test_validate_select_ty", errc::select_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_select_cond_type_not_i32_module(), u8"uwvm2test_validate_select_cond", errc::select_cond_type_not_i32) == 0);

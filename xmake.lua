@@ -26,6 +26,14 @@ add_moduledirs("xmake")
 set_defaultmode("release")
 set_allowedmodes(support_rules_table)
 
+local function uwvm_target_supports_llvm_jit()
+	local arch = string.lower(tostring(get_config("arch") or os.arch() or ""))
+	local is_powerpc = string.sub(arch, 1, 3) == "ppc" or string.sub(arch, 1, 7) == "powerpc"
+	local is_32_bit_powerpc = is_powerpc and string.find(arch, "64", 1, true) == nil
+	local is_sparc = string.sub(arch, 1, 5) == "sparc"
+	return not is_32_bit_powerpc and not is_sparc
+end
+
 function def_build(opt)
 	opt = opt or {}
 	if is_mode("debug") then
@@ -43,11 +51,31 @@ function def_build(opt)
 	set_encodings("utf-8")
 	set_warnings("all", "extra", "pedantic", "error")
 
+	add_rules("native_stack_probes")
+
+	local build_source_id = get_config("build-source-id")
+	if build_source_id and build_source_id ~= "none" then
+		if #build_source_id ~= 71 or not build_source_id:match("^sha256:[0-9a-f]+$") then
+			error("invalid --build-source-id: expected sha256:<64 lowercase hexadecimal digits>")
+		end
+		-- This is the builder's assertion of a verified source-manifest identity;
+		-- the syntax check above does not compute or authenticate that manifest.
+		-- Refresh it when the covered sources change. Reusing an old value for
+		-- an incremental diagnostic build does not make its caches distributable.
+		-- Consumed by the cache policy header, also when built as a module unit.
+		add_defines("UWVM2_BUILD_SOURCE_ID=u8\"" .. build_source_id .. "\"")
+	end
+
 	local enable_cxx_module = get_config("use-cxx-module")
 	if enable_cxx_module then
 		add_defines("UWVM_MODULE")
 		set_policy("build.c++.modules", true)
-		-- set_policy("build.c++.modules.std", true)
+		-- Check the bootstrap compiler's real initializer code generation, not
+		-- its version string or the unrelated bundled LLVM dependency version.
+		add_rules("module_initializer_check")
+		-- The project uses named modules but does not import `std`. Do not make xmake synthesize a standard-library module:
+		-- its compiler-shipped std.cc must exactly match the selected C++ standard library and is not a project dependency.
+		set_policy("build.c++.modules.std", false)
 	end
 
 	local use_stdlib = get_config("stdlib")
@@ -110,7 +138,8 @@ function def_build(opt)
 	end
 
 	local execution_jit = get_config("execution-jit")
-	if not execution_jit or execution_jit == "none" then
+	local enable_llvm_jit = (execution_jit == "default" or execution_jit == "llvm") and uwvm_target_supports_llvm_jit()
+	if not enable_llvm_jit then
 		add_defines("UWVM_DISABLE_JIT")
 	elseif execution_jit == "default" then
 		add_defines("UWVM_USE_DEFAULT_JIT")
@@ -120,7 +149,7 @@ function def_build(opt)
 		add_options("llvm-jit-env")
 	end
 
-	if execution_jit == "default" or execution_jit == "llvm" then
+	if enable_llvm_jit then
 		add_cxxflags("-Wno-deprecated-declarations", { force = true })
 
 		on_load(function(target)
@@ -143,17 +172,14 @@ function def_build(opt)
 					end
 				end
 			end
-			for _, value in ipairs(os.argv(llvm_jit_options.native_codegen_linkflags or "")) do
-				target:add("ldflags", value, { force = true })
-			end
 		end)
 	end
 
-	if (execution_jit == "default" or execution_jit == "llvm") and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
+	if enable_llvm_jit and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
-			-- Keep the runtime search path aligned with the LLVM installation
-			-- selected by llvm-config, rather than inferring it from the C++ driver.
+			-- Only the selected bootstrap C++ runtime may need dynamic lookup;
+			-- the bundled LLVM dependency itself is always an absolute static archive.
 			local llvm_jit_options = utility.get_llvm_jit_options()
 			for _, llvm_libdir in ipairs(llvm_jit_options.linkdirs or {}) do
 				if llvm_libdir and llvm_libdir ~= "" then
@@ -163,43 +189,38 @@ function def_build(opt)
 		end)
 	end
 
-	local debug_int = get_config("debug-int")
-	if debug_int then
-		add_defines("UWVM_ENABLE_DEBUG_INT")
-	else
-		add_defines("UWVM_DISABLE_DEBUG_INT")
-	end
+	if execution_int == "default" or execution_int == "uwvm-int" then
+		local combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
 
-	local heavy_combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
+		if combine_ops_mode ~= "none" then
+			-- Soft/light combine is enabled by default unless explicitly set to "none".
+			add_defines("UWVM_ENABLE_UWVM_INT_COMBINE_OPS")
 
-	if heavy_combine_ops_mode ~= "none" then
-		-- Soft/light combine is enabled by default unless explicitly set to "none".
-		add_defines("UWVM_ENABLE_UWVM_INT_COMBINE_OPS")
-
-		if heavy_combine_ops_mode == "heavy" or heavy_combine_ops_mode == "extra" then
-			add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
-			if heavy_combine_ops_mode == "extra" then
-				add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+			if combine_ops_mode == "heavy" or combine_ops_mode == "extra" then
+				add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
+				if combine_ops_mode == "extra" then
+					add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+				end
 			end
 		end
-	end
 
-	local delay_local_mode = get_config("enable-uwvm-int-delay-local")
-	if delay_local_mode == "soft" or delay_local_mode == "heavy" then
-		add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT")
-		if delay_local_mode == "heavy" then
-			add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY")
+		local delay_local_mode = get_config("enable-uwvm-int-delay-local")
+		if delay_local_mode == "soft" or delay_local_mode == "heavy" then
+			add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT")
+			if delay_local_mode == "heavy" then
+				add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY")
+			end
 		end
-	end
 
-	local enable_uwvm_int_instruction_reorder = get_config("enable-uwvm-int-instruction-reorder")
-	if enable_uwvm_int_instruction_reorder then
-		add_defines("UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER")
-	end
+		local enable_uwvm_int_instruction_reorder = get_config("enable-uwvm-int-instruction-reorder")
+		if enable_uwvm_int_instruction_reorder then
+			add_defines("UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER")
+		end
 
-	local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
-	if enable_uwvm_int_loop_unwind then
-		add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")
+		local enable_uwvm_int_loop_unwind = get_config("enable-uwvm-int-loop-unwind")
+		if enable_uwvm_int_loop_unwind then
+			add_defines("UWVM_ENABLE_UWVM_INT_LOOP_UNWIND")
+		end
 	end
 
 	local use_thread_local = get_config("use-thread-local")
@@ -280,8 +301,17 @@ function def_build(opt)
 						return nil
 					end
 
-					-- Get Commit ID
-					local commit_id = git_command("git rev-parse HEAD") or "unknown"
+					-- Only a verified object id is a usable source identity. Never turn a failed Git query into a
+					-- defined "unknown" commit: the persistent native-object cache treats a defined id as provenance.
+					local commit_id = git_command("git rev-parse --verify HEAD")
+					if commit_id then
+						local commit_id_length = #commit_id
+						if (commit_id_length ~= 40 and commit_id_length ~= 64) or not commit_id:match("^[0-9a-fA-F]+$") then
+							commit_id = nil
+						else
+							commit_id = commit_id:lower()
+						end
+					end
 
 					-- Get the current branch name (may be empty, such as the separation HEAD status)
 					local current_branch = git_command("git branch --show-current")
@@ -328,13 +358,13 @@ function def_build(opt)
 						commit_date = os.date("!%Y-%m-%d", timestamp) -- Attention '! 'means forcing UTC
 					end
 
-					local is_dirty = false
 					local status_output = git_command("git status --porcelain")
-					if status_output and status_output ~= "" then
-						is_dirty = true -- There are uncommitted modifications or untracked files
-					end
+					-- Failure to inspect the worktree is not evidence of a clean tree, so fail closed as dirty.
+					local is_dirty = status_output == nil or status_output ~= ""
 
-					target:add("defines", "UWVM_GIT_COMMIT_ID=u8\"" .. commit_id .. "\"")
+					if commit_id then
+						target:add("defines", "UWVM_GIT_COMMIT_ID=u8\"" .. commit_id .. "\"")
+					end
 					target:add("defines", "UWVM_GIT_REMOTE_URL=u8\"" .. remote_url .. "\"")
 					target:add("defines", "UWVM_GIT_COMMIT_DATA=u8\"" .. commit_date .. "\"")
 					target:add("defines", "UWVM_GIT_UPSTREAM_BRANCH=u8\"" .. upstream_branch .. "\"")
@@ -353,8 +383,16 @@ function def_build(opt)
 	)
 end
 
-local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
-local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or uwvm_uses_llvm_jit
+local uwvm_uses_uwvm_int = (get_config("execution-int") == "uwvm-int") or (get_config("execution-int") == "default")
+local uwvm_uses_llvm_jit = ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) and
+	uwvm_target_supports_llvm_jit()
+local uwvm_has_runtime_backend = uwvm_uses_uwvm_int or uwvm_uses_llvm_jit
+
+local function uwvm_add_frontend_module_files(is_public)
+	-- Keep the exported partition graph independent of backend macros. Each
+	-- partition's included header guards its backend-specific declarations.
+	add_files("src/uwvm2/uwvm/**.cppm", { public = is_public })
+end
 
 if uwvm_uses_llvm_jit and get_config("openssl-root") == "default" then
 	add_requires("openssl", {configs = {shared = false}})
@@ -404,10 +442,9 @@ target("uwvm")
 	-- third-parties/fast_io
 	add_includedirs("third-parties/fast_io/include")
 
-	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-	end
+	-- Module interfaces and their initializer objects belong to uwvm_runtime.
+	-- Consume its public BMIs through add_deps below; compiling the same .cppm
+	-- here links two strong module initializers, even when all C++ APIs inline.
 
 	-- third-parties/bizwen
 	add_includedirs("third-parties/bizwen/include")
@@ -428,29 +465,6 @@ target("uwvm")
 	add_headerfiles("src/**.h")
 
 	if enable_cxx_module then
-		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-		-- utils
-		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-		-- object
-		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-		-- imported
-		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-		-- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-		-- validation
-		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-		-- uwvm
-		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-	end
-
-	if enable_cxx_module then
 		-- uwvm main
 		add_files("src/uwvm2/uwvm/main.module.cpp")
 		add_files("src/uwvm2/uwvm/host_api.module.cpp")
@@ -469,6 +483,11 @@ target_end()
 target("uwvm_runtime")
 	set_kind("object")
 	def_build({ skip_static_libcxx = true })
+	-- Own every production interface once, including backend-neutral frontend
+	-- partitions. Public here means available to dependent xmake targets in
+	-- Release too, not a C++ export of otherwise private declarations. A consumer
+	-- may need its own compatible BMI, but must not add a second initializer
+	-- object. Do not fix duplicate symbols with allow-multiple-definition.
 
 	-- Interpreter/runtime execution unit: disable observable floating-point side effects
 	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
@@ -478,8 +497,11 @@ target("uwvm_runtime")
 	add_includedirs("third-parties/fast_io/include")
 
 	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = true })
+		if uwvm_uses_llvm_jit then
+			-- Only the LLVM object-cache partitions import fast_io_crypto.
+			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = true })
+		end
 	end
 
 	-- third-parties/bizwen
@@ -499,28 +521,39 @@ target("uwvm_runtime")
 
 	if enable_cxx_module then
 		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = true })
 
 		-- utils
-		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/utils/**.cppm", { public = true })
 
 		-- object
-		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/object/**.cppm", { public = true })
 
 		-- imported
-		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/imported/**.cppm", { public = true })
 
 		-- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/parser/**.cppm", { public = true })
 
 		-- validation
-		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+		add_files("src/uwvm2/validation/**.cppm", { public = true })
 
 		-- uwvm
-		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+		uwvm_add_frontend_module_files(true)
 
-		-- runtime
-		add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
+		-- The runtime interface is backend-neutral and remains visible in every module build. Compiler/cache partitions are added only
+		-- for enabled backends so int-only builds never parse LLVM modules and LLVM-only builds never compile interpreter optables.
+		add_files("src/uwvm2/runtime/lib/**.cppm", { public = true })
+		if uwvm_uses_uwvm_int or uwvm_uses_llvm_jit then
+			add_files("src/uwvm2/runtime/compiler/shared/**.cppm", { public = true })
+		end
+		if uwvm_uses_uwvm_int then
+			add_files("src/uwvm2/runtime/compiler/uwvm_int/**.cppm", { public = true })
+		end
+		if uwvm_uses_llvm_jit then
+			add_files("src/uwvm2/runtime/compiler/llvm_jit/**.cppm", { public = true })
+			add_files("src/uwvm2/runtime/llvm_jit_cache/**.cppm", { public = true })
+		end
 	end
 
 	if uwvm_has_runtime_backend then
@@ -542,18 +575,21 @@ target_end()
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
 	local is_0013_uwvm_int = (string.find(file, "test/0013.uwvm_int/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\", 1, true) ~= nil)
-	local is_0013_uwvm_int_lazy = (string.find(file, "test/0013.uwvm_int/lazy/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\lazy\\", 1, true) ~= nil)
 	local is_0014_llvm_jit = (string.find(file, "test/0014.llvm_jit/", 1, true) ~= nil) or (string.find(file, "test\\0014.llvm_jit\\", 1, true) ~= nil)
 	local is_0015_backend_fuzzer = (string.find(file, "test/0015.backend_fuzzer/", 1, true) ~= nil) or (string.find(file, "test\\0015.backend_fuzzer\\", 1, true) ~= nil)
 	local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
 		(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
 	local is_llvm_jit_test = is_0014_llvm_jit or (string.find(file, "llvm_jit", 1, true) ~= nil)
+	local is_parallel_compile_failure_state = string.find(file, "parallel_compile_failure_state.cc", 1, true) ~= nil
+	local is_wasm_entry_integer = string.find(file, "wasm_entry_integer.cc", 1, true) ~= nil
+	local is_uwvm_int_fp_environment = string.find(file, "uwvm_int_fp_environment.cc", 1, true) ~= nil
 	local test_libfuzzer = get_config("test-libfuzzer")
-	local is_int_backend = get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default"
 
-	if not ((is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) or
-		(is_0013_uwvm_int_lazy and not is_int_backend) or
+	if not ((is_0013_uwvm_int and (not get_config("enable-test-uwvm-int") or not uwvm_uses_uwvm_int)) or
 		(is_0014_llvm_jit and not get_config("enable-test-llvm-jit")) or
+		(is_llvm_jit_test and not uwvm_uses_llvm_jit) or
+		(is_parallel_compile_failure_state and not uwvm_uses_uwvm_int) or
+		(is_wasm_entry_integer and not uwvm_has_runtime_backend) or
 		is_0015_backend_fuzzer or
 		(is_libfuzzer and not test_libfuzzer)) then
 		local name = path.basename(file)
@@ -563,15 +599,25 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_kind("binary")
 		def_build({ skip_static_libcxx = (is_libfuzzer and test_libfuzzer) or is_llvm_jit_test })
 
-		if ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) and
-			is_llvm_jit_test then
+		if uwvm_uses_llvm_jit and is_llvm_jit_test then
 			add_deps("uwvm_runtime")
 			add_deps("uwvm")
 		end
 
-		if is_0013_uwvm_int_lazy then
+		-- In a combined interpreter/LLVM build, interpreter optables route local-imported provider access through
+		-- backend-neutral guarded entry points implemented by uwvm_runtime. Even header-driven interpreter tests must
+		-- link that object target once those templates are instantiated.
+		if uwvm_uses_llvm_jit and is_0013_uwvm_int then
+			add_deps("uwvm_runtime")
+		end
+
+		if string.find(file, "uwvm_int_fp_bit_environment.cc", 1, true) ~= nil then
 			add_deps("uwvm_runtime")
 			add_deps("uwvm")
+		end
+		-- This regression calls the production entry even in interpreter-only builds.
+		if is_uwvm_int_fp_environment then
+			add_deps("uwvm_runtime")
 		end
 
 		-- uwvm uses precise floating-point model to ensure determinism.
@@ -580,13 +626,20 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_default(false)
 
 		local enable_cxx_module = get_config("use-cxx-module")
+		-- Runtime-backed tests consume the same public interfaces as the CLI.
+		-- Re-registering them here would link duplicate module initializers;
+		-- standalone tests without that dependency still own their interfaces.
+		local test_uses_runtime = (uwvm_uses_llvm_jit and (is_llvm_jit_test or is_0013_uwvm_int)) or
+			(string.find(file, "uwvm_int_fp_bit_environment.cc", 1, true) ~= nil) or is_uwvm_int_fp_environment
 
 		-- third-parties/fast_io
 		add_includedirs("third-parties/fast_io/include")
 
-		if enable_cxx_module then
+		if enable_cxx_module and not test_uses_runtime then
 			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+			if uwvm_uses_llvm_jit and is_llvm_jit_test then
+				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+			end
 		end
 		-- third-parties/bizwen
 		add_includedirs("third-parties/bizwen/include")
@@ -594,7 +647,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- third-parties/boost
 		add_includedirs("third-parties/boost_unordered/include")
 
-		if is_llvm_jit_test then
+		if uwvm_uses_llvm_jit and is_llvm_jit_test then
 			uwvm_add_llvm_jit_cache_openssl()
 		end
 
@@ -606,7 +659,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		-- src
 		add_includedirs("src/")
 
-		if enable_cxx_module then
+		if enable_cxx_module and not test_uses_runtime then
 			-- uwvm predefine
 			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
 
@@ -626,7 +679,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
 
 			-- uwvm
-			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+			uwvm_add_frontend_module_files(is_debug_mode)
 		end
 
 		set_warnings("all", "extra", "error")
@@ -990,8 +1043,8 @@ for _, file in ipairs(os.files("test/**.cc")) do
 end
 
 if get_config("enable-test-backend-fuzzer") then
-	local backend_fuzzer_has_int = get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default"
-	local backend_fuzzer_has_jit = get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default"
+	local backend_fuzzer_has_int = uwvm_uses_uwvm_int
+	local backend_fuzzer_has_jit = uwvm_uses_llvm_jit
 	if not backend_fuzzer_has_int or not backend_fuzzer_has_jit then
 		raise("test/0015.backend_fuzzer requires --execution-int=uwvm-int/default and --execution-jit=llvm/default.")
 	end
@@ -1022,10 +1075,16 @@ if get_config("enable-test-backend-fuzzer") then
 	target_end()
 end
 
--- LLVM JIT mirror of the 0013 strict uwvm-int suites. These targets compile the
--- original 0013 source files with a runner macro that routes Runner::run through
--- llvm_jit_call_raw_host_api, so the LLVM coverage stays aligned with 0013.
-if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) then
+-- LLVM AOT mirror of the 0013 strict uwvm-int suites. These sources still inspect
+-- interpreter translation artifacts, so register the mirrors only for combined builds.
+-- Pure LLVM builds retain the native 0014 LLVM tests without pulling in the int harness.
+if get_config("enable-test-llvm-jit") and uwvm_uses_uwvm_int and uwvm_uses_llvm_jit then
+	-- LLVM now executes these bulk-memory, reference/table and SIMD operations.
+	-- The historical seven-file exclusion also hid multi-value if and validator
+	-- alignment regressions; all seven compile and execute through the LLVM
+	-- runner. Keep the complete inventory instead of silently omitting suites
+	-- based on obsolete backend limitations. Interpreter translation artifacts
+	-- are still inspected, which is why this remains a combined-backend target.
 	local llvm_jit_strict_files = os.files("test/0013.uwvm_int/strict/**.cc")
 	table.sort(llvm_jit_strict_files)
 	for index, file in ipairs(llvm_jit_strict_files) do
@@ -1046,15 +1105,10 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 
 			set_default(false)
 
-			local enable_cxx_module = get_config("use-cxx-module")
-
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")
 
-			if enable_cxx_module then
-				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-			end
+			-- Public module interfaces come from the uwvm_runtime dependency.
 			-- third-parties/bizwen
 			add_includedirs("third-parties/bizwen/include")
 
@@ -1072,28 +1126,6 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			-- src
 			add_includedirs("src/")
 
-			if enable_cxx_module then
-				-- uwvm predefine
-				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-				-- utils
-				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-				-- object
-				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-				-- imported
-				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-				-- wasm parser
-				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-				-- validation
-				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-				-- uwvm
-				add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-			end
 
 			set_warnings("all", "extra", "error")
 
@@ -1110,91 +1142,4 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 		target_end()
 	end
 
-	local llvm_jit_lazy_files = os.files("test/0013.uwvm_int/lazy/**.cc")
-	table.sort(llvm_jit_lazy_files)
-	local llvm_jit_lazy_index = 0
-	for _, file in ipairs(llvm_jit_lazy_files) do
-		local normalized = file:gsub("\\", "/")
-		if normalized:find("/uwvm_int_lazy_split.cc", 1, true) or normalized:find("/uwvm_int_lazy_strategy_matrix.cc", 1, true) then
-			goto continue_llvm_jit_lazy
-		end
-		local rel = normalized
-		rel = rel:gsub("^test/0013%.uwvm_int/lazy/", "")
-		llvm_jit_lazy_index = llvm_jit_lazy_index + 1
-		local name = string.format("lj13l_%03d", llvm_jit_lazy_index)
-
-		target(name)
-			set_group("test/0014.llvm_jit/lazy")
-			set_kind("binary")
-			def_build({ skip_static_libcxx = true })
-
-			add_deps("uwvm_runtime")
-			add_deps("uwvm")
-
-			-- uwvm uses precise floating-point model to ensure determinism.
-			set_fpmodels("precise")
-
-			set_default(false)
-
-			local enable_cxx_module = get_config("use-cxx-module")
-
-			-- third-parties/fast_io
-			add_includedirs("third-parties/fast_io/include")
-
-			if enable_cxx_module then
-				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-			end
-			-- third-parties/bizwen
-			add_includedirs("third-parties/bizwen/include")
-
-			-- third-parties/boost
-			add_includedirs("third-parties/boost_unordered/include")
-
-			uwvm_add_llvm_jit_cache_openssl()
-
-			-- uwvm
-			add_defines("UWVM=2")
-			-- uwvm test
-			add_defines("UWVM_TEST=2")
-			add_defines("UWVM2TEST_RUNNER_USE_LLVM_JIT")
-
-			-- src
-			add_includedirs("src/")
-
-			if enable_cxx_module then
-				-- uwvm predefine
-				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-				-- utils
-				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-				-- object
-				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-				-- imported
-				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-				-- wasm parser
-				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-				-- validation
-				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-				-- uwvm
-				add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-			end
-
-			set_warnings("all", "extra", "error")
-
-			if get_config("use-llvm-compiler") then
-				add_cxxflags("-Wno-error=undefined-inline")
-				add_cxxflags("-Wno-undefined-inline")
-			end
-
-			add_tests("unit", { group = "default" }) -- xmake test -g default
-			add_files(file)
-		target_end()
-		::continue_llvm_jit_lazy::
-	end
 end

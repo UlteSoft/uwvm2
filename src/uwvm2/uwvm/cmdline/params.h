@@ -24,6 +24,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <cstddef>
 # include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -72,11 +73,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_initializer_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_mvp),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_wasm1p1),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_wasm2),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_multi_value),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_multi_value),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_reference_types),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_reference_types),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_table_instructions),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_table_instructions),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_multiple_tables),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_multiple_tables),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_bulk_memory),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_bulk_memory),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_sign_extension),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_sign_extension),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_nontrapping_float_to_int),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_nontrapping_float_to_int),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_enable_simd),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_feature_disable_simd),
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
@@ -84,12 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
 
         // runtime
-#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_debug),
-# endif
+#if defined(UWVM_RUNTIME_HAS_BACKEND)
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_disable_loop_unwind),
@@ -101,30 +108,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_uwvm_int_loop_unwind_max_size),
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_jit),
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered),
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
 # endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
-# if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_policy),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_lazy_policy),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_full_policy),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_call_stack),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_disable_ir_verifaction),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_no_sign),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_no_verify),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_path),
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_uwvm_int_lazy_interpreter),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_llvm_full_jit),
 # endif
 #endif
 

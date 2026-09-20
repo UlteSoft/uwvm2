@@ -32,8 +32,8 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
-# include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
@@ -187,6 +187,9 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    // Retain the exact table mutation in the full-JIT bridge ABI.
+    enum class llvm_jit_call_indirect_table_mutation_kind : unsigned char { set, init, copy, fill, grow };
+
     struct llvm_jit_raw_call_target_t
     {
         ::std::uintptr_t entry_address{};
@@ -209,8 +212,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     {
         func_ref_imported,
         func_ref_defined,
-        /// @warning Extension point: externref/table-of-ref payloads must be added here when runtime table storage grows beyond function refs.
-        /// @todo Reference Types
+        /// @brief Host-owned opaque reference. A null pointer represents `ref.null extern`.
+        /// @details Appending this enumerator preserves the existing funcref tag values and table fast-path layout.
+        extern_ref,
     };
 
     struct local_defined_table_elem_storage_t
@@ -220,9 +224,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             // For other uses of WASM, the prerequisite is that WASM must be initialized.
             imported_function_storage_t const* imported_ptr;
             local_defined_function_storage_t const* defined_ptr;
-
-            /// @warning Extension point: keep payload members synchronized with local_defined_table_elem_storage_type_t.
-            /// @todo Reference Types
+            void* extern_ptr;
         };
 
         imported_function_storage_u storage{};
@@ -505,12 +507,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         func_idx_t const* funcidx_begin{};
         func_idx_t const* funcidx_end{};
 
+        // Runtime-owned canonical funcrefs for expression-form segments. Unlike a bare function index, these pointer-based entries
+        // preserve the creating module when an imported global supplies a reference from another module.
+        local_defined_table_elem_storage_t const* funcref_begin{};
+        local_defined_table_elem_storage_t const* funcref_end{};
+
+        // Runtime-owned opaque host references for externref expression segments.
+        // A null entry represents `ref.null extern`.
+        void* const* externref_begin{};
+        void* const* externref_end{};
+
         // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
         wasm_element_segment_kind kind{wasm_element_segment_kind::active};
 
-        // meaningful only for passive segments; when true the payload is not available.
+        // When true, the payload is unavailable. Active and declarative segments are
+        // dropped during instantiation; passive segments are dropped by elem.drop.
         bool dropped{};
     };
+
+    /// @brief Make every representation of an element-segment payload unavailable.
+    inline constexpr void drop_wasm_element_segment_payload(wasm_element_storage_t& element) noexcept
+    {
+        element.dropped = true;
+        element.funcidx_begin = nullptr;
+        element.funcidx_end = nullptr;
+        element.funcref_begin = nullptr;
+        element.funcref_end = nullptr;
+        element.externref_begin = nullptr;
+        element.externref_end = nullptr;
+    }
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_element_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -604,10 +629,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
         wasm_data_segment_kind kind{wasm_data_segment_kind::active};
 
-        // meaningful only for passive segments; when true the payload is not available.
-        // `data.drop` will set `byte_begin`/`byte_end` to nullptr, making it easier to validate.
+        // When true the payload is unavailable. Active segments are dropped after
+        // successful instantiation; `data.drop` does the same for passive segments.
         bool dropped{};
     };
+
+    /// @brief Make a data-segment payload unavailable.
+    inline constexpr void drop_wasm_data_segment_payload(wasm_data_storage_t& data) noexcept
+    {
+        data.dropped = true;
+        data.byte_begin = nullptr;
+        data.byte_end = nullptr;
+    }
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_data_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -647,7 +680,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     struct wasm_module_storage_t
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-        // Borrowed from the global module-name table.  LLVM JIT uses this stable identity for IR symbol names so
+        // Borrowed from the global module-name table.  LLVM AOT uses this stable identity for IR symbol names so
         // cache keys do not depend on runtime storage addresses.
         ::uwvm2::utils::container::u8string_view module_name{};
 #endif
@@ -678,7 +711,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         // element
         ::uwvm2::utils::container::vector<local_defined_element_storage_t> local_defined_element_vec_storage{};
-        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> element_expr_funcidx_vec_storage{};
+        ::uwvm2::utils::container::vector<local_defined_table_elem_storage_t> element_expr_funcref_vec_storage{};
+        ::uwvm2::utils::container::vector<void*> element_expr_externref_vec_storage{};
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> declared_ref_funcidx_vec_storage{};
 
         // code
@@ -686,8 +720,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         // data
         ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
+        // Absence is distinct from an explicitly present zero count for bulk-memory validation.
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_count_section_count{};
+        bool data_count_section_present{};
 
-        // LLVM JIT call_indirect uses a compact runtime table-view side structure.
+        // LLVM AOT call_indirect uses a compact runtime table-view side structure.
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::utils::container::vector<llvm_jit_call_indirect_table_view_t> llvm_jit_call_indirect_table_views{};
 #endif
@@ -720,7 +757,9 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
-                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<void*>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
@@ -758,7 +797,9 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
-                                                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<void*>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<

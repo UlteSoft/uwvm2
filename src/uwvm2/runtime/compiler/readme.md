@@ -1,12 +1,11 @@
 # Runtime compilers
 
-This directory contains UWVM2 “runtime compiler” components: implementations that translate validated WebAssembly into an **in-memory executable form** (interpreter bytecode and/or native code), without producing a standalone executable on disk.
+This directory contains the two retained UWVM2 translation components. Both translate a complete validated module before execution; demand compilation and tier switching have been removed.
 
 ## Contents
 
-- `uwvm_int/`: high-performance threaded interpreter pipeline (“u2”), including the register-ring stack-top cache design. See `uwvm_int/readme.md`.
-- `debug_int/`: debug interpreter focused on full semantic coverage and observability. See `debug_int/readme.md`.
-- `llvm_jit/`: JIT-related work (in-memory native code generation; currently sparse / work-in-progress).
+- `uwvm_int/`: high-performance threaded interpreter pipeline (“u2”), using full-module translation and the register-ring stack-top cache design. See `uwvm_int/readme.md`.
+- `llvm_jit/`: full-module LLVM AOT translation and native materialization. Its historical directory name is retained temporarily; no lazy LLVM compiler, tiered runtime, or per-function interpreter fallback is built.
 
 ## Notes
 

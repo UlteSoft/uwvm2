@@ -11,6 +11,30 @@ namespace details
 https://www.ibm.com/docs/en/aix/7.1?topic=ff-lc-time-category-locale-definition-source-file-format
 */
 
+/// @brief Lazily resolves the relative descriptors observed by the experimental locale-time formatter.
+/// @details `basic_lc_time` is an immutable facet table whose scatters are 32-bit RVAs into `basic_lc_object` storage;
+///          it is not a table of process pointers. Eagerly translating the complete facet would perform roughly
+///          seventy owner/vector lookups for a format that normally observes only a handful of fields. This view keeps
+///          the representation boundary explicit and resolves exactly the branch selected by the format program. Date
+///          arithmetic and character-generation kernels remain independent of locale storage and are left unchanged.
+template <::std::integral char_type>
+struct lc_time_view
+{
+	basic_lc_all<char_type> const *all;
+
+	[[nodiscard]] inline constexpr basic_lc_time<char_type> const &facets() const noexcept
+	{
+		return all->time;
+	}
+
+	template <typename value_type>
+	[[nodiscard]] inline constexpr basic_io_scatter_t<value_type> resolve(
+		basic_scatter<value_type> scatter) const noexcept
+	{
+		return ::fast_io::details::lc_resolve_scatter(all, scatter);
+	}
+};
+
 template <::std::integral year_type>
 inline constexpr bool is_leap_year(year_type year) noexcept
 {
@@ -80,13 +104,18 @@ inline constexpr ::std::int_least64_t day_diff(iso8601_timestamp const &tsp_afte
 
 template <::std::integral T, ::std::integral char_type>
 inline constexpr ::std::size_t
-lc_format_alt_digits_len(basic_io_scatter_t<basic_io_scatter_t<char_type>> const &alt_digits, T value) noexcept
+lc_format_alt_digits_len(
+	lc_time_view<char_type> locale,
+	basic_scatter<basic_scatter<char_type>> alt_digits_relative, T value) noexcept
 {
 	::std::size_t size_value{static_cast<::std::size_t>(value)};
+	auto const alt_digits{locale.resolve(alt_digits_relative)};
 	::std::size_t alt_digits_len{alt_digits.len};
 	if (size_value < alt_digits_len) [[likely]]
 	{
-		return alt_digits.base[size_value].len;
+		// The outer descriptor table has already been range-checked. A size query observes only the selected compact
+		// character count; the corresponding character pointer is resolved only by the define path below.
+		return alt_digits.base[size_value].length;
 	}
 	else
 	{
@@ -97,14 +126,17 @@ lc_format_alt_digits_len(basic_io_scatter_t<basic_io_scatter_t<char_type>> const
 
 template <::std::integral T, ::std::integral char_type>
 inline constexpr char_type *
-lc_format_alt_digits_print(basic_io_scatter_t<basic_io_scatter_t<char_type>> const &alt_digits, T value,
-						   char_type *iter) noexcept
+lc_format_alt_digits_print(
+	lc_time_view<char_type> locale,
+	basic_scatter<basic_scatter<char_type>> alt_digits_relative, T value,
+	char_type *iter) noexcept
 {
 	::std::size_t size_value{static_cast<::std::size_t>(value)};
+	auto const alt_digits{locale.resolve(alt_digits_relative)};
 	::std::size_t alt_digits_len{alt_digits.len};
 	if (size_value < alt_digits_len) [[likely]]
 	{
-		return copy_scatter(alt_digits.base[size_value], iter);
+		return copy_scatter(locale.resolve(alt_digits.base[size_value]), iter);
 	}
 	else
 	{
@@ -281,14 +313,25 @@ template <::std::integral char_type>
 inline constexpr char_type *copy_scatter_to_lowercase(basic_io_scatter_t<char_type> const &scatter,
 													  char_type *iter) noexcept
 {
+	if (!scatter.len)
+	{
+		return iter;
+	}
 	return non_overlapped_copy_to_lowercase(scatter.base, scatter.base + scatter.len, iter);
 }
 
 template <::std::integral char_type>
 inline constexpr ::std::size_t
-lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t, iso8601_timestamp const &tsp,
+lc_print_reserve_size_time_format_common_impl(lc_time_view<char_type> locale, iso8601_timestamp const &tsp,
 											  basic_io_scatter_t<char_type> const &format_str) noexcept
 {
+	auto const &t{locale.facets()};
+	if (!format_str.len)
+	{
+		// Empty relative descriptors resolve to `{nullptr, 0}`. Return before forming `nullptr + 0`; even a
+		// zero-offset pointer-arithmetic expression requires a pointer into an array object.
+		return 0u;
+	}
 	constexpr ::std::size_t uint_least8_reserve_size{
 		print_reserve_size(io_reserve_type<char_type, ::std::uint_least8_t>)};
 	constexpr ::std::size_t uint_least16_reserve_size{
@@ -329,7 +372,7 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 		case char_literal_v<u8'a', char_type>:
 		case char_literal_v<u8'A', char_type>:
 		{
-			basic_io_scatter_t<char_type> const *base_ptr;
+			basic_scatter<char_type> const *base_ptr;
 			if (*p == char_literal_v<u8'a', char_type>)
 			{
 				base_ptr = t.abday;
@@ -338,7 +381,9 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 			{
 				base_ptr = t.day;
 			}
-			value += base_ptr[c_weekday(tsp)].len;
+			// `c_weekday` is reduced modulo seven by construction, so the fixed facet array is already bounds-proven.
+			// A size pass needs only the compact descriptor count and deliberately does not touch character storage.
+			value += base_ptr[c_weekday(tsp)].length;
 			break;
 		}
 		case char_literal_v<u8'b', char_type>:
@@ -354,13 +399,13 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 			else
 			{
 				auto mon_or_abmon{*p == char_literal_v<u8'B', char_type> ? t.mon : t.abmon};
-				value += mon_or_abmon[month_minus1].len;
+				value += mon_or_abmon[month_minus1].length;
 			}
 			break;
 		}
 		case char_literal_v<u8'c', char_type>:
 		{
-			value += lc_print_reserve_size_time_format_common_impl(t, tsp, t.d_t_fmt);
+			value += lc_print_reserve_size_time_format_common_impl(locale, tsp, locale.resolve(t.d_t_fmt));
 			break;
 		}
 		case char_literal_v<u8'C', char_type>:
@@ -415,7 +460,7 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 			case char_literal_v<u8'x', char_type>:
 			case char_literal_v<u8'X', char_type>:
 			{
-				basic_io_scatter_t<char_type> const *scatter_ptr{};
+				basic_scatter<char_type> const *scatter_ptr{};
 				switch (*p)
 				{
 				case char_literal_v<u8'c', char_type>:
@@ -434,15 +479,18 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 					break;
 				}
 				}
-				value += lc_print_reserve_size_time_format_common_impl(t, tsp, *scatter_ptr);
+				value += lc_print_reserve_size_time_format_common_impl(locale, tsp, locale.resolve(*scatter_ptr));
 				break;
 			}
 			case char_literal_v<u8'C', char_type>:
 			case char_literal_v<u8'y', char_type>:
 			case char_literal_v<u8'Y', char_type>:
 			{
-				auto era_scatter_start{t.era.base};
-				auto era_scatter_end{era_scatter_start + t.era.len};
+				// Resolve the containing era table before inspecting an entry. This single check proves both iterator
+				// endpoints; the selected name can then contribute its stored length without resolving its bytes.
+				auto const eras{locale.resolve(t.era)};
+				auto era_scatter_start{eras.base};
+				auto era_scatter_end{eras.len ? era_scatter_start + eras.len : era_scatter_start};
 				auto era_result{
 					lc_time_find_era_impl(era_scatter_start, era_scatter_end, tsp.year, {tsp.month, tsp.day})};
 				if (era_result != era_scatter_end)
@@ -451,7 +499,7 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 					{
 					case char_literal_v<u8'C', char_type>:
 					{
-						value += era_result->era_name.len;
+						value += era_result->era_name.length;
 						break;
 					}
 					case char_literal_v<u8'y', char_type>:
@@ -461,8 +509,8 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 					}
 					default:
 					{
-						value +=
-							lc_print_reserve_size_time_format_common_impl(t, tsp, era_result->era_format);
+						value += lc_print_reserve_size_time_format_common_impl(
+							locale, tsp, locale.resolve(era_result->era_format));
 						break;
 					}
 					}
@@ -491,13 +539,13 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 				{
 					month_minus1 = 0u;
 				}
-				value += t.ab_alt_mon[month_minus1].len;
+				value += t.ab_alt_mon[month_minus1].length;
 				break;
 			}
 			case char_literal_v<u8'C', char_type>:
 			{
 				::std::int_least64_t yr{tsp.year / 100};
-				value += lc_format_alt_digits_len<::std::int_least64_t>(t.alt_digits, yr);
+				value += lc_format_alt_digits_len<::std::int_least64_t>(locale, t.alt_digits, yr);
 				break;
 			}
 			case char_literal_v<u8'p', char_type>: // Glibc's changelog said do not use %Op but the upstream
@@ -507,11 +555,11 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 				::std::uint_least8_t const hours{tsp.hours};
 				if (hours < 12u)
 				{
-					value += t.am_pm[0].len;
+					value += t.am_pm[0].length;
 				}
 				else if (hours < 24u)
 				{
-					value += t.am_pm[1].len;
+					value += t.am_pm[1].length;
 				}
 				// if hours >=24, ignore am pm
 				break;
@@ -525,7 +573,7 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 				}
 				else
 				{
-					value += lc_format_alt_digits_len<::std::uint_least8_t>(t.alt_digits, ret.alt_value);
+					value += lc_format_alt_digits_len<::std::uint_least8_t>(locale, t.alt_digits, ret.alt_value);
 					break;
 				}
 			}
@@ -543,18 +591,18 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 			::std::uint_least8_t const hours{tsp.hours};
 			if (hours < 12u)
 			{
-				value += t.am_pm[0].len;
+				value += t.am_pm[0].length;
 			}
 			else if (hours < 24u)
 			{
-				value += t.am_pm[1].len;
+				value += t.am_pm[1].length;
 			}
 			// if hours >=24, ignore am pm
 			break;
 		}
 		case char_literal_v<u8'r', char_type>:
 		{
-			value += lc_print_reserve_size_time_format_common_impl(t, tsp, t.t_fmt_ampm);
+			value += lc_print_reserve_size_time_format_common_impl(locale, tsp, locale.resolve(t.t_fmt_ampm));
 			break;
 		}
 		case char_literal_v<u8'R', char_type>:
@@ -576,12 +624,12 @@ lc_print_reserve_size_time_format_common_impl(basic_lc_time<char_type> const &t,
 		}
 		case char_literal_v<u8'x', char_type>:
 		{
-			value += lc_print_reserve_size_time_format_common_impl(t, tsp, t.d_fmt);
+			value += lc_print_reserve_size_time_format_common_impl(locale, tsp, locale.resolve(t.d_fmt));
 			break;
 		}
 		case char_literal_v<u8'X', char_type>:
 		{
-			value += lc_print_reserve_size_time_format_common_impl(t, tsp, t.t_fmt);
+			value += lc_print_reserve_size_time_format_common_impl(locale, tsp, locale.resolve(t.t_fmt));
 			break;
 		}
 		case char_literal_v<u8'z', char_type>:
@@ -701,7 +749,8 @@ inline constexpr char_type *lc_copy_53_impl(char_type *iter) noexcept
 }
 
 template <::std::integral char_type>
-inline constexpr char_type *lc_print_month_fmt_common(basic_io_scatter_t<char_type> const *month_array, char_type *iter,
+inline constexpr char_type *lc_print_month_fmt_common(lc_time_view<char_type> locale,
+													  basic_scatter<char_type> const *month_array, char_type *iter,
 													  ::std::uint_least8_t month)
 {
 	constexpr ::std::uint_least8_t twelve{12};
@@ -709,7 +758,9 @@ inline constexpr char_type *lc_print_month_fmt_common(basic_io_scatter_t<char_ty
 	--month_minus1;
 	if (month_minus1 < twelve) [[likely]]
 	{
-		return copy_scatter(month_array[month_minus1], iter);
+		// The calendar check proves the fixed twelve-entry table index. Resolve only that descriptor, at the point
+		// where the define pass actually dereferences its character pointer.
+		return copy_scatter(locale.resolve(month_array[month_minus1]), iter);
 	}
 	else
 	{
@@ -719,10 +770,15 @@ inline constexpr char_type *lc_print_month_fmt_common(basic_io_scatter_t<char_ty
 
 template <::std::integral char_type>
 inline constexpr char_type *
-lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, char_type *iter,
+lc_print_reserve_define_time_fmt_common_impl(lc_time_view<char_type> locale, char_type *iter,
 											 iso8601_timestamp const &tsp,
 											 basic_io_scatter_t<char_type> const &format_str)
 {
+	auto const &t{locale.facets()};
+	if (!format_str.len)
+	{
+		return iter;
+	}
 	for (char_type const *i{format_str.base}, *end_it{i + format_str.len}; i != end_it; ++i)
 	{
 		char_type const *p{::fast_io::freestanding::find(i, end_it, char_literal_v<u8'%', char_type>)};
@@ -760,7 +816,7 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 		case char_literal_v<u8'a', char_type>:
 		case char_literal_v<u8'A', char_type>:
 		{
-			basic_io_scatter_t<char_type> const *base_ptr;
+			basic_scatter<char_type> const *base_ptr;
 			if (*p == char_literal_v<u8'a', char_type>)
 			{
 				base_ptr = t.abday;
@@ -770,24 +826,24 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 				base_ptr = t.day;
 			}
 
-			iter = copy_scatter(base_ptr[c_weekday(tsp)], iter);
+			iter = copy_scatter(locale.resolve(base_ptr[c_weekday(tsp)]), iter);
 			break;
 		}
 		case char_literal_v<u8'B', char_type>:
 		{
-			iter = lc_print_month_fmt_common(t.mon, iter, tsp.month);
+			iter = lc_print_month_fmt_common(locale, t.mon, iter, tsp.month);
 			break;
 		}
 		case char_literal_v<u8'b', char_type>:
 		case char_literal_v<u8'h', char_type>:
 		{
 			auto mon_or_abmon{first_format_ch == char_literal_v<u8'B', char_type> ? t.mon : t.abmon};
-			iter = lc_print_month_fmt_common(mon_or_abmon, iter, tsp.month);
+			iter = lc_print_month_fmt_common(locale, mon_or_abmon, iter, tsp.month);
 			break;
 		}
 		case char_literal_v<u8'c', char_type>:
 		{
-			iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.d_t_fmt);
+			iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp, locale.resolve(t.d_t_fmt));
 			break;
 		}
 		case char_literal_v<u8'C', char_type>:
@@ -840,15 +896,17 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 			{
 			case char_literal_v<u8'c', char_type>:
 			{
-				iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.era_d_t_fmt);
+				iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp,
+																	locale.resolve(t.era_d_t_fmt));
 				break;
 			}
 			case char_literal_v<u8'C', char_type>:
 			case char_literal_v<u8'y', char_type>:
 			case char_literal_v<u8'Y', char_type>:
 			{
-				auto era_scatter_start{t.era.base};
-				auto era_scatter_end{era_scatter_start + t.era.len};
+				auto const eras{locale.resolve(t.era)};
+				auto era_scatter_start{eras.base};
+				auto era_scatter_end{eras.len ? era_scatter_start + eras.len : era_scatter_start};
 				auto era_result{
 					lc_time_find_era_impl(era_scatter_start, era_scatter_end, tsp.year, {tsp.month, tsp.day})};
 				if (era_result != era_scatter_end) [[likely]]
@@ -857,13 +915,13 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 					{
 					case char_literal_v<u8'Y', char_type>:
 					{
-						iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp,
-																			era_result->era_format);
+						iter = lc_print_reserve_define_time_fmt_common_impl(
+							locale, iter, tsp, locale.resolve(era_result->era_format));
 						break;
 					}
 					case char_literal_v<u8'C', char_type>:
 					{
-						iter = copy_scatter(era_result->era_name, iter);
+						iter = copy_scatter(locale.resolve(era_result->era_name), iter);
 						break;
 					}
 					default:
@@ -894,12 +952,14 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 			}
 			case char_literal_v<u8'x', char_type>:
 			{
-				iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.era_d_fmt);
+				iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp,
+																	locale.resolve(t.era_d_fmt));
 				break;
 			}
 			case char_literal_v<u8'X', char_type>:
 			{
-				iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.era_t_fmt);
+				iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp,
+																	locale.resolve(t.era_t_fmt));
 				break;
 			}
 			default:
@@ -1041,13 +1101,13 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 				{
 					month_minus1 = 0u;
 				}
-				auto month_scatter{t.ab_alt_mon[month_minus1]};
+				auto const month_scatter{locale.resolve(t.ab_alt_mon[month_minus1])};
 				iter = non_overlapped_copy_n(month_scatter.base, month_scatter.len, iter);
 				break;
 			}
 			case char_literal_v<u8'C', char_type>:
 			{
-				iter = lc_format_alt_digits_print<::std::int_least64_t>(t.alt_digits, tsp.year / 100, iter);
+				iter = lc_format_alt_digits_print<::std::int_least64_t>(locale, t.alt_digits, tsp.year / 100, iter);
 				break;
 			}
 			case char_literal_v<u8'P', char_type>:
@@ -1055,7 +1115,7 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 				auto hours{tsp.hours};
 				if (hours < 24u) [[likely]]
 				{
-					iter = copy_scatter_to_lowercase(t.am_pm[12u <= hours], iter);
+					iter = copy_scatter_to_lowercase(locale.resolve(t.am_pm[12u <= hours]), iter);
 				}
 				break;
 			}
@@ -1064,7 +1124,7 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 				auto hours{tsp.hours};
 				if (hours < 24u) [[likely]]
 				{
-					iter = copy_scatter(t.am_pm[12u <= hours], iter);
+					iter = copy_scatter(locale.resolve(t.am_pm[12u <= hours]), iter);
 				}
 				break;
 			}
@@ -1081,7 +1141,7 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 				}
 				else
 				{
-					iter = lc_format_alt_digits_print<::std::uint_least8_t>(t.alt_digits, ret.alt_value, iter);
+					iter = lc_format_alt_digits_print<::std::uint_least8_t>(locale, t.alt_digits, ret.alt_value, iter);
 					break;
 				}
 			}
@@ -1093,7 +1153,7 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 			auto hours{tsp.hours};
 			if (hours < 24u) [[likely]]
 			{
-				iter = copy_scatter_to_lowercase(t.am_pm[12u <= hours], iter);
+				iter = copy_scatter_to_lowercase(locale.resolve(t.am_pm[12u <= hours]), iter);
 			}
 			break;
 		}
@@ -1102,13 +1162,13 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 			auto hours{tsp.hours};
 			if (hours < 24u) [[likely]]
 			{
-				iter = copy_scatter(t.am_pm[12u <= hours], iter);
+				iter = copy_scatter(locale.resolve(t.am_pm[12u <= hours]), iter);
 			}
 			break;
 		}
 		case char_literal_v<u8'r', char_type>:
 		{
-			iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.t_fmt_ampm);
+			iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp, locale.resolve(t.t_fmt_ampm));
 			break;
 		}
 		case char_literal_v<u8'R', char_type>:
@@ -1291,12 +1351,12 @@ lc_print_reserve_define_time_fmt_common_impl(basic_lc_time<char_type> const &t, 
 		}
 		case char_literal_v<u8'x', char_type>:
 		{
-			iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.d_fmt);
+			iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp, locale.resolve(t.d_fmt));
 			break;
 		}
 		case char_literal_v<u8'X', char_type>:
 		{
-			iter = lc_print_reserve_define_time_fmt_common_impl(t, iter, tsp, t.t_fmt);
+			iter = lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp, locale.resolve(t.t_fmt));
 			break;
 		}
 		case char_literal_v<u8'y', char_type>:
@@ -1335,6 +1395,9 @@ namespace manipulators
 /*
 do not use them. they are experimental
 */
+/// @brief Formats a timestamp with the locale's composite date-and-time pattern.
+/// @details Locale-aware output interprets the `d_t_fmt` program (the `%c`-style representation). This experimental
+///          manipulator stores a reference, so the timestamp must remain alive until printing completes.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::d_t_fmt>,
 								iso8601_timestamp const &>
 d_t_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1342,6 +1405,9 @@ d_t_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's date-only pattern.
+/// @details Locale-aware output interprets the `d_fmt` program (the `%x`-style representation). The manipulator is
+///          experimental and borrows the referenced timestamp rather than copying it.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::d_fmt>,
 								iso8601_timestamp const &>
 d_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1349,6 +1415,9 @@ d_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's time-only pattern.
+/// @details Locale-aware output interprets the `t_fmt` program (the `%X`-style representation). The experimental
+///          manipulator borrows `tsp`, which must outlive materialization.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::t_fmt>,
 								iso8601_timestamp const &>
 t_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1356,6 +1425,9 @@ t_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's 12-hour AM/PM time pattern.
+/// @details Locale-aware output interprets `t_fmt_ampm`, including the locale's own AM/PM designators. This is an
+///          experimental reference-holding manipulator; it does not own the timestamp.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::t_fmt_ampm>,
 								iso8601_timestamp const &>
 t_fmt_ampm(iso8601_timestamp const &tsp) noexcept
@@ -1363,6 +1435,9 @@ t_fmt_ampm(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's extended date utility pattern.
+/// @details Locale-aware output interprets the locale `date_fmt` program (commonly associated with `%+`). The exact
+///          spelling is locale data, not a fixed ISO representation; the experimental carrier borrows `tsp`.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::date_fmt>,
 								iso8601_timestamp const &>
 date_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1370,6 +1445,9 @@ date_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's era-aware composite date-and-time pattern.
+/// @details The `era_d_t_fmt` program is used when nonempty; otherwise output falls back to ordinary `d_t_fmt`. The
+///          experimental manipulator holds only a reference to the timestamp.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::era_d_t_fmt>,
 								iso8601_timestamp const &>
 era_d_t_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1377,6 +1455,9 @@ era_d_t_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's era-aware date-only pattern.
+/// @details The `era_d_fmt` program is used when nonempty and ordinary `d_fmt` is the fallback. The exact calendar-era
+///          spelling comes from locale data, and the experimental carrier borrows `tsp`.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::era_d_fmt>,
 								iso8601_timestamp const &>
 era_d_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1384,6 +1465,9 @@ era_d_fmt(iso8601_timestamp const &tsp) noexcept
 	return {tsp};
 }
 
+/// @brief Formats a timestamp with the locale's era-aware time-only pattern.
+/// @details The `era_t_fmt` program is used when nonempty and ordinary `t_fmt` is the fallback. This experimental
+///          reference-holding manipulator does not copy or own the timestamp.
 inline constexpr scalar_manip_t<::fast_io::details::base_lc_time_flags_cache<lc_time_flag::era_t_fmt>,
 								iso8601_timestamp const &>
 era_t_fmt(iso8601_timestamp const &tsp) noexcept
@@ -1401,53 +1485,61 @@ inline constexpr ::std::size_t
 print_reserve_size(basic_lc_all<char_type> const *all,
 				   ::fast_io::manipulators::scalar_manip_t<flags, iso8601_timestamp const &> tsp) noexcept
 {
+	details::lc_time_view<char_type> const locale{all};
+	// The flag is a compile-time selector. Resolve only its chosen program after applying the empty-era fallback; this
+	// makes one owner/bounds check the entry cost and leaves unrelated facet descriptors completely unobserved.
 	constexpr manipulators::lc_time_flag current_lc_time_flag{flags.time_flag};
 	if constexpr (current_lc_time_flag == manipulators::lc_time_flag::d_t_fmt)
 	{
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, all->time.d_t_fmt);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference,
+																	  locale.resolve(all->time.d_t_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::d_fmt)
 	{
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, all->time.d_fmt);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference,
+																	  locale.resolve(all->time.d_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::t_fmt)
 	{
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, all->time.t_fmt);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference,
+																	  locale.resolve(all->time.t_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::t_fmt_ampm)
 	{
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, all->time.t_fmt_ampm);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference,
+																	  locale.resolve(all->time.t_fmt_ampm));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::date_fmt)
 	{
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, all->time.date_fmt);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference,
+																	  locale.resolve(all->time.date_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_d_t_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_d_t_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.d_t_fmt);
 		}
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, *e);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference, locale.resolve(*e));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_d_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_d_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.d_fmt);
 		}
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, *e);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference, locale.resolve(*e));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_t_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_t_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.t_fmt);
 		}
-		return details::lc_print_reserve_size_time_format_common_impl(all->time, tsp.reference, *e);
+		return details::lc_print_reserve_size_time_format_common_impl(locale, tsp.reference, locale.resolve(*e));
 	}
 }
 
@@ -1459,55 +1551,61 @@ inline constexpr char_type *
 print_reserve_define(basic_lc_all<char_type> const *all, char_type *iter,
 					 ::fast_io::manipulators::scalar_manip_t<flags, iso8601_timestamp const &> tsp) noexcept
 {
+	details::lc_time_view<char_type> const locale{all};
+	// Keep pointer materialization at the define boundary. The size CPO above may inspect compact counts, whereas this
+	// pass obtains a checked direct view for the one format program whose bytes it will actually read.
 	constexpr manipulators::lc_time_flag current_lc_time_flag{flags.time_flag};
 	if constexpr (current_lc_time_flag == manipulators::lc_time_flag::d_t_fmt)
 	{
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, all->time.d_t_fmt);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference,
+																	 locale.resolve(all->time.d_t_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::d_fmt)
 	{
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, all->time.d_fmt);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference,
+																	 locale.resolve(all->time.d_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::t_fmt)
 	{
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, all->time.t_fmt);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference,
+																	 locale.resolve(all->time.t_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::t_fmt_ampm)
 	{
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference,
-																	 all->time.t_fmt_ampm);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference,
+																	 locale.resolve(all->time.t_fmt_ampm));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::date_fmt)
 	{
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference,
-																	 all->time.date_fmt);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference,
+																	 locale.resolve(all->time.date_fmt));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_d_t_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_d_t_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.d_t_fmt);
 		}
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, *e);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference, locale.resolve(*e));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_d_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_d_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.d_fmt);
 		}
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, *e);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference, locale.resolve(*e));
 	}
 	else if constexpr (current_lc_time_flag == manipulators::lc_time_flag::era_t_fmt)
 	{
 		auto *e{__builtin_addressof(all->time.era_t_fmt)};
-		if (e->len == 0)
+		if (e->length == 0)
 		{
 			e = __builtin_addressof(all->time.t_fmt);
 		}
-		return details::lc_print_reserve_define_time_fmt_common_impl(all->time, iter, tsp.reference, *e);
+		return details::lc_print_reserve_define_time_fmt_common_impl(locale, iter, tsp.reference, locale.resolve(*e));
 	}
 }
 

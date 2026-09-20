@@ -133,7 +133,7 @@ inline constexpr bool support_hardware_crc32c{
 		defined(__ARM_FEATURE_CRC32) && FAST_IO_HAS_BUILTIN(__builtin_arm_crc32cb) || \
 		((defined(_MSC_VER) && !defined(__clang__)) &&                                                                                       \
 		 (defined(_M_IX86) ||                                                                                                               \
-		  ((defined(_M_X64) || defined(_M_AMD64)) && !defined(_M_ARM64EC)) ||                                                               \
+		  ((defined(_M_X64) || defined(_M_AMD64)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)) ||                                    \
 		  ((defined(_M_ARM64) || defined(_M_ARM64EC)) && defined(USE_SOFT_INTRINSICS))))
 		true
 #endif
@@ -150,7 +150,7 @@ inline constexpr ::std::uint_least32_t calculate_crc32c_hardware(::std::uint_lea
 		crc = __builtin_arm_crc32cb(crc, static_cast<::std::uint_least8_t>(*i));
 #elif (defined(_MSC_VER) && !defined(__clang__)) &&                                                                                       \
     (defined(_M_IX86) ||                                                                                                                   \
-     ((defined(_M_X64) || defined(_M_AMD64)) && !defined(_M_ARM64EC)) ||                                                                   \
+	     ((defined(_M_X64) || defined(_M_AMD64)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)) ||                                        \
      ((defined(_M_ARM64) || defined(_M_ARM64EC)) && defined(USE_SOFT_INTRINSICS)))
 			crc = ::_mm_crc32_u8(crc, static_cast<::std::uint_least8_t>(*i));
 #else
@@ -167,11 +167,7 @@ inline constexpr ::std::uint_least32_t calculate_crc32(::std::uint_least32_t crc
 {
 	if constexpr (opt == crc32_option::crc32)
 	{
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			if constexpr (support_hardware_crc32)
 			{
@@ -182,11 +178,7 @@ inline constexpr ::std::uint_least32_t calculate_crc32(::std::uint_least32_t crc
 	}
 	else
 	{
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			if constexpr (support_hardware_crc32c)
 			{

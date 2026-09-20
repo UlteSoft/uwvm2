@@ -386,7 +386,7 @@ template <bool line, ::std::integral ch_type, typename... Args>
 print_freestanding_decay_okay_character_type_no_status<ch_type, Args...> &&
 #endif
 		sizeof(ch_type) == 1 &&
-		(!::fast_io::details::is_ebcdic<ch_type>))
+		::fast_io::details::is_ascii<ch_type>)
 inline constexpr void print_status_define(basic_kpr<ch_type> k, Args... args)
 {
 	if constexpr ((::fast_io::details::kpr_total_print_reserve_size_less_or_equal_than512<ch_type, Args...>(0)))

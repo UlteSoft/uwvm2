@@ -1,0 +1,2 @@
+# Preserve the verified release-source bytes on Windows/autocrlf checkouts.
+third-parties/llvm/** -text

@@ -122,6 +122,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // buf_ptrsz is Pointer<u8> and therefore has alignment 1; only the lowered size result is alignment-sensitive.
+        check_wasip1_guest_pointer_alignment<4uz>(buf_used_ptrsz, u8"fd_readdir.buf_used (size)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

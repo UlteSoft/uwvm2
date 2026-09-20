@@ -77,6 +77,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<8uz>(environ_count_ptrsz, u8"environ_sizes_get_wasm64.environ_count (size64)");
+        check_wasip1_guest_pointer_alignment<8uz>(environ_buf_size_ptrsz, u8"environ_sizes_get_wasm64.environ_buf_size (size64)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

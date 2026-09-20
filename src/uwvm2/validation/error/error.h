@@ -103,6 +103,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         invalid_const_immediate,
         numeric_operand_type_mismatch,
         wasm1p1_feature_required,
+        wasm2_feature_required,
         illegal_data_index,
         illegal_element_index,
         wasm1p1_undeclared_ref_func,
@@ -295,6 +296,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject;
     };
 
+    struct wasm2_feature_required_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value;
+        ::uwvm2::parser::wasm::base::wasm2_feature_kind feature;
+        ::uwvm2::parser::wasm::base::wasm2_error_subject subject;
+    };
+
     struct illegal_data_index_err_t
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 data_index;
@@ -412,6 +420,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
 
         wasm1p1_feature_required_err_t wasm1p1_feature_required;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_err_t> && ::std::is_trivially_destructible_v<wasm1p1_feature_required_err_t>);
+
+        wasm2_feature_required_err_t wasm2_feature_required;
+        static_assert(::std::is_trivially_copyable_v<wasm2_feature_required_err_t> && ::std::is_trivially_destructible_v<wasm2_feature_required_err_t>);
 
         illegal_data_index_err_t illegal_data_index;
         static_assert(::std::is_trivially_copyable_v<illegal_data_index_err_t> && ::std::is_trivially_destructible_v<illegal_data_index_err_t>);

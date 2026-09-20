@@ -42,7 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
-#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
+#if defined(UWVM_RUNTIME_HAS_BACKEND)
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_scheduling_policy_alias{u8"-Rsp"};

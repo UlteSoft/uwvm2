@@ -698,6 +698,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 #include "error_code_outputs/eco_wasm1p1_feature_required.h"
                 return;
             }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm2_feature_required:
+            {
+#include "error_code_outputs/eco_wasm2_feature_required.h"
+                return;
+            }
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_invalid_data_count_section_count:
             {
 #include "error_code_outputs/eco_wasm1p1_invalid_data_count_section_count.h"

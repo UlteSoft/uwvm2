@@ -6,7 +6,7 @@ namespace fast_io
 namespace details
 {
 
-template <bool ebcdic, char8_t base>
+template <bool classic_ebcdic, char8_t base>
 	requires(2 <= base && base <= 36)
 inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 {
@@ -14,7 +14,7 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 	constexpr unsigned_char_type base_char_type(base);
 	if constexpr (base <= 10)
 	{
-		if constexpr (ebcdic)
+		if constexpr (classic_ebcdic)
 		{
 			ch -= static_cast<unsigned_char_type>(240);
 		}
@@ -26,7 +26,7 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 	}
 	else
 	{
-		if constexpr (ebcdic)
+		if constexpr (classic_ebcdic)
 		{
 
 			if constexpr (base <= 19)
@@ -59,9 +59,9 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 				unsigned_char_type ch3(ch);
 				ch3 -= 0x81;
 				unsigned_char_type ch4(ch);
-				ch2 -= 0xD1;
+				ch4 -= 0xD1;
 				unsigned_char_type ch5(ch);
-				ch3 -= 0x91;
+				ch5 -= 0x91;
 				ch -= 0xF0;
 				if (ch4 < mns)
 				{
@@ -87,7 +87,7 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 			}
 			else
 			{
-				constexpr unsigned_char_type mns{base - 27};
+				constexpr unsigned_char_type mns{base - 28};
 				unsigned_char_type ch2(ch);
 				ch2 -= 0xC1;
 				unsigned_char_type ch3(ch);
@@ -103,11 +103,11 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 				ch -= 0xF0;
 				if (ch6 < mns)
 				{
-					ch = ch6 + static_cast<unsigned_char_type>(27);
+					ch = ch6 + static_cast<unsigned_char_type>(28);
 				}
 				else if (ch7 < mns)
 				{
-					ch = ch7 + static_cast<unsigned_char_type>(27);
+					ch = ch7 + static_cast<unsigned_char_type>(28);
 				}
 				else if (ch4 < 9)
 				{
@@ -157,7 +157,7 @@ inline constexpr bool char_digit_to_literal_impl(char8_t &ch) noexcept
 	}
 }
 
-template <bool isebcdic, bool partial, char8_t base>
+template <bool classic_ebcdic, bool partial, char8_t base>
 inline constexpr ::std::size_t calculate_max_available_sto_tb_size() noexcept
 {
 	constexpr char8_t mx{::std::numeric_limits<char8_t>::max()};
@@ -167,7 +167,7 @@ inline constexpr ::std::size_t calculate_max_available_sto_tb_size() noexcept
 		for (; n; --n)
 		{
 			char8_t ch{static_cast<char8_t>(n - 1)};
-			if (!char_digit_to_literal_impl<isebcdic, base>(ch))
+			if (!char_digit_to_literal_impl<classic_ebcdic, base>(ch))
 			{
 				break;
 			}
@@ -184,16 +184,16 @@ inline constexpr ::std::size_t calculate_max_available_sto_tb_size() noexcept
 	}
 }
 
-template <bool isebcdic, bool partial, char8_t base>
+template <bool classic_ebcdic, bool partial, char8_t base>
 inline constexpr auto generate_sto_base_tb() noexcept
 {
 	constexpr char8_t mx{::std::numeric_limits<char8_t>::max()};
 
-	::fast_io::freestanding::array<char8_t, calculate_max_available_sto_tb_size<isebcdic, partial, base>()> buffer;
+	::fast_io::freestanding::array<char8_t, calculate_max_available_sto_tb_size<classic_ebcdic, partial, base>()> buffer;
 	for (char16_t i{}; i != buffer.size(); ++i)
 	{
 		char8_t ch{static_cast<char8_t>(i)};
-		if (char_digit_to_literal_impl<isebcdic, base>(ch))
+		if (char_digit_to_literal_impl<classic_ebcdic, base>(ch))
 		{
 			ch = mx;
 		}
@@ -202,8 +202,8 @@ inline constexpr auto generate_sto_base_tb() noexcept
 	return buffer;
 }
 
-template <bool isebcdic, bool partial, char8_t base>
-inline constexpr auto sto_base_tb{generate_sto_base_tb<isebcdic, partial, base>()};
+template <bool classic_ebcdic, bool partial, char8_t base>
+inline constexpr auto sto_base_tb{generate_sto_base_tb<classic_ebcdic, partial, base>()};
 
 } // namespace details
 

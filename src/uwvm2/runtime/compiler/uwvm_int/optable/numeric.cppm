@@ -3,6 +3,9 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// The global module fragment must also make the shared helpers for strict scalar arithmetic semantics
+// visible. Updating only the non-module header path would leave module builds
+// with missing declarations or inconsistent floating-point behavior.
 
 /**
  * @author      MacroModel
@@ -22,6 +25,7 @@
 module;
 
 // std
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -30,9 +34,12 @@ module;
 #include <concepts>
 #include <limits>
 #include <memory>
+#include <type_traits>
+#include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 #if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
 # include <cfenv>

@@ -47,6 +47,7 @@ import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.validation;
 import uwvm2.validation.standard.wasm1;
 import uwvm2.validation.standard.wasm1p1;
+import uwvm2.validation.standard.wasm2;
 import uwvm2.object;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;

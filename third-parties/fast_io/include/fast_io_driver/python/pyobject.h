@@ -225,6 +225,9 @@ status_io_print_forward(io_alias_type_t<char_type>, pyobject_io_observer piob) n
 namespace manipulators
 {
 
+/// @brief Wraps a borrowed `PyObject*` in the Python object IO observer.
+/// @details The manipulator does not increment the reference count; the Python object must remain alive for every IO
+///          operation performed through the returned observer.
 inline constexpr pyobject_io_observer pyobj(PyObject *p) noexcept
 {
 	return {p};

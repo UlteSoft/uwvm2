@@ -37,15 +37,17 @@
 # error "Module testing is not currently supported"
 #endif
 
+#include "error_output_test_stream.h"
+
 int main()
 {
-    ::fast_io::basic_obuf<::fast_io::u8native_io_observer> obuf_u8err{::fast_io::u8err()};
+    auto obuf_u8err{error_test_u8err()};
 
-    ::fast_io::obuf_file cf{u8"validation_error_code_test_c.log"};
-    ::fast_io::wobuf_file wcf{u8"validation_error_code_test_wc.log"};
-    ::fast_io::u8obuf_file u8cf{u8"validation_error_code_test_u8c.log"};
-    ::fast_io::u16obuf_file u16cf{u8"validation_error_code_test_u16c.log"};
-    ::fast_io::u32obuf_file u32f{u8"validation_error_code_test_u32c.log"};
+    error_test_output_file<char> cf{u8"validation_error_code_test_c.log", ::fast_io::open_mode::out};
+    error_test_output_file<wchar_t> wcf{u8"validation_error_code_test_wc.log", ::fast_io::open_mode::out};
+    error_test_output_file<char8_t> u8cf{u8"validation_error_code_test_u8c.log", ::fast_io::open_mode::out};
+    error_test_output_file<char16_t> u16cf{u8"validation_error_code_test_u16c.log", ::fast_io::open_mode::out};
+    error_test_output_file<char32_t> u32f{u8"validation_error_code_test_u32c.log", ::fast_io::open_mode::out};
 
     ::std::byte module_bytes[64]{};
 
@@ -53,7 +55,7 @@ int main()
     errout.module_begin = module_bytes;
 
     auto const last_ec{
-        static_cast<::std::uint_least32_t>(::uwvm2::validation::error::code_validation_error_code::numeric_operand_type_mismatch)};
+        static_cast<::std::uint_least32_t>(::uwvm2::validation::error::code_validation_error_code::wasm1p1_invalid_reference_type)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -308,6 +310,40 @@ int main()
                     ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_feature_required:
+            {
+                errout.err.err_selectable.wasm1p1_feature_required = {
+                    0xfdu, ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::simd,
+                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction};
+                break;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm2_feature_required:
+            {
+                errout.err.err_selectable.wasm2_feature_required = {
+                    0x25u, ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                    ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction};
+                break;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_data_index:
+            {
+                errout.err.err_selectable.illegal_data_index = {3u, 2u};
+                break;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_element_index:
+            {
+                errout.err.err_selectable.illegal_element_index = {4u, 2u};
+                break;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_undeclared_ref_func:
+            {
+                errout.err.err_selectable.wasm1p1_undeclared_ref_func = {7u};
+                break;
+            }
+            case ::uwvm2::validation::error::code_validation_error_code::wasm1p1_invalid_reference_type:
+            {
+                errout.err.err_selectable.wasm1p1_invalid_reference_type = {0x7fu};
+                break;
+            }
             default: break;
         }
 
@@ -319,14 +355,26 @@ int main()
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
             obuf_u8err_errout.flag.win32_use_text_attr = static_cast<::std::uint_least8_t>(!::uwvm2::uwvm::utils::ansies::log_win32_use_ansi_b);
 #endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 3
             ::fast_io::io::perrln(obuf_u8err, obuf_u8err_errout);
+#endif
         }
 
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 1
         ::fast_io::io::perrln(cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 2
         ::fast_io::io::perrln(wcf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 3
         ::fast_io::io::perrln(u8cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 4
         ::fast_io::io::perrln(u16cf, errout);
+#endif
+#if !defined(UWVM_TEST_ERROR_CHAR) || UWVM_TEST_ERROR_CHAR == 5
         ::fast_io::io::perrln(u32f, errout);
+#endif
     }
 }
 

@@ -22,8 +22,10 @@
 module;
 
 // std
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -40,6 +42,7 @@ export module uwvm2.uwvm.runtime.initializer:init;
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1.const_expr;
@@ -47,6 +50,7 @@ import uwvm2.parser.wasm.standard.wasm1.opcode;
 import uwvm2.parser.wasm.standard.wasm1.features;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm.standard.wasm1p1.features;
+import uwvm2.parser.wasm.standard.wasm2.features;
 import uwvm2.parser.wasm.standard.wasm3.type;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.object;

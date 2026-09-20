@@ -4,6 +4,42 @@
 #pragma GCC system_header
 #endif
 
+// Clang recognizes the __bf16 spelling on every target, but referencing it is a hard error when the selected ISA
+// lacks a BFloat16 type. Clang does not provide a target-aware __has_feature query for this extension, so keep every
+// reference behind the target and feature combinations verified by the compiler driver. Before Clang 17, the targets
+// that exposed __bf16 only provided its storage-only form, which cannot perform the float conversions fast_io needs.
+// ARM64EC uses its own target macro instead of __aarch64__. RISC-V, LoongArch, and SPIR/SPIR-V gain the usable type in
+// Clang 18, 21, and 22 respectively. x86 and 32-bit Arm additionally require the features that make the type available.
+// SPIR and SPIR-V expose LLVM's native `bfloat` scalar directly, including by-value scalar/aggregate transport, even
+// though they do not define a CPU feature macro.
+#if defined(__clang__) && !defined(__STDCPP_BFLOAT16_T__) &&                                      \
+	(((defined(__aarch64__) || defined(__arm64ec__) || defined(__AMDGCN__) ||                     \
+	   defined(__NVPTX__)) &&                                                                     \
+	  __clang_major__ >= 17) ||                                                                   \
+	 (defined(__riscv) && __clang_major__ >= 18) ||                                               \
+	 ((defined(__SPIR__) || defined(__SPIRV__)) && __clang_major__ >= 22) ||                      \
+	 ((defined(__x86_64__) || defined(__i386__)) && defined(__SSE2__) && __clang_major__ >= 17 && \
+	  !(defined(__arm64ec__) || defined(_M_ARM64EC))) ||                                          \
+	 (defined(__arm__) && defined(__ARM_FP) && __clang_major__ >= 17) ||                          \
+	 (defined(__loongarch__) && __clang_major__ >= 21))
+#define FAST_IO_CLANG_HAS_BFLOAT16_TYPE 1
+#endif
+
+// C++23 standardizes the `_Float64` spelling through `__STDCPP_FLOAT64_T__`.
+// GCC 13 and later also expose the same distinct IEC 60559 type in C++20, but
+// do not set that language-version feature macro.  GCC 11 and 12 publish the
+// FLT64 numeric macros while their C++ frontends do not provide the type; glibc
+// may then macro-map `_Float64` to double, which would duplicate specializations.
+// Admit the GNU extension only from the first frontend with a distinct type.
+// Clang deliberately stays behind the standard macro because it rejects the
+// spelling on current targets while publishing the generic numeric macros.
+#if defined(__STDCPP_FLOAT64_T__) ||                                          \
+	(defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 13 &&            \
+	 defined(__FLT64_MANT_DIG__) && __FLT64_MANT_DIG__ == 53 &&               \
+	 defined(__FLT64_MAX_EXP__) && __FLT64_MAX_EXP__ == 1024)
+#define FAST_IO_HAS_FLOAT64_TYPE 1
+#endif
+
 namespace fast_io
 {
 
@@ -173,19 +209,28 @@ concept my_floating_point = ::std::floating_point<T>
 #ifdef __SIZEOF_FLOAT128__
 							|| ::std::same_as<::std::remove_cv_t<T>, __float128>
 #endif
-#if defined(__clang__) && defined(__aarch64__) && !defined(__STDCPP_BFLOAT16_T__)
+#if defined(FAST_IO_CLANG_HAS_BFLOAT16_TYPE)
 							|| ::std::same_as<::std::remove_cv_t<T>, __bf16>
 #endif
-#ifdef __STDCPP_BFLOAT16_T__
+// The standard bf16 literal suffix belongs to C++23.  GCC exposes the
+// underlying __bf16 type in C++20 as a vendor extension, but diagnosing the
+// suffix under -Wpedantic would make the type concept unusable in that mode.
+// Keep the standardized literal spelling only in its feature-macro domain;
+// the following GCC branch names the identical vendor type directly.
+#if defined(__STDCPP_BFLOAT16_T__)
 							|| ::std::same_as<::std::remove_cv_t<T>, decltype(0.0bf16)>
 #endif
-#ifdef __STDCPP_FLOAT16_T__
+#if defined(__GNUC__) && !defined(__clang__) && defined(__BFLT16_MANT_DIG__) && \
+	!defined(__STDCPP_BFLOAT16_T__)
+							|| ::std::same_as<::std::remove_cv_t<T>, __bf16>
+#endif
+#if defined(__STDCPP_FLOAT16_T__) || defined(__FLT16_MANT_DIG__)
 							|| ::std::same_as<::std::remove_cv_t<T>, _Float16>
 #endif
 #ifdef __STDCPP_FLOAT32_T__
 							|| ::std::same_as<::std::remove_cv_t<T>, _Float32>
 #endif
-#ifdef __STDCPP_FLOAT64_T__
+#if defined(FAST_IO_HAS_FLOAT64_TYPE)
 							|| ::std::same_as<::std::remove_cv_t<T>, _Float64>
 #endif
 #ifdef __STDCPP_FLOAT128_T__

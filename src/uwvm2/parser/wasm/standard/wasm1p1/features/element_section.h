@@ -393,10 +393,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
             // Bucket 3 stores imported globals; wasm1 importdesc layout provides it for the feature set used here.
             auto const& imported_global{importsec.importdesc.index_unchecked(3uz)};
-            auto const& globalsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<global_section_storage_t<Fs...>>(module_storage.sections)};
+            // Wasm 2.0 constant expressions can only read immutable imported globals.
+            // Local globals in segment offsets/initializers require a later proposal.
             auto const imported_global_size{imported_global.size()};
-            auto const all_global_size{imported_global_size + globalsec.local_globals.size()};
             auto const expected_value_type{::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(expected_reftype)};
             auto const expected_value_type_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(expected_value_type)};
 
@@ -601,34 +600,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         //                             ^^ section_curr
 
                         auto const global_idx_uz{static_cast<::std::size_t>(global_idx)};
-                        if(global_idx_uz >= all_global_size) [[unlikely]]
+                        if(global_idx_uz >= imported_global_size) [[unlikely]]
                         {
                             err.err_curr = section_curr;
-                            err.err_selectable.u32arr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_global_size);
+                            err.err_selectable.u32arr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_global_size);
                             err.err_selectable.u32arr[1] = global_idx;
                             err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_ref_illegal_imported_global;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
-                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte global_type_byte{};
-                        bool global_is_mutable{};
-
-                        if(global_idx_uz < imported_global_size)
-                        {
-                            auto const curr_imported_global_ptr{imported_global.index_unchecked(global_idx_uz)};
+                        auto const curr_imported_global_ptr{imported_global.index_unchecked(global_idx_uz)};
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                            if(curr_imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                        if(curr_imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-                            auto const& curr_imported_global{curr_imported_global_ptr->imports.storage.global};
-                            global_type_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_imported_global.type);
-                            global_is_mutable = curr_imported_global.is_mutable;
-                        }
-                        else
-                        {
-                            auto const& curr_defined_global{globalsec.local_globals.index_unchecked(global_idx_uz - imported_global_size).global};
-                            global_type_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_defined_global.type);
-                            global_is_mutable = curr_defined_global.is_mutable;
-                        }
+                        auto const& curr_imported_global{curr_imported_global_ptr->imports.storage.global};
+                        auto const global_type_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_imported_global.type)};
+                        auto const global_is_mutable{curr_imported_global.is_mutable};
 
                         if(global_type_byte != expected_value_type_byte) [[unlikely]]
                         {
@@ -750,7 +737,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     }  // namespace wasm1p1_element_details
 
     /// @brief Parse one wasm1.1 element segment according to its leading flag.
-    /// @details Bulk-memory and reference-type dependent segment forms are gated by runtime feature flags before their payload is read.
+    /// @details Each segment form is gated by the feature group that introduced it before its payload is read.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr ::std::byte const* define_handler_element_type(
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<element_section_storage_t<Fs...>> sec_adl,
@@ -792,6 +779,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 err.err_selectable.wasm1p1_feature_required.feature = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types;
                 err.err_selectable.wasm1p1_feature_required.subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_feature_required;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        };
+
+        auto const require_multiple_tables = [&]() UWVM_THROWS
+        {
+            if(para.disable_multiple_tables || para.controllable_allow_multi_table) [[unlikely]]
+            {
+                err.err_curr = section_curr;
+                err.err_selectable.wasm2_feature_required.value = static_cast<wasm_u32>(fet_type);
+                err.err_selectable.wasm2_feature_required.feature = ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables;
+                err.err_selectable.wasm2_feature_required.subject = ::uwvm2::parser::wasm::base::wasm2_error_subject::element_segment;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm2_feature_required;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         };
@@ -885,7 +885,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
             case ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_type_t::active_explicit_funcidx:
             {
-                require_reference_types();
+                require_multiple_tables();
                 element_storage.active = true;
                 element_storage.reftype = reference_type::funcref;
                 parse_tableidx();
@@ -968,6 +968,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             case ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_type_t::active_explicit_expr:
             {
                 require_reference_types();
+                require_multiple_tables();
                 element_storage.active = true;
                 parse_tableidx();
                 parse_active_offset();

@@ -1,5 +1,16 @@
 ﻿#pragma once
 
+/*
+ * Freestanding-capable environment/package umbrella.
+ *
+ * This header extends `fast_io_core.h` with facilities that require dynamic
+ * allocation and exceptions, including buffering, decorators, serializers, and
+ * floating conversion. It is not the "FMT level" or an intermediate layer
+ * between IO and CPO: those architectural responsibilities already cross the
+ * core package. Format syntax remains in `fast_io_format.h`, while hosted
+ * devices remain in `fast_io_hosted.h`.
+ */
+
 // fast_io_freestanding.h is usable when the underlining system implements dynamic memory allocations and exceptions
 #if !defined(__cplusplus)
 #error "You are not using a C++ compiler"

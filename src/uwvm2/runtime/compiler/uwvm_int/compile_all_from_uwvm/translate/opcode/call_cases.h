@@ -76,6 +76,7 @@ case wasm1_code::return_:
     auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
     operand_stack_truncate_to(curr_frame_base);
     is_polymorphic = true;
+    codegen_reachable = false;
 
     break;
 }
@@ -310,8 +311,16 @@ case wasm1_code::call:
     [[maybe_unused]] bool fuse_call_local_tee{};
     [[maybe_unused]] local_offset_t fused_local_off{};
 
+    // Fusion has typed runtime stubs only for scalar results. Decide this before peeking at and
+    // consuming the following opcode: a v128/reference `call; drop` must leave `drop` for its own
+    // validation/emission path.
+    auto const result_type_ok{result_count == 1uz && (callee_type.result.begin[0] == curr_operand_stack_value_type::i32 ||
+                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::i64 ||
+                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::f32 ||
+                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::f64)};
+
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-    if(allow_call_fusion && result_count == 1uz && code_curr != code_end)
+    if(allow_call_fusion && result_type_ok && code_curr != code_end)
     {
         if(use_stacktop_call_fast)
         {
@@ -383,10 +392,6 @@ case wasm1_code::call:
     }
 #endif
 
-    auto const result_type_ok{result_count == 1uz && (callee_type.result.begin[0] == curr_operand_stack_value_type::i32 ||
-                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::i64 ||
-                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::f32 ||
-                                                      callee_type.result.begin[0] == curr_operand_stack_value_type::f64)};
     if(!allow_call_fusion || !result_type_ok)
     {
         fuse_call_drop = false;
@@ -903,8 +908,8 @@ case wasm1_code::call:
 }
 case wasm1_code::call_indirect:
 {
-    // Indirect calls add one dynamic table index operand on top of the function parameters. That is
-    // why validation computes `param_count + 1` and checks the table index type before parameters.
+    // call_indirect consumes one dynamic i32 table-element index above the function arguments.
+    // This stack operand is distinct from the encoded table_index immediate, which selects the table.
     // call_indirect  type_index table_index ...
     // [ safe      ] unsafe (could be the section_end)
     // ^^ code_curr
@@ -944,36 +949,44 @@ case wasm1_code::call_indirect:
     // [          safe        ] unsafe (could be the section_end)
     //                          ^^ code_curr
 
-    wasm_u32 table_index;
-    auto const [table_next, table_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                ::fast_io::mnp::leb128_get(table_index))};
-    if(table_err != ::fast_io::parse_code::ok) [[unlikely]]
+    // Decode through a local scanner and commit code_curr only after the complete trailing field.
+    // MVP likewise advances only after matching its literal 0x00, so every trailing-immediate decode
+    // failure leaves code_curr at the table_index position shown above.
+    wasm_u32 table_index{};
+    if(!::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_call_indirect_reserved_byte(wasm1p1_para))
     {
-        err.err_curr = op_begin;
-        err.err_code = code_validation_error_code::invalid_table_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(table_err);
+        // Reference Types/Core 2.0 encode a real `tableidx ::= u32`.  A
+        // single-table feature policy still decodes this ULEB128 before requiring zero.
+        auto const [table_next, table_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                    ::fast_io::mnp::leb128_get(table_index))};
+        if(table_err != ::fast_io::parse_code::ok) [[unlikely]]
+        {
+            err.err_curr = op_begin;
+            err.err_code = code_validation_error_code::invalid_table_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(table_err);
+        }
+        code_curr = reinterpret_cast<::std::byte const*>(table_next);
     }
-
-    // call_indirect type_index table_index ...
-    // [                safe              ] unsafe (could be the section_end)
-    //                          ^^ code_curr
-
-    code_curr = reinterpret_cast<::std::byte const*>(table_next);
+    else
+    {
+        // Core 1.0 section 5.4.1 uses the literal reserved byte in
+        // `0x11 typeidx 0x00`; it is not a ULEB128 table index.
+        if(code_curr == code_end || *code_curr != ::std::byte{}) [[unlikely]]
+        {
+            err.err_curr = op_begin;
+            err.err_code = code_validation_error_code::invalid_table_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+        ++code_curr;
+    }
 
     // call_indirect type_index table_index ...
     // [                safe              ] unsafe (could be the section_end)
     //                                      ^^ code_curr
 
-    if(table_index >= all_table_count) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.illegal_table_index.table_index = table_index;
-        err.err_selectable.illegal_table_index.all_table_count = all_table_count;
-        err.err_code = code_validation_error_code::illegal_table_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
+    // Both immediate fields now have valid encodings.  Semantic checks intentionally start with
+    // type_index so uwvm-int, LLVM, and the standard validators agree on compound-invalid operands.
     auto types_begin{curr_module.type_section_storage.type_section_begin};
     auto types_end{curr_module.type_section_storage.type_section_end};
 
@@ -987,6 +1000,23 @@ case wasm1_code::call_indirect:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
+    if((wasm1p1_para.disable_multiple_tables || wasm1p1_para.controllable_allow_multi_table) && table_index != 0u) [[unlikely]]
+    {
+        fail_wasm2_feature_required(op_begin,
+                                    static_cast<wasm_u32>(static_cast<wasm_byte>(wasm1_code::call_indirect)),
+                                    ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                                    ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
+    }
+
+    if(table_index >= all_table_count) [[unlikely]]
+    {
+        err.err_curr = op_begin;
+        err.err_selectable.illegal_table_index.table_index = table_index;
+        err.err_selectable.illegal_table_index.all_table_count = all_table_count;
+        err.err_code = code_validation_error_code::illegal_table_index;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
     auto const& callee_type{types_begin[static_cast<::std::size_t>(type_index)]};
     auto const param_count{static_cast<::std::size_t>(callee_type.parameter.end - callee_type.parameter.begin)};
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
@@ -997,11 +1027,11 @@ case wasm1_code::call_indirect:
 #endif
 
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
-    auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
-    auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
+    auto const param_count_plus_element_index_overflows{param_count == max_operand_stack_requirement};
+    auto const required_stack_size{param_count_plus_element_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
     [[maybe_unused]] auto const stack_size{operand_stack.size()};
 
-    if(!is_polymorphic && (param_count_plus_table_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (param_count_plus_element_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
         report_operand_stack_underflow(op_begin, u8"call_indirect", required_stack_size);
     }
@@ -1051,7 +1081,7 @@ case wasm1_code::call_indirect:
         if(!is_polymorphic)
         {
             bool const n_ok{param_count <= 4uz};
-            bool const state_ok{stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && !param_count_plus_table_index_overflows &&
+            bool const state_ok{stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && !param_count_plus_element_index_overflows &&
                                 stack_size >= required_stack_size};
 
             if(n_ok && state_ok)
@@ -1553,6 +1583,13 @@ case wasm1_code::select:
         {
             push_unknown_operand();
         }
+    }
+    else if(v1_is_unknown && v2_from_stack && !v2_is_unknown)
+    {
+        // The known right operand refines the bottom left operand. Use pop/push
+        // to keep byte accounting correct when the placeholder's width changes.
+        operand_stack_pop_unchecked();
+        operand_stack_push(v2_type);
     }
 
     break;

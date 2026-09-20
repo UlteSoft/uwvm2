@@ -3,6 +3,7 @@
 namespace fast_io
 {
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, typename Rep, typename Period>
 	requires(reserve_printable<char_type, Rep> &&
 			 (::std::same_as<Period, ::std::nano> || ::std::same_as<Period, ::std::micro> ||

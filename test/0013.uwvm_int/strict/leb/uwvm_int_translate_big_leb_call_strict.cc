@@ -16,12 +16,13 @@ namespace
         ::std::memcpy(p, ::std::addressof(v), sizeof(v));
     }
 
-    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
         using kind_t = optable::trivial_defined_call_kind;
         using info_t = optable::compiled_defined_call_info;
 
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const* const info = reinterpret_cast<info_t const*>(call_function);
@@ -29,18 +30,18 @@ namespace
 
         if(info->trivial_kind == kind_t::none) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         auto const top_addr = reinterpret_cast<::std::uintptr_t>(top);
         if(top_addr < info->param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
         ::std::byte* const base = reinterpret_cast<::std::byte*>(top_addr - info->param_bytes);
 
         ::std::uint_least32_t const imm_u32{::std::bit_cast<::std::uint_least32_t>(info->trivial_imm)};
 
-        auto finish_void = [&]() noexcept { *stack_top_ptr = base; };
+        auto finish_void = [&]() noexcept { stack_top = base; };
         auto finish_i32 = [&](::std::uint32_t v) noexcept
         {
             store_u32(base, v);
-            *stack_top_ptr = base + 4;
+            stack_top = base + 4;
         };
 
         switch(info->trivial_kind)
@@ -57,6 +58,7 @@ namespace
             default:
                 ::fast_io::fast_terminate();
         }
+        return stack_top;
     }
 
     [[nodiscard]] byte_vec build_big_leb_call_module()

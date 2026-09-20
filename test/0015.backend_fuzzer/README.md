@@ -19,53 +19,36 @@ are also useful, because `unreachable`, divide-by-zero, and OOB memory accesses
 are observable backend behavior.
 
 In addition to random arithmetic/memory cases, the generator emits fixed
-strategy cases by default:
+full-compilation cases by default:
 
 - `local_defined_call_matrix`: exercises direct local-defined calls with i32
   and i64 signatures, recursive calls, and call results flowing into
   `local.set` and `drop`.
 - `call_indirect_matrix`: builds a local table and exercises indirect calls
   through multiple table elements, including result-to-local and drop sites.
-- `tiered_hot_direct_call`: repeatedly calls a tiny local helper enough times to
-  force tiered entry-hot replacement, then keeps executing through the
-  interpreter-to-JIT call edge.
-- `tiered_hot_indirect_call`: repeatedly calls local helpers through a table so
-  tiered raw target publication and call-indirect table views are stressed.
-- `tiered_full_switch_call_pressure`: runs a longer hot direct-call loop to
-  pressure the native-switch counters that request the full LLVM tier.
-- `tiered_osr_loop`: emits a large-enough loop body to exercise tiered loop OSR
-  polling and reentry generation.
-- `tiered_win32_abi_direct_matrix`: stresses local-defined typed/raw tiered
-  calls with enough arguments to expose Win64 SysV vs host-ABI mixups.
-- `tiered_win32_abi_osr_call_matrix`: combines tiered OSR reentry with a
-  local-defined JIT call inside the loop body.
+- `local_imported_i32_add_loop`: exercises a local imported host function from
+  both the eager interpreter and LLVM AOT paths.
 
 On Windows, `run_win32_abi_probe.py` also builds a small standalone C++ probe
 that directly exercises host-to-raw-entry, host-to-typed-entry, generated
-Wasm-ABI-to-host-bridge, table typed/raw dispatch, OSR-style reentry, and
-interpreter callback function-pointer boundaries.  It also checks the source for
-the pointer-sized atomic-load alignment guard that prevents COFF/MCJIT from
-emitting unresolved `__atomic_load` calls.
+Wasm-ABI-to-host-bridge, table typed/raw dispatch, and interpreter callback
+function-pointer boundaries. It also checks the pointer-sized atomic-load
+alignment guard used by the LLVM AOT path.
 
 Fixed trap cases also include `call_indirect` OOB, null-element, and signature
 mismatch paths.
 
 The low-level `uwvm-int-ring-matrix` runner only exercises single-function
 translator ABI shapes, so cases that require runtime call bridges are marked
-and skipped there while still running in lazy/full JIT and tiered modes. For
-skipped trap cases, the runner mirrors the expected trap result so WABT
+and skipped there while still running in eager interpreter and LLVM AOT modes.
+For skipped trap cases, the runner mirrors the expected trap result so WABT
 differential comparison remains meaningful.
 
 Default compared modes:
 
 - `uwvm-int-ring-matrix`
-- `uwvm-int-lazy`
 - `uwvm-int-full`
-- `llvm-jit-lazy`
-- `llvm-jit-full`
-- `tiered`
-- `tiered-no-t0`
-- `tiered-no-t2`
+- `llvm-aot`
 
 Run one macro configuration:
 
@@ -109,7 +92,7 @@ Run the LLVM libFuzzer target:
 ```bash
 CXX="$(command -v clang++)" \
 SYSROOT="$(xcrun --sdk macosx --show-sdk-path)" \
-UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix llvm-jit-lazy tiered" \
+UWVM_BACKEND_LIBFUZZER_MODES="uwvm-int-ring-matrix uwvm-int-full llvm-aot" \
 test/0015.backend_fuzzer/run_backend_libfuzzer.sh \
   --memory-model single-thread-alloc \
   --no-use-thread-local \
@@ -129,7 +112,7 @@ Useful environment variables:
 - `UWVM_BACKEND_FUZZ_SEED`: deterministic seed. If unset, a random seed is
   generated and printed; generated corpora also write it to `cases/seed.txt`.
 - `UWVM_BACKEND_FUZZER_INCLUDE_TRAPS=0`: skip fixed trap cases.
-- `UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY=0`: skip fixed tiered strategy cases.
+- `UWVM_BACKEND_FUZZER_INCLUDE_STRATEGY=0`: skip fixed full-compilation cases.
 - `UWVM_BACKEND_FUZZER_MODES`: space- or comma-separated mode list.
 - `UWVM_BACKEND_FUZZER_WABT_ROOT`: WABT checkout/build root.
 - `UWVM_BACKEND_FUZZER_WORK_DIR`: corpus, runner, and log output root.
@@ -147,12 +130,6 @@ Useful environment variables:
   libFuzzer target. Defaults to all backend modes.
 - `UWVM_BACKEND_LIBFUZZER_TRACE=1`: print input size and backend mode before
   each execution. This is useful when reducing a crash.
-- `UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_OSR=1`: add a long self-checking loop to
-  each generated libFuzzer module so tiered OSR polling/reentry paths are hit
-  more aggressively.
-- `UWVM_BACKEND_LIBFUZZER_STRESS_TIERED_SWITCH=1`: add a long self-checking
-  direct-call loop to each generated libFuzzer module so tiered native-switch
-  and full-tier request paths are hit more aggressively.
 - `UWVM_BACKEND_LIBFUZZER_SANITIZERS`: default `fuzzer,address,undefined`.
 - `UWVM_BACKEND_LIBFUZZER_SYSROOT`: sysroot path; `SYSROOT` and `SDKROOT` are
   also honored.
@@ -161,11 +138,11 @@ Useful environment variables:
   heartbeat.
 - `UWVM_BACKEND_LIBFUZZER_PROGRESS_INTERVAL`: heartbeat interval in seconds,
   default `10`.
-- `LLVM_CONFIG`: llvm-config path for building the JIT-enabled runner.
+- `LLVM_CONFIG`: llvm-config path for building the LLVM AOT/full runner.
 - `CXX`: C++ compiler used by `build_runner.py`.
 
 `run_backend_fuzzer.sh` also accepts repeated `--define`, `--extra-cxxflag`,
-and `--extra-ldflag` arguments. These are intended for targeted llvm-jit or
+and `--extra-ldflag` arguments. These are intended for targeted LLVM AOT or
 runtime macro probes that are not worth making first-class matrix dimensions.
 Known crashes can be skipped during long libFuzzer runs by passing
 `-ignore_crashes=1` after `--`.

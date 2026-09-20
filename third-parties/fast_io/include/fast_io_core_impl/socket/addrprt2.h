@@ -32,6 +32,7 @@ inline constexpr char_type *prtrsv_ipv4_define_impl(char_type *it, ipv4 v) noexc
 
 } // namespace details
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, posix_in_addr>) noexcept
 {

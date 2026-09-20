@@ -24,10 +24,8 @@ module;
 
 // std
 #include <bit>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
-#include <cmath>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -37,20 +35,21 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
-// platform
-#include <uwvm2/runtime/lib/uwvm_runtime.h>
 export module uwvm2.uwvm.run:run;
 
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
-import uwvm2.utils.madvise;
 import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard;
 import uwvm2.parser.wasm.binfmt.base;
+// Import the API and its configuration types just as the runtime implementation
+// does. A textual header in the global fragment cannot see module-owned
+// u8string_view; adding textual container headers there would mix type ownership.
+import uwvm2.runtime;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.utils.memory;

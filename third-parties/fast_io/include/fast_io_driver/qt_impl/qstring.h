@@ -137,6 +137,9 @@ inline constexpr io_strlike_reference_wrapper<char16_t, QString> io_strlike_ref(
 namespace manipulators
 {
 
+/// @brief Adapts a Qt UTF-16 string-like object for use as an operating-system filename.
+/// @details `QString` produces a known-size C-string wrapper; compatible non-owning Qt views produce a counted,
+///          non-terminated range. The result borrows UTF-16 storage and performs no encoding conversion.
 template <typename T>
 inline auto qt_as_filename(T const &hstr) noexcept
 {

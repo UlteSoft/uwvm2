@@ -26,6 +26,7 @@ module;
 export module uwvm2.validation.standard;
 export import uwvm2.validation.standard.wasm1;
 export import uwvm2.validation.standard.wasm1p1;
+export import uwvm2.validation.standard.wasm2;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Detect incorrect includes inserted after `#pragma once`.
+Detect includes that escape the header/module split after `#pragma once`.
 
 Rule:
-- After `#pragma once`, the first non-comment, non-blank preprocessor directive
-  must be `#ifndef ...`. If it is `#include ...` (or anything else), report an error.
+- Headers with a `#ifndef UWVM_MODULE` compatibility guard must not include
+  dependencies between `#pragma once` and that guard. Other directives (for
+  example a C++ feature-level check) are permitted before the guard.
+- Plain implementation-detail headers without a `UWVM_MODULE` compatibility
+  guard are out of scope; their includes are intentionally textual in both
+  default and module translation units.
 
 Scope:
 - Scans the local `src` tree (two levels up from this test directory).
@@ -20,7 +24,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -28,6 +32,7 @@ SRC_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", "src"))
 
 
 RE_PRAGMA_ONCE = re.compile(r"^\s*#\s*pragma\s+once\b")
+RE_UWVM_MODULE_GUARD = re.compile(r"^\s*#\s*ifndef\s+UWVM_MODULE\b")
 
 
 def list_header_files(root: str) -> List[str]:
@@ -55,15 +60,23 @@ def find_pragma_once_line(lines: List[str]) -> Optional[int]:
     return None
 
 
-def classify_first_directive_after_pragma(lines: List[str], start_idx: int) -> Optional[Tuple[int, str]]:
-    """Return (line_index, directive_keyword) of the first preprocessor directive after `#pragma once`.
+def find_uwvm_module_guard(lines: List[str], start_idx: int) -> Optional[int]:
+    for i in range(start_idx + 1, len(lines)):
+        if RE_UWVM_MODULE_GUARD.match(lines[i]):
+            return i
+    return None
 
-    Skips blank lines and both line and block comments. Returns None if no directive found.
-    `directive_keyword` is lower-cased one of: 'ifndef', 'include', or other (actual token).
+
+def find_include_before_guard(lines: List[str], start_idx: int, guard_idx: int) -> Optional[int]:
+    """Return the first active-looking include before the UWVM_MODULE guard.
+
+    Blank text and comments are ignored. Non-include directives are allowed so
+    headers may diagnose unsupported language modes before selecting their
+    textual-header or named-module dependency surface.
     """
     in_block_comment = False
     i = start_idx + 1
-    while i < len(lines):
+    while i < guard_idx:
         s = lines[i]
         p = 0
         while True:
@@ -101,12 +114,11 @@ def classify_first_directive_after_pragma(lines: List[str], start_idx: int) -> O
             # First non-comment token
             if s[p] == '#':
                 rest = s[p+1:].lstrip()
-                # Extract directive keyword
                 m = re.match(r"(\w+)", rest)
-                if not m:
-                    return (i, "#")
-                kw = m.group(1).lower()
-                return (i, kw)
+                if m and m.group(1).lower() == "include":
+                    return i
+                i += 1
+                break
 
             # Non-preprocessor content before any directive: treat as benign; continue to next line
             i += 1
@@ -123,16 +135,14 @@ def check_header(path: str) -> Optional[str]:
     if idx is None:
         return None  # No pragma once; out of scope
 
-    res = classify_first_directive_after_pragma(lines, idx)
-    if res is None:
-        return None  # No directive found after pragma once; do not flag
+    guard_idx = find_uwvm_module_guard(lines, idx)
+    if guard_idx is None:
+        return None  # Plain textual helper, not a dual header/module surface.
 
-    line_no, kw = res
-    if kw == 'ifndef':
+    include_idx = find_include_before_guard(lines, idx, guard_idx)
+    if include_idx is None:
         return None
-    if kw == 'include':
-        return f"{path}:{line_no+1}: `#include` appears immediately after `#pragma once` (expected `#ifndef ...`)"
-    return f"{path}:{line_no+1}: unexpected `#{kw}` after `#pragma once` (expected `#ifndef ...`)"
+    return f"{path}:{include_idx+1}: `#include` escapes the `#ifndef UWVM_MODULE` dependency guard"
 
 
 def main(argv: List[str]) -> int:

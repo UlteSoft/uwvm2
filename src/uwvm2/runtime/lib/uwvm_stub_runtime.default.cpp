@@ -25,14 +25,13 @@ namespace uwvm2::runtime::lib
         ::fast_io::fast_terminate();
     }
 
-    extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
-    {
-        static_cast<void>(main_module_name);
-        static_cast<void>(cfg);
-        ::fast_io::fast_terminate();
-    }
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept {}
 
-    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept {}
+    extern "C++" void reset_runtime_state_host_api() noexcept {}
+
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+    extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept { reset_runtime_state_host_api(); }
+#endif
 
     extern "C++" ::std::size_t preload_memory_descriptor_count_host_api() noexcept { return 0uz; }
 

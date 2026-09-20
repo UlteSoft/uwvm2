@@ -1768,6 +1768,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(element_storage), ::std::addressof(all_sections)}; }
 
+#ifndef UWVM_MODULE
+    // This optional context-print fast path depends on non-exported fast_io protocol internals.
     namespace details::wasm1_element_section_details_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -1951,6 +1953,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         };
     }  // namespace details::wasm1_element_section_details_print
+#endif
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>,
@@ -2059,6 +2062,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>) noexcept
     { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::wasm1_element_section_details_print::storage_context>{}; }
@@ -2070,6 +2074,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 }
 
 // Subsequent specifications of union must include this information, so it has to be declared here.
@@ -2223,6 +2228,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
+    // This optional context-print fast path depends on non-exported fast_io protocol internals.
     namespace details::wasm1_element_section_details_print
     {
         enum class element_stage : unsigned char
@@ -2283,7 +2290,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         };
     }  // namespace details::wasm1_element_section_details_print
+#endif
 
+#ifndef UWVM_MODULE
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, wasm1_element_t_section_details_wrapper_t<Fs...>>) noexcept
     { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::wasm1_element_section_details_print::element_context>{}; }
@@ -2295,6 +2304,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 
     template <typename... Fs>
     concept has_handle_element_type = requires(::uwvm2::parser::wasm::concepts::feature_reserve_type_t<element_section_storage_t<Fs...>> sec_adl,

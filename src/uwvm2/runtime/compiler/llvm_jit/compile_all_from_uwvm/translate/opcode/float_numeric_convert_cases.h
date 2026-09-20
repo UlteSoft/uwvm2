@@ -194,9 +194,8 @@ case wasm1_code::f64_trunc:
 }
 
 // f32.nearest / f64.nearest
-// Stack effect: (fN) -> (fN).  Round to the nearest integral floating-point value with the
-// WebAssembly nearest/ties-to-even semantics represented through LLVM `rint`, keeping the
-// operation intrinsic and overloaded on the original operand type.
+// Stack effect: (fN) -> (fN).  LLVM `roundeven` encodes WebAssembly's fixed ties-to-even
+// semantics without observing the host floating-point rounding mode.
 case wasm1_code::f32_nearest:
 case wasm1_code::f64_nearest:
 {
@@ -223,7 +222,7 @@ case wasm1_code::f64_nearest:
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
                    ::llvm::Value* arguments[]{operand.value};
-                   return call_llvm_intrinsic(*llvm_module, ir_builder, ::llvm::Intrinsic::rint, overloaded_types, arguments);
+                   return call_llvm_intrinsic(*llvm_module, ir_builder, get_llvm_wasm_nearest_intrinsic_id(), overloaded_types, arguments);
                })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -293,7 +292,7 @@ case wasm1_code::f64_add:
                llvm_operand_type,
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return ir_builder.CreateFAdd(left.value, right.value); })) [[unlikely]]
+               { return emit_llvm_float_binary(ir_builder, left.value, right.value, 0u); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -323,7 +322,7 @@ case wasm1_code::f64_sub:
                llvm_operand_type,
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return ir_builder.CreateFSub(left.value, right.value); })) [[unlikely]]
+               { return emit_llvm_float_binary(ir_builder, left.value, right.value, 1u); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -353,7 +352,7 @@ case wasm1_code::f64_mul:
                llvm_operand_type,
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return ir_builder.CreateFMul(left.value, right.value); })) [[unlikely]]
+               { return emit_llvm_float_binary(ir_builder, left.value, right.value, 2u); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -383,7 +382,7 @@ case wasm1_code::f64_div:
                llvm_operand_type,
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return ir_builder.CreateFDiv(left.value, right.value); })) [[unlikely]]
+               { return emit_llvm_float_binary(ir_builder, left.value, right.value, 3u); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -877,7 +876,7 @@ case wasm1_code::f32_convert_i32_s:
                                                        runtime_operand_stack_value_type::i32,
                                                        runtime_operand_stack_value_type::f32,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext()), true); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -901,7 +900,7 @@ case wasm1_code::f32_convert_i32_u:
                                                        runtime_operand_stack_value_type::i32,
                                                        runtime_operand_stack_value_type::f32,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext()), false); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -925,7 +924,7 @@ case wasm1_code::f32_convert_i64_s:
                                                        runtime_operand_stack_value_type::i64,
                                                        runtime_operand_stack_value_type::f32,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext()), true); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -949,7 +948,7 @@ case wasm1_code::f32_convert_i64_u:
                                                        runtime_operand_stack_value_type::i64,
                                                        runtime_operand_stack_value_type::f32,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext()), false); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -973,7 +972,7 @@ case wasm1_code::f32_demote_f64:
                                                        runtime_operand_stack_value_type::f64,
                                                        runtime_operand_stack_value_type::f32,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateFPTrunc(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_float_demote(ir_builder, operand.value); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -997,7 +996,7 @@ case wasm1_code::f64_convert_i32_s:
                                                        runtime_operand_stack_value_type::i32,
                                                        runtime_operand_stack_value_type::f64,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext()), true); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -1021,7 +1020,7 @@ case wasm1_code::f64_convert_i32_u:
                                                        runtime_operand_stack_value_type::i32,
                                                        runtime_operand_stack_value_type::f64,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext()), false); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -1045,7 +1044,7 @@ case wasm1_code::f64_convert_i64_s:
                                                        runtime_operand_stack_value_type::i64,
                                                        runtime_operand_stack_value_type::f64,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext()), true); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -1069,7 +1068,7 @@ case wasm1_code::f64_convert_i64_u:
                                                        runtime_operand_stack_value_type::i64,
                                                        runtime_operand_stack_value_type::f64,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_int_to_float(ir_builder, operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext()), false); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
@@ -1093,7 +1092,7 @@ case wasm1_code::f64_promote_f32:
                                                        runtime_operand_stack_value_type::f32,
                                                        runtime_operand_stack_value_type::f64,
                                                        [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateFPExt(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+                                                       { return emit_llvm_float_promote(ir_builder, operand.value); }))
             [[unlikely]]
         {
             disable_inline_llvm_jit_emission();

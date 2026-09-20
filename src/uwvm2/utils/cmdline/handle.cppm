@@ -37,7 +37,6 @@ module;
 export module uwvm2.utils.cmdline:handle;
 
 import fast_io;
-import fast_io_crypto;
 import uwvm2.utils.container;
 import uwvm2.utils.hash;
 import uwvm2.utils.debug;

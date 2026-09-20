@@ -5,13 +5,20 @@ namespace fast_io
 
 namespace details
 {
+
+// Integer conversion remains representation-agnostic. Locale grouping metadata enters the digit kernels only as
+// checked direct views resolved from the owning locale's compact RVAs; reserve bounds use counts alone. This separation
+// is both a correctness boundary (an RVA is never reinterpreted as a pointer) and a cost boundary (resolution occurs
+// once per observed field, never once per digit or grouping iteration).
 template <::std::integral char_type, manipulators::scalar_flags flags, typename T>
 inline constexpr ::std::size_t lc_print_reserve_size_int_cal(basic_lc_all<char_type> const *__restrict all) noexcept
 {
 	constexpr ::std::size_t static_size{
 		print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, flags.modern_octal, ::std::remove_cv_t<T>>};
 	constexpr ::std::size_t static_sizem1{static_size - 1};
-	return static_size + static_sizem1 * all->numeric.thousands_sep.len;
+	// A reserve bound needs only the compact descriptor's count. Resolving its RVA here would add a storage-owner load
+	// to every size query without observing a character; pointer resolution is deferred to the materialization path.
+	return static_size + static_sizem1 * all->numeric.thousands_sep.length;
 }
 
 template <::std::integral char_type, ::std::size_t base, bool uppercase, my_unsigned_integral T>
@@ -30,7 +37,9 @@ inline constexpr char_type to_char_single_digit(T t) noexcept
 		}
 		else
 		{
-			if constexpr (is_ebcdic<char_type>)
+			if constexpr (is_classic_ebcdic<char_type> &&
+						  (!::std::same_as<char_type, wchar_t> ||
+						   !::fast_io::details::wide_is_none_ebcdic_endian))
 			{
 				if constexpr (base <= 19)
 				{
@@ -105,9 +114,14 @@ inline constexpr char_type to_char_single_digit(T t) noexcept
 					}
 				}
 			}
-			else
+			else if constexpr (is_ascii<char_type>)
 			{
 				return ::fast_io::char_literal_add<char_type, (uppercase ? u8'A' : u8'a')>(t - ten);
+			}
+			else
+			{
+				return ::fast_io::details::charliteralofnumber<char_type, uppercase>(
+					static_cast<char8_t>(t));
 			}
 		}
 	}
@@ -221,19 +235,20 @@ constexpr char_type *grouping_mul_sep_print_sep_impl(char_type const *thousands_
 }
 
 template <bool full, ::std::size_t base, bool uppercase, ::std::integral char_type, my_unsigned_integral T>
-constexpr char_type *grouping_mul_sep_impl(basic_lc_all<char_type> const *__restrict all, char_type *iter, T t) noexcept
+constexpr char_type *grouping_mul_sep_impl(
+	basic_io_scatter_t<::std::size_t> grouping,
+	basic_io_scatter_t<char_type> thousands_sep, char_type *iter, T t) noexcept
 {
 	constexpr ::std::size_t array_len{cal_max_int_size<T, base>() * 2u - 1u};
 	char_type array[array_len];
 	auto const ed{array + array_len};
-	auto thousands_sep{all->numeric.thousands_sep};
 	char_type replacement_ch{char_literal_v<u8',', char_type>};
 	bool single_character{thousands_sep.len == 1};
 	if (single_character)
 	{
 		replacement_ch = *thousands_sep.base;
 	}
-	auto first{lc_grouping_single_sep_ch_impl<full, base, uppercase>(all->numeric.grouping, ed, t, replacement_ch)};
+	auto first{lc_grouping_single_sep_ch_impl<full, base, uppercase>(grouping, ed, t, replacement_ch)};
 	if (single_character)
 	{
 		return non_overlapped_copy(first, ed, iter);
@@ -316,20 +331,27 @@ inline constexpr char_type *print_lc_grouping_3_path_impl(char_type seperator, c
 
 template <bool full, ::std::size_t base, bool uppercase, ::std::integral char_type, my_unsigned_integral intg>
 inline constexpr char_type *lc_print_reserve_integral_withfull_main_impl(basic_lc_all<char_type> const *__restrict all,
-																		 char_type *first, intg t)
+														 char_type *first, intg t)
 {
-	if ((all->numeric.grouping.len == 0) | (all->numeric.thousands_sep.len == 0))
+	auto const grouping_relative{all->numeric.grouping};
+	auto const separator_relative{all->numeric.thousands_sep};
+	if ((grouping_relative.length == 0) | (separator_relative.length == 0))
 	{
 		return print_reserve_integral_withfull_main_impl<full, base, uppercase>(first, t);
 	}
-	else if ((all->numeric.grouping.len == 1 && *all->numeric.grouping.base == 3) &
-			 (all->numeric.thousands_sep.len == 1))
+
+	// Locale files store offsets, not process pointers. Resolve both descriptors once at this boundary and pass the
+	// resulting direct views through the unchanged digit/grouping kernels. Besides keeping the numeric algorithm
+	// representation-independent, this prevents repeated owner/vector lookup inside the per-digit loop.
+	auto const grouping{::fast_io::details::lc_resolve_scatter(all, grouping_relative)};
+	auto const separator{::fast_io::details::lc_resolve_scatter(all, separator_relative)};
+	if ((grouping.len == 1 && *grouping.base == 3) & (separator.len == 1))
 	{
-		return print_lc_grouping_3_path_impl<full, base, uppercase>(*(all->numeric.thousands_sep.base), first, t);
+		return print_lc_grouping_3_path_impl<full, base, uppercase>(*separator.base, first, t);
 	}
 	else
 	{
-		return grouping_mul_sep_impl<full, base, uppercase>(all, first, t);
+		return grouping_mul_sep_impl<full, base, uppercase>(grouping, separator, first, t);
 	}
 }
 
@@ -396,7 +418,7 @@ inline constexpr ::std::size_t print_reserve_size_grouping_timestamp_impl(basic_
 {
 	constexpr ::std::size_t static_size{print_reserve_size(io_reserve_type<char_type, ::std::int_least64_t>)};
 	constexpr ::std::size_t static_sizem1{static_size - 1};
-	return static_size + static_sizem1 * all->numeric.thousands_sep.len + all->numeric.decimal_point.len +
+	return static_size + static_sizem1 * all->numeric.thousands_sep.length + all->numeric.decimal_point.length +
 		   ::std::numeric_limits<::std::uint_least64_t>::digits10;
 }
 
@@ -407,14 +429,18 @@ inline constexpr char_type *print_reserve_define_grouping_timestamp_impl(basic_l
 	iter = lc_print_reserve_integral_define<10>(all, iter, timestamp.seconds);
 	if (timestamp.subseconds)
 	{
-		if (all->numeric.decimal_point.len == 1)
+		// Resolve the decimal separator only when it is observed. Empty and multi-character locale separators preserve
+		// their historical behavior, while malformed nonempty RVAs are rejected by the common checked resolver.
+		auto const decimal_point{
+			::fast_io::details::lc_resolve_scatter(all, all->numeric.decimal_point)};
+		if (decimal_point.len == 1)
 		{
-			*iter = all->numeric.decimal_point.base[0];
+			*iter = decimal_point.base[0];
 			++iter;
 		}
 		else
 		{
-			iter = non_overlapped_copy_n(all->numeric.decimal_point.base, all->numeric.decimal_point.len, iter);
+			iter = non_overlapped_copy_n(decimal_point.base, decimal_point.len, iter);
 		}
 		iter = output_iso8601_subseconds_main(iter, timestamp.subseconds);
 	}
@@ -422,6 +448,7 @@ inline constexpr char_type *print_reserve_define_grouping_timestamp_impl(basic_l
 }
 
 } // namespace details
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename T>
 	requires((details::my_integral<T> || ::std::same_as<::std::remove_cv_t<T>, ::std::byte>) && !flags.alphabet &&
 			 !::std::same_as<::std::remove_cv_t<T>, bool>)

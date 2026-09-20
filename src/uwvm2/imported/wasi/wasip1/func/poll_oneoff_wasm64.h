@@ -232,6 +232,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<8uz>(in, u8"poll_oneoff_wasm64.in (subscription)");
+        check_wasip1_guest_pointer_alignment<8uz>(out, u8"poll_oneoff_wasm64.out (event)");
+        check_wasip1_guest_pointer_alignment<8uz>(nevents, u8"poll_oneoff_wasm64.nevents (size64)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
@@ -764,7 +768,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #   endif
             };
 
-            if(::fast_io::linux_system_call_fails(epfd)) [[unlikely]]
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(epfd)) [[unlikely]]
             {
                 ::fast_io::error fe{};
                 fe.domain = ::fast_io::posix_domain_value;
@@ -873,7 +877,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ev.data.ptr = const_cast<void*>(static_cast<void const*>(::std::addressof(sub)));
 
                         int ret{::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_ADD, curr_fd_native_file.native_handle(), ::std::addressof(ev))};
-                        if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
+                        if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ret)) [[unlikely]]
                         {
                             auto err{-ret};
 
@@ -887,7 +891,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 ret =
                                     ::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_MOD, curr_fd_native_file.native_handle(), ::std::addressof(ev));
-                                if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
+                                if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ret)) [[unlikely]]
                                 {
                                     ::fast_io::error fe{};
                                     fe.domain = ::fast_io::posix_domain_value;
@@ -1020,7 +1024,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         }
 
                         int const tfd{::fast_io::system_call<__NR_timerfd_create, int>(linux_clock_id, TFD_NONBLOCK | TFD_CLOEXEC)};
-                        if(::fast_io::linux_system_call_fails(tfd)) [[unlikely]]
+                        if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(tfd)) [[unlikely]]
                         {
                             ::fast_io::error fe{};
                             fe.domain = ::fast_io::posix_domain_value;
@@ -1037,7 +1041,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ts.it_value.tv_nsec = static_cast<decltype(ts.it_value.tv_nsec)>(ns_rem);
 
                         int ret{::fast_io::system_call<__NR_timerfd_settime, int>(tfd, 0, ::std::addressof(ts), nullptr)};
-                        if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
+                        if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ret)) [[unlikely]]
                         {
                             ::fast_io::error fe{};
                             fe.domain = ::fast_io::posix_domain_value;
@@ -1051,7 +1055,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ev.data.ptr = const_cast<void*>(static_cast<void const*>(::std::addressof(sub)));
 
                         ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_ADD, tfd, ::std::addressof(ev));
-                        if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
+                        if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ret)) [[unlikely]]
                         {
                             ::fast_io::error fe{};
                             fe.domain = ::fast_io::posix_domain_value;
@@ -1100,7 +1104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             for(;;)
             {
                 ready = ::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1);
-                if(!::fast_io::linux_system_call_fails(ready)) { break; }
+                if(!::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ready)) { break; }
 
                 auto err{-ready};
 
@@ -1470,7 +1474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             int const ready{::fast_io::system_call<__NR_poll, int>(poll_fds.data(), static_cast<::nfds_t>(poll_fds.size()), timeout_ms)};
 
-            if(::fast_io::linux_system_call_fails(ready)) [[unlikely]]
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(ready)) [[unlikely]]
             {
                 ::fast_io::error fe{};
                 fe.domain = ::fast_io::posix_domain_value;

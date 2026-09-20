@@ -28,7 +28,7 @@ xmake i -o ./out/djgpp
 
 ### Additional Options
 - `--static=none|non-system|compiler` Static linking policy (`compiler` is typical for DOS/DJGPP builds)
-- `--march` Defaults to native; adjust as needed
+- `--march` defaults to `none` (the configured toolchain baseline). Fix and test an explicit release CPU baseline; use `--march=native` only for developer-local builds.
 - `--use-cxx-module=y` Use C++ modules if your compiler supports them
 
 ## Caveats

@@ -63,10 +63,7 @@ def _build_uwvm(repo_root: Path) -> Path:
 def _uwvm_args(uwvm_bin: Path, case: Case) -> list[str]:
     args = [
         str(uwvm_bin),
-        "--runtime-custom-mode",
-        "full",
-        "--runtime-custom-compiler",
-        "int",
+        "--runtime-int",
     ]
 
     if case.relay_wasm is not None and case.relay_module_name is not None:

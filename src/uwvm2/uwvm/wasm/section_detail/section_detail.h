@@ -133,7 +133,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                 u8"\nBinary Format Version: ",
                                 module_storage.module_storage_ptr.wf->binfmt_ver,
                                 u8"\n",
+#if defined(UWVM_MODULE)
+                                ::uwvm2::uwvm::wasm::feature::render_wasm_binfmt_ver1_module_details(
+                                    module_storage.module_storage_ptr.wf->get_curr_binfmt_version_wasm_storage<1u>()),
+#else
                                 section_details_adl_caller(module_storage.module_storage_ptr.wf->get_curr_binfmt_version_wasm_storage<1u>()),
+#endif
                                 u8"\n\n");
                         }
                         else if constexpr(::std::same_as<char_type, char16_t>)
@@ -230,7 +235,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                 u8"\nBinary Format Version: ",
                                 module_storage.module_storage_ptr.wf->binfmt_ver,
                                 u8"\n",
+#if defined(UWVM_MODULE)
+                                ::uwvm2::uwvm::wasm::feature::render_wasm_binfmt_ver1_module_details(
+                                    module_storage.module_storage_ptr.wf->get_curr_binfmt_version_wasm_storage<1u>()),
+#else
                                 section_details_adl_caller(module_storage.module_storage_ptr.wf->get_curr_binfmt_version_wasm_storage<1u>()),
+#endif
                                 u8"\n\n");
                         }
                         else if constexpr(::std::same_as<char_type, char16_t>)

@@ -512,6 +512,23 @@ public:
 	}
 };
 
+/**
+ * @brief Proves that a POSIX descriptor observer is substitutable under value transport.
+ * @details The observer is a non-owning copy of one numeric descriptor. Primitive
+ *          reads, writes, and seeks mutate the kernel open-file description, not
+ *          the `fd` field in the observer object; copying that field therefore
+ *          neither forks stream position nor changes descriptor ownership. This
+ *          semantic proof is intentionally attached to this exact observer type
+ *          and does not extend to buffered views whose cursor is stored locally.
+ */
+template <::fast_io::posix_family family, ::std::integral ch_type>
+inline constexpr ::std::true_type stream_ref_value_transport_safe_define(
+	::fast_io::io_type_t<
+		::fast_io::basic_posix_family_io_observer<family, ch_type>>) noexcept
+{
+	return {};
+}
+
 template <::fast_io::posix_family family, ::std::integral ch_type>
 inline constexpr bool operator==(basic_posix_family_io_observer<family, ch_type> a, basic_posix_family_io_observer<family, ch_type> b) noexcept
 {
@@ -545,25 +562,126 @@ io_bytes_stream_ref_define(basic_posix_family_io_observer<family, ch_type> other
 	return {other.fd};
 }
 
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::true_type print_semantic_optional_scatter_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// The exact POSIX observer is a closed fast_io type whose native writer consumes the compact nonempty iovec
+	// sequence. It owns no status-print overload for the library-owned leaf set. File owners, mutex wrappers, buffers,
+	// decorators, and transcoders reach this marker only if output-reference normalization has produced this observer.
+	return {};
+}
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::true_type
+print_semantic_optional_scatter_barrier_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// The observer namespace owns no whole-record status operation involving a marked direct-only barrier. The ordinary
+	// POSIX control scanner drains each admitted scatter/reserve prefix before it invokes that barrier, then resumes on
+	// the same descriptor-backed observer. Segmenting at that existing boundary therefore preserves iovec grouping,
+	// syscall order, exception-visible prefixes, and final-line ownership. Owners and wrappers remain unmarked.
+	return {};
+}
+
 #if 0
 template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	// POSIX has native writev. Measurements show that scatter-fallback copying is not a good default once
-	// whole-run materialization is available for compact output.
+	// POSIX has native writev. Keep the previously measured scatter-fallback policy disabled.
 	return 0u;
 }
-#endif
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_direct_full_output_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// The unbuffered observer is the native scatter boundary. Preserve short producer sequences so writev remains
+	// selectable; buffered owners have independent put-area policies.
+	return 0u;
+}
 
 template <::fast_io::posix_family family, ::std::integral char_type>
 inline constexpr ::std::size_t full_output_coalesce_threshold(
 	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
 {
-	// Compact whole-output runs are copied into one contiguous buffer before a single write. This improves real
-	// file/log output patterns on measured POSIX kernels; syscall-shell sinks such as /dev/null-like streams should
-	// opt out with a zero threshold in their own stream policy.
-	return 2048u;
+	// Do not memcpy short records merely to replace writev with write. The observer has no put area, so sequence
+	// preservation is the only zero-copy path.
+	return 0u;
+}
+#endif
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t full_output_dynamic_coalesce_threshold(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// Heap materialization is deliberately a separate admission decision from full_output_coalesce_threshold: stack
+	// coalescing is bounded by frame size, while this path pays allocation/deallocation to replace descriptor setup and
+	// multiple writes with one contiguous write. The 1 MiB ceiling admits measured log/record-sized aggregates but
+	// prevents a formatting call from turning an arbitrarily large output into an equally large temporary allocation.
+	// Express the ceiling in bytes so a wide-character observer receives the same memory budget, not sizeof(char_type)
+	// times that budget. This overload is a POSIX-observer default; unrelated sinks must provide their own evidence.
+	constexpr ::std::size_t default_bytes{1024u * 1024u};
+	return default_bytes / sizeof(char_type);
+}
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::fast_io::repeated_fill_output_policy repeated_fill_output_policy_define(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// This policy is intentionally scoped to unbuffered POSIX-family observers. It must not become a generic formatting
+	// rule: memory-backed and syscall-shell sinks have materially different copy-versus-dispatch costs. Linux P-core
+	// measurements put the crossover from materialize-and-write to repeated-block writev between 8 KiB and 16 KiB.
+	// Selecting the lower endpoint deliberately biases toward bounded repeated-block output instead of full temporary
+	// materialization. A 4 KiB reusable block limits fill work and matches the measured page-scale copy unit. The
+	// preferred 256 descriptors can describe 1 MiB per native batch; it is only a preference, because the generic
+	// dispatcher clamps it again to the stream's hard descriptor limit.
+	constexpr ::std::size_t dynamic_bytes{8192u};
+	constexpr ::std::size_t block_bytes{4096u};
+	return {dynamic_bytes / sizeof(char_type), block_bytes / sizeof(char_type), 256u};
+}
+
+namespace details
+{
+
+// The descriptor cap must be a compile-time value because it participates in concept-based strategy selection and is
+// also used at the final syscall boundary. POSIX defines IOV_MAX for readv/writev, and supported kernels apply the
+// same vector limit to preadv/pwritev. Linux fixes the kernel-side UIO_MAXIOV at 1024, while Darwin publishes
+// IOV_MAX == 1024. Other POSIX targets are conservatively limited to the portable _XOPEN_IOV_MAX minimum of 16. A
+// runtime sysconf(_SC_IOV_MAX) result cannot satisfy the compile-time policy contract, and using the guaranteed floor
+// remains correct on systems with a larger runtime limit.
+inline constexpr ::std::size_t posix_scatter_maximum_count{
+#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
+	1024u
+#else
+	16u
+#endif
+};
+
+} // namespace details
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_read_maximum_count(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// readv and preadv use the same iovec-count ABI as their write counterparts. Publishing the limit lets generic
+	// typed/byte and positioned/non-positioned dispatch admit the legal prefix before the platform adapter; the adapter
+	// keeps its own clamp as a trust-boundary invariant for lower-level callers.
+	return ::fast_io::details::posix_scatter_maximum_count;
+}
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_write_maximum_count(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// The kernel limit is a count of iovec entries, independent of element width and of whether an explicit offset is
+	// supplied. One policy therefore governs typed/byte write and pwrite paths and keeps their batching proofs aligned.
+	return ::fast_io::details::posix_scatter_maximum_count;
 }
 
 #if 0
@@ -574,6 +692,21 @@ inline constexpr ::std::size_t small_scatter_coalesce_threshold(
 	// Repacking small scatter elements is a memcpy tradeoff. POSIX defaults to direct writev, so this remains
 	// disabled unless a more specialized stream type opts in with its own measured threshold.
 	return 0u;
+}
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_repack_chunk_size(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	// Repack storage is an independent policy and remains disabled with small-scatter repacking.
+	return 0u;
+}
+
+template <::fast_io::posix_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_repack_minimum_saved_scatter_count(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::basic_posix_family_io_observer<family, char_type>>) noexcept
+{
+	return 8u;
 }
 #endif
 
@@ -935,16 +1068,10 @@ using dos_path_tlc_string = ::fast_io::containers::basic_string<char, ::fast_io:
 template <typename... Args>
 constexpr inline dos_path_tlc_string concat_dos_path_tlc_string(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<char>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, char, dos_path_tlc_string>(::fast_io::io_print_forward<char>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat dos_path_tlc_string");
-		return {};
-	}
+	// The DOS path helper is a concat boundary, not a print-to-dummy-stream boundary. The checked concat entry proves
+	// its actual destination and owns the only alias/status normalization of these named lvalue arguments.
+	return ::fast_io::basic_general_concat_checked<
+		false, char, dos_path_tlc_string>(args...);
 }
 
 struct my_dos_concat_tlc_path_common_result

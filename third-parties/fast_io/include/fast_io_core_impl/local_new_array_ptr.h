@@ -112,9 +112,7 @@ struct buffer_alloc_arr_ptr
 		if (ptr) [[likely]]
 		{
 			deallocate_iobuf_space<nsecure_clear, T, allocator_type>(ptr, size);
-			ptr = nullptr;
 		}
-		size = 0;
 	}
 };
 

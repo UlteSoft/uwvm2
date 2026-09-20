@@ -114,6 +114,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<8uz>(ri_data_ptrsz, u8"sock_recv_wasm64.ri_data (iovec64)");
+        check_wasip1_guest_pointer_alignment<8uz>(ro_data_len_ptrsz, u8"sock_recv_wasm64.ro_data_len (size64)");
+        check_wasip1_guest_pointer_alignment<2uz>(ro_flags_ptrsz, u8"sock_recv_wasm64.ro_flags (roflags)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

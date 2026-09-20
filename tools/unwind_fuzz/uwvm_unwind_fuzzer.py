@@ -39,11 +39,8 @@ TRAPS = (
 
 
 MODES = (
-    ("tiered", ["-Rtiered"]),
-    ("tiered_full_ready", ["-Rtiered", "-Rct", "2", "-Rllvm-policy", "max"]),
-    ("tiered_no_t0", ["-Rtiered", "-Rtiered-disable-t0"]),
-    ("tiered_no_t2", ["-Rtiered", "-Rtiered-disable-t2"]),
-    ("tiered_no_t0_no_t2", ["-Rtiered", "-Rtiered-disable-t0", "-Rtiered-disable-t2"]),
+    ("aot", ["-Raot"]),
+    ("aot_max", ["-Raot", "-Rllvm-policy", "max"]),
 )
 
 
@@ -183,6 +180,7 @@ def detect_call_stack_policies(uwvm: Path, cwd: Path):
     result = run_cmd([str(uwvm), "--help", "runtime"], cwd)
     help_text = strip_ansi(result.stdout)
     if re.search(r"runtime-llvm-jit-call-stack[\s\S]{0,300}\[auto\|instruction\|none\|unwind", help_text):
+        # POSIX native unwind is auxiliary; checked `unwind` correctly rejects replacing logical frames.
         return ("instruction", "unwind", "auto")
     return DEFAULT_POLICIES
 

@@ -60,5 +60,5 @@ $ xmake i -o <install_path>
 
 ### Additional Options
 1. `--static=none|non-system|compiler` Static linking policy (`compiler` uses the static runtime/global static strategy where supported)
-2. `--march` The default is native, which uses the cpu designator to control it
+2. `--march` defaults to `none` (the configured toolchain baseline). Fix and test the release CPU baseline through the selected Windows compiler/toolchain; host-native tuning is developer-only where that toolchain supports it.
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported

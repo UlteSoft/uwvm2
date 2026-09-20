@@ -44,11 +44,15 @@ import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1;
 import uwvm2.object;
+import uwvm2.runtime.compiler.shared.wasm1p1_simd;
 import uwvm2.uwvm.runtime.storage;
 import :define;
 import :convert;
 import :storage;
 import :memory;
+// wasm1p1.h directly names the stack-top selector template declared by :stack.
+// Import its owning partition instead of depending on a later aggregate import.
+import :stack;
 import :register_ring;
 
 #ifndef UWVM_MODULE

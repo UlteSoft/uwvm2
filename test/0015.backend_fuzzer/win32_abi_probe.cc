@@ -44,7 +44,6 @@ namespace
     {
         uint64_t cookie{};
         typed_entry_fn typed_entry{};
-        raw_entry_fn reentry{};
     };
 
     inline volatile uint64_t g_error_code{};
@@ -123,7 +122,7 @@ namespace
 
     void host_calls_raw_entry() noexcept
     {
-        raw_context context{0x7a6b5c4d3e2f1908ull, typed_entry_probe, raw_entry_probe};
+        raw_context context{0x7a6b5c4d3e2f1908ull, typed_entry_probe};
         uint64_t params[8]{0x10u, 0x21u, 0x32u, 0x43u, 0x54u, 0x65u, 0x76u, 0x87u};
         uint64_t result{};
         raw_entry_fn const raw{raw_entry_probe};
@@ -156,7 +155,7 @@ namespace
 
     void host_calls_table_dispatch() noexcept
     {
-        raw_context context{0x7a6b5c4d3e2f1908ull, typed_entry_probe, raw_entry_probe};
+        raw_context context{0x7a6b5c4d3e2f1908ull, typed_entry_probe};
         uint64_t params[8]{11u, 13u, 17u, 19u, 23u, 29u, 31u, 37u};
         auto const expected{typed_expected(params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7])};
 
@@ -171,24 +170,6 @@ namespace
 
         expect(table_dispatch_probe(&raw_target, params) == expected, 5004u);
         expect(table_dispatch_probe(&typed_target, params) == expected, 5005u);
-    }
-
-    void UWVM_TEST_WASM_ABI reentry_driver(raw_entry_fn reentry, raw_context const* context, uint64_t const* params, uint64_t* result) noexcept
-    {
-        reentry(reinterpret_cast<uintptr_t>(context),
-                reinterpret_cast<uintptr_t>(result),
-                sizeof(*result),
-                reinterpret_cast<uintptr_t>(params),
-                sizeof(uint64_t) * 8u);
-    }
-
-    void host_calls_reentry_driver() noexcept
-    {
-        raw_context context{0x7a6b5c4d3e2f1908ull, typed_entry_probe, raw_entry_probe};
-        uint64_t params[8]{101u, 103u, 107u, 109u, 113u, 127u, 131u, 137u};
-        uint64_t result{};
-        reentry_driver(raw_entry_probe, &context, params, &result);
-        expect(result == typed_expected(params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]), 6001u);
     }
 
     void UWVM_TEST_WASM_ABI interpreter_callback_probe(size_t module_id, size_t function_index, unsigned char** stack_top) noexcept
@@ -216,7 +197,6 @@ namespace
         host_calls_raw_entry();
         wasm_calls_host_bridge(host_bridge_probe);
         host_calls_table_dispatch();
-        host_calls_reentry_driver();
         host_calls_interpreter_callback_driver();
     }
 }  // namespace

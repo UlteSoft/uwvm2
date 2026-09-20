@@ -23,6 +23,31 @@ struct make_noexcept<R(Args...) noexcept>
 	using type = R(Args...) noexcept;
 };
 
+/*
+Function-type transformation invariant:
+
+  make_noexcept_t<R(Args..., ...)> == R(Args..., ...) noexcept
+
+The C ellipsis is part of a function type but is not an element of `Args...`.
+Consequently the fixed-arity partial specializations above cannot match a
+variadic declaration.  Preserve the return type, fixed parameter sequence, and
+ellipsis exactly; only the exception specification changes.  Darwin declares
+some libc entry points, including `shm_open`, with an ellipsis, so omitting
+these cases makes the generic `noexcept_call` adapter ill-formed even when the
+call supplies the documented fixed arguments.
+*/
+template <typename R, typename... Args>
+struct make_noexcept<R(Args..., ...)>
+{
+	using type = R(Args..., ...) noexcept;
+};
+
+template <typename R, typename... Args>
+struct make_noexcept<R(Args..., ...) noexcept>
+{
+	using type = R(Args..., ...) noexcept;
+};
+
 template <typename R, typename... Args>
 using make_noexcept_t = typename make_noexcept<R, Args...>::type;
 

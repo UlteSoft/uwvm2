@@ -181,13 +181,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
 
         // wasm1
-        auto& wasm1_feapara_r{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<::uwvm2::parser::wasm::standard::wasm1::features::wasm1>(
+        auto& wasm1_feapara_r{::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_wasm1_parameter(
             ::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
         auto& wasm1_parser_limit{wasm1_feapara_r.parser_limit};
 
         // wasm1.1
-        auto& wasm1p1_feapara_r{
-            ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
+        auto& wasm1p1_feapara_r{::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_wasm1p1_parameter(
+            ::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
         auto& wasm1p1_parser_limit{wasm1p1_feapara_r.parser_limit};
 
         // custom name

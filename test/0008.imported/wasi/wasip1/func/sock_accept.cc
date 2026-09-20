@@ -90,7 +90,8 @@ int main()
     env.fd_storage.opens.resize(4uz);
 
     constexpr wasi_void_ptr_t FD_PTR{1024u};
-    [[maybe_unused]] constexpr wasi_void_ptr_t ADDR_PTR{2048u};
+    // The WASIX address result is a byte record (alignment 1), not the naturally aligned historical host-side descriptor.
+    [[maybe_unused]] constexpr wasi_void_ptr_t ADDR_PTR{2049u};
 
 # if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET)
 #  define UWVM2_TEST_SOCK_ACCEPT(ENV, SOCK_FD, FD_FLAGS, RO_FD_PTR, RO_ADDR_PTR) \

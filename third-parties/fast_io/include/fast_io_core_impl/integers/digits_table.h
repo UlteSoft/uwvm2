@@ -10,27 +10,33 @@ inline constexpr auto charliteralofnumber(char8_t v) noexcept
 	{
 		return ::fast_io::char_literal_add<char_type>(v);
 	}
-	else if constexpr (::fast_io::details::is_ebcdic<char_type>)
+	else if constexpr (::fast_io::details::is_classic_ebcdic<char_type>)
 	{
 		if (v < 19u)
 		{
 			return ::fast_io::char_literal_add<char_type,
-											   upper ? u8'A' : u8'a'>(static_cast<char8_t>(v - UINT8_C(10)));
+											   upper ? u8'A' : u8'a'>(static_cast<char8_t>(v - static_cast<::std::uint_least8_t>(10)));
 		}
 		else if (v < 28u)
 		{
 			return ::fast_io::char_literal_add<char_type,
-											   upper ? u8'J' : u8'j'>(static_cast<char8_t>(v - UINT8_C(19)));
+											   upper ? u8'J' : u8'j'>(static_cast<char8_t>(v - static_cast<::std::uint_least8_t>(19)));
 		}
 		else
 		{
 			return ::fast_io::char_literal_add<char_type,
-											   upper ? u8'S' : u8's'>(static_cast<char8_t>(v - UINT8_C(28)));
+											   upper ? u8'S' : u8's'>(static_cast<char8_t>(v - static_cast<::std::uint_least8_t>(28)));
 		}
+	}
+	else if constexpr (::fast_io::details::is_ascii<char_type>)
+	{
+		return ::fast_io::char_literal_add<char_type, upper ? u8'A' : u8'a'>(static_cast<char8_t>(v - static_cast<::std::uint_least8_t>(10)));
 	}
 	else
 	{
-		return ::fast_io::char_literal_add<char_type, upper ? u8'A' : u8'a'>(static_cast<char8_t>(v - UINT8_C(10)));
+		return ::fast_io::char_literal<char_type>(static_cast<char8_t>(
+			(upper ? u8'A' : u8'a') +
+			static_cast<char8_t>(v - static_cast<::std::uint_least8_t>(10))));
 	}
 }
 
@@ -64,7 +70,7 @@ template <::std::integral char_type, ::std::size_t base, bool upper>
 inline constexpr auto &get_digits_table() noexcept
 {
 	constexpr bool up{(base <= 10u) ? false : upper};
-	if constexpr (::fast_io::details::is_ebcdic<char_type> ||
+	if constexpr (!::fast_io::details::is_ascii<char_type> ||
 				  (::std::same_as<char_type, wchar_t> && ::fast_io::details::wide_is_none_utf_endian))
 	{
 		return ::fast_io::details::digits_table_impl<char_type, base, up>;

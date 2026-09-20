@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+/*
+ * Conditional semantic record node (`cond`) for the CPO/semantic level.
+ *
+ * This node retains two alternative IO object graphs and a run-time selector;
+ * exactly one branch contributes to the active print/concat record. Branches
+ * are alias-normalized and stored with the same ownership rules as pack
+ * elements. Capacity and strategy planning must inspect only the selected
+ * branch, while neither branch is allowed to perform IO during construction.
+ */
+
 #include "forward.h"
 
 namespace fast_io
@@ -9,21 +19,96 @@ namespace details
 {
 
 template <typename T1>
-concept cond_value_transferable = ::std::is_trivially_copyable_v<::std::remove_cvref_t<T1>> &&
-#if (defined(_WIN32) && !defined(__WINE__)) || defined(__CYGWIN__)
-								  sizeof(::std::remove_cvref_t<T1>) <= 8u
-#else
-								  sizeof(::std::remove_cvref_t<T1>) <= (sizeof(::std::size_t) * 2)
-#endif
-	;
+concept cond_value_transferable =
+	::fast_io::details::io_print_forward_transport_by_value<T1>;
+
+// Condition storage is an entry-decay decision, not an independent calling-convention model. Reusing the common
+// transport policy keeps Microsoft x64's exact 1/2/4/8-byte rule, SysV eightbyte envelopes, AAPCS, RISC-V, LoongArch,
+// PowerPC, MIPS, SPARC, s390, capability, and conservative unknown-ABI policies identical at both boundaries. The old
+// `Windows ? 8 : 2 * sizeof(size_t)` shortcut admitted indirect or stack-passed aggregates on several ABIs and also
+// disagreed with print forwarding about non-trivial-for-calls classes. Incomplete lvalues remain safe: the shared
+// admission checks completeness before every standard trait and selects reference storage when the conservative
+// by-value transport envelope does not admit the object.
+
+template <typename T>
+using cond_alias_result = decltype(::fast_io::io_print_alias(::std::declval<T>()));
+
+/// @brief Selects branch storage without copying a borrowed alias proxy or borrowing from a temporary.
+/// @details The proof is identical to pack storage: only an alias reference obtained from an lvalue source may remain
+///          a reference.  Every rvalue-derived result is materialized, so a condition object never retains a pointer
+///          into an already-destroyed source temporary.  For an ordinary non-aliased lvalue, small trivial values are
+///          copied as a calling-convention optimization and all other values retain their actual cv-qualified
+///          reference identity.
+template <typename T>
+using cond_alias_type = ::std::conditional_t<
+	::std::is_lvalue_reference_v<T &&> && ::fast_io::alias_printable<T> && ::std::is_lvalue_reference_v<::fast_io::details::cond_alias_result<T>>,
+	::fast_io::details::cond_alias_result<T>,
+	::std::conditional_t<
+		::std::is_lvalue_reference_v<T &&> && !::fast_io::alias_printable<T>,
+		::std::conditional_t<::fast_io::details::cond_value_transferable<T>, ::std::remove_cvref_t<T>, T>,
+		::std::remove_cvref_t<::fast_io::details::cond_alias_result<T>>>>;
+
+/// @brief Admits exactly the explicit alias-to-storage conversion executed by `cond_store`.
+/// @details The requires-expression turns an ill-formed conversion into constraint-false. The independent move test
+///          models the subsequent by-value semantic boundary; references need no such proof because they preserve the
+///          existing object's identity instead of creating another owned transport object.
+template <typename T>
+concept cond_alias_storable =
+	requires {
+		static_cast<::fast_io::details::cond_alias_type<T>>(
+			::fast_io::io_print_alias(::std::declval<T>()));
+	} &&
+	(::std::is_lvalue_reference_v<::fast_io::details::cond_alias_type<T>> ||
+	 ::std::constructible_from<
+		 ::std::remove_cvref_t<::fast_io::details::cond_alias_type<T>>,
+		 ::std::remove_cvref_t<::fast_io::details::cond_alias_type<T>> &&>);
+
+/// @brief Computes the exception contract of the exact condition-arm storage expression.
+/// @details The final condition enters print/concat's by-value decay pipeline. An owned result must therefore remain
+///          movable after its initial elided construction; accepting an immovable prvalue would merely defer a hard
+///          error to that decay boundary and create a compiler-specific semantic type. Stable lvalue proxies remain
+///          references and need not be movable. An rvalue alias exposing a borrowed noncopyable subobject is rejected
+///          independently by the exact storage expression above.
+template <typename T>
+inline constexpr bool cond_alias_nothrow_constructible = []() constexpr {
+	if constexpr (::fast_io::details::cond_alias_storable<T>)
+	{
+		return noexcept(static_cast<::fast_io::details::cond_alias_type<T>>(
+			::fast_io::io_print_alias(::std::declval<T>())));
+	}
+	else
+	{
+		return false;
+	}
+}();
+
+/// @brief Performs the one alias evaluation and the explicit conversion proved by condition admission.
+/// @details Aggregate element initialization uses copy-initialization semantics and therefore can reject an explicit
+///          converting constructor even though the admission probe's `static_cast` accepted it. Routing every factory
+///          arm through this helper makes the constraint, exception proof, and executed conversion identical. It also
+///          preserves the entry policy: alias once, then store either the compact owned value or the exact reference.
+template <typename T>
+	requires ::fast_io::details::cond_alias_storable<T>
+inline constexpr ::fast_io::details::cond_alias_type<T> cond_store(T &&t)
+	noexcept(::fast_io::details::cond_alias_nothrow_constructible<T>)
+{
+	return static_cast<::fast_io::details::cond_alias_type<T>>(
+		::fast_io::io_print_alias(::std::forward<T>(t)));
+}
+
 } // namespace details
 
 namespace manipulators
 {
 
+/// @brief Identifies a semantic node that selects one of two printable arms at run time.
+/// @details The tag is consumed by print/concat planning and has no printable representation itself.
 struct condition_manip_tag_t
 {};
 
+/// @brief Stores two normalized printable alternatives and the predicate selecting the first arm.
+/// @details Both arms are constructed when the manipulator is created; only the selected arm is formatted. The factory
+///          may reverse physical member order to reduce padding while inversely adjusting `pred`, preserving semantics.
 template <typename T1, typename T2>
 struct condition
 {
@@ -50,47 +135,69 @@ struct condition
 	alias_type2 t2;
 };
 
+/// @brief Selects exactly one of two printable alternatives at formatting time.
+/// @details `pred == true` emits `t1`, otherwise `t2`. Both arguments are normalized and stored immediately, so their
+///          construction side effects occur regardless of which arm is later emitted. No separator is added.
 template <typename T1, typename T2>
-inline constexpr auto cond(bool pred, T1 &&t1, T2 &&t2) noexcept
+	requires(::fast_io::details::cond_alias_storable<T1> &&
+			 ::fast_io::details::cond_alias_storable<T2>)
+inline constexpr auto cond(bool pred, T1 &&t1, T2 &&t2) noexcept(::fast_io::details::cond_alias_nothrow_constructible<T1> &&
+																 ::fast_io::details::cond_alias_nothrow_constructible<T2>)
 {
-	using t1aliastype =
-		::std::conditional_t<::fast_io::details::alias_return_lvalue_ref<T1>,
-							 ::std::conditional_t<::fast_io::details::cond_value_transferable<T1>,
-												  ::std::remove_cvref_t<T1>, ::std::remove_cvref_t<T1> const &>,
-							 ::std::remove_cvref_t<decltype(fast_io::io_print_alias(::std::forward<T1>(t1)))>>;
-	using t2aliastype =
-		::std::conditional_t<::fast_io::details::alias_return_lvalue_ref<T2>,
-							 ::std::conditional_t<::fast_io::details::cond_value_transferable<T2>,
-												  ::std::remove_cvref_t<T2>, ::std::remove_cvref_t<T2> const &>,
-							 ::std::remove_cvref_t<decltype(fast_io::io_print_alias(::std::forward<T2>(t2)))>>;
+	using t1aliastype = ::fast_io::details::cond_alias_type<T1>;
+	using t2aliastype = ::fast_io::details::cond_alias_type<T2>;
+	// Initialize final aggregate members from `cond_store`'s one alias evaluation and explicit conversion. This keeps
+	// lifetime flow visible to the optimizer and introduces no additional semantic transport type after normalization.
 
 	if constexpr (::std::same_as<t1aliastype, ::fast_io::io_null_t> &&
 				  ::std::same_as<t2aliastype, ::fast_io::io_null_t>)
 	{
 		return ::fast_io::io_null;
 	}
-	else if constexpr (sizeof(t1aliastype) < sizeof(t2aliastype))
+	else if constexpr (
+		::std::same_as<t1aliastype, t2aliastype> &&
+		!::std::is_reference_v<t1aliastype> &&
+		::std::is_trivially_copyable_v<t1aliastype> &&
+		::std::is_nothrow_move_constructible_v<t1aliastype>)
 	{
+		// The two normalized arms have one representation and no observable destruction. Construct both first so alias
+		// evaluation keeps the semantic node's ordering/effect rule, then return only the selected value. This collapses
+		// the common homogeneous condition before print planning without changing either argument's normalization.
+		t1aliastype first{
+			::fast_io::details::cond_store(::std::forward<T1>(t1))};
+		t2aliastype second{
+			::fast_io::details::cond_store(::std::forward<T2>(t2))};
+		return pred ? ::std::move(first) : ::std::move(second);
+	}
+	else if constexpr (
+		sizeof(condition<t2aliastype, t1aliastype>) <
+		sizeof(condition<t1aliastype, t2aliastype>))
+	{
+		// Compare the two complete aggregate layouts rather than guessing from the members' sizes. `sizeof(T1) <
+		// sizeof(T2)` is not a padding proof: a smaller but more strongly aligned arm can make largest-first ordering larger.
+		// Inverting the predicate proves that physical order is unobservable to formatting semantics. Equal-size layouts
+		// preserve source order, so aliases are reordered only when the object representation has measured evidence.
 		return condition<t2aliastype, t1aliastype>{!pred,
-												   ::fast_io::io_print_alias(::std::forward<T2>(t2)),
-												   ::fast_io::io_print_alias(::std::forward<T1>(t1))};
+												   ::fast_io::details::cond_store(::std::forward<T2>(t2)),
+												   ::fast_io::details::cond_store(::std::forward<T1>(t1))};
 	}
 	else
 	{
 		return condition<t1aliastype, t2aliastype>{pred,
-												   ::fast_io::io_print_alias(::std::forward<T1>(t1)),
-												   ::fast_io::io_print_alias(::std::forward<T2>(t2))};
+												   ::fast_io::details::cond_store(::std::forward<T1>(t1)),
+												   ::fast_io::details::cond_store(::std::forward<T2>(t2))};
 	}
 }
 
+/// @brief Conditionally emits one printable value or nothing.
+/// @details `pred == true` emits `t1`; `false` selects `io_null`. The argument is still normalized and stored when the
+///          manipulator is created.
 template <typename T1>
-inline constexpr auto cond(bool pred, T1 &&t1) noexcept
+	requires ::fast_io::details::cond_alias_storable<T1>
+inline constexpr auto cond(bool pred, T1 &&t1) noexcept(::fast_io::details::cond_alias_nothrow_constructible<T1>)
 {
-	using t1aliastype =
-		::std::conditional_t<::fast_io::details::alias_return_lvalue_ref<T1>,
-							 ::std::conditional_t<::fast_io::details::cond_value_transferable<T1>,
-												  ::std::remove_cvref_t<T1>, ::std::remove_cvref_t<T1> const &>,
-							 ::std::remove_cvref_t<decltype(fast_io::io_print_alias(::std::forward<T1>(t1)))>>;
+	using t1aliastype = ::fast_io::details::cond_alias_type<T1>;
+	// As in the two-arm overload, the normalized storage expression directly constructs the semantic member.
 
 	constexpr bool type_match{::std::same_as<t1aliastype, ::fast_io::io_null_t>};
 	if constexpr (type_match)
@@ -100,12 +207,27 @@ inline constexpr auto cond(bool pred, T1 &&t1) noexcept
 	else
 	{
 		return condition<t1aliastype, ::fast_io::io_null_t>{
-			pred, ::fast_io::io_print_alias(::std::forward<T1>(t1)), ::fast_io::io_null};
+			pred,
+			::fast_io::details::cond_store(::std::forward<T1>(t1)),
+			::fast_io::io_null};
 	}
 }
 
-	} // namespace manipulators
-	
+} // namespace manipulators
+
+/// @brief Propagates read-prefetch provenance only when both possible condition arms are safe.
+/// @details The run-time predicate is not part of the type, so a type-level policy cannot justify itself from the arm
+///          selected by one particular value. Requiring both arms makes the promise valid for every instance;
+///          `io_null_t` is admitted only as the vacuous alternative which exposes no external range.
+template <typename T1, typename T2>
+	requires(::fast_io::prfch_cacheable_read_or_no_external_range<T1> &&
+			 ::fast_io::prfch_cacheable_read_or_no_external_range<T2>)
+inline constexpr ::std::true_type prfch_cacheable_read_provenance_define(
+	io_type_t<manipulators::condition<T1, T2>>) noexcept
+{
+	return {};
+}
+
 #if 0
 	namespace details
 	{
@@ -810,4 +932,4 @@ inline constexpr void print_define(io_reserve_type_t<char_type, ::fast_io::manip
 	}
 	}
 #endif
-	} // namespace fast_io
+} // namespace fast_io

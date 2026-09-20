@@ -112,12 +112,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         cache_context base_context{};
         cache_policy policy{};
+        ::llvm::Module const* derived_context_module{};
+        cache_context derived_context{};
+        bool has_derived_context{};
 
-        [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) const UWVM_THROWS
+        [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) UWVM_THROWS
         {
             auto ctx{base_context};
             // Some callers already provide a fully qualified cache key, so avoid expensive bitcode hashing in that path.
             if(ctx.cache_key_is_complete) { return ctx; }
+
+            // One ObjectCache instance is attached to one freshly-created ExecutionEngine and its single input Module.
+            // LLVM asks getObject before code generation and notifyObjectCompiled afterwards; optimization/codegen may
+            // mutate that Module between callbacks. Reuse the lookup identity so a miss is stored under the exact key
+            // queried on the next process run, and avoid serializing a large lazy CU twice on the compile path.
+            if(has_derived_context && derived_context_module == ::std::addressof(module)) { return derived_context; }
 
             auto key{details::make_cache_key(u8"llvm-module-object")};
             details::append_cache_key_value(key, u8"base-key", ctx.cache_key);
@@ -125,6 +134,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto bitcode_hash{details::module_bitcode_hash(module)};
             details::append_cache_key_value(key, u8"bitcode-hash", bitcode_hash);
             ctx.cache_key = ::std::move(key);
+            derived_context_module = ::std::addressof(module);
+            derived_context = ctx;
+            has_derived_context = true;
             return ctx;
         }
 
@@ -145,7 +157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"LLVM JIT cache object has no identity signature; rejected because signature verification is enabled. ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                u8"Use --runtime-llvm-jit-cache-no-verify only when unsigned cache objects are trusted.",
+                                u8"Unsigned native cache objects are never accepted by this build.",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8" (runtime)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -217,7 +229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                       load.signature_verified ? u8"1" : u8"0");
             auto const first{reinterpret_cast<char const*>(load.object.data())};
             // LLVM owns the returned MemoryBuffer, so copy from the temporary vector into a stable buffer.
-            return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2-llvm-jit-cache");
+            return ::llvm::MemoryBuffer::getMemBufferCopy(::llvm::StringRef{first, load.object.size()}, "uwvm2ros-llvm-jit-cache");
         }
     };
 }  // namespace uwvm2::runtime::llvm_jit_cache

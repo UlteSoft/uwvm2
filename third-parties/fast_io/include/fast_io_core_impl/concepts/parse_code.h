@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+/*
+ * Shared result vocabulary for incremental protocols (CPO/protocol level).
+ *
+ * `parse_code`, `parse_result`, and `context_print_result` communicate
+ * progress between scanner/formatter providers and operation engines. They are
+ * protocol results rather than public scenario policy: for example, the scan
+ * operation decides when `partial` means refill, terminal failure, `false`, or
+ * an exception.
+ */
+
 namespace fast_io
 {
 

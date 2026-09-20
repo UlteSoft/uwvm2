@@ -81,6 +81,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<4uz>(argc_ptrsz, u8"args_sizes_get.argc (size)");
+        check_wasip1_guest_pointer_alignment<4uz>(argv_buf_size_ptrsz, u8"args_sizes_get.argv_buf_size (size)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

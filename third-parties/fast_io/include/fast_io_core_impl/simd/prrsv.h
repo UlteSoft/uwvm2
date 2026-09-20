@@ -30,6 +30,7 @@ inline constexpr Iter print_reserve_df_mm_impl(Iter iter,
 
 } // namespace details
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type, typename T, ::std::size_t n>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, intrinsics::simd_vector<T, n>>) noexcept
 {

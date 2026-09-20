@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+/*
+ * Common data carriers and tag types for the CPO/protocol level.
+ *
+ * Scatter descriptors, progress results, reserve/scatter cursors, alias tags,
+ * `io_type`/`io_reserve_type` dispatch tags, seek positions, conversion
+ * results, and related structural values are declared here. They give unrelated
+ * device and object CPOs a stable common language. These carriers contain no
+ * orchestration policy and invoking them performs no IO.
+ */
+
 namespace fast_io
 {
 
@@ -10,6 +20,49 @@ struct basic_io_scatter_t
 	T const *base;
 	::std::size_t len;
 };
+
+/// @brief A character scatter carrying an explicit ordinary-cacheable-read assertion.
+/// @details This wrapper deliberately has the same pointer/length field layout as `basic_io_scatter_t`, so entry decay
+///          can preserve the provenance proof without enlarging the ABI transport object or retaining the identity of
+///          an otherwise copy-stable producer. Layout equality only proves equal calling cost; consumers project a
+///          value to the raw descriptor before use and must not type-pun between these distinct C++ types. Constructing
+///          the wrapper is a caller assertion: `base[0, len)` must denote ordinary cacheable memory and remain readable
+///          for the complete operation which may issue a prefetch. The wrapper does not independently prove lifetime,
+///          bounds, non-nullness, or print borrowing.
+///
+///          A raw scatter intentionally has no implicit conversion to this type. Pointer shape alone cannot distinguish
+///          normal allocations from MMIO, transient mappings, or implementation-defined non-cacheable storage. The
+///          explicit constructor keeps every proof introduction visible at the audited source boundary.
+template <typename T>
+struct basic_prfch_cacheable_io_scatter_t
+{
+	using value_type = T;
+	T const *base;
+	::std::size_t len;
+
+	inline constexpr basic_prfch_cacheable_io_scatter_t() noexcept = default;
+
+	inline explicit constexpr basic_prfch_cacheable_io_scatter_t(
+		T const *scatter_base, ::std::size_t scatter_len) noexcept
+		: base(scatter_base), len(scatter_len)
+	{}
+
+	inline explicit constexpr basic_prfch_cacheable_io_scatter_t(basic_io_scatter_t<T> scatter) noexcept
+		: base(scatter.base), len(scatter.len)
+	{}
+
+	inline constexpr basic_io_scatter_t<T> scatter() const noexcept
+	{
+		return {base, len};
+	}
+};
+
+static_assert(sizeof(basic_prfch_cacheable_io_scatter_t<void>) == sizeof(basic_io_scatter_t<void>));
+static_assert(alignof(basic_prfch_cacheable_io_scatter_t<void>) == alignof(basic_io_scatter_t<void>));
+static_assert(offsetof(basic_prfch_cacheable_io_scatter_t<void>, base) ==
+			  offsetof(basic_io_scatter_t<void>, base));
+static_assert(offsetof(basic_prfch_cacheable_io_scatter_t<void>, len) ==
+			  offsetof(basic_io_scatter_t<void>, len));
 
 // should be binary compatible with POSIX's iovec
 
@@ -77,6 +130,17 @@ template <::std::integral char_type>
 struct basic_reserve_scatters_define_result
 {
 	basic_io_scatter_t<char_type> *scatters_pos_ptr;
+	char_type *reserve_pos_ptr;
+};
+
+/// @brief Result cursor pair for a producer that writes native byte-scatter descriptors.
+/// @details This is intentionally a distinct type from `basic_reserve_scatters_define_result`: descriptor layout
+///          compatibility does not permit a producer to write one class-template specialization through a pointer to
+///          another. Byte lengths are expressed in bytes, while `reserve_pos_ptr` still advances in `char_type` units.
+template <::std::integral char_type>
+struct basic_reserve_scatters_bytes_define_result
+{
+	io_scatter_t *scatters_pos_ptr;
 	char_type *reserve_pos_ptr;
 };
 

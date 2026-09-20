@@ -1,0 +1,47 @@
+diff --git a/llvm/lib/Target/Mips/MipsSEInstrInfo.cpp b/llvm/lib/Target/Mips/MipsSEInstrInfo.cpp
+--- a/llvm/lib/Target/Mips/MipsSEInstrInfo.cpp
++++ b/llvm/lib/Target/Mips/MipsSEInstrInfo.cpp
+@@ -145,6 +145,25 @@
+   unsigned Opc = 0, ZeroReg = 0;
+   bool isMicroMips = Subtarget.inMicroMipsMode();
+
++  // R6 conditions may travel through COPYs, PHIs and spill slots before a
++  // SEL.D consumes bit zero.  Looking for a nearby CMP/SEL cannot prove the
++  // origin or all uses after allocation (a COPY to another FPR is enough to
++  // defeat that search).  A GPR32/FGR64 COPY transports the low word; it does
++  // not request a numeric conversion or a defined upper word.
++  if (Subtarget.hasMips32r6() && !isMicroMips) {
++    if (Mips::GPR32RegClass.contains(DestReg) &&
++        Mips::FGR64RegClass.contains(SrcReg))
++      Opc = Mips::MFC1_D64;
++    else if (Mips::FGR64RegClass.contains(DestReg) &&
++             Mips::GPR32RegClass.contains(SrcReg))
++      Opc = Mips::MTC1_D64;
++    if (Opc) {
++      BuildMI(MBB, I, DL, get(Opc), DestReg)
++          .addReg(SrcReg, getKillRegState(KillSrc));
++      return;
++    }
++  }
++
+   if (Mips::GPR32RegClass.contains(DestReg)) { // Copy to CPU Reg.
+     if (Mips::GPR32RegClass.contains(SrcReg)) {
+       if (isMicroMips)
+diff --git a/llvm/lib/Target/Mips/MipsRegisterInfo.td b/llvm/lib/Target/Mips/MipsRegisterInfo.td
+--- a/llvm/lib/Target/Mips/MipsRegisterInfo.td
++++ b/llvm/lib/Target/Mips/MipsRegisterInfo.td
+@@ -430,5 +430,11 @@
+ // MIPS32r6/MIPS64r6 store FPU condition codes in normal FGR registers.
+ // This class allows us to represent this in codegen patterns.
+ def FGR32CC : RegisterClass<"Mips", [i32], 32, (sequence "F%u", 0, 31)>;
+-def FGR64CC : RegisterClass<"Mips", [i32, f32, f64], 64, (sequence "D%u_64", 0, 31)>;
++def FGR64CC : RegisterClass<"Mips", [i32, f32, f64], 64, (sequence "D%u_64", 0, 31)> {
++  // The first value type is i32, but this class also carries full f64 values
++  // (SEL.D ties its condition and result).  Alignment alone does not set the
++  // spill size.  A 32-bit slot both loses the upper word and prevents this
++  // class from being recognized as an FGR64 subclass by spill/reload lowering.
++  let Size = 64;
++}
+
+--
+UWVM downstream LLVM compatibility repair

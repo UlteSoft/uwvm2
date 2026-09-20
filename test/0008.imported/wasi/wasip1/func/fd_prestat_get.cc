@@ -90,7 +90,8 @@ int main()
 
     // Case 1: success write of prestat
     {
-        constexpr wasi_void_ptr_t buf{1024u};
+        // Canonical Preview 1 prestat has alignment 4, despite the over-aligned host staging struct in fd_prestat_get.h.
+        constexpr wasi_void_ptr_t buf{1028u};  // 4-byte aligned, deliberately 4 modulo 8
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::fd_prestat_get(env, static_cast<wasi_posix_fd_t>(3), buf);
         if(ret != errno_t::esuccess) { ::fast_io::fast_terminate(); }
 
@@ -132,4 +133,3 @@ int main()
 
     return 0;
 }
-

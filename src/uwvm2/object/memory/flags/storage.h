@@ -51,7 +51,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::flags
     /// @note       If true, the memory allocation will be strict, otherwise it will be slient.
     ///             strictly means that the memory allocation will return nullptr if the allocation fails.
     ///             slient means that the memory allocation will trap if the allocation fails.
-    /// @todo       Set it to the interpreter, JIT.
+    /// @todo       Set it to the interpreter and LLVM AOT backend.
     inline bool grow_strict{};  // [global]
 
 }  // namespace uwvm2::object::memory::flags

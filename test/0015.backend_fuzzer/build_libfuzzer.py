@@ -104,7 +104,6 @@ def main() -> int:
         "-DUWVM_VERSION_S=0",
         "-DUWVM_USE_UWVM_INT",
         "-DUWVM_USE_LLVM_JIT",
-        "-DUWVM_DISABLE_DEBUG_INT",
         "-DUWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519",
     ]
     add_matrix_defines(defines, args.combine, args.delay)

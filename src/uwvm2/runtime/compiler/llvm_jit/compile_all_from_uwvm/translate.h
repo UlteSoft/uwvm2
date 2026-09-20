@@ -43,13 +43,14 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <uwvm2/runtime/compiler/llvm_jit/pinned_version.h>
+#  include <uwvm2/runtime/compiler/shared/strict_float.h>
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/Attributes.h>
 #  include <llvm/IR/BasicBlock.h>
 #  include <llvm/IR/CallingConv.h>
 #  include <llvm/IR/Constants.h>
-#  include <llvm/IR/DIBuilder.h>
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
 #  include <llvm/IR/InlineAsm.h>
@@ -62,6 +63,13 @@
 #  include <llvm/IR/Verifier.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/DynamicLibrary.h>
+#  include <llvm/TargetParser/Host.h>
+#  include <llvm/TargetParser/Triple.h>
+#  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/Pass.h>
+#  include <llvm/PassRegistry.h>
+#  include <llvm/InitializePasses.h>
+#  include <llvm/Transforms/Scalar/Scalarizer.h>
 # endif
 // import
 # include <fast_io.h>
@@ -74,11 +82,13 @@
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/call_indirect_immediate.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
-# include <uwvm2/validation/standard/wasm1p1/impl.h>
+# include <uwvm2/validation/standard/wasm2/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/object/memory/flags/impl.h>
+# include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
@@ -89,6 +99,11 @@
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
+#endif
+
+#ifndef UWVM_MODULE
+# include <uwvm2/runtime/lib/uwvm_runtime_generated_wasm_bridge.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_local_imported_provider_callbacks.h>
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -104,7 +119,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         call_indirect_null_element,
         call_indirect_type_mismatch,
         memory_out_of_bounds,
-        runtime_invariant_failure
+        runtime_invariant_failure,
+        table_out_of_bounds
     };
 
     extern "C++"
@@ -128,23 +144,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                               [[maybe_unused]] ::std::uintptr_t frame_address,
                                                               [[maybe_unused]] ::std::uintptr_t stack_pointer) noexcept;
 
+    // A successful funcref-table mutation updates only compact views which alias the resolved destination table.
+    extern "C++" void llvm_jit_refresh_call_indirect_table_views(
+        ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*,
+        ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind,
+        ::std::size_t begin,
+        ::std::size_t count) noexcept;
+
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 
     extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;
 
-    extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
-                                                 ::std::uint_least32_t func_index,
-                                                 void* result_buffer,
-                                                 ::std::size_t result_bytes,
-                                                 void const* param_buffer,
-                                                 ::std::size_t param_bytes) noexcept;
-
-    extern "C++" void llvm_jit_call_interpreter_defined_raw_api(void const* runtime_module_ptr,
-                                                                ::std::uint_least32_t func_index,
-                                                                void* result_buffer,
-                                                                ::std::size_t result_bytes,
-                                                                void const* param_buffer,
-                                                                ::std::size_t param_bytes) noexcept;
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm

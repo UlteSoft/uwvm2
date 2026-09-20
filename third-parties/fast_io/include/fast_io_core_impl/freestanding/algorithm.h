@@ -141,11 +141,7 @@ inline constexpr void fill(fwd_iter first, fwd_iter last, T value)
 		if constexpr (::std::is_trivially_copyable_v<fwd_iter> &&
 					  ::std::is_scalar_v<fwd_iter> && sizeof(fwd_iter) == 1)
 		{
-#ifdef __cpp_if_consteval
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 #if FAST_IO_HAS_BUILTIN(__builtin_memset)
 				__builtin_memset
@@ -172,11 +168,7 @@ inline constexpr void fill_n(fwd_iter first, ::std::size_t n, T value)
 		if constexpr (::std::is_trivially_copyable_v<fwd_iter> &&
 					  ::std::is_scalar_v<fwd_iter> && sizeof(fwd_iter) == 1)
 		{
-#ifdef __cpp_if_consteval
-			if !consteval
-#else
-			if (!__builtin_is_constant_evaluated())
-#endif
+			FAST_IO_IF_NOT_CONSTEVAL
 			{
 #if FAST_IO_HAS_BUILTIN(__builtin_memset)
 				__builtin_memset
@@ -301,8 +293,7 @@ inline constexpr output_iter overlapped_copy_trivial(input_iter first, ::std::si
 	{
 		tempbufferptr[i] = first[i];
 	}
-#if __cpp_if_consteval >= 202106L
-	if consteval
+	FAST_IO_IF_CONSTEVAL
 	{
 		for (::std::size_t i{}; i != n; ++i)
 		{
@@ -310,7 +301,6 @@ inline constexpr output_iter overlapped_copy_trivial(input_iter first, ::std::si
 		}
 	}
 	else
-#endif
 	{
 		for (::std::size_t i{}; i != n; ++i)
 		{
@@ -383,9 +373,25 @@ inline
 		(dest, src, count);
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+// GCC 13--15 can lose the enclosing reserve proof after inlining the two-digit table copies below and diagnose their
+// destination as a zero-sized region. Keep the warning visible, but do not let this known false positive inherit the
+// translation unit's -Werror policy. The diagnostic scope is limited to this formatter.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic warning "-Wstringop-overflow"
+#endif
+
 template <::std::input_iterator input_iter, ::std::input_or_output_iterator output_iter>
 inline constexpr output_iter non_overlapped_copy_n(input_iter first, ::std::size_t count, output_iter result)
 {
+	if (count == 0u) [[unlikely]]
+	{
+		// A zero-length copy has no iterator-domain precondition. In particular, a
+		// lazy buffer may represent its empty cursor with nullptr; returning the
+		// unchanged iterator avoids both a library call with null operands and the
+		// otherwise undefined built-in `nullptr += 0` operation.
+		return result;
+	}
 
 	if (__builtin_is_constant_evaluated())
 	{
@@ -401,11 +407,8 @@ inline constexpr output_iter non_overlapped_copy_n(input_iter first, ::std::size
 					  (::std::same_as<input_value_type, output_value_type> ||
 					   ((::std::integral<input_value_type> || ::std::same_as<::std::byte, input_value_type>) && (::std::integral<output_value_type> || ::std::same_as<::std::byte, output_value_type>) && sizeof(input_value_type) == sizeof(output_value_type))))
 		{
-			if (count) // to avoid nullptr UB
-			{
-				my_memcpy(::std::to_address(result), ::std::to_address(first),
-						  sizeof(::std::iter_value_t<input_iter>) * count);
-			}
+			my_memcpy(::std::to_address(result), ::std::to_address(first),
+					  sizeof(::std::iter_value_t<input_iter>) * count);
 			return result += count;
 		}
 		else
@@ -415,9 +418,22 @@ inline constexpr output_iter non_overlapped_copy_n(input_iter first, ::std::size
 	}
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 template <::std::input_iterator input_iter, ::std::input_or_output_iterator output_iter>
 inline constexpr output_iter non_overlapped_copy(input_iter first, input_iter last, output_iter result)
 {
+	if (first == last) [[unlikely]]
+	{
+		// Equality proves that the source range contains no element and gives the
+		// copy operation no iterator-domain precondition. Returning the destination
+		// unchanged before either subtraction or advancement is therefore required
+		// for lazy buffers whose canonical empty range is {nullptr,nullptr}.
+		return result;
+	}
+
 	if (__builtin_is_constant_evaluated())
 	{
 		return ::fast_io::freestanding::copy(first, last, result);
@@ -624,6 +640,30 @@ inline constexpr output_iter my_copy_backward(input_iter first, input_iter last,
 	}
 }
 
+/// Moves one already-materialized range to a higher address without corrupting
+/// the unread suffix during constant evaluation. The run-time arm deliberately
+/// retains my_copy's memmove-shaped destination-begin API and code generation;
+/// only the constexpr arm needs an explicit backward traversal.
+template <::std::random_access_iterator iterator>
+inline constexpr void my_copy_right_shift(
+	iterator first, iterator last, ::std::size_t shift)
+{
+#if FAST_IO_HAS_BUILTIN(__builtin_is_constant_evaluated)
+	if (__builtin_is_constant_evaluated())
+#else
+	if (::std::is_constant_evaluated())
+#endif
+	{
+		::fast_io::freestanding::my_copy_backward(
+			first, last, last + shift);
+	}
+	else
+	{
+		::fast_io::freestanding::my_copy(
+			first, last, first + shift);
+	}
+}
+
 template <::std::random_access_iterator input_iter, ::std::random_access_iterator output_iter>
 inline constexpr bool my_compare_iter_n(input_iter first, ::std::size_t n, output_iter outier) noexcept
 {
@@ -748,12 +788,7 @@ inline constexpr NoThrowForwardIt uninitialized_copy(InputIt first, InputIt last
 				   (::std::integral<input_value_type> && ::std::integral<output_value_type> &&
 					sizeof(input_value_type) == sizeof(output_value_type))))
 	{
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			::std::size_t count{static_cast<::std::size_t>(last - first)};
 			if (count) // to avoid nullptr UB
@@ -762,7 +797,6 @@ inline constexpr NoThrowForwardIt uninitialized_copy(InputIt first, InputIt last
 			}
 			return d_first += count;
 		}
-#endif
 	}
 	destroyer d{d_first, d_first};
 	for (; first != last; ++first)
@@ -807,12 +841,7 @@ uninitialized_copy_n(InputIt first, ::std::size_t n, NoThrowForwardIt d_first) n
 				   (::std::integral<input_value_type> && ::std::integral<output_value_type> &&
 					sizeof(input_value_type) == sizeof(output_value_type))))
 	{
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			if (n) // to avoid nullptr UB
 			{
@@ -820,7 +849,6 @@ uninitialized_copy_n(InputIt first, ::std::size_t n, NoThrowForwardIt d_first) n
 			}
 			return d_first += n;
 		}
-#endif
 	}
 	destroyer d{d_first, d_first};
 	for (::std::size_t i{}; i != n; ++i)
@@ -852,12 +880,7 @@ uninitialized_move_n(InputIt first, ::std::size_t n, NoThrowForwardIt d_first) n
 				   (::std::integral<input_value_type> && ::std::integral<output_value_type> &&
 					sizeof(input_value_type) == sizeof(output_value_type))))
 	{
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			if (n) // to avoid nullptr UB
 			{
@@ -865,7 +888,6 @@ uninitialized_move_n(InputIt first, ::std::size_t n, NoThrowForwardIt d_first) n
 			}
 			return d_first += n;
 		}
-#endif
 	}
 	for (::std::size_t i{}; i != n; ++i)
 	{
@@ -884,17 +906,11 @@ inline constexpr void uninitialized_default_construct(ForwardIt first, ForwardIt
 	if constexpr (::fast_io::freestanding::is_zero_default_constructible_v<T> &&
 				  ::std::contiguous_iterator<ForwardIt> && !::std::is_volatile_v<T>)
 	{
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			::fast_io::freestanding::my_memset(::std::to_address(first), 0, sizeof(T) * static_cast<::std::size_t>(last - first));
 			return;
 		}
-#endif
 	}
 	for (; first != last; ++first)
 	{
@@ -918,17 +934,11 @@ inline constexpr ForwardIt uninitialized_fill(ForwardIt first, ForwardIt last, T
 	if constexpr (::std::integral<valuetype> && ::std::integral<T> &&
 				  sizeof(T) == 1 && sizeof(valuetype) == 1 && ::std::contiguous_iterator<ForwardIt>)
 	{
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-		if !consteval
-#else
-		if (!__builtin_is_constant_evaluated())
-#endif
+		FAST_IO_IF_NOT_CONSTEVAL
 		{
 			::fast_io::freestanding::my_memset(::std::to_address(first), static_cast<int>(static_cast<::std::uint_least8_t>(x)), sizeof(T) * static_cast<::std::size_t>(last - first));
 			return last;
 		}
-#endif
 	}
 
 	for (; first != last; ++first)
@@ -1069,6 +1079,7 @@ namespace fast_io::details
 {
 using ::fast_io::freestanding::my_copy;
 using ::fast_io::freestanding::my_copy_backward;
+using ::fast_io::freestanding::my_copy_right_shift;
 using ::fast_io::freestanding::my_copy_n;
 using ::fast_io::freestanding::my_memcpy;
 using ::fast_io::freestanding::my_memmove;

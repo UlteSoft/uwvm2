@@ -429,8 +429,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
 #   if defined(__NR_utimensat)
-            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
             {
                 auto const err{static_cast<int>(-res)};
                 switch(err)
@@ -519,8 +519,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
             }
 
-            auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
             {
                 auto const err{static_cast<int>(-res)};
                 switch(err)
@@ -601,8 +601,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
 #    if defined(__NR_utimensat)
-            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+            if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
             {
                 auto const err{static_cast<int>(-res)};
                 switch(err)
@@ -1339,8 +1339,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
 
 #   if defined(__NR_utimensat)
-                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
                     {
                         auto const err{static_cast<int>(-res)};
                         switch(err)
@@ -1431,8 +1431,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
                     }
 
-                    auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+                    auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
                     {
                         auto const err{static_cast<int>(-res)};
                         switch(err)
@@ -1513,8 +1513,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
 
 #    if defined(__NR_utimensat)
-                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, ::uwvm2::imported::wasi::wasip1::func::posix::linux_at_empty_path)};
+                    if(::uwvm2::imported::wasi::wasip1::func::posix::linux_raw_system_call_failed(res)) [[unlikely]]
                     {
                         auto const err{static_cast<int>(-res)};
                         switch(err)

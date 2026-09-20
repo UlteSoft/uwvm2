@@ -66,6 +66,10 @@ namespace test
     {
         expect(!p1_para.explicit_disable_multi_value, "multi-value explicit disable flag should be unset");
         expect(!p1_para.explicit_disable_reference_types, "reference-types explicit disable flag should be unset");
+        expect(!p1_para.explicit_enable_table_instructions, "table-instructions explicit enable flag should be unset");
+        expect(!p1_para.explicit_disable_table_instructions, "table-instructions explicit disable flag should be unset");
+        expect(!p1_para.explicit_enable_multiple_tables, "multiple-tables explicit enable flag should be unset");
+        expect(!p1_para.explicit_disable_multiple_tables, "multiple-tables explicit disable flag should be unset");
         expect(!p1_para.explicit_disable_bulk_memory, "bulk-memory explicit disable flag should be unset");
         expect(!p1_para.explicit_disable_sign_extension, "sign-extension explicit disable flag should be unset");
         expect(!p1_para.explicit_disable_nontrapping_float_to_int, "nontrapping explicit disable flag should be unset");
@@ -76,6 +80,8 @@ namespace test
     {
         expect(!p1_para.disable_multi_value, "multi-value should be enabled");
         expect(!p1_para.disable_reference_types, "reference-types should be enabled");
+        expect(!p1_para.disable_table_instructions, "table-instructions should be enabled");
+        expect(!p1_para.disable_multiple_tables, "multiple-tables should be enabled");
         expect(!p1_para.disable_bulk_memory, "bulk-memory should be enabled");
         expect(!p1_para.disable_sign_extension, "sign-extension should be enabled");
         expect(!p1_para.disable_nontrapping_float_to_int, "nontrapping should be enabled");
@@ -84,11 +90,27 @@ namespace test
 
     inline void expect_default_wasm1p1_feature_state(auto const& p1_para)
     {
+        using cli_mode = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode;
+        expect(p1_para.cli_mode == cli_mode::unspecified, "default CLI feature mode should be unspecified");
         expect(!p1_para.explicit_feature_mvp, "mvp collection should not be explicit by default");
+        expect(!p1_para.explicit_feature_wasm1p1, "wasm1.1 collection should not be explicit by default");
+        expect(!p1_para.explicit_feature_wasm2, "wasm2 collection should not be explicit by default");
         expect_no_explicit_subfeatures(p1_para);
         expect_all_wasm1p1_features_enabled(p1_para);
         expect(!p1_para.controllable_allow_multi_result_vector, "default wasm1p1 state should allow multi-result validation");
         expect(!p1_para.controllable_allow_multi_table, "default wasm1p1 state should allow multi-table validation");
+    }
+
+    inline void expect_wasm1p1_feature_state(auto const& p1_para)
+    {
+        using cli_mode = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode;
+        expect(p1_para.cli_mode == cli_mode::direct_wasm1p1, "wasm1.1 collection did not claim the direct CLI mode");
+        expect(!p1_para.explicit_feature_mvp, "wasm1.1 collection set the MVP explicit flag");
+        expect(p1_para.explicit_feature_wasm1p1, "wasm1.1 collection explicit flag was not set");
+        expect_no_explicit_subfeatures(p1_para);
+        expect_all_wasm1p1_features_enabled(p1_para);
+        expect(!p1_para.controllable_allow_multi_result_vector, "wasm1.1 collection should allow multi-result validation");
+        expect(!p1_para.controllable_allow_multi_table, "wasm1.1 collection should allow multi-table validation");
     }
 
     inline void expect_only_multi_value_disabled(auto const& p1_para)
@@ -114,7 +136,7 @@ namespace test
         expect(!p1_para.disable_simd, "reference-types switch disabled simd");
         expect(p1_para.explicit_disable_reference_types, "reference-types explicit disable flag was not set");
         expect(!p1_para.controllable_allow_multi_result_vector, "reference-types disable should not restore the MVP single-result check");
-        expect(p1_para.controllable_allow_multi_table, "reference-types disable should restore the MVP single-table check");
+        expect(!p1_para.controllable_allow_multi_table, "reference-types disable should not change the independent multiple-tables check");
     }
 
     inline void expect_only_bulk_memory_disabled(auto const& p1_para)
@@ -171,9 +193,14 @@ namespace test
 
     inline void expect_mvp_feature_state(auto const& p1_para)
     {
+        using cli_mode = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode;
+        expect(p1_para.cli_mode == cli_mode::direct_mvp, "mvp collection did not claim the direct CLI mode");
         expect(p1_para.explicit_feature_mvp, "mvp collection explicit flag was not set");
+        expect(!p1_para.explicit_feature_wasm1p1, "mvp collection set the wasm1.1 explicit flag");
         expect(p1_para.disable_multi_value, "mvp collection did not disable multi-value");
         expect(p1_para.disable_reference_types, "mvp collection did not disable reference-types");
+        expect(p1_para.disable_table_instructions, "mvp collection did not disable table-instructions");
+        expect(p1_para.disable_multiple_tables, "mvp collection did not disable multiple-tables");
         expect(p1_para.disable_bulk_memory, "mvp collection did not disable bulk-memory");
         expect(p1_para.disable_sign_extension, "mvp collection did not disable sign-extension");
         expect(p1_para.disable_nontrapping_float_to_int, "mvp collection did not disable nontrapping");
@@ -190,6 +217,14 @@ namespace test
         if(res != ::uwvm2::utils::cmdline::parameter_return_type::def) [[unlikely]] { fail(label); }
     }
 
+    inline void expect_callback_conflict(::uwvm2::utils::cmdline::handle_func_type callback, char const* label)
+    {
+        ::uwvm2::utils::cmdline::parameter_parsing_results args[1]{};
+        args[0].type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::parameter;
+        auto const res{callback(args, args, args + 1uz)};
+        if(res != ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme) [[unlikely]] { fail(label); }
+    }
+
     inline void test_cli_feature_controller()
     {
         namespace callbacks = ::uwvm2::uwvm::cmdline::params::details;
@@ -204,6 +239,17 @@ namespace test
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_disable_reference_types_callback, "reference-types callback failed");
         expect_only_reference_types_disabled(cli_wasm1p1_parameter());
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_disable_table_instructions_callback, "table-instructions callback failed");
+        expect(cli_wasm1p1_parameter().disable_table_instructions, "table-instructions was not disabled");
+        expect(!cli_wasm1p1_parameter().disable_reference_types, "table-instructions switch disabled reference-types");
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_disable_multiple_tables_callback, "multiple-tables callback failed");
+        expect(cli_wasm1p1_parameter().disable_multiple_tables, "multiple-tables was not disabled");
+        expect(cli_wasm1p1_parameter().controllable_allow_multi_table, "multiple-tables disable did not synchronize the legacy gate");
+        expect_callback_conflict(callbacks::wasm_feature_enable_multiple_tables_callback, "opposite multiple-tables switches should conflict");
 
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_disable_bulk_memory_callback, "bulk-memory callback failed");
@@ -223,16 +269,43 @@ namespace test
 
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 collection callback failed");
-        expect_default_wasm1p1_feature_state(cli_wasm1p1_parameter());
+        expect_wasm1p1_feature_state(cli_wasm1p1_parameter());
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_wasm2_callback, "wasm2 collection callback failed");
+        expect(cli_wasm1p1_parameter().cli_mode ==
+                   ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm_feature_cli_mode::direct_wasm2,
+               "wasm2 collection did not select the Wasm2 validation policy");
+        expect_all_wasm1p1_features_enabled(cli_wasm1p1_parameter());
 
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_mvp_callback, "mvp collection callback failed");
         expect_mvp_feature_state(cli_wasm1p1_parameter());
 
-        expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 re-enable callback failed");
-        expect_all_wasm1p1_features_enabled(cli_wasm1p1_parameter());
-        expect(!cli_wasm1p1_parameter().controllable_allow_multi_result_vector, "wasm1p1 re-enable should relax the MVP single-result check");
-        expect(!cli_wasm1p1_parameter().controllable_allow_multi_table, "wasm1p1 re-enable should relax the MVP single-table check");
+        expect_callback_conflict(callbacks::wasm_feature_wasm1p1_callback, "MVP then wasm1p1 should conflict");
+        expect_mvp_feature_state(cli_wasm1p1_parameter());
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 collection callback failed");
+        expect_callback_conflict(callbacks::wasm_feature_mvp_callback, "wasm1p1 then MVP should conflict");
+        expect_wasm1p1_feature_state(cli_wasm1p1_parameter());
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_disable_multi_value_callback, "scoped disable callback failed");
+        expect_callback_success(callbacks::wasm_feature_disable_simd_callback, "second scoped disable callback failed");
+        expect_callback_conflict(callbacks::wasm_feature_wasm1p1_callback, "scoped disable then wasm1p1 should conflict");
+        expect(cli_wasm1p1_parameter().disable_multi_value, "conflicting aggregate selector changed multi-value policy");
+        expect(cli_wasm1p1_parameter().disable_simd, "conflicting aggregate selector changed SIMD policy");
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 collection callback failed");
+        expect_callback_conflict(callbacks::wasm_feature_disable_multi_value_callback, "wasm1p1 then scoped disable should conflict");
+        expect_wasm1p1_feature_state(cli_wasm1p1_parameter());
+
+        reset_cli_wasm_parameter();
+        expect_callback_success(callbacks::wasm_feature_mvp_callback, "mvp collection callback failed");
+        expect_callback_conflict(callbacks::wasm_feature_disable_reference_types_callback, "MVP then scoped disable should conflict");
+        expect_mvp_feature_state(cli_wasm1p1_parameter());
     }
 
     inline void test_parser_feature_defaults()

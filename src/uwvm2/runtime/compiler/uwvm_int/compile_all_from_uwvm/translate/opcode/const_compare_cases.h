@@ -1,7 +1,7 @@
 // Constants and comparisons are deliberately kept close together because both mostly transform
 // operand-stack shape without touching external state. The comments below call out where immediate
 // parsing, delayed constants, and compare-result stack modeling affect later opcode fusion.
-/// @warning Extension point: new constants or comparison opcodes require immediate parsing, operand-stack modeling, lazy scanner, and opfunc support.
+/// @warning Extension point: new constants or comparison opcodes require immediate parsing, operand-stack modeling, and opfunc support.
 case wasm1_code::i32_const:
 {
     // Constants are side-effect free, so the translator can either emit them directly, delay them as
@@ -307,6 +307,24 @@ case wasm1_code::f32_const:
     // [ safe      ] unsafe (could be the section_end)
     //           ^^ code_curr
 
+    // Test integer bits before decoding to Float: a native helper return
+    // can quiet sNaNs at GCC -O0 even if no Wasm arithmetic is emitted.
+    // Flush pending fusion to preserve instruction order and avoid storing
+    // NaNs in its Float-valued state; emit the literal's exact integer bits.
+    // Keep NaN literals out of native floating temporaries and delayed arithmetic
+    // fusion state. This is a translation-only cold path; finite constants keep
+    // their existing fusion fast paths.
+    auto const constant_bits{read_wasm_le_u32(code_curr)};
+    if((constant_bits & 0x7fffffffu) > 0x7f800000u)
+    {
+        code_curr += sizeof(wasm_f32);
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+        flush_conbine_pending();
+#endif
+        emit_const_f32_to(bytecode, constant_bits);
+        operand_stack_push(wasm_value_type_u::f32);
+        break;
+    }
     wasm_f32 const imm{read_wasm_f32_const(code_curr)};
 
     code_curr += sizeof(imm);
@@ -412,6 +430,24 @@ case wasm1_code::f64_const:
     // [     safe  ] unsafe (could be the section_end)
     //           ^^ code_curr
 
+    // Test integer bits before decoding to Float: a native helper return
+    // can quiet sNaNs at GCC -O0 even if no Wasm arithmetic is emitted.
+    // Flush pending fusion to preserve instruction order and avoid storing
+    // NaNs in its Float-valued state; emit the literal's exact integer bits.
+    // Keep NaN literals out of native floating temporaries and delayed arithmetic
+    // fusion state. This is a translation-only cold path; finite constants keep
+    // their existing fusion fast paths.
+    auto const constant_bits{read_wasm_le_u64(code_curr)};
+    if((constant_bits & 0x7fffffffffffffffull) > 0x7ff0000000000000ull)
+    {
+        code_curr += sizeof(wasm_f64);
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+        flush_conbine_pending();
+#endif
+        emit_const_f64_to(bytecode, constant_bits);
+        operand_stack_push(wasm_value_type_u::f64);
+        break;
+    }
     wasm_f64 const imm{read_wasm_f64_const(code_curr)};
 
     code_curr += sizeof(imm);

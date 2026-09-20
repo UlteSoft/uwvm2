@@ -22,22 +22,8 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-// std
-# include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
 // macro
-# include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
-# include <uwvm2/object/impl.h>
-# include <uwvm2/uwvm/wasm/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -48,9 +34,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
     enum class runtime_mode_t : unsigned
     {
-        auto_compile,
-        lazy_compile,
-        lazy_compile_with_full_code_verification,
         full_compile
     };
 
@@ -62,12 +45,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         uwvm_interpreter_only,
 #endif
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-        debug_interpreter,
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        uwvm_interpreter_llvm_jit_tiered,
-#endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         llvm_jit_only,
 #endif
@@ -77,5 +54,4 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>
-# include <uwvm2/utils/macro/pop_macros.h>
 #endif

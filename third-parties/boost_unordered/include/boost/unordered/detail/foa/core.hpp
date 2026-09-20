@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <new>
@@ -848,11 +849,18 @@ struct pow2_size_policy
 
 /* size index of a group array for a given *element* capacity */
 
+[[noreturn]] inline void capacity_overflow();
+
 template<typename Group,typename SizePolicy>
 static inline std::size_t size_index_for(std::size_t n)
 {
   /* n/N+1 == ceil((n+1)/N) (extra +1 for the sentinel) */
-  return SizePolicy::size_index(n/Group::N+1);
+  auto index=SizePolicy::size_index(n/Group::N+1);
+  // Rounding the group count up must not wrap the element capacity down to a
+  // small allocation. This check also protects capacity_for(), before new_().
+  if(SizePolicy::size(index)>(std::numeric_limits<std::size_t>::max)()/Group::N)
+    capacity_overflow();
+  return index;
 }
 
 /* Quadratic prober over a power-of-two range using triangular numbers.
@@ -1097,14 +1105,20 @@ struct table_arrays
 
   static std::size_t buffer_size(std::size_t groups_size)
   {
-    auto buffer_bytes=
-      /* space for elements (we subtract 1 because of the sentinel) */
-      sizeof(value_type)*(groups_size*N-1)+
-      /* space for groups + padding for group alignment */
-      sizeof(group_type)*(groups_size+1)-1;
+    constexpr auto max=(std::numeric_limits<std::size_t>::max)();
+    if(groups_size>max/N)capacity_overflow();
+    auto elements=groups_size*N-1; /* subtract the sentinel */
+    if(elements>max/sizeof(value_type) ||
+       groups_size>=max/sizeof(group_type))capacity_overflow();
+    auto element_bytes=sizeof(value_type)*elements;
+    auto group_bytes=sizeof(group_type)*(groups_size+1)-1;
+    if(element_bytes>max-group_bytes)capacity_overflow();
+    auto buffer_bytes=element_bytes+group_bytes;
 
-    /* ceil(buffer_bytes/sizeof(value_type)) */
-    return (buffer_bytes+sizeof(value_type)-1)/sizeof(value_type);
+    /* ceil(buffer_bytes/sizeof(value_type)), without an overflowing add */
+    auto units=buffer_bytes/sizeof(value_type)+(buffer_bytes%sizeof(value_type)!=0);
+    if(units>max/sizeof(value_type))capacity_overflow();
+    return units;
   }
 
   static void initialize_groups(
@@ -1252,6 +1266,34 @@ _STL_RESTORE_DEPRECATED_WARNING
  * class.
  */
 static constexpr float mlf=0.875f;
+
+/* UWVM local patch: capacity is an integer quantity. In particular, x86-64
+ * -mno-sse cannot call even std::ceil(float): the ABI still requires XMM0 for
+ * its return value. Use the exact fixed ratio 7/8 for internal sizing instead
+ * of rounding size_t to float (which can also under-reserve large tables).
+ * Do not compute 8*n or n+6: both can overflow for valid size_t inputs.
+ * Public load_factor()/max_load_factor() retain their upstream float API.
+ */
+[[noreturn]] inline void capacity_overflow()
+{
+#if !defined(BOOST_NO_EXCEPTIONS)
+  throw std::bad_alloc();
+#else
+  std::terminate();
+#endif
+}
+
+inline constexpr std::size_t slots_for_size(std::size_t n)
+{
+  auto extra=n/7+(n%7!=0); /* ceil(n/7); n+extra == ceil(8*n/7) */
+  if(n>(std::numeric_limits<std::size_t>::max)()-extra)capacity_overflow();
+  return n+extra;
+}
+
+inline constexpr std::size_t max_load_for_capacity(std::size_t n)
+{
+  return n-(n/8+(n%8!=0)); /* floor(7*n/8), without multiplying n */
+}
 
 template<typename Group,typename Element>
 struct table_locator
@@ -1505,7 +1547,7 @@ public:
   {}
 
   table_core(const table_core& x,const Allocator& al_):
-    table_core{std::size_t(std::ceil(float(x.size())/mlf)),x.h(),x.pred(),al_}
+    table_core{slots_for_size(x.size()),x.h(),x.pred(),al_}
   {
     copy_elements_from(x);
   }
@@ -1551,7 +1593,7 @@ public:
       return capacity_; /* we allow 100% usage */
     }
     else{
-      return (std::size_t)(mlf*(float)(capacity_));
+      return max_load_for_capacity(capacity_);
     }
   }
 
@@ -1586,7 +1628,7 @@ public:
 
       if_constexpr<pocca>([&,this]{
         if(al()!=x.al()){
-          auto ah=x.make_arrays(std::size_t(std::ceil(float(x.size())/mlf)));
+          auto ah=x.make_arrays(slots_for_size(x.size()));
           delete_arrays(arrays);
           arrays=ah.release();
           size_ctrl.ml=initial_max_load();
@@ -1810,7 +1852,7 @@ public:
 
   void rehash(std::size_t n)
   {
-    auto m=size_t(std::ceil(float(size())/mlf));
+    auto m=slots_for_size(size());
     if(m>n)n=m;
     if(n)n=capacity_for(n); /* exact resulting capacity */
 
@@ -1819,7 +1861,7 @@ public:
 
   void reserve(std::size_t n)
   {
-    rehash(std::size_t(std::ceil(float(n)/mlf)));
+    rehash(slots_for_size(n));
   }
 
 #if defined(BOOST_UNORDERED_ENABLE_STATS)
@@ -1994,7 +2036,7 @@ public:
     BOOST_ASSERT(empty());
 
     if(n){
-      n=std::size_t(std::ceil(float(n)/mlf)); /* elements -> slots */
+      n=slots_for_size(n); /* elements -> slots */
       n=capacity_for(n); /* exact resulting capacity */
 
       if(n>capacity()){
@@ -2115,8 +2157,9 @@ private:
      * probability of an element having caused overflow; P has been measured as
      * ~0.162 under ideal conditions, yielding F ~ 0.0165 ~ 1/61.
      */
-    return new_arrays(std::size_t(
-      std::ceil(static_cast<float>(size()+size()/61+1)/mlf)));
+    auto extra=size()/61+1;
+    if(size()>(std::numeric_limits<std::size_t>::max)()-extra)capacity_overflow();
+    return new_arrays(slots_for_size(size()+extra));
   }
 
   void delete_arrays(arrays_type& arrays_)noexcept

@@ -110,6 +110,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // The path remains ConstPointer<u8>; fd remains a 32-bit handle in the mirrored wasm64 ABI.
+        check_wasip1_guest_pointer_alignment<4uz>(fd_ptrsz, u8"path_open_wasm64.fd (fd)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

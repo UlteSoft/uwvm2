@@ -84,23 +84,23 @@ Examples:
 ```bash
 uwvm --run app.wasm
 uwvm -r app.wasm hello world
-uwvm --runtime-tiered -- app.wasm --guest-option
+uwvm --runtime-aot -- app.wasm --guest-option
 uwvm --runtime-aot app.wasm hello world
 ```
 
 Host option placement:
 
 ```bash
-uwvm --runtime-jit --run app.wasm
+uwvm --runtime-aot --run app.wasm
 ```
 
-This selects JIT.
+This selects full-module LLVM AOT.
 
 ```bash
-uwvm --run app.wasm --runtime-jit
+uwvm --run app.wasm --runtime-aot
 ```
 
-This passes `--runtime-jit` to the guest.
+This passes `--runtime-aot` to the guest.
 
 ## `--version`
 
@@ -113,7 +113,7 @@ The report can include:
 - Build mode and compiler information.
 - Platform and ISA details.
 - Allocator and install-path information where available.
-- Runtime backend support, including LLVM version when JIT support is compiled.
+- Runtime backend support, including the LLVM version when AOT support is compiled.
 - Compiled WebAssembly feature support.
 - WASI-related support when compiled.
 
