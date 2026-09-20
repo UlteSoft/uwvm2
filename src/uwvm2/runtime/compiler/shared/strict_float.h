@@ -451,6 +451,75 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         return slow_operation<operation::sqrt>(value);
     }
 
+    enum class comparison { eq, ne, lt, gt, le, ge };
+
+    // IEEE comparisons without a Float/vector return ABI. NaNs are unordered
+    // (only ne is true); the two zeros compare equal. Reversing negative
+    // encodings supplies the numeric order, including subnormals/infinities.
+    template <comparison Op, typename UInt>
+    [[nodiscard]] inline constexpr bool compare_ieee_bits(UInt lhs, UInt rhs) noexcept
+    {
+        static_assert(::std::is_unsigned_v<UInt> && (sizeof(UInt) == 4 || sizeof(UInt) == 8));
+        constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+        constexpr UInt infinity{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+        if((lhs & ~sign) > infinity || (rhs & ~sign) > infinity) { return Op == comparison::ne; }
+        bool const equal{lhs == rhs || ((lhs | rhs) & ~sign) == 0};
+        if constexpr(Op == comparison::eq) { return equal; }
+        else if constexpr(Op == comparison::ne) { return !equal; }
+        else
+        {
+            bool const less{!equal && (((lhs ^ rhs) & sign) != 0 ? (lhs & sign) != 0 : (lhs & sign) != 0 ? lhs > rhs : lhs < rhs)};
+            if constexpr(Op == comparison::lt) { return less; }
+            else if constexpr(Op == comparison::le) { return less || equal; }
+            else if constexpr(Op == comparison::gt) { return !less && !equal; }
+            else { return !less; }
+        }
+    }
+
+    // Return the IEEE encoding, not Float: x86-64 -mno-sse cannot return
+    // binary32/64 in XMM0 even at O0. The unsigned subtraction also handles
+    // INT_MIN without signed overflow. This is the same RN-even conversion
+    // used by the extended-precision path, with no intermediate FP rounding.
+    template <typename Out, typename In>
+    [[nodiscard]] inline constexpr bits_t<Out> integer_to_float_bits(In value) noexcept
+    {
+        static_assert(::std::is_integral_v<In> && sizeof(In) <= sizeof(u64));
+        bool const negative{::std::is_signed_v<In> && value < 0};
+        u64 const magnitude{negative ? u64{} - static_cast<u64>(value) : static_cast<u64>(value)};
+        if(magnitude == 0u) { return {}; }
+        unsigned const leading{static_cast<unsigned>(::std::countl_zero(magnitude))};
+        return round_extended<Out>({magnitude << leading,
+            (negative ? 0x8000u : 0u) | (16383u + 63u - leading)});
+    }
+
+    // Saturating SIMD conversions consume Wasm IEEE bits, never native NaN
+    // encodings or Float-returning lane helpers. Classify before converting:
+    // casting an out-of-range float to an integer is undefined in C++. NaNs
+    // become zero; infinities clamp; finite values truncate toward zero.
+    // The exponent checks bound every shift and the result before narrowing.
+    template <bool Signed, typename UInt>
+    [[nodiscard]] inline constexpr u32 trunc_sat_i32_bits(UInt raw) noexcept
+    {
+        static_assert(::std::is_unsigned_v<UInt> && (sizeof(UInt) == 4 || sizeof(UInt) == 8));
+        constexpr unsigned fraction{sizeof(UInt) == 4 ? 23u : 52u};
+        constexpr unsigned bias{sizeof(UInt) == 4 ? 127u : 1023u};
+        constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+        constexpr UInt infinity{static_cast<UInt>(sizeof(UInt) == 4 ? 0x7f800000ull : 0x7ff0000000000000ull)};
+        UInt const magnitude{raw & ~sign};
+        bool const negative{(raw & sign) != 0};
+        if(magnitude > infinity || magnitude < (UInt{bias} << fraction)) { return {}; }
+        if constexpr(!Signed) { if(negative) { return {}; } }
+        unsigned const exponent{static_cast<unsigned>(magnitude >> fraction) - bias};
+        if(exponent >= (Signed ? 31u : 32u))
+        {
+            if constexpr(Signed) { return negative ? 0x80000000u : 0x7fffffffu; }
+            else { return 0xffffffffu; }
+        }
+        UInt const significand{(UInt{1} << fraction) | (magnitude & ((UInt{1} << fraction) - 1u))};
+        u32 const result{static_cast<u32>(exponent < fraction ? significand >> (fraction - exponent) : significand << (exponent - fraction))};
+        return negative ? u32{} - result : result;
+    }
+
     template <typename Out, typename In>
     [[nodiscard]] inline constexpr Out convert(In value) noexcept
     {
@@ -476,12 +545,7 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         {
             if constexpr(::std::is_integral_v<In>)
             {
-                bool const negative{::std::is_signed_v<In> && value < 0};
-                u64 const magnitude{negative ? u64{} - static_cast<u64>(value) : static_cast<u64>(value)};
-                if(magnitude == 0u) { return Out{}; }
-                unsigned const leading{static_cast<unsigned>(::std::countl_zero(magnitude))};
-                return ::std::bit_cast<Out>(round_extended<Out>({magnitude << leading,
-                    (negative ? 0x8000u : 0u) | (16383u + 63u - leading)}));
+                return ::std::bit_cast<Out>(integer_to_float_bits<Out>(value));
             }
             else if constexpr(sizeof(In) == 8 && sizeof(Out) == 4)
             {

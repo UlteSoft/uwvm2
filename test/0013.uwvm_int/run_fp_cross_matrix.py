@@ -23,6 +23,7 @@ SUITES = {
                for name in ("bits", "fused_bits", "parser_bits", "provider_bits", "rounding", "nan_encoding")],
     "simd": ["0013.uwvm_int/uwvm_int_simd_" + name + ".cc" for name in ("fp_bits", "nan_encoding")],
     "simd_integer_abi": ["0013.uwvm_int/uwvm_int_simd_no_sse_arithmetic.cc"],
+    "simd_conversion": ["0013.uwvm_int/uwvm_int_simd_conversion_bits.cc"],
     "tail": ["0013.uwvm_int/uwvm_int_fp_tail_chain.cc"],
     # Opt in only with a Linux SDK: the clock setter is instantiated, never run.
     "libc": ["0017.runtime/linux_rv32_libc_fallback.cc"],
