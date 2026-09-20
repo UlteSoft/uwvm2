@@ -4,6 +4,7 @@
  *************************************************************/
 
 #pragma once
+#include <type_traits>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/MC/MCSubtargetInfo.h>
 #include <llvm/Target/TargetMachine.h>
@@ -11,6 +12,23 @@
 
 namespace uwvm2::runtime::compiler::llvm_jit::details
 {
+    template<typename type>
+    concept llvm_jit_mcjit_pointer = ::std::is_pointer_v<::std::remove_cvref_t<type>>;
+
+    template<typename subtarget_type>
+    [[nodiscard]] inline bool llvm_jit_mcjit_subtarget_features_supported(subtarget_type&& subtarget) noexcept
+    {
+        if constexpr(llvm_jit_mcjit_pointer<subtarget_type>)
+        {
+            if(subtarget == nullptr) { return false; }
+            return !subtarget->checkFeatures("+micromips") && !subtarget->checkFeatures("+mips16");
+        }
+        else
+        {
+            return !subtarget.checkFeatures("+micromips") && !subtarget.checkFeatures("+mips16");
+        }
+    }
+
     [[nodiscard]] inline bool llvm_jit_mcjit_subtarget_supported(::llvm::TargetMachine const& machine) noexcept
     {
         if(!machine.getTargetTriple().isMIPS()) { return true; }
@@ -21,14 +39,7 @@ namespace uwvm2::runtime::compiler::llvm_jit::details
         // Inspect effective features, including CPU defaults and +/- ordering;
         // never silently generate standard MIPS for a compressed-only CPU.
         // This is a native-loader gate, NOT a cross-AOT inventory filter.
-#if LLVM_VERSION_MAJOR >= 23
-        auto const& subtarget{machine.getMCSubtargetInfo()};
-#else
-        auto const pointer{machine.getMCSubtargetInfo()};
-        if(pointer == nullptr) { return false; }
-        auto const& subtarget{*pointer};
-#endif
-        return !subtarget.checkFeatures("+micromips") && !subtarget.checkFeatures("+mips16");
+        return llvm_jit_mcjit_subtarget_features_supported(machine.getMCSubtargetInfo());
     }
 
     // A Target's hasJIT flag is architecture-wide, not an object-loader check.
