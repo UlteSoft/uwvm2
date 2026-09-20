@@ -14,6 +14,9 @@ inline constexpr ::fast_io::manipulators::scalar_flags strlike_default_scalar_fl
 namespace manipulators
 {
 
+/// @brief Hidden carrier for a mutable string-like scan destination.
+/// @details `reference` is obtained through `io_strlike_ref`; the enclosing scalar or whole-object wrapper selects
+///          token, line, or complete-input semantics.
 template <typename T>
 struct basic_strlike_get
 {
@@ -29,6 +32,9 @@ struct basic_strlike_get
 	T reference;
 };
 
+/// @brief Reads one whitespace-delimited token into a mutable string-like destination.
+/// @details Leading C whitespace is skipped, then code units are copied until the next C whitespace. The delimiter is
+///          not part of the stored value and the terminating whitespace remains at the returned scan position.
 template <typename T>
 inline constexpr auto strlike_get(T &reference) noexcept
 {
@@ -38,6 +44,10 @@ inline constexpr auto strlike_get(T &reference) noexcept
 		{io_strlike_ref(io_alias, reference)}};
 }
 
+/// @brief Reads one line into a mutable string-like destination.
+/// @details Input is copied until line-feed according to the scanner's line contract; ordinary spaces are preserved
+///          rather than terminating the token. The line-feed is consumed but is not stored; no carriage-return
+///          normalization is performed by this manipulator.
 template <typename T>
 inline constexpr auto strlike_line_get(T &reference) noexcept
 {
@@ -47,6 +57,9 @@ inline constexpr auto strlike_line_get(T &reference) noexcept
 		{io_strlike_ref(io_alias, reference)}};
 }
 
+/// @brief Reads the complete remaining input into a mutable string-like destination.
+/// @details No whitespace or line delimiter has special meaning. Completion is determined by the enclosing whole-input
+///          scan operation rather than by the first token boundary.
 template <typename T>
 inline constexpr auto strlike_whole_get(T &reference) noexcept
 {
@@ -94,12 +107,12 @@ scan_context_define_strlike_impl(::std::conditional_t<ctxread, bool, bool &> ski
 		{
 			obuffer_set_curr(ref, obuffer_begin(ref));
 		}
-		::fast_io::operations::decay::write_all_decay(ref, it, it_space);
+		::fast_io::operations::decay::write_all_decay_dispatch(ref, it, it_space);
 		skip_space_done = true;
 	}
 	else
 	{
-		::fast_io::operations::decay::write_all_decay(ref, it, it_space);
+		::fast_io::operations::decay::write_all_decay_dispatch(ref, it, it_space);
 	}
 	if (it_space == last)
 	{
@@ -122,7 +135,7 @@ scan_context_define_strlike_getall_impl(::std::conditional_t<ctxread, bool, bool
 		obuffer_set_curr(ref, obuffer_begin(ref));
 		skip_space_done = true;
 	}
-	::fast_io::operations::decay::write_all_decay(ref, first, last);
+	::fast_io::operations::decay::write_all_decay_dispatch(ref, first, last);
 	return {last, ::fast_io::parse_code::partial};
 }
 
@@ -138,9 +151,67 @@ inline constexpr ::fast_io::parse_code scan_context_eof_strlike_define_impl(bool
 	}
 }
 
+/// @brief Proves the target and adapter protocol consumed by the strlike scanner bodies.
+/// @details `io_strlike_ref` is extensible, so merely finding members named `value_type`, `char_type`, and `ptr` is not
+///          evidence that the pointed target can be completed. Same-domain writable targets use the adapter's put area
+///          directly and therefore require its exact buffered plus primitive-write protocols. Construct-only and
+///          cross-domain targets stage into `basic_concat_buffer`; for those branches an exact target `strlike` and a
+///          pointer to that target are the complete construction proof. Keeping this predicate on every scan CPO makes
+///          malformed associated refs make `context_scannable` false instead of failing in the selected function body.
+template <::std::integral input_char_type, typename T>
+inline consteval bool strlike_get_reference_target_impl() noexcept
+{
+	using reference_type = ::std::remove_cvref_t<T>;
+	if constexpr (!requires(reference_type &ref) {
+		typename reference_type::value_type;
+		typename reference_type::char_type;
+		ref.ptr;
+	})
+	{
+		return false;
+	}
+	else
+	{
+		using target_type = typename reference_type::value_type;
+		using target_char_type = typename reference_type::char_type;
+		if constexpr (
+			!::std::integral<target_char_type> ||
+			!::std::same_as<::std::remove_cvref_t<decltype(::std::declval<reference_type &>().ptr)>, target_type *> ||
+			!::fast_io::strlike<target_char_type, target_type>)
+		{
+			return false;
+		}
+		else if constexpr (
+			::std::same_as<input_char_type, target_char_type> &&
+			::fast_io::buffer_strlike<input_char_type, target_type>)
+		{
+			if constexpr (requires { typename reference_type::output_char_type; })
+			{
+				return ::std::same_as<input_char_type, typename reference_type::output_char_type> &&
+					   ::fast_io::operations::decay::defines::has_obuffer_basic_operations<reference_type> &&
+					   ::fast_io::operations::decay::defines::writable<reference_type>;
+			}
+			else
+			{
+				return false;
+			}
+		}
+		else
+		{
+			return true;
+		}
+	}
+}
+
+template <typename input_char_type, typename T>
+concept strlike_get_reference_target =
+	::std::integral<input_char_type> &&
+	::fast_io::details::strlike_get_reference_target_impl<input_char_type, T>();
+
 } // namespace details
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr io_type_t<
 	::std::conditional_t<(::fast_io::buffer_strlike<char_type, typename ::std::remove_cvref_t<T>::value_type> &&
 						  ::std::same_as<typename ::std::remove_cvref_t<T>::char_type, char_type>),
@@ -152,6 +223,7 @@ scan_context_type(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_m
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename ctx_type, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr parse_result<char_type const *> scan_context_define(
 	io_reserve_type_t<char_type,
 					  ::fast_io::manipulators::scalar_manip_t<flags, ::fast_io::manipulators::basic_strlike_get<T>>>,
@@ -191,6 +263,7 @@ inline constexpr parse_result<char_type const *> scan_context_define(
 }
 
 template <::fast_io::manipulators::scalar_flags flags, ::std::integral char_type, typename ctx_type, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr ::fast_io::parse_code scan_context_eof_define(
 	io_reserve_type_t<char_type,
 					  ::fast_io::manipulators::scalar_manip_t<flags, ::fast_io::manipulators::basic_strlike_get<T>>>,
@@ -203,14 +276,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(
 		if constexpr (::fast_io::buffer_strlike<char_type, typename ::std::remove_cvref_t<T>::value_type> &&
 					  ::std::same_as<undefttype_char_type, char_type>)
 		{
-			if (obuffer_begin(ref.reference.reference) == obuffer_curr(ref.reference.reference))
-			{
-				return ::fast_io::parse_code::end_of_file;
-			}
-			else
-			{
-				return ::fast_io::parse_code::ok;
-			}
+			return ::fast_io::details::scan_context_eof_strlike_define_impl(ctx.copying);
 		}
 		else
 		{
@@ -272,6 +338,7 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(
 }
 
 template <::std::integral char_type, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr io_type_t<
 	::std::conditional_t<(::fast_io::buffer_strlike<char_type, typename ::std::remove_cvref_t<T>::value_type> &&
 						  ::std::same_as<typename ::std::remove_cvref_t<T>::char_type, char_type>),
@@ -284,6 +351,7 @@ scan_context_type(
 }
 
 template <::std::integral char_type, typename ctx_type, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr parse_result<char_type const *> scan_context_define(
 	io_reserve_type_t<char_type, ::fast_io::manipulators::whole_get_t<::fast_io::manipulators::basic_strlike_get<T>>>,
 	ctx_type &ctx, char_type const *first, char_type const *last,
@@ -322,6 +390,7 @@ inline constexpr parse_result<char_type const *> scan_context_define(
 }
 
 template <::std::integral char_type, typename ctx_type, typename T>
+	requires ::fast_io::details::strlike_get_reference_target<char_type, T>
 inline constexpr ::fast_io::parse_code scan_context_eof_define(
 	io_reserve_type_t<char_type, ::fast_io::manipulators::whole_get_t<::fast_io::manipulators::basic_strlike_get<T>>>,
 	ctx_type &ctx, ::fast_io::manipulators::whole_get_t<::fast_io::manipulators::basic_strlike_get<T>> ref)

@@ -31,6 +31,7 @@
 # include <tuple>
 # include <memory>
 # include <concepts>
+# include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -51,6 +52,11 @@
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
+    // Keep unhandled-value assertions dependent without spelling `Value != Value`, which GCC diagnoses as a
+    // tautological self-comparison before the discarded `if constexpr` branch is selected.
+    template <auto Value>
+    inline constexpr bool dependent_false_v{false};
+
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
@@ -380,15 +386,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     using memory_out_of_bounds_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
 
-    /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
-    ///          the arguments and writes the return result back onto the operand stack.
+    /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack.  It removes the arguments,
+    ///          writes the return result back onto the operand stack, and returns the updated stack top.  Passing and returning the pointer by value keeps
+    ///          tail-dispatch opfuncs from exposing the address of one of their parameters across a `musttail` boundary.
+    /// @note `stack_top` and every pointer derived from it are borrowed only for the synchronous callback invocation and must not be retained.
     using interpreter_call_func_t =
-        void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
+        ::std::byte*(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS;
 
     /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
     ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
-    using interpreter_call_indirect_func_t = void(
-        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr)
+    /// @note `stack_top` has the same synchronous, non-retaining borrowed-pointer contract as `interpreter_call_func_t`.
+    using interpreter_call_indirect_func_t = ::std::byte*(
+        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top)
         UWVM_THROWS;
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
@@ -890,6 +899,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr bool i64_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.i64_stack_top_begin_pos, CompileOption.i64_stack_top_end_pos)};
             constexpr bool f32_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos)};
             constexpr bool f64_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos)};
+# if defined(__i386__) || defined(_M_IX86) || (defined(__m68k__) && defined(__HAVE_68881__))
+            // This is an ABI restriction, not just a choice of arithmetic instructions:
+            // i386 float/double returns still use ST0 with -msse2/-mfpmath=sse.
+            // GCC -O0 can leave a floating load/bit_cast helper out of line, exposing that
+            // return path; x87/68881 transfers may quiet sNaNs before a Wasm operation.
+            // Inlining at -O3 can hide the bug but is not a representation guarantee.
+            // Reject custom FP-cache profiles on these ABIs at compile time; modern
+            // targets retain their register caches without an extra run-time branch.
+            // Native floating cache carriers can quiet sNaNs in x87/68881.
+            // These ABIs must use the raw-byte operand stack, as the runtime profiles already do.
+            static_assert(!f32_enabled && !f64_enabled, "This ABI requires uncached floating operands to preserve Wasm NaN bits");
+# endif
             constexpr bool v128_enabled{uwvm_interpreter_stacktop_range_enabled(CompileOption.v128_stack_top_begin_pos, CompileOption.v128_stack_top_end_pos)};
 
             if constexpr(i32_enabled)

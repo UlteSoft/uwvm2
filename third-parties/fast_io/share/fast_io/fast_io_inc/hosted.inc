@@ -100,6 +100,7 @@ using ::fast_io::current;
 using ::fast_io::recursive;
 
 using ::fast_io::native_file_loader;
+using ::fast_io::contiguous_range_padding_size;
 
 using ::fast_io::in;
 using ::fast_io::out;

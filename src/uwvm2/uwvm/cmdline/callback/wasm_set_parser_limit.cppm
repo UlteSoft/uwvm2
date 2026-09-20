@@ -38,6 +38,7 @@ import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
 import uwvm2.parser.wasm.standard.wasm1.features;
+import uwvm2.parser.wasm.standard.wasm1p1.features;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm_custom.customs;
 import uwvm2.uwvm.io;

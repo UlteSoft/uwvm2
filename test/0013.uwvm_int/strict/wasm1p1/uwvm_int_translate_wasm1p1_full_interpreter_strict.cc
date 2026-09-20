@@ -42,7 +42,7 @@ namespace
         optable::call_indirect_func = strict_terminate_call_indirect;
 
         auto wasm{build_full_wasm1p1_module()};
-        auto features{make_wasm1p1_feature_parameter()};
+        auto features{make_wasm2_feature_parameter()};
 
         {
             constexpr auto opt{k_test_byref_opt};

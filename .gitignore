@@ -17,3 +17,5 @@ build
 vsxmake2022/
 vsxmake2019/
 vsxmake2017/
+__pycache__/
+*.py[cod]

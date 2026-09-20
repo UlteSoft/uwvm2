@@ -195,15 +195,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval double generate_section_probability_from_Fs() noexcept
         {
-#if __cpp_structured_bindings >= 202411L
-            // for __builtin_expect_with_probability
-            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> ret{};
-            auto const& [... secs]{ret.sections};
-            constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte max_id{generate_section_max_id<::std::remove_cvref_t<decltype(secs)>...>()};
-            constexpr double max_id_probability{1.0 - 1.0 / static_cast<double>(max_id + 1)};
-            static_assert(0.0 <= max_id_probability && max_id_probability <= 1.0);
-            return max_id_probability;
-#else
             // for __builtin_expect_with_probability
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> ret{};
             constexpr auto get_max_id_from_tuple{[]<typename... Secs> UWVM_ALWAYS_INLINE(::uwvm2::utils::container::tuple<Secs...> const&) constexpr noexcept
@@ -212,7 +203,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
             constexpr double max_id_probability{1.0 - 1.0 / static_cast<double>(max_id + 1)};
             static_assert(0.0 <= max_id_probability && max_id_probability <= 1.0);
             return max_id_probability;
-#endif
         }
 
         template <typename... Sec>
@@ -236,15 +226,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval void check_extensible_section_is_series_from_Fs() noexcept
     {
-#if __cpp_structured_bindings >= 202411L
-        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> ret{};
-        auto const& [... secs]{ret.sections};
-        details::check_extensible_section_is_series<::std::remove_cvref_t<decltype(secs)>...>();
-#else
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> ret{};
         []<typename... Secs> UWVM_ALWAYS_INLINE(::uwvm2::utils::container::tuple<Secs...> const&) constexpr noexcept -> void
         { details::check_extensible_section_is_series<Secs...>(); }(ret.sections);
-#endif
     }
 
     // Custom Section: compile-time name -> wasm_byte hash table

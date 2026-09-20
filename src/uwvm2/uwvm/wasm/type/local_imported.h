@@ -23,6 +23,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <concepts>
 # include <cstdint>
 # include <cstddef>
 # include <cstring>
@@ -449,8 +450,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_memory_name =
         requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::memory_name)>, ::uwvm2::utils::container::u8string_view>; };
 
-    /// @brief   check has page size
-    /// @note    If the concept is unsatisfied, the default assumption is 64Kib.
+    /// @brief   check whether a page-size member is explicitly declared
+    /// @note    This deliberately detects malformed declarations too; an invalid explicit contract must not silently
+    ///          fall back to the default 64KiB page size.
+    template <typename SingleMemory>
+    concept declares_page_size = requires { &::std::remove_cvref_t<SingleMemory>::page_size; };
+
+    /// @brief   check has a valid page size
+    /// @note    If no page-size member is declared, the default assumption is 64Kib. An explicitly declared but invalid
+    ///          member makes the provider invalid instead of selecting that default.
     /// @note    The page size is 2 raised to the power of n.
     /// @details
     /// ```cpp
@@ -463,6 +471,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_page_size = requires {
         requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::page_size)>, ::std::uint_least64_t>;
         requires ::std::has_single_bit(SingleMemory::page_size);
+        requires(::std::numeric_limits<::std::size_t>::digits >= ::std::numeric_limits<::std::uint_least64_t>::digits ||
+                 SingleMemory::page_size <= static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)()));
     };
 
     template <typename SingleMemory>
@@ -483,10 +493,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 
     /// @brief   check if the type is a local imported memory
-    /// @details equivalent to `has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>`
-    /// @note    Non-mandatory has_page_size
+    /// @details Requires a valid name and memory access operations. Omitting `page_size` selects the WebAssembly default
+    ///          of 64KiB; once declared, `page_size` must be a constant `uint_least64_t`, a non-zero power of two, and
+    ///          representable by `size_t` on the target host.
     template <typename SingleMemory>
-    concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>;
+    concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory> &&
+                                       (!declares_page_size<SingleMemory> || has_page_size<SingleMemory>);
 
     namespace details
     {
@@ -656,7 +668,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     /// };
     template <typename SingleGlobal>
     concept has_global_get = has_global_value_type<SingleGlobal> && requires(SingleGlobal& g) {
-        { global_get(g) } -> ::std::same_as<typename ::std::remove_cvref_t<SingleGlobal>::value_type>;
+        // A value-returning provider owns its native FP ABI: on i386 its result
+        // can pass through ST0 even in an SSE2 build. GCC -O0 commonly exposes
+        // this boundary; successful optimized inlining is not a provider contract.
+        // Reference getters permit bit-exact FP storage access even when the native
+        // value-return ABI uses x87/68881. Existing value getters remain supported.
+        requires ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type> ||
+                 ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type&> ||
+                 ::std::same_as<decltype(global_get(g)), typename ::std::remove_cvref_t<SingleGlobal>::value_type const&>;
     };
 
     /// @brief   check has global set
@@ -837,6 +856,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::std::uint_least64_t page_count{};
     };
 
+    // Function-level contract for callbacks entered from generated Wasm. `preserves_wasm_control` covers only state that
+    // affects subsequent Wasm arithmetic: rounding, exception masks, and architecture FTZ/DAZ controls. Accrued FP status
+    // flags may change across an external ABI and are not observable by Wasm. Missing, malformed, and unknown declarations
+    // remain conservative and use the complete FP environment save/restore guard.
+    enum class local_imported_wasm_fp_control_policy_t : unsigned char
+    {
+        may_modify,
+        preserves_wasm_control
+    };
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct global_get_all_result_t
     {
@@ -850,46 +879,108 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         struct local_imported_module_base_impl
         {
             virtual inline constexpr ~local_imported_module_base_impl() noexcept = default;
-            virtual inline constexpr local_imported_module_base_impl* clone() const noexcept = 0;
+            virtual local_imported_module_base_impl* clone() const noexcept = 0;
 
-            virtual inline constexpr bool init_local_imported_module() noexcept = 0;
+            virtual bool init_local_imported_module() noexcept = 0;
 
-            virtual inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept = 0;
-            virtual inline constexpr ::std::size_t get_total_export_count() const noexcept = 0;
+            virtual ::uwvm2::utils::container::u8string_view get_module_name() const noexcept = 0;
+            virtual ::std::size_t get_total_export_count() const noexcept = 0;
 
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
+            virtual ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_index(::std::size_t index) const noexcept = 0;
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
+            virtual ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept = 0;
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept = 0;
-            virtual inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept = 0;
+            virtual ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept = 0;
+            virtual void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept = 0;
 
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::memory_get_all_result_t<Fs...> get_all_memory_information() const noexcept = 0;
-            virtual inline constexpr ::std::uint_least64_t memory_page_size_from_index(::std::size_t index) const noexcept = 0;
-            virtual inline constexpr bool memory_grow_from_index(::std::size_t index, ::std::uint_least64_t grow_page_size) noexcept = 0;
-            virtual inline constexpr bool memory_try_grow_from_index(::std::size_t index,
-                                                                     ::std::uint_least64_t grow_page_size,
-                                                                     ::std::size_t max_limit_memory_length,
-                                                                     ::std::uint_least64_t* old_page_size_out) noexcept = 0;
-            virtual inline constexpr bool memory_access_snapshot_from_index(::std::size_t index,
-                                                                            ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept = 0;
-            virtual inline constexpr bool
+            virtual ::uwvm2::uwvm::wasm::type::memory_get_all_result_t<Fs...> get_all_memory_information() const noexcept = 0;
+            virtual ::std::uint_least64_t memory_page_size_from_index(::std::size_t index) const noexcept = 0;
+            virtual bool memory_grow_from_index(::std::size_t index, ::std::uint_least64_t grow_page_size) noexcept = 0;
+            virtual bool memory_try_grow_from_index(::std::size_t index,
+                                                    ::std::uint_least64_t grow_page_size,
+                                                    ::std::size_t max_limit_memory_length,
+                                                    ::std::uint_least64_t* old_page_size_out) noexcept = 0;
+            virtual bool memory_access_snapshot_from_index(::std::size_t index,
+                                                           ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept = 0;
+            virtual bool
                 memory_read_from_index(::std::size_t index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept = 0;
-            virtual inline constexpr bool
+            virtual bool
                 memory_write_to_index(::std::size_t index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept = 0;
-            virtual inline constexpr ::std::byte* memory_begin_from_index(::std::size_t index) noexcept = 0;
-            virtual inline constexpr ::std::uint_least64_t memory_size_from_index(::std::size_t index) noexcept = 0;
+            virtual ::std::byte* memory_begin_from_index(::std::size_t index) noexcept = 0;
+            virtual ::std::uint_least64_t memory_size_from_index(::std::size_t index) noexcept = 0;
 
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::global_get_all_result_t<Fs...> get_all_global_information() const noexcept = 0;
-            virtual inline constexpr ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
+            virtual ::uwvm2::uwvm::wasm::type::global_get_all_result_t<Fs...> get_all_global_information() const noexcept = 0;
+            virtual ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
                 global_value_type_from_index(::std::size_t index) const noexcept = 0;
-            virtual inline constexpr bool global_is_mutable_from_index(::std::size_t index) const noexcept = 0;
-            virtual inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept = 0;
-            virtual inline constexpr bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept = 0;
+            virtual bool global_is_mutable_from_index(::std::size_t index) const noexcept = 0;
+            virtual void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept = 0;
+            virtual bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept = 0;
+
+            // Internal header-only type-erasure vtable: providers enter through the constrained local_imported_module
+            // constructor, and the sole implementation is local_imported_module_derv_impl below. This is not the
+            // versioned preload/weak-symbol C ABI; every C++ participant must be rebuilt from the same uwvm2 headers.
+            // Keep new slots appended nevertheless, so source-level changes remain reviewable and existing slots stay put.
+            virtual ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+                function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept = 0;
         };
 
         template <typename>
         inline constexpr bool dependent_false_v{false};
+
+        template <::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t>
+        struct local_imported_wasm_fp_control_policy_constant
+        {
+        };
+
+        template <typename Function>
+        concept has_well_formed_local_imported_wasm_fp_control_policy = requires {
+            requires ::std::same_as<
+                ::std::remove_cv_t<decltype(::std::remove_cvref_t<Function>::wasm_fp_control_policy)>,
+                ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t>;
+            typename local_imported_wasm_fp_control_policy_constant<
+                ::std::remove_cvref_t<Function>::wasm_fp_control_policy>;
+        };
+
+        template <typename Function>
+        [[nodiscard]] inline consteval ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            local_imported_function_wasm_fp_control_policy() noexcept
+        {
+            using policy_type = ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t;
+            if constexpr(has_well_formed_local_imported_wasm_fp_control_policy<Function>)
+            {
+                if constexpr(::std::remove_cvref_t<Function>::wasm_fp_control_policy == policy_type::preserves_wasm_control)
+                {
+                    return policy_type::preserves_wasm_control;
+                }
+            }
+            // This also covers an undeclared policy, a wrong type, a non-constant value, and an unknown enum value.
+            return policy_type::may_modify;
+        }
+
+        struct local_imported_wasm_fp_control_missing_policy_probe
+        {
+        };
+        struct local_imported_wasm_fp_control_malformed_policy_probe
+        {
+            inline static constexpr bool wasm_fp_control_policy{true};
+        };
+        struct local_imported_wasm_fp_control_unknown_policy_probe
+        {
+            inline static constexpr local_imported_wasm_fp_control_policy_t wasm_fp_control_policy{
+                static_cast<local_imported_wasm_fp_control_policy_t>(0xffu)};
+        };
+        struct local_imported_wasm_fp_control_nonconstant_policy_probe
+        {
+            inline static local_imported_wasm_fp_control_policy_t wasm_fp_control_policy;
+        };
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_missing_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_malformed_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_unknown_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
+        static_assert(local_imported_function_wasm_fp_control_policy<local_imported_wasm_fp_control_nonconstant_policy_probe>() ==
+                      ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify);
 
         template <typename T, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> local_imported_storage_to_final_value_type() noexcept
@@ -1018,6 +1109,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             if constexpr(::uwvm2::uwvm::wasm::type::has_page_size<Mem>) { return Mem::page_size; }
             else
             {
+                static_assert(!::uwvm2::uwvm::wasm::type::declares_page_size<Mem>,
+                              "an explicitly declared local-imported memory page_size must be a representable power-of-two uint_least64_t");
                 return static_cast<::std::uint_least64_t>(64u * 1024u);
             }
         }
@@ -1205,6 +1298,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
                 using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
                 return call_func_packed<func_type>(res, para);
+            }
+        }
+
+        template <::std::size_t N, typename FuncTuple>
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            function_wasm_fp_control_policy_from_index_impl(::std::size_t index) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size)
+            {
+                return ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify;
+            }
+            else
+            {
+                if(index != N) { return function_wasm_fp_control_policy_from_index_impl<N + 1uz, curr_tuple_type>(index); }
+
+                using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return local_imported_function_wasm_fp_control_policy<func_type>();
             }
         }
 
@@ -1551,7 +1664,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 using value_type = typename global_type::value_type;
                 static_assert(::std::is_trivially_copyable_v<value_type>, "global get requires trivially copyable value types");
 
-                value_type const v{global_get(::fast_io::get<N>(globals))};
+            // const& retains the provider's storage (or extends a by-value temporary's
+            // lifetime) without another FP value copy. It cannot undo quieting inside
+            // a by-value getter. Providers requiring exact NaN bits should return a
+            // reference; neither volatile nor restoring fenv recovers destroyed bits.
+                // Preserve reference-returning provider storage without an FP value copy.
+                // A value-returning native getter still owns its native FP ABI semantics.
+                value_type const& v{global_get(::fast_io::get<N>(globals))};
                 if constexpr(::std::same_as<value_type, ::uwvm2::object::global::wasm_funcref_t> ||
                              ::std::same_as<value_type, ::uwvm2::object::global::wasm_externref_t>)
                 {
@@ -1726,6 +1845,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 {
                     return {};
                 }
+            }
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+                function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept override
+            {
+                using policy_type = ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t;
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_func_tuple_type>::value};
+                    if(index < tuple_size) { return function_wasm_fp_control_policy_from_index_impl<0uz, curr_func_tuple_type>(index); }
+                }
+                return policy_type::may_modify;
             }
 
             virtual inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept override
@@ -2108,6 +2240,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return {}; }
             return this->ptr->get_all_function_information();
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t
+            function_wasm_fp_control_policy_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr)
+            {
+                return ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify;
+            }
+            return this->ptr->function_wasm_fp_control_policy_from_index(index);
         }
 
         inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept

@@ -113,6 +113,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // Canonical Preview 1 defines prestat as size 8, alignment 4. Do not derive guest alignment from this file's over-aligned host staging type.
+        check_wasip1_guest_pointer_alignment<4uz>(buf_ptrsz, u8"fd_prestat_get.buf (prestat)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

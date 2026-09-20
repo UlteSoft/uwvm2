@@ -47,11 +47,14 @@ using wexecution_charset_mb_state = wutf_mb_state;
 
 enum class encoding_scheme
 {
-	execution_charset,
-	utf_le,
-	utf_be,
-	gb18030,
-	utf_ebcdic,
+	execution_charset = 0,
+	utf_le = 1,
+	utf_be = 2,
+	gb18030 = 3,
+	utf_ebcdic = 4,
+	// An implementation-defined ordinary execution character set.  This is an
+	// opaque one-code-unit domain; it is neither UTF-8 nor UTF-EBCDIC.
+	execution_sbcs = 6,
 	utf = ::std::endian::big == ::std::endian::native ? utf_be
 													  : (::std::endian::little == ::std::endian::native ? utf_le : 5)
 };
@@ -263,7 +266,7 @@ inline constexpr ::std::size_t cal_decorated_reserve_size(::std::size_t internal
 #if defined(__GNUC_EXECUTION_CHARSET_NAME) || defined(__GNUC_WIDE_EXECUTION_CHARSET_NAME)
 
 template <::std::size_t N1, ::std::size_t N2>
-inline constexpr bool execution_charset_is(char const (&str)[N1], char8_t const (&encoding)[N2]) noexcept
+inline constexpr bool execution_charset_is(char const (&str)[N1], char const (&encoding)[N2]) noexcept
 {
 	if constexpr (N1 != N2)
 	{
@@ -273,8 +276,8 @@ inline constexpr bool execution_charset_is(char const (&str)[N1], char8_t const 
 	{
 		for (::std::size_t i{}; i != N1; ++i)
 		{
-			char8_t ch{::fast_io::char_category::to_c_upper(static_cast<char8_t>(str[i]))};
-			char8_t ch1{::fast_io::char_category::to_c_upper(static_cast<char8_t>(encoding[i]))};
+			char ch{::fast_io::char_category::to_c_upper(str[i])};
+			char ch1{::fast_io::char_category::to_c_upper(encoding[i])};
 			if (ch != ch1)
 			{
 				return false;
@@ -291,69 +294,66 @@ template <::std::integral char_type>
 inline constexpr encoding_scheme execution_charset_encoding_scheme() noexcept
 {
 	using char_type_no_cvref_t = ::std::remove_cvref_t<char_type>;
-	if constexpr (::fast_io::details::is_ebcdic<char_type_no_cvref_t>)
+	if constexpr (::std::same_as<char_type_no_cvref_t, char>)
 	{
-		return encoding_scheme::utf_ebcdic;
-	}
-	else
-	{
-		if constexpr (::std::same_as<char_type_no_cvref_t, char>)
-		{
 #if defined(_MSVC_EXECUTION_CHARACTER_SET)
-			if constexpr (_MSVC_EXECUTION_CHARACTER_SET == 936 || _MSVC_EXECUTION_CHARACTER_SET == 54936)
-			{
-				return encoding_scheme::gb18030;
-			}
-			else
-			{
-				return encoding_scheme::utf;
-			}
-#elif defined(__GNUC_EXECUTION_CHARSET_NAME)
-			if constexpr (::fast_io::details::execution_charset_is(__GNUC_EXECUTION_CHARSET_NAME, u8"GB18030") ||
-						  ::fast_io::details::execution_charset_is(__GNUC_EXECUTION_CHARSET_NAME, u8"GBK"))
-			{
-				return encoding_scheme::gb18030;
-			}
-			else
-			{
-				return encoding_scheme::utf;
-			}
-#else
-			return encoding_scheme::utf;
-#endif
-		}
-		else if constexpr (::std::same_as<char_type_no_cvref_t, wchar_t>)
+		if constexpr (_MSVC_EXECUTION_CHARACTER_SET == 936 || _MSVC_EXECUTION_CHARACTER_SET == 54936)
 		{
-#if defined(__GNUC_WIDE_EXECUTION_CHARSET_NAME)
-			if constexpr (sizeof(wchar_t) == 1 &&
-						  (::fast_io::details::execution_charset_is(__GNUC_WIDE_EXECUTION_CHARSET_NAME, u8"GB18030") ||
-						   ::fast_io::details::execution_charset_is(__GNUC_WIDE_EXECUTION_CHARSET_NAME, u8"GBK")))
-			{
-				return encoding_scheme::gb18030;
-			}
-			else
-			{
-				if constexpr (::fast_io::details::wide_is_none_utf_endian)
-				{
-					if constexpr (encoding_scheme::utf == encoding_scheme::utf_le)
-					{
-						return encoding_scheme::utf_be;
-					}
-					else
-					{
-						return encoding_scheme::utf_le;
-					}
-				}
-				return encoding_scheme::utf;
-			}
-#else
-			return encoding_scheme::utf;
+			return encoding_scheme::gb18030;
+		}
+#elif defined(__GNUC_EXECUTION_CHARSET_NAME)
+		if constexpr (::fast_io::details::execution_charset_name_is_or_has_iconv_suffix(
+					  __GNUC_EXECUTION_CHARSET_NAME, "GB18030") ||
+					  ::fast_io::details::execution_charset_name_is_or_has_iconv_suffix(
+						  __GNUC_EXECUTION_CHARSET_NAME, "GBK"))
+		{
+			return encoding_scheme::gb18030;
+		}
 #endif
+		if constexpr (!::fast_io::details::is_utf8_execution_charset<char_type_no_cvref_t>)
+		{
+			return encoding_scheme::execution_sbcs;
+		}
+		return encoding_scheme::utf;
+	}
+	else if constexpr (::std::same_as<char_type_no_cvref_t, wchar_t>)
+	{
+#if defined(__GNUC_WIDE_EXECUTION_CHARSET_NAME)
+		if constexpr (sizeof(wchar_t) == 1 &&
+					  (::fast_io::details::execution_charset_name_is_or_has_iconv_suffix(
+						   __GNUC_WIDE_EXECUTION_CHARSET_NAME, "GB18030") ||
+					   ::fast_io::details::execution_charset_name_is_or_has_iconv_suffix(
+						   __GNUC_WIDE_EXECUTION_CHARSET_NAME, "GBK")))
+		{
+			return encoding_scheme::gb18030;
+		}
+#endif
+		if constexpr ((sizeof(wchar_t) == 1u &&
+					   !::fast_io::details::is_utf8_execution_charset<char_type_no_cvref_t>) ||
+					  ::fast_io::details::is_ebcdic<char_type_no_cvref_t> ||
+					  !::fast_io::details::is_unicode_execution_charset<char_type_no_cvref_t>)
+		{
+			return encoding_scheme::execution_sbcs;
 		}
 		else
 		{
+			if constexpr (::fast_io::details::wide_is_none_utf_endian)
+			{
+				if constexpr (encoding_scheme::utf == encoding_scheme::utf_le)
+				{
+					return encoding_scheme::utf_be;
+				}
+				else
+				{
+					return encoding_scheme::utf_le;
+				}
+			}
 			return encoding_scheme::utf;
 		}
+	}
+	else
+	{
+		return encoding_scheme::utf;
 	}
 }
 
@@ -380,6 +380,76 @@ inline constexpr bool is_native_scheme(encoding_scheme scheme) noexcept
 	return scheme == encoding_scheme::utf;
 }
 
+struct execution_sbcs_decode_result
+{
+	char32_t code_point{};
+	bool valid{};
+};
+
+template <::std::integral char_type>
+inline constexpr execution_sbcs_decode_result decode_execution_sbcs_code_unit(char_type value) noexcept
+{
+	using clean_type = ::std::remove_cv_t<char_type>;
+	using unsigned_type = ::std::make_unsigned_t<clean_type>;
+	auto const unsigned_value{static_cast<unsigned_type>(value)};
+	constexpr char8_t controls[]{u8'\0', u8'\a', u8'\b', u8'\t',
+								 u8'\n', u8'\v', u8'\f', u8'\r'};
+	for (auto ch : controls)
+	{
+		if (unsigned_value == ::fast_io::details::execution_character_value<clean_type>(ch))
+		{
+			return {static_cast<char32_t>(static_cast<::std::uint_least8_t>(ch)), true};
+		}
+	}
+	for (char8_t ch{u8' '}; ch != static_cast<char8_t>(0x7fu); ++ch)
+	{
+		if (unsigned_value == ::fast_io::details::execution_character_value<clean_type>(ch))
+		{
+			return {static_cast<char32_t>(static_cast<::std::uint_least8_t>(ch)), true};
+		}
+	}
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::size_t get_execution_sbcs_code_units(char32_t code_point, char_type *dst) noexcept
+{
+	char8_t execution_character{};
+	bool representable{};
+	auto const value{static_cast<::std::uint_least32_t>(code_point)};
+	if (0x20u <= value && value <= 0x7eu)
+	{
+		execution_character = static_cast<char8_t>(value);
+		representable = true;
+	}
+	else
+	{
+		switch (value)
+		{
+		case 0u:
+		case 7u:
+		case 8u:
+		case 9u:
+		case 10u:
+		case 11u:
+		case 12u:
+		case 13u:
+			execution_character = static_cast<char8_t>(value);
+			representable = true;
+			break;
+		default:
+			break;
+		}
+	}
+	if (!representable)
+	{
+		execution_character = u8'?';
+	}
+	*dst = ::fast_io::details::execution_character_literal<::std::remove_cv_t<char_type>>(
+		execution_character);
+	return 1u;
+}
+
 template <::std::integral T>
 	requires(sizeof(T) == 1)
 inline constexpr ::std::size_t get_utf8_invalid_code_units(T *dst) noexcept
@@ -401,6 +471,10 @@ inline constexpr ::std::size_t get_utf_code_units(char32_t cdpt, T *dst) noexcep
 	else if constexpr (scheme == encoding_scheme::gb18030)
 	{
 		return gb18030::get_gb18030_code_units(cdpt, dst);
+	}
+	else if constexpr (scheme == encoding_scheme::execution_sbcs)
+	{
+		return get_execution_sbcs_code_units(cdpt, dst);
 	}
 	else
 	{

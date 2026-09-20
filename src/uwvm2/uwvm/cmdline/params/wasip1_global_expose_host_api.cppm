@@ -36,6 +36,7 @@ export module uwvm2.uwvm.cmdline.params:wasip1_global_expose_host_api;
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.cmdline;
+import uwvm2.uwvm.wasm.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

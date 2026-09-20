@@ -1,298 +1,316 @@
 ﻿#pragma once
 
+/**
+ * @file
+ * @brief Defines normalized bounded transform operations.
+ *
+ * Unsuffixed decay entry points own one normalized engine value, matching the
+ * ABI contract of the stream primitive layer. Explicit borrowed entry points
+ * preserve a stateful observer's identity. Public entry points normalize once
+ * and use a mandatory-inline semantic/ABI selector between those transports.
+ */
+
 namespace fast_io
 {
 
 namespace operations::decay
 {
 
+/** @brief Performs one bounded process step through a stable observer borrow. */
 template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_min_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_min_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_bytes_min_tosize_decay(::fast_io::transcode_reserve_t<T>) noexcept
+	requires ::fast_io::operations::decay::defines::has_transcode_process_define<T>
+inline constexpr auto transcode_process_decay_borrowed(
+	T &ref, ::fast_io::transcode_from_value_t<T> const *from_first,
+	::fast_io::transcode_from_value_t<T> const *from_last,
+	::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept(noexcept(transcode_process_define(ref, from_first, from_last, to_first, to_last)))
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_min_tosize_decay_define<T>)
-	{
-		return transcode_bytes_min_tosize_decay_define(::fast_io::transcode_reserve<T>);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_min_tosize_decay_define<T>)
-	{
-		return transcode_min_tosize_decay_define(::fast_io::transcode_reserve<T>) * sizeof(typename T::to_value_type);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T>)
-	{
-		return 1;
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-	{
-		return sizeof(typename T::to_value_type);
-	}
+	return transcode_process_define(
+		ref, from_first, from_last, to_first, to_last);
 }
 
+/** @brief Owns a normalized observer for one bounded process step. */
 template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_bytes_imaginary_decay(T t,
-															   ::std::byte const *fromfirst, ::std::byte const *fromlast, ::std::size_t mxsz);
-
-template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_bytes_tosize_decay(T t,
-															::std::byte const *fromfirst, ::std::byte const *fromlast)
+	requires ::fast_io::operations::decay::defines::has_transcode_process_define<T>
+inline constexpr auto transcode_process_decay(
+	T ref, ::fast_io::transcode_from_value_t<T> const *from_first,
+	::fast_io::transcode_from_value_t<T> const *from_last,
+	::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept(noexcept(::fast_io::operations::decay::transcode_process_decay_borrowed(ref, from_first, from_last, to_first, to_last)))
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T>)
-	{
-		return transcode_bytes_tosize_decay_define(t, fromfirst, fromlast);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T>)
-	{
-		using from_value_type = typename T::from_value_type;
-		using to_value_type = typename T::to_value_type;
-		using from_may_alias_const_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= from_value_type const *;
-		return transcode_tosize_decay_define(t, reinterpret_cast<from_may_alias_const_ptr>(fromfirst),
-											 reinterpret_cast<from_may_alias_const_ptr>(fromfirst) + static_cast<::std::size_t>(fromlast - fromfirst) / sizeof(from_value_type)) *
-			   sizeof(to_value_type);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-					   ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-	{
-		constexpr ::std::size_t bfminsz{::fast_io::operations::decay::transcode_bytes_min_tosize_decay(::fast_io::transcode_reserve<T>)};
-		constexpr ::std::size_t mxsz{::std::numeric_limits<::std::size_t>::max() / 2};
-		for (::std::size_t n{bfminsz};;)
-		{
-			if (::fast_io::operations::decay::transcode_bytes_imaginary_decay(t, fromfirst, fromlast, n) == fromlast)
-			{
-				return n;
-			}
-			if (mxsz < n) [[unlikely]]
-			{
-				::fast_io::fast_terminate();
-			}
-			n <<= 1;
-		}
-#if __has_cpp_attribute(unreachable)
-		[[unreachable]];
-#endif
-	}
+	return ::fast_io::operations::decay::transcode_process_decay_borrowed(
+		ref, from_first, from_last, to_first, to_last);
 }
 
+/** @brief Selects value or borrowed transport for one normalized observer. */
 template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::byte const *transcode_bytes_imaginary_decay(T t,
-																	::std::byte const *fromfirst, ::std::byte const *fromlast, ::std::size_t mxsz)
-{
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T>)
+	requires ::fast_io::operations::decay::defines::has_transcode_process_define<T>
+FAST_IO_GNU_ALWAYS_INLINE inline constexpr auto transcode_process_decay_dispatch(
+	T &ref, ::fast_io::transcode_from_value_t<T> const *from_first,
+	::fast_io::transcode_from_value_t<T> const *from_last,
+	::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept([]() consteval {
+	// The exception proof must discard the same transport branch as execution.
+	// A conditional operator still requires both calls to be well-formed, which
+	// would impose an unexecuted copy on a valid noncopyable borrowed observer.
+	using from_pointer = ::fast_io::transcode_from_value_t<T> const *;
+	using to_pointer = ::fast_io::transcode_to_value_t<T> *;
+	if constexpr (::fast_io::operations::defines::
+					  abi_value_transcode_ref_result_object<T &>())
 	{
-		return transcode_bytes_imaginary_decay_define(t, fromfirst, fromlast, mxsz);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-	{
-		using from_value_type = typename T::from_value_type;
-		using from_may_alias_const_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= from_value_type const *;
-		return reinterpret_cast<::std::byte const *>(transcode_imaginary_decay_define(t, reinterpret_cast<from_may_alias_const_ptr>(fromfirst),
-																					  reinterpret_cast<from_may_alias_const_ptr>(fromfirst) + static_cast<::std::size_t>(fromlast - fromfirst) / sizeof(typename T::from_value_type), mxsz));
+		return noexcept(::fast_io::operations::decay::transcode_process_decay(
+			::std::declval<T &>(), ::std::declval<from_pointer>(),
+			::std::declval<from_pointer>(), ::std::declval<to_pointer>(),
+			::std::declval<to_pointer>()));
 	}
 	else
 	{
-		::std::size_t n{static_cast<::std::size_t>(fromlast - fromfirst)};
-		for (; (n && ::fast_io::operations::decay::transcode_bytes_tosize_decay(t, fromfirst, fromfirst + n) <= mxsz); n >>= 1u)
-		{
-		}
-		return fromfirst + n;
+		return noexcept(::fast_io::operations::decay::transcode_process_decay_borrowed(
+			::std::declval<T &>(), ::std::declval<from_pointer>(),
+			::std::declval<from_pointer>(), ::std::declval<to_pointer>(),
+			::std::declval<to_pointer>()));
 	}
-}
-
-template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_decay_define<T>)
-inline constexpr ::fast_io::transcode_bytes_result transcode_bytes_decay(T t,
-																		 ::std::byte const *fromfirst, ::std::byte const *fromlast,
-																		 ::std::byte *tofirst, ::std::byte *tolast)
+}())
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_decay_define<T>)
+	if constexpr (::fast_io::operations::defines::
+					  abi_value_transcode_ref_result_object<T &>())
 	{
-		return transcode_bytes_decay_define(t, fromfirst, fromlast, tofirst, tolast);
+		return ::fast_io::operations::decay::transcode_process_decay(
+			ref, from_first, from_last, to_first, to_last);
 	}
 	else
 	{
-		using from_value_type = typename T::from_value_type;
-		using to_value_type = typename T::to_value_type;
-		using from_may_alias_const_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= from_value_type const *;
-		using to_may_alias_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= to_value_type *;
-		auto [fromit, toit] = transcode_decay_define(t, reinterpret_cast<from_may_alias_const_ptr>(fromfirst),
-													 reinterpret_cast<from_may_alias_const_ptr>(fromfirst) + static_cast<::std::size_t>(fromlast - fromfirst) / sizeof(from_value_type),
-													 reinterpret_cast<to_may_alias_ptr>(tofirst),
-													 reinterpret_cast<to_may_alias_ptr>(tofirst) + static_cast<::std::size_t>(tolast - tofirst) / sizeof(to_value_type));
-		return {reinterpret_cast<::std::byte const *>(fromit), reinterpret_cast<::std::byte *>(toit)};
+		return ::fast_io::operations::decay::transcode_process_decay_borrowed(
+			ref, from_first, from_last, to_first, to_last);
 	}
 }
 
+/** @brief Performs optional sync-flush through a stable observer borrow. */
 template <typename T>
-	requires((sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1 && (::fast_io::operations::decay::defines::has_transcode_bytes_min_tosize_decay_define<T> || ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T>)) ||
-			 ::fast_io::operations::decay::defines::has_transcode_min_tosize_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_min_tosize_decay(::fast_io::transcode_reserve_t<T>) noexcept
+	requires ::fast_io::operations::decay::defines::has_transcode_endpoint_types<T>
+inline constexpr auto transcode_sync_flush_decay_borrowed(
+	T &ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last)
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_min_tosize_decay_define<T>)
+	if constexpr (::fast_io::operations::decay::defines::
+					  has_transcode_sync_flush_define<T>)
 	{
-		return transcode_min_tosize_decay_define(::fast_io::transcode_reserve<T>);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_min_tosize_decay_define<T> &&
-					   sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1)
-	{
-		return transcode_bytes_min_tosize_decay_define(::fast_io::transcode_reserve<T>);
+		// Use the engine's nonterminal drain when it buffers pending output.
+		return transcode_sync_flush_define(ref, to_first, to_last);
 	}
 	else
 	{
-		return 1;
+		// Stateless engines are synchronized without producing additional units.
+		// Sync flush is optional. An engine without buffered nonterminal output is
+		// already synchronized from the transform protocol's perspective.
+		return ::fast_io::basic_transcode_drain_result<
+			::fast_io::transcode_to_value_t<T>>{
+			to_first, ::fast_io::transcode_drain_status::complete};
 	}
 }
 
+/** @brief Owns a normalized observer for one optional sync-flush step. */
 template <typename T>
-	requires(::fast_io::operations::decay::defines::has_transcode_bytes_decay_define<T> ||
-			 (::fast_io::operations::decay::defines::has_transcode_decay_define<T> &&
-			  sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1))
-inline constexpr ::fast_io::transcode_bytes_result transcode_decay(T t,
-																   typename T::from_value_type const *fromfirst, typename T::from_value_type const *fromlast,
-																   typename T::to_value_type *tofirst, typename T::to_value_type *tolast)
+	requires ::fast_io::operations::decay::defines::has_transcode_endpoint_types<T>
+inline constexpr auto transcode_sync_flush_decay(
+	T ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last)
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_decay_define<T>)
-	{
-		return transcode_decay_define(t, fromfirst, fromlast, tofirst, tolast);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_decay_define<T>)
-	{
-		return transcode_bytes_decay_define(t, fromfirst, fromlast, tofirst, tolast);
-	}
+	return ::fast_io::operations::decay::transcode_sync_flush_decay_borrowed(
+		ref, to_first, to_last);
 }
 
+/** @brief Selects value or borrowed transport for optional sync-flush. */
 template <typename T>
-	requires(((::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			   ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T>) &&
-			  (sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1)) ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_imaginary_decay(T t,
-														 typename T::from_value_type const *fromfirst, typename T::from_value_type const *fromlast);
-
-template <typename T>
-	requires(((::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			   ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T>) &&
-			  (sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1)) ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr ::std::size_t transcode_tosize_decay(T t,
-													  typename T::from_value_type const *fromfirst, typename T::from_value_type const *fromlast)
+	requires ::fast_io::operations::decay::defines::has_transcode_endpoint_types<T>
+FAST_IO_GNU_ALWAYS_INLINE inline constexpr auto
+transcode_sync_flush_decay_dispatch(
+	T &ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last)
 {
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T>)
+	if constexpr (::fast_io::operations::defines::
+					  abi_value_transcode_ref_result_object<T &>())
 	{
-		::std::size_t res{transcode_tosize_decay_define(t, fromfirst, fromlast)};
-		if constexpr (1 < sizeof(typename T::value_type))
-		{
-			constexpr ::std::size_t mxsz{::std::numeric_limits<::std::size_t>::max() / sizeof(typename T::to_value_type)};
-			if (mxsz < res) [[unlikely]]
-			{
-				::fast_io::fast_terminate();
-			}
-		}
-		return res;
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> &&
-					   (sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1))
-	{
-		using from_value_type = typename T::from_value_type;
-		using from_may_alias_const_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= from_value_type const *;
-		return transcode_bytes_tosize_decay_define(t, reinterpret_cast<from_may_alias_const_ptr>(fromfirst),
-												   reinterpret_cast<from_may_alias_const_ptr>(fromlast));
-	}
-	else if constexpr ((::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> &&
-						(sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1)) ||
-					   ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-	{
-		constexpr ::std::size_t bfminsz{::fast_io::operations::decay::transcode_min_tosize_decay(::fast_io::transcode_reserve<T>)};
-		constexpr ::std::size_t mxsz{::std::numeric_limits<::std::size_t>::max() / 2 / sizeof(typename T::to_value_type)};
-		for (::std::size_t n{bfminsz};;)
-		{
-			if (::fast_io::operations::decay::transcode_imaginary_decay(t, fromfirst, fromlast, n) == fromlast)
-			{
-				return n;
-			}
-			if (mxsz < n) [[unlikely]]
-			{
-				::fast_io::fast_terminate();
-			}
-			n <<= 1;
-		}
-#if __has_cpp_attribute(unreachable)
-		[[unreachable]];
-#endif
-	}
-}
-
-template <typename T>
-	requires(((::fast_io::operations::decay::defines::has_transcode_bytes_tosize_decay_define<T> ||
-			   ::fast_io::operations::decay::defines::has_transcode_tosize_decay_define<T>) &&
-			  (sizeof(typename T::from_value_type) == 1 && sizeof(typename T::to_value_type) == 1)) ||
-			 ::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T> ||
-			 ::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-inline constexpr typename T::from_value_type const *transcode_imaginary_decay(T t,
-																			  typename T::from_value_type const *fromfirst, typename T::from_value_type const *fromlast, ::std::size_t mxsz)
-{
-	if constexpr (::fast_io::operations::decay::defines::has_transcode_imaginary_decay_define<T>)
-	{
-		return transcode_imaginary_decay_define(t, fromfirst, fromlast, mxsz);
-	}
-	else if constexpr (::fast_io::operations::decay::defines::has_transcode_bytes_imaginary_decay_define<T>)
-	{
-		using from_value_type = typename T::from_value_type;
-		using from_may_alias_const_ptr
-#if __has_cpp_attribute(__gnu__::__may_alias__)
-			[[__gnu__::__may_alias__]]
-#endif
-			= from_value_type const *;
-		return reinterpret_cast<::std::byte const *>(transcode_bytes_imaginary_decay_define(t, reinterpret_cast<from_may_alias_const_ptr>(fromfirst),
-																							reinterpret_cast<from_may_alias_const_ptr>(fromfirst) + static_cast<::std::size_t>(fromlast - fromfirst) / sizeof(typename T::from_value_type), mxsz));
+		return ::fast_io::operations::decay::transcode_sync_flush_decay(
+			ref, to_first, to_last);
 	}
 	else
 	{
-		::std::size_t n{static_cast<::std::size_t>(fromlast - fromfirst)};
-		for (; (n && ::fast_io::operations::decay::transcode_tosize_decay(t, fromfirst, fromfirst + n) <= mxsz); n >>= 1u)
-		{
-		}
-		return fromfirst + n;
+		return ::fast_io::operations::decay::
+			transcode_sync_flush_decay_borrowed(ref, to_first, to_last);
 	}
+}
+
+/** @brief Performs mandatory terminal finish through a stable observer borrow. */
+template <typename T>
+	requires ::fast_io::operations::decay::defines::has_transcode_finish_define<T>
+inline constexpr auto transcode_finish_decay_borrowed(
+	T &ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept(noexcept(transcode_finish_define(ref, to_first, to_last)))
+{
+	return transcode_finish_define(ref, to_first, to_last);
+}
+
+/** @brief Owns a normalized observer for one mandatory terminal finish step. */
+template <typename T>
+	requires ::fast_io::operations::decay::defines::has_transcode_finish_define<T>
+inline constexpr auto transcode_finish_decay(
+	T ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept(noexcept(::fast_io::operations::decay::transcode_finish_decay_borrowed(ref, to_first, to_last)))
+{
+	return ::fast_io::operations::decay::transcode_finish_decay_borrowed(
+		ref, to_first, to_last);
+}
+
+/** @brief Selects value or borrowed transport for terminal finish. */
+template <typename T>
+	requires ::fast_io::operations::decay::defines::has_transcode_finish_define<T>
+FAST_IO_GNU_ALWAYS_INLINE inline constexpr auto transcode_finish_decay_dispatch(
+	T &ref, ::fast_io::transcode_to_value_t<T> *to_first,
+	::fast_io::transcode_to_value_t<T> *to_last) noexcept([]() consteval {
+	// Terminal dispatch uses the same selected-expression proof as process;
+	// the discarded value branch must not require a copy of a stable observer.
+	using to_pointer = ::fast_io::transcode_to_value_t<T> *;
+	if constexpr (::fast_io::operations::defines::
+					  abi_value_transcode_ref_result_object<T &>())
+	{
+		return noexcept(::fast_io::operations::decay::transcode_finish_decay(
+			::std::declval<T &>(), ::std::declval<to_pointer>(),
+			::std::declval<to_pointer>()));
+	}
+	else
+	{
+		return noexcept(::fast_io::operations::decay::transcode_finish_decay_borrowed(
+			::std::declval<T &>(), ::std::declval<to_pointer>(),
+			::std::declval<to_pointer>()));
+	}
+}())
+{
+	if constexpr (::fast_io::operations::defines::
+					  abi_value_transcode_ref_result_object<T &>())
+	{
+		return ::fast_io::operations::decay::transcode_finish_decay(
+			ref, to_first, to_last);
+	}
+	else
+	{
+		return ::fast_io::operations::decay::transcode_finish_decay_borrowed(
+			ref, to_first, to_last);
+	}
+}
+
+/** @brief Queries mandatory minimum destination capacity on an observer type. */
+template <typename T>
+	requires ::fast_io::operations::decay::defines::
+		has_transcode_min_output_size_define<T>
+	inline constexpr ::std::size_t transcode_min_output_size_decay(
+		::fast_io::transcode_reserve_t<T> reserve,
+		::fast_io::transcode_phase phase) noexcept(noexcept(transcode_min_output_size_define(reserve, phase)))
+{
+	return transcode_min_output_size_define(reserve, phase);
+}
+
+/** @brief Queries an optional input-sensitive destination-capacity upper bound. */
+template <typename T>
+	requires ::fast_io::operations::decay::defines::
+		has_transcode_max_output_size_define<T>
+	inline constexpr ::std::size_t transcode_max_output_size_decay(
+		::fast_io::transcode_reserve_t<T> reserve, ::std::size_t input_units,
+		::fast_io::transcode_phase phase) noexcept(noexcept(transcode_max_output_size_define(reserve, input_units, phase)))
+{
+	return transcode_max_output_size_define(
+		reserve, input_units, phase);
 }
 
 } // namespace operations::decay
+
+namespace operations
+{
+
+/** @brief Names the normalized observer type selected for an engine. */
+template <typename T>
+using transcode_engine_ref_t = ::std::remove_cvref_t<
+	decltype(::fast_io::transcode_ref(::std::declval<T &>()))>;
+
+/** @brief Models the exact cv-qualified lvalue expression used after normalization. */
+template <typename T>
+using transcode_engine_ref_lvalue_t = ::std::remove_reference_t<
+	decltype(::fast_io::transcode_ref(::std::declval<T &>()))> &;
+
+/** @brief Normalizes an engine once and performs one bounded process step. */
+template <typename T>
+	requires ::fast_io::transcoder<T>
+inline constexpr auto transcode_process(
+	T &engine,
+	::fast_io::transcode_from_value_t<transcode_engine_ref_t<T>> const *from_first,
+	::fast_io::transcode_from_value_t<transcode_engine_ref_t<T>> const *from_last,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_first,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_last) noexcept(noexcept(::fast_io::transcode_ref(engine)) &&
+																				  noexcept(::fast_io::operations::decay::transcode_process_decay_dispatch(
+																					  ::std::declval<transcode_engine_ref_lvalue_t<T>>(), from_first, from_last,
+																					  to_first, to_last)))
+{
+	// Normalize exactly once. The exception specification is the conjunction of
+	// this selected normalization expression and the process expression invoked
+	// on the resulting lvalue observer; neither provider failure is strengthened.
+	decltype(auto) ref{::fast_io::transcode_ref(engine)};
+	return ::fast_io::operations::decay::transcode_process_decay_dispatch(
+		ref, from_first, from_last, to_first, to_last);
+}
+
+/** @brief Normalizes an engine once and performs one nonterminal sync-flush step. */
+template <typename T>
+	requires ::fast_io::transcoder<T>
+inline constexpr auto transcode_sync_flush(
+	T &engine,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_first,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_last)
+{
+	decltype(auto) ref{::fast_io::transcode_ref(engine)};
+	return ::fast_io::operations::decay::transcode_sync_flush_decay_dispatch(
+		ref, to_first, to_last);
+}
+
+/** @brief Normalizes an engine once and performs one terminal finish step. */
+template <typename T>
+	requires ::fast_io::transcoder<T>
+inline constexpr auto transcode_finish(
+	T &engine,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_first,
+	::fast_io::transcode_to_value_t<transcode_engine_ref_t<T>> *to_last)
+{
+	decltype(auto) ref{::fast_io::transcode_ref(engine)};
+	return ::fast_io::operations::decay::transcode_finish_decay_dispatch(
+		ref, to_first, to_last);
+}
+
+/** @brief Queries the minimum legal destination capacity for a protocol phase. */
+template <typename T>
+	requires ::fast_io::transcoder<T>
+inline constexpr ::std::size_t transcode_min_output_size(
+	::fast_io::transcode_reserve_t<T>, ::fast_io::transcode_phase phase)
+{
+	using ref_type = transcode_engine_ref_t<T>;
+	return ::fast_io::operations::decay::transcode_min_output_size_decay(
+		::fast_io::transcode_reserve<ref_type>, phase);
+}
+
+/** @brief Queries an optional maximum output size for a bounded input count. */
+template <typename T>
+	requires(::fast_io::transcoder<T> &&
+			 ::fast_io::operations::decay::defines::
+				 has_transcode_max_output_size_define<transcode_engine_ref_t<T>>)
+inline constexpr ::std::size_t transcode_max_output_size(
+	::fast_io::transcode_reserve_t<T>, ::std::size_t input_units,
+	::fast_io::transcode_phase phase)
+{
+	// This optional query is an allocation optimization only. Adapter
+	// correctness is based exclusively on bounded calls and minimum capacity.
+	using ref_type = transcode_engine_ref_t<T>;
+	return ::fast_io::operations::decay::transcode_max_output_size_decay(
+		::fast_io::transcode_reserve<ref_type>, input_units, phase);
+}
+
+} // namespace operations
 
 } // namespace fast_io

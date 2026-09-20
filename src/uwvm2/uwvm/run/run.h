@@ -209,7 +209,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                             auto const idx{static_cast<::std::size_t>(startsec.start_idx)};
                             auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
-                            if(idx < total_n && is_void_to_void_wasm_func_index(idx)) { return idx; }
+                            // The parser validated the start signature. Unlike conventional CLI exports,
+                            // a standard start section may also designate an imported host function.
+                            if(idx < total_n) { return idx; }
                         }
                     }
                 }
@@ -423,11 +425,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // here because fast_io scanners fail quickly on non-matching input, and `wasm_entry_scan_exact` rejects partial
         // matches after each attempted scan.
         //
-        // fast_io scanners only write to the target on a successful scan; no initialization needed.
+        // fast_io scanners write to the target only on a successful scan.  Value-initialize the temporary nonetheless:
+        // this keeps the successful short-circuit path visibly free of indeterminate reads for conservative compiler
+        // data-flow analysis and provides a deterministic defensive value if a future scanner contract regresses.
 
         if constexpr(allow_signed_decimal)
         {
-            Out signed_value;  // no init necessary
+            Out signed_value{};
             if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(signed_value)))
             {
                 out = signed_value;
@@ -435,7 +439,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        Unsigned unsigned_value;  // no init necessary
+        Unsigned unsigned_value{};
         if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex0x_get<true, false>(unsigned_value)) ||
            wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin0b_get<true, false>(unsigned_value)) ||
@@ -1106,13 +1110,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     /**
-     * @brief   Compute the default adaptive runtime compile-thread limit.
-     * @details The default policy grows slowly with detected hardware parallelism: roughly `floor(log2(max))`, with a
-     *          minimum of one.  Lower runtime layers may further adapt per-module scheduling below this upper bound.
-     *
-     * @param   max_compile_threads Detected platform concurrency used as the policy input.
-     * @return  Default compile-thread limit selected by policy.
+     * @brief Execute preloaded start sections and the selected main entry using the full backend.
+     * @details Runtime storage and imports are already initialized. Eager compilation is cached across these entries.
      */
+    template <typename RunConfig, typename RunEntry>
+    inline constexpr void run_initialized_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
+                                                       RunConfig cfg, RunEntry run_entry) noexcept
+    {
+        using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
+        // Preloaded Wasm modules are instances too: run each actual start section once, in preload order.
+        // Do not invoke library exports named _start/main, and do not apply the main-module CLI override to libraries.
+        for(auto const& module: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        {
+            if(module.binfmt_ver != 1u) [[unlikely]] { ::fast_io::fast_terminate(); }
+            ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(module.module_name);
+            auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
+                module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
+            if(start.sec_span.sec_begin == nullptr) { continue; }
+            RunConfig start_cfg{};
+            if constexpr(requires { start_cfg.assume_full_code_verified; })
+            { start_cfg.assume_full_code_verified = cfg.assume_full_code_verified; }
+            start_cfg.entry_function_index = static_cast<::std::size_t>(start.start_idx);
+            start_cfg.module_start = true;
+            run_entry(module.module_name, start_cfg);
+        }
+        auto const& main_module{::uwvm2::uwvm::wasm::storage::execute_wasm};
+        ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(main_module_name);
+        auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
+            main_module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
+        cfg.module_start = !::uwvm2::uwvm::wasm::storage::start_func_call.enabled &&
+                           start.sec_span.sec_begin != nullptr && cfg.entry_function_index == start.start_idx;
+        run_entry(main_module_name, cfg);
+    }
+
+    inline constexpr void run_full_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
+                                                 ::uwvm2::runtime::lib::full_compile_run_config cfg) noexcept
+    {
+        run_initialized_module_graph(main_module_name, cfg, ::uwvm2::runtime::lib::full_compile_and_run_main_module);
+    }
+
+    // Default adaptive compilation limit: floor(log2(hardware concurrency)), at least one.
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
     {
         // Follow the default policy upper bound: roughly one compiler thread per log2(N) CPUs.
@@ -1707,7 +1744,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         // Initialize runtime storage, link metadata, and backend-visible module data after import resolution succeeds.
-        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
+        ::uwvm2::uwvm::runtime::initializer::initialize_runtime(true);
 
 # if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
         // The debug interpreter backend is modeled as a full-compile backend.  If the command line selected a lazy mode,
@@ -1854,7 +1891,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
                         configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = false;
-                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg,
+                                                     ::uwvm2::runtime::lib::lazy_compile_and_run_main_module);
 # else
                         ::fast_io::io::perr(
                             ::uwvm2::uwvm::io::u8log_output,
@@ -1919,13 +1957,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         // validation work.  Per-function compilation may still occur lazily.
                         if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
                         {
+                            // Runtime storage has already been initialized at this point. Release backend artifacts and invalidate
+                            // pointer caches before returning so an embedding host can load another module set safely.
+                            ::uwvm2::runtime::lib::reset_runtime_state_host_api();
                             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
                         }
 
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
                         configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = true;
-                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg,
+                                                     ::uwvm2::runtime::lib::lazy_compile_and_run_main_module);
 # else
                         ::fast_io::io::perr(
                             ::uwvm2::uwvm::io::u8log_output,
@@ -1955,7 +1997,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // Full compile with the uwvm-int interpreter backend.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
-                                ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;
                             }
@@ -2008,7 +2050,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // runtime library from the globally configured runtime-mode storage.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
-                                ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;
                             }
@@ -2047,16 +2089,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-# if defined(UWVM_RUNTIME_LLVM_JIT)
-        // Normal executable-mode exit must release LLVM JIT runtime state before
-        // process teardown. The runtime library intentionally avoids destroying
-        // MCJIT objects from static destructors, because they can run after other
-        // LLVM globals have already started tearing down. Cleaning here keeps
-        // sanitizer builds from reporting the live runtime-owned LLVM graph as a
-        // process-exit leak while preserving the defensive static-destruction
-        // guard for abnormal exit paths.
-        ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
-# endif
+        // Normal executable-mode exit invalidates backend-neutral caches, stops
+        // lazy workers, and releases selected-backend artifacts before their
+        // runtime module storage is destroyed.
+        ::uwvm2::runtime::lib::reset_runtime_state_host_api();
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
 #endif

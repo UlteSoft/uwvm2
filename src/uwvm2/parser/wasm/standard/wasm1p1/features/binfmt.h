@@ -59,6 +59,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         inline static constexpr bool allow_multi_result_vector{true};
         inline static constexpr bool allow_multi_table{true};
 
+        using code_version = ::uwvm2::parser::wasm::concepts::operation::type_replacer<
+            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_code_version>;
+
         using value_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::value_type,
                                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>;
 
@@ -94,6 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     };
 
     static_assert(::uwvm2::parser::wasm::concepts::wasm_feature<wasm1p1>);
+    static_assert(::uwvm2::parser::wasm::binfmt::ver1::has_code_version_reserve_type<wasm1p1>);
     static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_value_type<wasm1p1>);
     static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_table_type<wasm1p1>);
     static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_global_type<wasm1p1>);

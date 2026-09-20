@@ -31,6 +31,7 @@
 # include <limits>
 # include <memory>
 # include <type_traits>
+# include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -394,6 +395,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             using wasm_f32 [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
             using wasm_f64 [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
             static_assert(sizeof(Scalar) <= sizeof(wasm_v128));
+
+# if defined(__GNUC__) && !defined(__clang__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)
+            // For GCC vector ABIs, construct the complete carrier in a vector register.
+            // GCC otherwise lowers the zero-initialize + low-lane memcpy
+            // fallback to a 16-byte stack store/reload on AArch64 (and some x86-64
+            // paths), even after inlining.  Vector aggregate initialization has the
+            // same low-lane/zero-upper-lanes representation on little-endian targets.
+            if constexpr(::std::endian::native != ::std::endian::big)
+            {
+                if constexpr(::std::same_as<Scalar, wasm_f32>)
+                {
+                    using float32x4_t [[__gnu__::__vector_size__(16)]] = wasm_f32;
+                    return ::std::bit_cast<wasm_v128>(float32x4_t{v, 0.0f, 0.0f, 0.0f});
+                }
+                else if constexpr(::std::same_as<Scalar, wasm_f64>)
+                {
+                    using float64x2_t [[__gnu__::__vector_size__(16)]] = wasm_f64;
+                    return ::std::bit_cast<wasm_v128>(float64x2_t{v, 0.0});
+                }
+            }
+# endif
 
 # if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
 #  if UWVM_HAS_BUILTIN(__builtin_shufflevector)

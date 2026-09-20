@@ -34,6 +34,14 @@ namespace uwvm2::runtime::lib
 
     extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept {}
 
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept {}
+
+    extern "C++" void reset_runtime_state_host_api() noexcept {}
+
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+    extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept { reset_runtime_state_host_api(); }
+#endif
+
     extern "C++" ::std::size_t preload_memory_descriptor_count_host_api() noexcept { return 0uz; }
 
     extern "C++" bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index,

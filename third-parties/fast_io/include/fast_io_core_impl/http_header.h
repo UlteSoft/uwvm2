@@ -59,6 +59,17 @@ print_alias_define(io_alias_t, basic_http_header_buffer<ch_type, buffer_size> co
 	return {b.buffer, b.header_length};
 }
 
+/// @brief Proves that an HTTP header buffer's print scatter is backed by its source object.
+/// @details `buffer` is an inline array member and `header_length` merely selects a prefix. Alias construction neither
+///          allocates nor invokes parsing, so another alias operation cannot relocate or overwrite this object's
+///          characters. The descriptor therefore remains valid for the lifetime of the enclosing source object.
+template <::std::integral char_type, ::std::size_t buffer_size>
+inline constexpr ::std::true_type print_borrowed_scatter_source(
+	io_reserve_type_t<char_type, basic_http_header_buffer<char_type, buffer_size>>) noexcept
+{
+	return {};
+}
+
 namespace details
 {
 template <::std::integral ch_type, ::std::size_t buffer_size, ::std::integral char_type>

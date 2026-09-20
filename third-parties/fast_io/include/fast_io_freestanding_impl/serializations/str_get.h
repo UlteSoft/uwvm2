@@ -6,6 +6,9 @@ namespace fast_io
 namespace manipulators
 {
 
+/// @brief Hidden carrier for reading exactly `n` code units into a string-like destination.
+/// @details `reference` is the destination adapter selected by `io_strlike_ref`; `n` is an exact count rather than a
+///          delimiter or capacity. Context scanning may fill the destination across multiple input chunks.
 template <typename T>
 struct basic_str_get_all
 {
@@ -21,6 +24,9 @@ struct basic_str_get_all
 	::std::size_t n;
 };
 
+/// @brief Reads exactly `n` code units into a mutable string-like destination.
+/// @details The destination is reset/reserved by the scanner and input is copied without whitespace or delimiter
+///          interpretation. End of input before `n` code units is incomplete/failure under the scan protocol.
 template <typename T>
 inline constexpr auto str_get_all(T &reference, ::std::size_t n) noexcept
 {
@@ -90,6 +96,7 @@ scan_context_define_str_get_all_general_strlike_impl(char_type const *first, cha
 } // namespace details
 
 template <::std::integral char_type, typename T>
+	requires ::fast_io::strlike<char_type, T>
 inline constexpr io_type_t<
 	::std::conditional_t<::fast_io::buffer_strlike<char_type, T>, ::fast_io::details::str_get_all_context,
 						 ::fast_io::details::basic_concat_buffer<char_type>>>
@@ -101,6 +108,7 @@ scan_context_type(
 }
 
 template <::std::integral char_type, typename ctxtype, typename T>
+	requires ::fast_io::strlike<char_type, T>
 inline constexpr parse_result<char_type const *> scan_context_define(
 	io_reserve_type_t<char_type,
 					  ::fast_io::manipulators::basic_str_get_all<io_strlike_reference_wrapper<char_type, T>>>,
@@ -120,6 +128,7 @@ inline constexpr parse_result<char_type const *> scan_context_define(
 }
 
 template <::std::integral char_type, typename ctxtype, typename T>
+	requires ::fast_io::strlike<char_type, T>
 inline constexpr parse_code scan_context_eof_define(
 	io_reserve_type_t<char_type,
 					  ::fast_io::manipulators::basic_str_get_all<io_strlike_reference_wrapper<char_type, T>>>,

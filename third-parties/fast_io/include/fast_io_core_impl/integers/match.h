@@ -5,6 +5,9 @@ namespace fast_io
 
 namespace manipulators
 {
+/// @brief Hidden scan carrier that requires input to match an exact character sequence.
+/// @details `reference` normally holds a borrowed scatter. Context scanning retains matched-prefix state across chunks;
+///          success consumes exactly the requested sequence and produces no separate value.
 template <typename T>
 struct basic_matcher_t
 {
@@ -84,6 +87,9 @@ scan_alias_define(io_alias_t, char_type const (&s)[n]) noexcept
 #if 0
 namespace manipulators
 {
+/// @brief Disabled range factory for an exact-match scanner.
+/// @details The template is not part of the active API; if enabled it would borrow a contiguous range as the required
+///          character sequence.
 template<typename rg>
 //requires (::std::integral<::std::ranges::range_value_t<rg>>)
 inline constexpr manipulators::basic_matcher_t<basic_io_scatter_t<::std::ranges::range_value_t<rg>>> mtvw(rg&& r) noexcept

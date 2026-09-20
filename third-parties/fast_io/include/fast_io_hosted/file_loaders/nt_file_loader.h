@@ -107,7 +107,15 @@ inline ::std::size_t nt_file_loader_get_page_size()
 	return 4096u;
 }
 
+// The NT current-process pseudo-handle is a runtime bit-pattern, not a pre-C++23 constant expression: converting its
+// signed sentinel to a pointer is rejected while defining a constexpr function under the older constexpr rules.
+// P2448R2 deliberately relaxes that definition rule, advertised by __cpp_constexpr >= 202207L, so retain constexpr
+// exactly where the language permits it without weakening the C++20 Windows build.
+#if defined(__cpp_constexpr) && __cpp_constexpr >= 202207L
 inline constexpr void *nt_file_loader_current_process() noexcept
+#else
+inline void *nt_file_loader_current_process() noexcept
+#endif
 {
 	return reinterpret_cast<void *>(static_cast<::std::ptrdiff_t>(-1));
 }
@@ -633,6 +641,12 @@ public:
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
+		if (this->storage.address_end == this->storage.address_capacity)
+		{
+			// Avoid subtraction for the null disengaged state. A live unpadded mapping also has equal endpoints and
+			// correctly advertises zero additional readable characters.
+			return 0u;
+		}
 		return static_cast<::std::size_t>(storage.address_capacity - storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
@@ -823,9 +837,32 @@ public:
 
 template <::fast_io::nt_family family>
 inline constexpr basic_io_scatter_t<char> print_alias_define(::fast_io::io_alias_t,
-															 nt_family_file_loader<family> const &load) noexcept
+														 nt_family_file_loader<family> const &load) noexcept
 {
 	return {load.data(), load.size()};
+}
+
+/// @brief Reports readable tail characters while preserving the NT mapping's real file endpoint.
+/// @details Every family specialization stores the semantic EOF in `address_end` and the end of the explicitly
+///          reserved file-plus-padding view in `address_capacity`. Returning their difference models
+///          `contiguous_range_with_padding` for both NT and Zw spellings without granting access to page rounding or
+///          changing `end()`.
+template <::fast_io::nt_family family>
+inline constexpr ::std::size_t
+contiguous_range_padding_size(nt_family_file_loader<family> const &load) noexcept
+{
+	return load.padding_size();
+}
+
+/// @brief Marks an NT-family file loader as the owner of its print-alias mapping.
+/// @details The family parameter changes the system-call spelling, not ownership: every specialization retains its
+///          mapped address until `close`, `release`, or destruction. Alias construction invokes none of those state
+///          transitions, so its descriptor remains valid while the source participates in the enclosing print.
+template <::fast_io::nt_family family>
+inline constexpr ::std::true_type
+print_borrowed_scatter_source(io_reserve_type_t<char, nt_family_file_loader<family>>) noexcept
+{
+	return {};
 }
 
 using nt_file_loader = nt_family_file_loader<::fast_io::nt_family::nt>;

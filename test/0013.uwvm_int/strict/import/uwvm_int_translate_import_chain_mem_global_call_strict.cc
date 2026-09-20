@@ -31,20 +31,21 @@ namespace
     // Minimal imported-call bridge:
     // - compiler encodes imported calls as (module_id=compile_option.curr_wasm_id, call_function=funcidx)
     // - in this test, the only imported function is funcidx=0 with signature (i32,i32)->i32, implemented as `a+b`.
-    static void UWVM2TEST_WASM_ABI imported_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        imported_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != g_expected_wasm_id) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(call_function != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         // stack layout: [a(i32), b(i32)] (top points past b)
-        ::std::byte* const top = *stack_top_ptr;
+        ::std::byte* const top = stack_top;
         ::std::byte* const base = top - 8;
         ::std::uint32_t const a = load_u32(base);
         ::std::uint32_t const b = load_u32(base + 4);
         ::std::uint32_t const r = a + b;
         store_u32(base, r);
-        *stack_top_ptr = base + 4;
+        return base + 4;
     }
 
     [[nodiscard]] byte_vec build_modC()

@@ -19,7 +19,13 @@ if(local_func_count != 0uz)
                                  case wasm_value_type::i64:
                                  case wasm_value_type::f64:
                                      return 8uz;
-                                 // Keep the metadata writer fail-closed when a non-scalar type reaches this path.
+                                 case wasm_value_type::v128:
+                                     return sizeof(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128);
+                                 case wasm_value_type::funcref:
+                                     return sizeof(::uwvm2::object::global::wasm_funcref_t);
+                                 case wasm_value_type::externref:
+                                     return sizeof(::uwvm2::object::global::wasm_externref_t);
+                                 // Keep the metadata writer fail-closed when an unknown future type reaches this path.
                                  [[unlikely]] default:
                                      return 0uz;
                              }

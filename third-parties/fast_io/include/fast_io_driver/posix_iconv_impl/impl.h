@@ -267,6 +267,9 @@ inline void reset_state(posix_iconv_io_observer piciob)
 namespace manipulators
 {
 
+/// @brief Hidden carrier for transcoding a borrowed byte scatter through an existing POSIX iconv descriptor.
+/// @details `cd` is borrowed state and may be stateful; `reference` supplies source bytes. The descriptor and source
+///          storage must remain valid and must not be used concurrently without external synchronization.
 template <typename T>
 struct iconv_code_cvt_t
 {
@@ -275,6 +278,11 @@ struct iconv_code_cvt_t
 	T reference;
 };
 
+/// @brief Transcodes a character scatter using an existing POSIX iconv conversion descriptor.
+/// @details `scatter.base` is reinterpreted as bytes, but `scatter.len` is forwarded unchanged as the byte count. Thus
+///          this overload consumes the expected extent for one-byte code units; for wider code units it consumes only
+///          `len` bytes, not `len * sizeof(char_type)`. Use the range overload when full wide-code-unit byte extent is
+///          required. No ownership is taken and descriptor state may advance.
 template <::std::integral char_type>
 constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer piiob,
 														basic_io_scatter_t<char_type> scatter) noexcept
@@ -282,6 +290,9 @@ constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer 
 	return {piiob.cd, scatter};
 }
 
+/// @brief Transcodes a contiguous integral range through an existing POSIX iconv descriptor.
+/// @details Arrays exclude their conventional final terminator; other ranges consume their complete object-byte extent.
+///          The source and iconv descriptor are borrowed.
 template <typename rg>
 	requires(::std::ranges::contiguous_range<::std::remove_cvref_t<rg>> &&
 			 ::std::integral<::std::ranges::range_value_t<::std::remove_cvref_t<rg>>>)
@@ -301,6 +312,8 @@ constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer 
 	}
 }
 
+/// @brief Transcodes a character-view pointer through an existing POSIX iconv descriptor.
+/// @details Source length is determined by a string view and excludes the terminator; the source remains borrowed.
 template <::std::integral char_type>
 constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer piiob,
 														chvw_t<char_type const *> t) noexcept
@@ -308,6 +321,8 @@ constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer 
 	::fast_io::freestanding::basic_string_view<char_type> view(t.reference);
 	return {piiob.cd, {view.data(), sizeof(char_type) * view.size()}};
 }
+/// @brief Computes a conservative converted-output reserve for an iconv carrier.
+/// @details The hidden CPO uses an eightfold byte expansion bound and terminates if the multiplication would overflow.
 template <::std::integral char_type>
 inline ::std::size_t print_reserve_size(io_reserve_type_t<char_type, iconv_code_cvt_t<io_scatter_t>>,
 										iconv_code_cvt_t<io_scatter_t> v) noexcept
@@ -321,6 +336,8 @@ inline ::std::size_t print_reserve_size(io_reserve_type_t<char_type, iconv_code_
 	return v.reference.len * 8 / sizeof(char_type);
 }
 
+/// @brief Returns the stack staging size used by dynamic iconv reserve output.
+/// @details The result is type-based and independent of descriptor state or source contents.
 template <::std::integral char_type>
 inline constexpr ::std::size_t
 print_reserve_static_stack_size(io_reserve_type_t<char_type, iconv_code_cvt_t<io_scatter_t>>) noexcept
@@ -328,6 +345,10 @@ print_reserve_static_stack_size(io_reserve_type_t<char_type, iconv_code_cvt_t<io
 	return ::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>();
 }
 
+/// @brief Intended hidden reserve emitter for iconv conversion into a contiguous output iterator.
+/// @details In the current declaration `Iter` is neither declared nor a template parameter, so this customization is
+///          ill-formed when the optional header is compiled and no emitted-result contract is presently usable. The
+///          function body shows the intended byte-to-code-unit end calculation but must not be treated as available API.
 template <::std::integral char_type>
 inline Iter print_reserve_define(io_reserve_type_t<char_type, iconv_code_cvt_t<io_scatter_t>>, Iter iter,
 								 iconv_code_cvt_t<io_scatter_t> v) noexcept

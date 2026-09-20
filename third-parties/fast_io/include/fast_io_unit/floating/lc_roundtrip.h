@@ -2,6 +2,8 @@
 
 namespace fast_io::details
 {
+inline constexpr auto lc_roundtrip_size_max{(::std::numeric_limits<::std::size_t>::max)()};
+
 // let the compiler pick the best calling convention.
 template <::std::integral char_type, my_unsigned_integral U>
 inline constexpr char_type *lc_print_rsv_fp_dgs_common_decay_impl(char_type const *decimal_point_base,
@@ -192,7 +194,7 @@ grouping_handle_buffer_internal(srcIter first, srcIter last, destIter dest, ::st
 }
 
 template <::std::size_t digits, ::std::random_access_iterator srcIter, ::std::random_access_iterator destIter>
-	requires(digits < (SIZE_MAX >> 1u))
+	requires(digits < (lc_roundtrip_size_max >> 1u))
 inline constexpr destIter grouping_handle_buffer(srcIter first, srcIter last, destIter dest,
 												 ::std::size_t const *grouping_base, ::std::size_t grouping_len,
 												 ::std::iter_value_t<destIter> const *thousands_sep_base,
@@ -257,12 +259,15 @@ inline constexpr char_type *lc_print_rsv_fp_fixed_decision_impl(basic_lc_all<cha
 																::std::int_least32_t e10) noexcept
 {
 	auto const &numeric_ref{all->numeric};
-	auto thousands_sep{numeric_ref.thousands_sep};
+	auto const thousands_sep{
+		::fast_io::details::lc_resolve_scatter(all, numeric_ref.thousands_sep)};
 	auto thousands_sep_base{thousands_sep.base};
 	auto thousands_sep_len{thousands_sep.len};
-	auto grouping{numeric_ref.grouping};
+	auto const grouping{::fast_io::details::lc_resolve_scatter(all, numeric_ref.grouping)};
 	auto grouping_base{grouping.base};
 	auto grouping_len{grouping.len};
+	auto const decimal_point{
+		::fast_io::details::lc_resolve_scatter(all, numeric_ref.decimal_point)};
 	::std::int_least32_t olength(static_cast<::std::int_least32_t>(chars_len<10, true>(m10)));
 	::std::int_least32_t const real_exp(static_cast<::std::int_least32_t>(e10 + olength - 1));
 	bool no_grouping_grouping_case{
@@ -288,18 +293,18 @@ inline constexpr char_type *lc_print_rsv_fp_fixed_decision_impl(basic_lc_all<cha
 		if (no_grouping_grouping_case)
 		{
 			return lc_no_grouping_fixed_case1_integer_and_point<flt>(iter, m10, {olength, real_exp},
-																	 numeric_ref.decimal_point);
+															 decimal_point);
 		}
 		else
 		{
 			return lc_grouping_fixed_case1_integer_and_point<flt>(iter, m10, {olength, real_exp},
-																  numeric_ref.decimal_point, grouping_base,
+														  decimal_point, grouping_base,
 																  grouping_len, thousands_sep_base, thousands_sep_len);
 		}
 	}
 	else
 	{
-		return lc_grouping_fixed_case2_all_point<flt>(iter, m10, {olength, real_exp}, numeric_ref.decimal_point);
+		return lc_grouping_fixed_case2_all_point<flt>(iter, m10, {olength, real_exp}, decimal_point);
 	}
 }
 
@@ -310,7 +315,17 @@ inline constexpr char_type *lc_print_rsv_fp_decision_impl(basic_lc_all<char_type
 {
 	if constexpr (mt == ::fast_io::manipulators::floating_format::general)
 	{
-		if (-5 < e10 && e10 < 7)
+		auto const length{static_cast<::std::int_least32_t>(
+			chars_len<10, true>(m10))};
+		auto const scientific_exponent{
+			static_cast<::std::int_least32_t>(e10 + length - 1)};
+		/*
+		Locale grouping changes only the code-unit layout of the chosen fixed
+		coefficient; it does not change the abstract decimal exponent.  Therefore
+		the same -4<=X<6 predicate as the non-locale emitter is necessary and
+		sufficient for notation equivalence.
+		*/
+		if (-4 <= scientific_exponent && scientific_exponent < 6)
 		{
 			return lc_print_rsv_fp_fixed_decision_impl<flt>(all, iter, m10, e10);
 		}
@@ -329,7 +344,9 @@ inline constexpr char_type *lc_print_rsv_fp_decision_impl(basic_lc_all<char_type
 			::std::uint_least32_t olength{static_cast<::std::uint_least32_t>(chars_len<10, true>(m10))};
 			::std::uint_least32_t sz{static_cast<::std::uint_least32_t>(olength - 1u)};
 			e10 += static_cast<::std::int_least32_t>(sz);
-			iter = lc_print_rsv_fp_dgs_common_impl(all->numeric.decimal_point, iter, m10, olength);
+			auto const decimal_point{::fast_io::details::lc_resolve_scatter(
+				all, all->numeric.decimal_point)};
+			iter = lc_print_rsv_fp_dgs_common_impl(decimal_point, iter, m10, olength);
 		}
 		return print_rsv_fp_e_impl<flt, uppercase_e>(iter, e10);
 	}
@@ -357,21 +374,25 @@ inline constexpr char_type *lc_print_rsv_fp_decision_impl(basic_lc_all<char_type
 			fixed_length = static_cast<::std::uint_least32_t>(static_cast<::std::uint_least32_t>(-real_exp) +
 															  static_cast<::std::uint_least32_t>(olength) + 1u);
 		}
-		::std::uint_least32_t scientific_length{
-			static_cast<::std::uint_least32_t>(olength == 1 ? olength + 3 : olength + 5)};
+		auto const scientific_length{
+			::fast_io::details::print_rsv_fp_scientific_length(
+				real_exp, static_cast<::std::size_t>(olength))};
 		auto const &numeric_ref{all->numeric};
+		auto const decimal_point{
+			::fast_io::details::lc_resolve_scatter(all, numeric_ref.decimal_point)};
 		if (scientific_length < fixed_length)
 		{
 			// scientific decision
-			iter = lc_print_rsv_fp_decimal_common_impl(numeric_ref.decimal_point, iter, m10,
+			iter = lc_print_rsv_fp_decimal_common_impl(decimal_point, iter, m10,
 													   static_cast<::std::uint_least32_t>(olength));
 			return print_rsv_fp_e_impl<flt, uppercase_e>(iter, real_exp);
 		}
 		// fixed decision
-		auto thousands_sep{numeric_ref.thousands_sep};
+		auto const thousands_sep{
+			::fast_io::details::lc_resolve_scatter(all, numeric_ref.thousands_sep)};
 		auto thousands_sep_base{thousands_sep.base};
 		auto thousands_sep_len{thousands_sep.len};
-		auto grouping{numeric_ref.grouping};
+		auto const grouping{::fast_io::details::lc_resolve_scatter(all, numeric_ref.grouping)};
 		auto grouping_base{grouping.base};
 		auto grouping_len{grouping.len};
 		bool no_grouping_grouping_case{
@@ -399,19 +420,19 @@ inline constexpr char_type *lc_print_rsv_fp_decision_impl(basic_lc_all<char_type
 			if (no_grouping_grouping_case)
 			{
 				return lc_no_grouping_fixed_case1_integer_and_point<flt>(iter, m10, {olength, real_exp},
-																		 numeric_ref.decimal_point);
+															 decimal_point);
 			}
 			else
 			{
 				return lc_grouping_fixed_case1_integer_and_point<flt>(
-					iter, m10, {olength, real_exp}, numeric_ref.decimal_point, grouping_base, grouping_len,
+					iter, m10, {olength, real_exp}, decimal_point, grouping_base, grouping_len,
 					thousands_sep_base, thousands_sep_len);
 			}
 		}
 		default:
 		{
 			return lc_grouping_fixed_case2_all_point<flt>(iter, m10, {olength, real_exp},
-														  numeric_ref.decimal_point);
+														  decimal_point);
 		}
 		}
 	}
@@ -453,7 +474,11 @@ inline constexpr char_type *lc_print_rsvflt_define_impl(basic_lc_all<char_type> 
 				return prsv_fp_dece0<uppercase>(iter);
 			}
 		}
-		auto [m10, e10] = dragonbox_impl<flt>(mantissa, static_cast<::std::int_least32_t>(exponent));
+		// Nearest-to-even is sign-symmetric, but the shared conversion entry models
+		// sign explicitly for directed policies.  Forward the decoded bit so this
+		// locale path obeys the same complete conversion contract.
+		auto [m10, e10] =
+			dragonbox_impl<flt>(mantissa, static_cast<::std::int_least32_t>(exponent), sign);
 		if constexpr (mt == ::fast_io::manipulators::floating_format::fixed)
 		{
 			return lc_print_rsv_fp_fixed_decision_impl<flt>(all, iter, m10, e10);

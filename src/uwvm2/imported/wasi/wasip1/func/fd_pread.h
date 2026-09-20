@@ -109,6 +109,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<4uz>(iovs, u8"fd_pread.iovs (iovec)");
+        check_wasip1_guest_pointer_alignment<4uz>(nread, u8"fd_pread.nread (size)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

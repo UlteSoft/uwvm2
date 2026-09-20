@@ -1,5 +1,8 @@
 #include "../uwvm_int_translate_strict_common.h"
 
+#include <cmath>
+#include <limits>
+
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
@@ -132,6 +135,15 @@ namespace
         UWVM2TEST_REQUIRE(run_i32_from_f32(5, 3.0f) == 3);
         UWVM2TEST_REQUIRE(run_i32_from_f64(6, -5.0) == -5);
         UWVM2TEST_REQUIRE(run_i32_from_f64(7, 7.0) == 7);
+
+        // Exact trapping-conversion edges for the fused local.get paths.
+        UWVM2TEST_REQUIRE(run_i32_from_f32(4, -2147483648.0f) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i32_from_f32(5, -0.5f) == 0);
+        UWVM2TEST_REQUIRE(run_i32_from_f32(5, ::std::nextafter(-1.0f, 0.0f)) == 0);
+        UWVM2TEST_REQUIRE(run_i32_from_f64(6, -2147483648.5) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i32_from_f64(6, ::std::nextafter(-2147483649.0, 0.0)) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i32_from_f64(7, -0.5) == 0);
+        UWVM2TEST_REQUIRE(run_i32_from_f64(7, ::std::nextafter(-1.0, 0.0)) == 0);
 
         return 0;
     }

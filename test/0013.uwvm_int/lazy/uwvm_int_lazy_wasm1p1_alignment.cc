@@ -43,7 +43,7 @@ namespace
         para.disable_reference_types = !reference_types;
         para.disable_bulk_memory = !bulk_memory;
         para.controllable_allow_multi_result_vector = para.disable_multi_value;
-        para.controllable_allow_multi_table = para.disable_reference_types;
+        para.controllable_allow_multi_table = false;
         return out;
     }
 
@@ -117,6 +117,59 @@ namespace
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
         return mb.build();
     }
+
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    [[nodiscard]] byte_vec build_extended_immediates_before_direct_call_module()
+    {
+        module_builder mb{};
+        mb.has_table = true;
+        mb.table_min = 1u;
+        mb.table_has_max = true;
+        mb.table_max = 1u;
+
+        auto op = [](byte_vec& c, wasm_op o) { strict::append_u8(c, u8(o)); };
+        auto op1p1 = [](byte_vec& c, strict::wasm1p1_op o) { strict::append_u8(c, strict::u8(o)); };
+        auto ext = [&](byte_vec& c, strict::wasm1p1_numeric_op o)
+        {
+            op1p1(c, strict::wasm1p1_op::numeric_prefix);
+            strict::append_u32_leb(c, strict::u32(o));
+        };
+        auto simd = [&](byte_vec& c, strict::wasm1p1_simd_op o)
+        {
+            op1p1(c, strict::wasm1p1_op::simd_prefix);
+            strict::append_u32_leb(c, strict::u32(o));
+        };
+
+        func_type caller_type{{}, {}};
+        func_body caller{};
+        auto& c{caller.code};
+        op(c, wasm_op::unreachable);
+
+        // Exercise each proposal-immediate family that previously confused the shallow raw-body scan.
+        op1p1(c, strict::wasm1p1_op::select_t);
+        strict::append_u32_leb(c, 1u);
+        strict::append_u8(c, k_val_i32);
+        ext(c, strict::wasm1p1_numeric_op::table_fill);
+        strict::append_u32_leb(c, 0u);
+        op1p1(c, strict::wasm1p1_op::ref_null);
+        strict::append_u8(c, 0x70u);  // funcref
+        op(c, wasm_op::drop);
+        simd(c, strict::wasm1p1_simd_op::v128_const);
+        for(unsigned i{}; i != 16u; ++i) { strict::append_u8(c, 0u); }
+        op(c, wasm_op::drop);
+        op(c, wasm_op::call);
+        strict::append_u32_leb(c, 1u);
+        op(c, wasm_op::end);
+
+        func_type callee_type{{}, {}};
+        func_body callee{};
+        op(callee.code, wasm_op::end);
+
+        (void)mb.add_func(::std::move(caller_type), ::std::move(caller));
+        (void)mb.add_func(::std::move(callee_type), ::std::move(callee));
+        return mb.build();
+    }
+#endif
 
     [[nodiscard]] byte_vec build_typeidx_block_multivalue_repair_module()
     {
@@ -426,24 +479,35 @@ namespace
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
-    [[nodiscard]] int compile_select_empty_and_run(lazy_validation_mode_t validation_mode)
+    [[nodiscard]] int compile_select_empty_expect_failure(lazy_validation_mode_t validation_mode)
     {
         auto const module_name{validation_mode == lazy_validation_mode_t::validate_on_lazy_compile
                                    ? literal_view(u8"uwvm2test_lazy_wasm1p1_select_validate")
                                    : literal_view(u8"uwvm2test_lazy_wasm1p1_select_assume")};
-        auto features{make_alignment_feature_parameter(false, false, true)};
+        auto features{make_alignment_feature_parameter(false, true, true)};
         auto wasm{build_select_t_empty_result_types_module()};
         auto prep{prepare_runtime_from_wasm(wasm, module_name, {}, features)};
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
 
         auto storage{initialize_lazy_storage(*prep.mod, small_code_size_split_config())};
-        UWVM2TEST_REQUIRE(compile_primary_lazy_function<Opt>(prep, storage, module_name, validation_mode) == 0);
+        UWVM2TEST_REQUIRE(storage.functions.size() == 1uz);
+        auto const& fn{storage.functions.index_unchecked(0)};
+        UWVM2TEST_REQUIRE(fn.primary_cu_index != SIZE_MAX);
 
-        auto rr{run_compiled_local_func<Opt>(storage,
-                                             0uz,
-                                             prep.mod->local_defined_function_vec_storage.index_unchecked(0),
-                                             strict::pack_no_params())};
-        UWVM2TEST_REQUIRE(load_i32(rr.results) == 7);
+        auto options{make_lazy_options(module_name, validation_mode)};
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        try
+        {
+            compile_lazy_cu<Opt>(*prep.mod, storage, options, fn.primary_cu_index, err);
+        }
+        catch(::fast_io::error const&)
+        {}
+        catch(...)
+        {
+            return strict::fail(__LINE__, "unexpected exception type");
+        }
+
+        UWVM2TEST_REQUIRE(err.err_code == errc::invalid_const_immediate);
         return 0;
     }
 
@@ -479,17 +543,77 @@ namespace
         return 0;
     }
 
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    [[nodiscard]] int collect_direct_callee_after_extended_immediates()
+    {
+        auto const module_name{literal_view(u8"uwvm2test_lazy_llvm_extended_immediate_callee_scan")};
+        auto features{make_alignment_feature_parameter(true, true, true)};
+        auto wasm{build_extended_immediates_before_direct_call_module()};
+        auto prep{prepare_runtime_from_wasm(wasm, module_name, {}, features)};
+        UWVM2TEST_REQUIRE(prep.mod != nullptr);
+
+        ::uwvm2::utils::container::vector<::std::size_t> callees{};
+        UWVM2TEST_REQUIRE(lazy::collect_direct_defined_callees(*prep.mod, 0uz, callees, ::std::addressof(features)));
+        UWVM2TEST_REQUIRE(callees.size() == 1uz);
+        UWVM2TEST_REQUIRE(callees.index_unchecked(0uz) == 1uz);
+        return 0;
+    }
+
+    [[nodiscard]] int reject_truncated_raw_instructions_transactionally()
+    {
+        auto features{make_alignment_feature_parameter(true, true, true)};
+        auto const expect_failure_without_commit{
+            [&](auto const& bytes)
+            {
+                auto const* const begin{bytes};
+                auto const* cursor{begin};
+                auto const* const end{begin + sizeof(bytes) / sizeof(bytes[0])};
+                return !lazy::details::skip_wasm_instruction_for_direct_call_scan(
+                           cursor, end, ::std::addressof(features)) &&
+                       cursor == begin;
+            }};
+
+        // memarg has alignment but no offset.
+        ::std::byte const truncated_memarg[]{static_cast<::std::byte>(u8(wasm_op::i32_load)), ::std::byte{0x00}};
+        UWVM2TEST_REQUIRE(expect_failure_without_commit(truncated_memarg));
+
+        // typed select declares one result type but omits that byte.
+        ::std::byte const truncated_typed_select[]{static_cast<::std::byte>(strict::u8(strict::wasm1p1_op::select_t)), ::std::byte{0x01}};
+        UWVM2TEST_REQUIRE(expect_failure_without_commit(truncated_typed_select));
+
+        // call_indirect has a complete typeidx followed by an unterminated tableidx ULEB128.
+        ::std::byte const truncated_call_indirect[]{static_cast<::std::byte>(u8(wasm_op::call_indirect)),
+                                                    ::std::byte{0x00},
+                                                    ::std::byte{0x80}};
+        UWVM2TEST_REQUIRE(expect_failure_without_commit(truncated_call_indirect));
+
+        // v128.const carries exactly 16 payload bytes; provide only 15.
+        ::std::byte truncated_v128_const[17]{};
+        truncated_v128_const[0] = static_cast<::std::byte>(strict::u8(strict::wasm1p1_op::simd_prefix));
+        truncated_v128_const[1] = static_cast<::std::byte>(strict::u32(strict::wasm1p1_simd_op::v128_const));
+        UWVM2TEST_REQUIRE(expect_failure_without_commit(truncated_v128_const));
+
+        ::std::byte const unknown_opcode[]{::std::byte{0xff}};
+        UWVM2TEST_REQUIRE(expect_failure_without_commit(unknown_opcode));
+        return 0;
+    }
+#endif
+
     [[nodiscard]] int test_lazy_wasm1p1_alignment()
     {
         configure_unexpected_traps();
 
         constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-        UWVM2TEST_REQUIRE(compile_select_empty_and_run<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);
-        UWVM2TEST_REQUIRE(compile_select_empty_and_run<opt>(lazy_validation_mode_t::assume_full_code_verified) == 0);
+        UWVM2TEST_REQUIRE(compile_select_empty_expect_failure<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);
+        UWVM2TEST_REQUIRE(compile_select_empty_expect_failure<opt>(lazy_validation_mode_t::assume_full_code_verified) == 0);
         UWVM2TEST_REQUIRE(compile_table_fill_bulk_only<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);
         UWVM2TEST_REQUIRE(compile_table_fill_bulk_only<opt>(lazy_validation_mode_t::assume_full_code_verified) == 0);
         UWVM2TEST_REQUIRE(compile_ref_is_null_unknown_operand<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);
         UWVM2TEST_REQUIRE(compile_ref_is_null_unknown_operand<opt>(lazy_validation_mode_t::assume_full_code_verified) == 0);
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(collect_direct_callee_after_extended_immediates() == 0);
+        UWVM2TEST_REQUIRE(reject_truncated_raw_instructions_transactionally() == 0);
+#endif
         UWVM2TEST_REQUIRE(compile_typeidx_block_multivalue_and_run<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);
         UWVM2TEST_REQUIRE(compile_typeidx_block_multivalue_and_run<opt>(lazy_validation_mode_t::assume_full_code_verified) == 0);
         UWVM2TEST_REQUIRE(compile_typeidx_loop_param_and_run<opt>(lazy_validation_mode_t::validate_on_lazy_compile) == 0);

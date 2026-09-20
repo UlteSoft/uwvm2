@@ -674,6 +674,40 @@ inline constexpr ::fast_io::basic_io_scatter_t<char_type> print_alias_define(::f
 	return {str.ptr, str.n};
 }
 
+/// @brief Proves that a stored fast_io string view's print scatter is stable for the enclosing range write.
+/// @details The proof is attached to the source view type, not to `basic_io_scatter_t` globally. This distinction is
+///          required because an arbitrary alias customization may return the same scatter type while reusing mutable
+///          scratch storage between elements.
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_borrowed_scatter_source(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_string_view<char_type>>) noexcept
+{
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_eager_materialization_safe(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_string_view<char_type>>) noexcept
+{
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_scatter_output_state_independent(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_string_view<char_type>>) noexcept
+{
+	// The alias operation reads only `ptr` and `n`; publishing an unrelated destination cursor cannot change it.
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_scatter_direct_print_equivalent(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_string_view<char_type>>) noexcept
+{
+	// Printing this view has no semantics beyond emitting its stored `[ptr, ptr+n)` character sequence.
+	return {};
+}
+
 template <::std::integral char_type>
 inline constexpr ::std::size_t
 print_reserve_size(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_string_view<char_type>>,

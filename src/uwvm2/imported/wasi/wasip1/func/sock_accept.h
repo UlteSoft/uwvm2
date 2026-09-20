@@ -153,6 +153,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                ::std::endian::native == ::std::endian::little && is_default_wasi_addr_ip4_data_layout() && is_default_wasi_addr_ip6_data_layout();
     }
 
+    // Historical host-side description only.  The WASIX guest result serialized below is `u8 tag + u8 padding + u8 octs[18]`, whose alignment is 1;
+    // never infer the required alignment of ro_addr_ptrsz from this naturally two-byte-aligned C++ type.
     struct wasi_addr_port_t
     {
         wasi_addr_t addr;
@@ -190,6 +192,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 
         auto& memory{*env.wasip1_memory};
+
+        check_wasip1_guest_pointer_alignment<4uz>(ro_fd_ptrsz, u8"sock_accept.ro_fd (fd)");
 
         auto const trace_wasip1_call{env.trace_wasip1_call};
 

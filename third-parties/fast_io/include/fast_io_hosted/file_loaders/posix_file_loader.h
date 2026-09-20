@@ -403,6 +403,12 @@ public:
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
+		if (this->storage.address_end == this->storage.address_capacity)
+		{
+			// The unpadded empty mapping uses an implementation sentinel and the disengaged state uses null. Equality
+			// identifies both without subtracting pointers which do not denote elements of a C++ array object.
+			return 0u;
+		}
 		return static_cast<::std::size_t>(this->storage.address_capacity - this->storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
@@ -568,6 +574,27 @@ public:
 inline constexpr basic_io_scatter_t<char> print_alias_define(io_alias_t, posix_file_loader const &load) noexcept
 {
 	return {load.data(), load.size()};
+}
+
+/// @brief Reports the explicitly requested readable suffix of a POSIX file mapping.
+/// @details The mapping implementation may round OS reservations to pages, but `address_capacity` records
+///          `address_end + extra_bytes`, not the rounded reservation end. The returned value therefore grants exactly
+///          the caller-requested character extent, keeps `address_end` as the real file EOF, and exposes no incidental
+///          page slack to a padded scanner.
+inline constexpr ::std::size_t
+contiguous_range_padding_size(posix_file_loader const &load) noexcept
+{
+	return load.padding_size();
+}
+
+/// @brief Marks a POSIX file loader as the owner of the mapping exposed by its print alias.
+/// @details `print_alias_define` is a const projection of the loader's current mapping. Only explicit ownership
+///          operations or destruction unmap it, and the source object remains alive throughout the enclosing print.
+///          Retaining the pointer/length pair for that operation is therefore valid and does not rely on shared scratch.
+inline constexpr ::std::true_type
+print_borrowed_scatter_source(io_reserve_type_t<char, posix_file_loader>) noexcept
+{
+	return {};
 }
 
 namespace freestanding

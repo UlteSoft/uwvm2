@@ -2332,7 +2332,7 @@ inline constexpr bool operator==(
 	auto [full_bytes, rem] = ::fast_io::details::bitvec_split_bits<::fast_io::containers::bitvec<allocator>::underlying_digits>(bits);
 
 	// --- Compare full bytes ---
-	if consteval
+	FAST_IO_IF_CONSTEVAL
 	{
 		// constexpr path: byte-by-byte
 		for (size_type i{}; i != full_bytes; ++i)
@@ -2524,6 +2524,8 @@ inline constexpr chtype *pr_rsv_bin_full(chtype *outit, underlying const *first,
 				  ::std::numeric_limits<::std::uint_least32_t>::digits == 32 &&
 				  ::std::numeric_limits<::std::uint_least64_t>::digits == 64 &&
 				  (sizeof(chtype) == 1) &&
+				  (::fast_io::details::is_ascii<chtype> ||
+				   ::fast_io::details::is_ebcdic<chtype>) &&
 				  ::std::numeric_limits<underlying>::digits == 8 &&
 				  64 <= ::std::numeric_limits<::std::size_t>::digits)
 	{

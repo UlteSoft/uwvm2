@@ -109,7 +109,15 @@ inline void run_impl(void *p) noexcept
 	try
 #endif
 	{
-		::std::apply([](auto &func, auto &...args) { ::std::invoke(func, args...); }, *tup);
+		// The control block owns one decay-copied invocation and consumes it exactly once. fast_io's apply preserves its
+		// native tuple protocol, while forwarding the xvalue elements permits rvalue-qualified callables and ownership
+		// transfer into move-only by-value parameters without depending on std::tuple customization.
+		::fast_io::containers::apply(
+			[](auto &&func, auto &&...args) {
+				::std::invoke(::std::forward<decltype(func)>(func),
+							  ::std::forward<decltype(args)>(args)...);
+			},
+			::std::move(*tup));
 	}
 #ifdef FAST_IO_CPP_EXCEPTIONS
 	catch (...)
@@ -136,6 +144,7 @@ inline wasi_thread_control_block *make_control_block(Func &&func, Args &&...args
 	using alloc_cb = ::fast_io::native_typed_global_allocator<wasi_thread_control_block>;
 
 	auto tup{alloc_tuple::allocate(1u)};
+	::fast_io::details::thread_start_storage_guard<tuple_type> tuple_guard{tup};
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
@@ -144,10 +153,15 @@ inline wasi_thread_control_block *make_control_block(Func &&func, Args &&...args
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
+	tuple_guard.mark_constructed();
 
 	auto cb{alloc_cb::allocate(1u)};
+	::fast_io::details::thread_start_storage_guard<wasi_thread_control_block> control_guard{cb};
 	::new (cb) wasi_thread_control_block{next_thread_id.fetch_add(1u, ::std::memory_order_relaxed), tup,
 											 &run_impl<tuple_type>, &destroy_impl<tuple_type>, 2u, false};
+	control_guard.mark_constructed();
+	(void)tuple_guard.release();
+	(void)control_guard.release();
 	return cb;
 }
 
@@ -292,7 +306,7 @@ public:
 	inline constexpr wasi_thread() noexcept = default;
 
 	template <typename Func, typename... Args>
-		requires(::std::invocable<Func, Args...>)
+		requires(::fast_io::details::thread_decay_invocable<Func, Args...>)
 	inline wasi_thread(Func &&func, Args &&...args)
 	{
 		auto *cb{::fast_io::wasi::details::make_control_block(::std::forward<Func>(func),

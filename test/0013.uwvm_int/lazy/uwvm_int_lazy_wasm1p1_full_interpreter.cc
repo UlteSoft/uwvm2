@@ -16,17 +16,17 @@ namespace
 
     [[nodiscard]] feature_parameter_t make_reference_feature_parameter(bool enabled) noexcept
     {
-        auto out{strict::make_wasm1p1_feature_parameter()};
+        auto out{strict::make_wasm2_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
         para.disable_reference_types = !enabled;
-        para.controllable_allow_multi_table = para.disable_reference_types;
+        para.controllable_allow_multi_table = false;
         return out;
     }
 
     [[nodiscard]] feature_parameter_t make_sign_extension_feature_parameter(bool enabled) noexcept
     {
-        auto out{strict::make_wasm1p1_feature_parameter()};
+        auto out{strict::make_wasm2_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
         para.disable_sign_extension = !enabled;
@@ -35,7 +35,7 @@ namespace
 
     [[nodiscard]] feature_parameter_t make_bulk_memory_feature_parameter(bool enabled) noexcept
     {
-        auto out{strict::make_wasm1p1_feature_parameter()};
+        auto out{strict::make_wasm2_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
         para.disable_bulk_memory = !enabled;
@@ -44,7 +44,7 @@ namespace
 
     [[nodiscard]] feature_parameter_t make_nontrapping_feature_parameter(bool enabled) noexcept
     {
-        auto out{strict::make_wasm1p1_feature_parameter()};
+        auto out{strict::make_wasm2_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
         para.disable_nontrapping_float_to_int = !enabled;
@@ -53,7 +53,7 @@ namespace
 
     [[nodiscard]] feature_parameter_t make_simd_feature_parameter(bool enabled) noexcept
     {
-        auto out{strict::make_wasm1p1_feature_parameter()};
+        auto out{strict::make_wasm2_feature_parameter()};
         using wasm1p1 = ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1;
         auto& para{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(out)};
         para.disable_simd = !enabled;
@@ -275,7 +275,7 @@ namespace
                                                          lazy_validation_mode_t validation_mode)
     {
         auto wasm{build_full_wasm1p1_module()};
-        auto features{strict::make_wasm1p1_feature_parameter()};
+        auto features{strict::make_wasm2_feature_parameter()};
         auto prep{prepare_runtime_from_wasm(wasm, module_name, {}, features)};
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         UWVM2TEST_REQUIRE(prep.mod->local_defined_function_vec_storage.size() == k_fn_count);
@@ -321,12 +321,19 @@ namespace
     template <optable::uwvm_interpreter_translate_option_t Opt>
     [[nodiscard]] int run_alignment_error_suite_for_opt() noexcept
     {
-        auto all_features{strict::make_wasm1p1_feature_parameter()};
+        auto legacy_features{strict::make_wasm1p1_feature_parameter()};
+        auto all_features{strict::make_wasm2_feature_parameter()};
         auto ref_disabled_features{make_reference_feature_parameter(false)};
         auto sign_disabled_features{make_sign_extension_feature_parameter(false)};
         auto bulk_disabled_features{make_bulk_memory_feature_parameter(false)};
         auto nontrapping_disabled_features{make_nontrapping_feature_parameter(false)};
         auto simd_disabled_features{make_simd_feature_parameter(false)};
+
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_overlong_inline_blocktype_module(),
+                                                               literal_view(u8"uwvm2test_lazy_overlong_inline_blocktype"),
+                                                               all_features,
+                                                               all_features,
+                                                               errc::illegal_block_type) == 0);
 
         UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_ref_feature_module(),
                                                                literal_view(u8"uwvm2test_lazy_full_ref_feature"),
@@ -365,6 +372,16 @@ namespace
                                                                all_features,
                                                                errc::numeric_operand_type_mismatch) == 0);
 
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_select_t_empty_result_types_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_legacy_select_empty"),
+                                                               legacy_features,
+                                                               legacy_features,
+                                                               errc::invalid_const_immediate) == 0);
+        UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_select_t_count_module(),
+                                                               literal_view(u8"uwvm2test_lazy_full_legacy_select_count"),
+                                                               legacy_features,
+                                                               legacy_features,
+                                                               errc::invalid_const_immediate) == 0);
         UWVM2TEST_REQUIRE(expect_validator_alignment_case<Opt>(build_invalid_select_t_count_module(),
                                                                literal_view(u8"uwvm2test_lazy_full_select_count"),
                                                                all_features,

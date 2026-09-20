@@ -113,6 +113,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // This project's wasm64 mirror expands pr_name_len to u64 at offset 8, so the guest record alignment is 8.
+        check_wasip1_guest_pointer_alignment<8uz>(buf_ptrsz, u8"fd_prestat_get_wasm64.buf (prestat64)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

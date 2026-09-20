@@ -89,14 +89,22 @@ struct cxa_demangle
 	~cxa_demangle()
 	{
 		free(buffer);
-		buffer = nullptr;
-		length = static_cast<::std::size_t>(0u);
 	}
 };
 
 inline constexpr basic_io_scatter_t<char> print_alias_define(io_alias_t, cxa_demangle const &man) noexcept
 {
 	return {man.buffer, man.length};
+}
+
+/// @brief Marks a demangled-name object as the owner of its aliased character storage.
+/// @details `cxa_demangle` releases `buffer` only in its destructor (or when explicitly replaced by object-level
+///          operations); `print_alias_define` is a read-only pointer/length projection. The source object remains alive
+///          through the enclosing print operation, hence retaining that projection cannot observe freed scratch data.
+inline constexpr ::std::true_type
+print_borrowed_scatter_source(io_reserve_type_t<char, cxa_demangle>) noexcept
+{
+	return {};
 }
 
 } // namespace fast_io

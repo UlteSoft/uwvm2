@@ -274,17 +274,21 @@ uwvm -Rllvm-call-stack none
 
 Behavior:
 
-- `auto`: default. If an unwind backend is present, try `unwind`; if the generated-code live unwind probe fails, warn once and fall back to `instruction`. If runtime warnings are disabled, the fallback is silent; if runtime warnings are converted to fatal errors, the fallback warning is fatal.
-- `instruction`: emit per-function LLVM JIT call-stack push/pop instructions. This preserves trap diagnostics without relying on generated-code unwind metadata.
+- `auto`: default. Select native `unwind` when the actual generated-caller live probe succeeds. Otherwise select `instruction` before code generation; a failed live probe causes a one-time fallback warning.
+- `instruction`: explicitly emit per-function LLVM JIT call-stack push/pop instructions. These logical frames preserve trap diagnostics without relying on a native walk.
 - `none`: omit per-function LLVM JIT call-stack push/pop instructions. This can substantially improve hot Wasm-to-Wasm call workloads, but trap stack reports lose JIT body frames.
-- `unwind`: force generated-code unwind metadata for LLVM JIT frames at trap-report time. This value is only accepted when the build can see an unwind backend. At runtime, uwvm runs a tiny generated-code live unwind probe once before replacing instruction frames; failure is fatal instead of falling back to `instruction`.
-- `unwind-uncheck`: use the same generated-code unwind metadata as `unwind`, but skip the live unwind probe. This is intended for deployments that have already validated the JIT unwind path and want to avoid the check on startup.
+- `unwind`: require native unwind to replace generated logical frames, with per-function JIT push/pop omitted. The actual runtime probe must recover generated caller frames. Unsupported or failed checked selection fails closed.
+- `unwind-uncheck`: use the same native replacement and omitted push/pop policy, but skip the live self-check. It does not disable memory safety or unwind-table registration.
 - `unwind-unchecked`: accepted as an alias for `unwind-uncheck`.
 - Default: `auto`.
-- uwvm itself may still be built without unwind tables. Host-runtime unwindability is not a requirement for JIT unwind mode, and uwvm does not warn when ordinary host-runtime frames cannot be walked.
+- Allow-listed POSIX targets with `<unwind.h>` and supported Win64 SEH targets advertise both native modes. Targets without a compiled native-unwind backend advertise only `auto`, `instruction`, and `none`, with `auto` selecting instruction frames.
+- POSIX native replacement walks registered JIT CFI and live host-runtime frames through an ordinary `<unwind.h>` backtrace. Relevant host frames must retain unwind metadata; the live probe checks the actual runtime path. There is no seeded POSIX cursor, frame-pointer scan, raw-stack scan, or inline call-chain reconstruction.
 - On Apple targets, uwvm registers generated `.eh_frame` FDEs directly. On Win64 x86_64 targets, uwvm registers generated SEH function tables with the OS.
+- Every generated Wasm function, raw wrapper, tiered core, and OSR entry is marked LLVM `NoInline`, including the max/O3 policy. Function-local optimization remains enabled.
+- Recursive calls remain distinct frames even when module/function indices repeat. Interpreter-only execution retains logical frames; mixed Tiered execution must preserve interpreter callers across the native entry boundary.
 - This command is independent of `--runtime-llvm-jit-policy`, `--runtime-llvm-jit-lazy-policy`, and `--runtime-llvm-jit-full-policy`.
-- Runtime compiler logs report the selected mode as `call_stack=`, the selected unwind backend as `unwind_backend=`, the live-probe decision as `unwind_check=live-jit|skipped|off`, whether generated-code unwind metadata is allowed to replace instruction frames as `unwind_replace_frames=`, and the actual instruction-frame emission as `call_stack_frames=`.
+- Runtime compiler logs report the effective mode as `call_stack=`, the selected unwind backend as `unwind_backend=`, the check decision as `unwind_check=live|unchecked|off`, whether native unwind is allowed to replace instruction frames as `unwind_replace_frames=yes|no`, and the actual instruction-frame emission as `call_stack_frames=emit|omit`.
+- Native correctness tests must verify the complete ordered caller chain and omitted logical-frame emission; one resolved native address or native output supplemented by hidden push/pop frames is not sufficient.
 
 ## `--runtime-llvm-jit-disable-ir-verifaction`
 
@@ -308,6 +312,19 @@ Example:
 ```bash
 uwvm --runtime-aot --runtime-llvm-jit-disable-ir-verifaction --run app.wasm
 ```
+
+## LLVM Native-Object Cache Source Identity
+
+Persistent LLVM native-object caching requires a clean Git commit identity or a verified complete-source manifest ID.
+Source-archive packagers can pass `--build-source-id=sha256:<64 lowercase hex digits>`; the value must be regenerated
+whenever any packaged source input changes. Official release archives should carry the stable hash of a normalized,
+complete source manifest rather than a tag, version string, timestamp, path, or build artifact.
+
+Dirty Git worktrees and builds with neither identity fail closed even when an explicit cache path is requested. A
+Wasm-derived LLVM module hash does not cover host bridge/runtime/unwind semantics, and the cache signature provides
+integrity and context binding rather than source provenance. Developers may separately accept these risks with
+`UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE` or `UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE`; release builds must not
+define either macro.
 
 ## `--runtime-compile-threads`
 

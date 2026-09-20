@@ -1,5 +1,6 @@
 #include "../uwvm_int_translate_strict_common.h"
 
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 
@@ -134,6 +135,28 @@ namespace
         add_i64_from_f64(wasm_op::i64_trunc_f64_s, 1.0e40);
         add_i64_from_f64(wasm_op::i64_trunc_f64_u, -1.0);
 
+        auto add_param_trunc = [&](::std::uint8_t input_type, ::std::uint8_t output_type, wasm_op trunc_op) -> void
+        {
+            func_type ty{{input_type}, {output_type}};
+            func_body fb{};
+            op(fb.code, wasm_op::local_get);
+            append_u32_leb(fb.code, 0u);
+            op(fb.code, wasm_op::nop);  // Keep this matrix on the non-fused fast/byref conversion paths.
+            op(fb.code, trunc_op);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        };
+
+        // f16..f23: parameterized forms used for exact lower/upper boundary coverage.
+        add_param_trunc(k_val_f32, k_val_i32, wasm_op::i32_trunc_f32_s);
+        add_param_trunc(k_val_f32, k_val_i32, wasm_op::i32_trunc_f32_u);
+        add_param_trunc(k_val_f64, k_val_i32, wasm_op::i32_trunc_f64_s);
+        add_param_trunc(k_val_f64, k_val_i32, wasm_op::i32_trunc_f64_u);
+        add_param_trunc(k_val_f32, k_val_i64, wasm_op::i64_trunc_f32_s);
+        add_param_trunc(k_val_f32, k_val_i64, wasm_op::i64_trunc_f32_u);
+        add_param_trunc(k_val_f64, k_val_i64, wasm_op::i64_trunc_f64_s);
+        add_param_trunc(k_val_f64, k_val_i64, wasm_op::i64_trunc_f64_u);
+
         return mb.build();
     }
 
@@ -208,6 +231,162 @@ namespace
             if(ec != 0) { return ec; }
         }
 
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        auto run_param_trap = [&](::std::size_t fidx, byte_vec const& params, char const* expected_message) noexcept -> int
+        {
+            return run_in_child_expect_trap_message(expected_message,
+                                                    [&]
+                                                    {
+                                                        (void)Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                                                          rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                                                          params,
+                                                                          nullptr,
+                                                                          nullptr);
+                                                        exit_98();
+                                                    });
+        };
+#else
+        auto run_param_trap = [&](::std::size_t fidx, byte_vec const& params, int expected_exit) noexcept -> int
+        {
+            return run_in_child_expect_exit(expected_exit,
+                                            [&]
+                                            {
+                                                if(optable::trap_invalid_conversion_to_integer_func != exit_12) { _exit(92); }
+                                                if(optable::trap_integer_overflow_func != exit_11) { _exit(91); }
+
+                                                (void)Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                                                  params,
+                                                                  nullptr,
+                                                                  nullptr);
+                                                exit_98();
+                                            });
+        };
+#endif
+
+        auto require_param_trap = [&](::std::size_t fidx, byte_vec const& params, int expected_exit) noexcept -> int
+        {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            return run_param_trap(fidx, params, expected_exit == 12 ? "invalid conversion to integer" : "integer overflow");
+#else
+            return run_param_trap(fidx, params, expected_exit);
+#endif
+        };
+
+        auto run_i32_f32 = [&](::std::size_t fidx, float value) noexcept -> ::std::int32_t
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                  pack_f32(value),
+                                  nullptr,
+                                  nullptr);
+            return load_i32(rr.results);
+        };
+        auto run_i32_f64 = [&](::std::size_t fidx, double value) noexcept -> ::std::int32_t
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                  pack_f64(value),
+                                  nullptr,
+                                  nullptr);
+            return load_i32(rr.results);
+        };
+        auto run_i64_f32 = [&](::std::size_t fidx, float value) noexcept -> ::std::int64_t
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                  pack_f32(value),
+                                  nullptr,
+                                  nullptr);
+            return load_i64(rr.results);
+        };
+        auto run_i64_f64 = [&](::std::size_t fidx, double value) noexcept -> ::std::int64_t
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                  pack_f64(value),
+                                  nullptr,
+                                  nullptr);
+            return load_i64(rr.results);
+        };
+
+        // Unsigned truncation is valid for -1 < x < 0 and produces zero.
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f32(17uz, -0.5f)) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f32(17uz, ::std::nextafter(-1.0f, 0.0f))) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f64(19uz, -0.5)) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f64(19uz, ::std::nextafter(-1.0, 0.0))) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f32(21uz, -0.5f)) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f32(21uz, ::std::nextafter(-1.0f, 0.0f))) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f64(23uz, -0.5)) == 0u);
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f64(23uz, ::std::nextafter(-1.0, 0.0))) == 0u);
+
+        // The greatest representable source below each exclusive upper bound remains valid.
+        float const i32_f32_upper_ok{::std::nextafter(2147483648.0f, 0.0f)};
+        double const i32_f64_upper_ok{::std::nextafter(2147483648.0, 0.0)};
+        float const u32_f32_upper_ok{::std::nextafter(4294967296.0f, 0.0f)};
+        double const u32_f64_upper_ok{::std::nextafter(4294967296.0, 0.0)};
+        float const i64_f32_upper_ok{::std::nextafter(9223372036854775808.0f, 0.0f)};
+        double const i64_f64_upper_ok{::std::nextafter(9223372036854775808.0, 0.0)};
+        float const u64_f32_upper_ok{::std::nextafter(18446744073709551616.0f, 0.0f)};
+        double const u64_f64_upper_ok{::std::nextafter(18446744073709551616.0, 0.0)};
+        UWVM2TEST_REQUIRE(run_i32_f32(16uz, i32_f32_upper_ok) == static_cast<::std::int32_t>(i32_f32_upper_ok));
+        UWVM2TEST_REQUIRE(run_i32_f64(18uz, i32_f64_upper_ok) == static_cast<::std::int32_t>(i32_f64_upper_ok));
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f32(17uz, u32_f32_upper_ok)) == static_cast<::std::uint32_t>(u32_f32_upper_ok));
+        UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(run_i32_f64(19uz, u32_f64_upper_ok)) == static_cast<::std::uint32_t>(u32_f64_upper_ok));
+        UWVM2TEST_REQUIRE(run_i64_f32(20uz, i64_f32_upper_ok) == static_cast<::std::int64_t>(i64_f32_upper_ok));
+        UWVM2TEST_REQUIRE(run_i64_f64(22uz, i64_f64_upper_ok) == static_cast<::std::int64_t>(i64_f64_upper_ok));
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f32(21uz, u64_f32_upper_ok)) == static_cast<::std::uint64_t>(u64_f32_upper_ok));
+        UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(run_i64_f64(23uz, u64_f64_upper_ok)) == static_cast<::std::uint64_t>(u64_f64_upper_ok));
+
+        // Signed lower sentinels are exclusive. Their next representable value toward +infinity is valid;
+        // for f64->i32 that includes fractional values below INT32_MIN which truncate back to INT32_MIN.
+        float const i32_f32_lower_bad{-2147483904.0f};
+        double const i32_f64_lower_bad{-2147483649.0};
+        float const i64_f32_lower_bad{-9223373136366403584.0f};
+        double const i64_f64_lower_bad{-9223372036854777856.0};
+        UWVM2TEST_REQUIRE(run_i32_f32(16uz, ::std::nextafter(i32_f32_lower_bad, 0.0f)) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i32_f64(18uz, -2147483648.5) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i32_f64(18uz, ::std::nextafter(i32_f64_lower_bad, 0.0)) == ::std::numeric_limits<::std::int32_t>::min());
+        UWVM2TEST_REQUIRE(run_i64_f32(20uz, ::std::nextafter(i64_f32_lower_bad, 0.0f)) == ::std::numeric_limits<::std::int64_t>::min());
+        UWVM2TEST_REQUIRE(run_i64_f64(22uz, ::std::nextafter(i64_f64_lower_bad, 0.0)) == ::std::numeric_limits<::std::int64_t>::min());
+
+        float const nanf{::std::numeric_limits<float>::quiet_NaN()};
+        double const nand{::std::numeric_limits<double>::quiet_NaN()};
+        float const pinff{::std::numeric_limits<float>::infinity()};
+        double const pinfd{::std::numeric_limits<double>::infinity()};
+
+        // NaN is invalid conversion; both infinities are integer overflow for all eight opcodes.
+        for(::std::size_t fidx : {16uz, 17uz, 20uz, 21uz})
+        {
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f32(nanf), 12) == 0);
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f32(pinff), 11) == 0);
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f32(-pinff), 11) == 0);
+        }
+        for(::std::size_t fidx : {18uz, 19uz, 22uz, 23uz})
+        {
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f64(nand), 12) == 0);
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f64(pinfd), 11) == 0);
+            UWVM2TEST_REQUIRE(require_param_trap(fidx, pack_f64(-pinfd), 11) == 0);
+        }
+
+        // Exact lower and upper overflow boundaries.
+        UWVM2TEST_REQUIRE(require_param_trap(16uz, pack_f32(i32_f32_lower_bad), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(18uz, pack_f64(i32_f64_lower_bad), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(20uz, pack_f32(i64_f32_lower_bad), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(22uz, pack_f64(i64_f64_lower_bad), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(16uz, pack_f32(2147483648.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(18uz, pack_f64(2147483648.0), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(20uz, pack_f32(9223372036854775808.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(22uz, pack_f64(9223372036854775808.0), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(17uz, pack_f32(-1.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(19uz, pack_f64(-1.0), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(21uz, pack_f32(-1.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(23uz, pack_f64(-1.0), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(17uz, pack_f32(4294967296.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(19uz, pack_f64(4294967296.0), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(21uz, pack_f32(18446744073709551616.0f), 11) == 0);
+        UWVM2TEST_REQUIRE(require_param_trap(23uz, pack_f64(18446744073709551616.0), 11) == 0);
+
         return 0;
     }
 
@@ -218,7 +397,7 @@ namespace
         optable::compile_option cop{};
         auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 16uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 24uz);
 
 #if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         // Hooks must remain intact after compilation.

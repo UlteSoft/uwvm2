@@ -23,6 +23,7 @@ module;
 
 // std
 #include <atomic>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -33,18 +34,26 @@ module;
 #include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.compile_cu_from_lazy_validator:translate;
 
 import fast_io;
+import uwvm2.object.global;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.opcode;
+import uwvm2.parser.wasm.standard.wasm1p1.features;
+import uwvm2.parser.wasm.standard.wasm2.features;
 import uwvm2.validation.error;
+import uwvm2.validation.concepts;
 import uwvm2.validation.standard.wasm1;
 import uwvm2.validation.standard.wasm1p1;
+import uwvm2.validation.standard.wasm2;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.runtime.storage;
 import uwvm2.runtime.compiler.uwvm_int.optable;

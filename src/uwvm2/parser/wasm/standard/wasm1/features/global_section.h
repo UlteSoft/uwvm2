@@ -3,6 +3,12 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP initializer decoding must remain a byte/integer operation all the way into
+// opcode storage. Merely bit_casting to Float and assigning can pass through a
+// native FP return/copy (notably GCC -O0/i386), quieting an sNaN before execution.
+// Decode Wasm little-endian integers first, activate the union member, then memcpy
+// the representation. The runtime FP guard is too late to repair parser-time loss.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @brief       WebAssembly Release 1.0 (2019-07-20)
@@ -357,8 +363,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // [       safe           ] unsafe (could be the section_end)
                         //           ^^ section_curr
 
-                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 test_f32;
-
 #if CHAR_BIT > 8
                         ::std::uint_least32_t temp_ul32{};
                         for(unsigned i{}; i != 4u; ++i)
@@ -378,7 +382,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                             //          ^^ section_curr
                         }
 
-                        test_f32 = ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(temp_ul32);
 #else
                         static_assert(sizeof(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32) == 4uz);
                         static_assert(sizeof(::std::uint_least32_t) == 4uz);
@@ -388,8 +391,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // to little endian
                         temp_ul32 = ::fast_io::little_endian(temp_ul32);
 
-                        test_f32 = ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(temp_ul32);
-
                         section_curr += 4u;
 #endif
 
@@ -397,8 +398,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // [       safe           ] unsafe (could be the section_end)
                         //                          ^^ section_curr
 
-                        global_expr.opcodes.emplace_back(::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f32 = test_f32},
+                        global_expr.opcodes.emplace_back(::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f32 = {}},
                                                          ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const);
+                        // Decode into storage without a native FP return/copy that can quiet a signaling NaN.
+                        static_assert(sizeof(temp_ul32) == sizeof(global_expr.opcodes.back_unchecked().storage.f32));
+                        ::std::memcpy(::std::addressof(global_expr.opcodes.back_unchecked().storage.f32),
+                                      ::std::addressof(temp_ul32), sizeof(temp_ul32));
 
                         break;
                     }
@@ -449,8 +454,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // There is no need to perform little-endian capture here, because 8 bytes of space is sufficient to obtain fp64.
                         // On platforms where charbit is not equal to 8, only cyclic reading is allowed.
 
-                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 test_f64;
-
 #if CHAR_BIT > 8
                         ::std::uint_least64_t temp_ul64{};
                         for(unsigned i{}; i != 8u; ++i)
@@ -470,7 +473,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                             //          ^^ section_curr
                         }
 
-                        test_f64 = ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(temp_ul64);
 #else
                         static_assert(sizeof(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64) == 8uz);
                         static_assert(sizeof(::std::uint_least64_t) == 8uz);
@@ -480,8 +482,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // to little endian
                         temp_ul64 = ::fast_io::little_endian(temp_ul64);
 
-                        test_f64 = ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(temp_ul64);
-
                         section_curr += 8u;
 #endif
 
@@ -489,8 +489,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         // [       safe                       ] unsafe (could be the section_end)
                         //                                      ^^ section_curr
 
-                        global_expr.opcodes.emplace_back(::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f64 = test_f64},
+                        global_expr.opcodes.emplace_back(::uwvm2::parser::wasm::standard::wasm1::const_expr::base_const_expr_opcode_storage_u{.f64 = {}},
                                                          ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const);
+                        // Decode into storage without a native FP return/copy that can quiet a signaling NaN.
+                        static_assert(sizeof(temp_ul64) == sizeof(global_expr.opcodes.back_unchecked().storage.f64));
+                        ::std::memcpy(::std::addressof(global_expr.opcodes.back_unchecked().storage.f64),
+                                      ::std::addressof(temp_ul64), sizeof(temp_ul64));
 
                         break;
                     }
@@ -815,6 +819,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(global_section_storage), ::std::addressof(all_sections)}; }
 
+#ifndef UWVM_MODULE
+    // This optional context-print fast path depends on non-exported fast_io protocol internals.
     namespace details::global_section_print
     {
         template <::std::integral char_type, ::std::size_t n>
@@ -1037,6 +1043,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         };
     }  // namespace details::global_section_print
+#endif
 
     /// @brief Print the global section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream
@@ -1151,6 +1158,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
     }
 
+#ifndef UWVM_MODULE
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires details::global_section_print::context_body_supported<char_type, Fs...>
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, global_section_storage_section_details_wrapper_t<Fs...>>) noexcept
@@ -1164,6 +1172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
         return buffer_size;
     }
+#endif
 }
 
 /// @brief Define container optimization operations for use with fast_io

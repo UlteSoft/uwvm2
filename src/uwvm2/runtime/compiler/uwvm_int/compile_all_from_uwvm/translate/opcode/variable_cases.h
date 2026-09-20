@@ -3188,6 +3188,15 @@ case wasm1_code::local_tee:
         }
     }
 
+    // local.tee has result type t, even when its input was Unknown. Pop/push
+    // through the helpers so changing the placeholder i32 to i64/v128 also
+    // updates operand_stack_bytes; mutating only the tag corrupts accounting.
+    if(operand_stack.back_unchecked().is_unknown)
+    {
+        operand_stack_pop_unchecked();
+        operand_stack_push(curr_local_type);
+    }
+
     auto const local_off{local_offset_from_index(local_index)};
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -3899,9 +3908,14 @@ case wasm1_code::global_get:
         curr_global_mutable = local_global_ptr->is_mutable;
     }
 
+    auto const global_access{resolve_global_access(global_index)};
+
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     // Conbine: fuse `global.get i32; i32.const imm; i32.add; global.set (same)` into `i32_add_imm_global_set_same`.
-    if(curr_global_type == curr_operand_stack_value_type::i32 && curr_global_mutable && code_curr != code_end)
+    // The fused opfunc embeds a runtime-owned storage pointer, so a host-backed global uses the
+    // ordinary typed bridge sequence below.
+    if(global_access.kind == resolved_global_access_kind::direct && curr_global_type == curr_operand_stack_value_type::i32 && curr_global_mutable &&
+       code_curr != code_end)
     {
         wasm1_code next_op{};  // init
         ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(wasm1_code));
@@ -3937,11 +3951,10 @@ case wasm1_code::global_get:
                                 if(set_index_err == ::fast_io::parse_code::ok && set_global_index == global_index)
                                 {
                                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                                    wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
                                     emit_opfunc_to(
                                         bytecode,
                                         translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                                    emit_imm_to(bytecode, global_p);
+                                    emit_imm_to(bytecode, global_access.storage_ptr);
                                     emit_imm_to(bytecode, imm);
 
                                     // Skip `i32.const imm; i32.add; global.set <same>`: net stack effect is 0.
@@ -3960,9 +3973,6 @@ case wasm1_code::global_get:
     operand_stack_push(curr_global_type);
     {
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-        // Resolve the storage pointer only after index/type validation; emitted opfuncs are lean and
-        // assume this immediate already points at the correct global slot.
-        wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
 
         if constexpr(stacktop_enabled)
         {
@@ -3970,51 +3980,62 @@ case wasm1_code::global_get:
             stacktop_prepare_push1_if_reachable(bytecode, curr_global_type);
         }
 
+        auto const emit_global_get{[&]<typename GlobalT>() constexpr
+                                   {
+                                       if(global_access.kind == resolved_global_access_kind::direct)
+                                       {
+                                           emit_opfunc_to(
+                                               bytecode,
+                                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, GlobalT>(curr_stacktop,
+                                                                                                                               interpreter_tuple));
+                                           emit_imm_to(bytecode, global_access.storage_ptr);
+                                       }
+                                       else
+                                       {
+                                           emit_opfunc_to(bytecode,
+                                                          translate::get_uwvmint_local_imported_global_get_typed_fptr_from_tuple<CompileOption, GlobalT>(
+                                                              curr_stacktop,
+                                                              interpreter_tuple));
+                                           emit_imm_to(bytecode, global_access.local_imported_module_ptr);
+                                           emit_imm_to(bytecode, global_access.local_imported_global_index);
+                                       }
+                                   }};
+
         switch(curr_global_type)
         {
             case curr_operand_stack_value_type::i32:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_get_i32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_i32>();
                 break;
             }
             case curr_operand_stack_value_type::i64:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_get_i64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_i64>();
                 break;
             }
             case curr_operand_stack_value_type::f32:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_get_f32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_f32>();
                 break;
             }
             case curr_operand_stack_value_type::f64:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_get_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_f64>();
                 break;
             }
             case curr_operand_stack_value_type::v128:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_v128_t>();
                 break;
             }
             case curr_operand_stack_value_type::funcref:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_funcref_t>();
                 break;
             }
             case curr_operand_stack_value_type::externref:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_get_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_get.template operator()<wasm_externref_t>();
                 break;
             }
             [[unlikely]] default:
@@ -4136,54 +4157,62 @@ case wasm1_code::global_set:
     // Translate: typed `global.set`.
     {
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-        // The runtime setter receives a direct storage pointer, so mutability/type checks must be
-        // complete before this immediate is embedded in bytecode.
-        wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
+        auto const global_access{resolve_global_access(global_index)};
+        auto const emit_global_set{[&]<typename GlobalT>() constexpr
+                                   {
+                                       if(global_access.kind == resolved_global_access_kind::direct)
+                                       {
+                                           emit_opfunc_to(
+                                               bytecode,
+                                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, GlobalT>(curr_stacktop,
+                                                                                                                               interpreter_tuple));
+                                           emit_imm_to(bytecode, global_access.storage_ptr);
+                                       }
+                                       else
+                                       {
+                                           emit_opfunc_to(bytecode,
+                                                          translate::get_uwvmint_local_imported_global_set_typed_fptr_from_tuple<CompileOption, GlobalT>(
+                                                              curr_stacktop,
+                                                              interpreter_tuple));
+                                           emit_imm_to(bytecode, global_access.local_imported_module_ptr);
+                                           emit_imm_to(bytecode, global_access.local_imported_global_index);
+                                       }
+                                   }};
         switch(curr_global_type)
         {
             case curr_operand_stack_value_type::i32:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_set_i32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_i32>();
                 break;
             }
             case curr_operand_stack_value_type::i64:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_set_i64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_i64>();
                 break;
             }
             case curr_operand_stack_value_type::f32:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_set_f32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_f32>();
                 break;
             }
             case curr_operand_stack_value_type::f64:
             {
-                emit_opfunc_to(bytecode, translate::get_uwvmint_global_set_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_f64>();
                 break;
             }
             case curr_operand_stack_value_type::v128:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_v128_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_v128_t>();
                 break;
             }
             case curr_operand_stack_value_type::funcref:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_funcref_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_funcref_t>();
                 break;
             }
             case curr_operand_stack_value_type::externref:
             {
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_global_set_typed_fptr_from_tuple<CompileOption, wasm_externref_t>(curr_stacktop, interpreter_tuple));
-                emit_imm_to(bytecode, global_p);
+                emit_global_set.template operator()<wasm_externref_t>();
                 break;
             }
             [[unlikely]] default:

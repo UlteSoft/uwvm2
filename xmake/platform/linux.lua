@@ -22,6 +22,14 @@ function linux_target()
         return triple:find("^powerpc%-") ~= nil or triple:find("^ppc%-") ~= nil
     end
 
+    local function triple_is_powerpc64le(triple)
+        if not triple or triple == "detect" then
+            return false
+        end
+        triple = triple:lower()
+        return triple:find("^powerpc64le") ~= nil or triple:find("^ppc64le") ~= nil
+    end
+
     local function triple_is_sparc(triple)
         if not triple or triple == "detect" then
             return false
@@ -69,6 +77,17 @@ function linux_target()
     if use_llvm_compiler then
         set_toolchains("clang")
 
+        -- LLVM's MIPS backend disables tail calls by default, independently of
+        -- Clang accepting [[clang::musttail]]. The interpreter requires bounded
+        -- host stack depth even at -O0; never work around this by dropping that
+        -- attribute. Internal opfunc visibility is handled in their macros.
+        local mips_target = get_config("target") or ""
+        local mips_llvm_target = get_config("llvm-target") or ""
+        if is_arch("mips") or is_arch("mips64") or mips_target:lower():find("^mips") or
+            mips_llvm_target:lower():find("^mips") then
+            add_cxflags("-mllvm -mips-tail-calls", {force = true})
+        end
+
         -- lld does not support the PPC64 ELFv1 ABI used by big-endian Linux, and
         -- 32-bit PowerPC glibc linker scripts use absolute paths that bfd resolves
         -- through sysroot correctly. SPARC64 also uses relocations in GCC startup
@@ -103,11 +122,16 @@ function linux_target()
     end
 
     add_cxflags("-fno-rtti") -- disable rtti
-    
-    if not is_mode("debug") then
-        add_cxflags("-fno-unwind-tables") -- disable unwind tables
-        add_cxflags("-fno-asynchronous-unwind-tables") -- disable asynchronous unwind tables
+
+    if triple_is_powerpc64le(get_config("cross")) or triple_is_powerpc64le(get_config("target")) or
+        triple_is_powerpc64le(get_config("llvm-target")) then
+        -- GCC's IEEE long-double ABI makes `__float128` and `long double` the same C++ type on
+        -- powerpc64le.  Hide only the duplicate compiler spelling from header feature detection;
+        -- the ordinary long-double path retains the complete binary128 formatting support.
+        add_cxflags("-U__SIZEOF_FLOAT128__", "-U__FLOAT128__", {force = true})
     end
+    
+    uwvm_add_native_unwind_cxflags()
 
     local march = get_config("march")
     if not march or march == "none" then

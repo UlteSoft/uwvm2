@@ -71,6 +71,22 @@ namespace
         0x40u, 0x00u, 0x0bu, 0x43u, 0x00u, 0x00u, 0xc0u, 0xbfu, 0xfcu, 0x01u, 0x41u, 0x00u,
         0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
 
+    // These modules intentionally have the same path, function type, and function body. Only the
+    // declared memory maximum differs, which changes the generated memory.grow implementation.
+    // A complete persistent-cache key must therefore cover the authoritative generated LLVM IR,
+    // rather than assuming that a function-body-only/module-count fingerprint is complete.
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_one_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x01u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
+
+    inline constexpr ::std::array<unsigned char, 38uz> memory_max_two_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x05u, 0x04u, 0x01u, 0x01u, 0x01u, 0x02u,
+        0x08u, 0x01u, 0x00u, 0x0au, 0x09u, 0x01u, 0x07u, 0x00u, 0x41u, 0x01u, 0x40u, 0x00u,
+        0x1au, 0x0bu};
+
     inline constexpr ::std::array<unsigned char, 59uz> wasm1p1_multivalue_start_wasm{
         0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x09u, 0x02u, 0x60u,
         0x00u, 0x02u, 0x7fu, 0x7fu, 0x60u, 0x00u, 0x00u, 0x03u, 0x03u, 0x02u, 0x00u, 0x01u,
@@ -321,6 +337,27 @@ namespace
         return true;
     }
 
+    [[nodiscard]] bool first_cache_context_contains(::std::filesystem::path const& cache_dir, ::std::string_view needle)
+    {
+        ::std::filesystem::path file{};
+        if(!first_cache_file(cache_dir, file)) { return false; }
+
+        ::std::vector<unsigned char> bytes{};
+        if(!read_binary_file(file, bytes)) { return false; }
+
+        constexpr ::std::size_t header_size{64uz};
+        if(bytes.size() < header_size) { return false; }
+        auto const isa_size{read_u64_le(bytes, 40uz)};
+        auto const context_size{read_u64_le(bytes, 48uz)};
+        if(isa_size > bytes.size() - header_size) { return false; }
+        auto const context_offset{header_size + static_cast<::std::size_t>(isa_size)};
+        if(context_size > bytes.size() - context_offset) { return false; }
+
+        auto const context_begin{bytes.begin() + static_cast<::std::ptrdiff_t>(context_offset)};
+        auto const context_end{context_begin + static_cast<::std::ptrdiff_t>(context_size)};
+        return ::std::search(context_begin, context_end, needle.begin(), needle.end()) != context_end;
+    }
+
     [[nodiscard]] bool rewrite_first_cache_file(::std::filesystem::path const& cache_dir,
                                                 bool (*mutate)(::std::vector<unsigned char>&),
                                                 ::std::string_view label)
@@ -370,11 +407,12 @@ namespace
 
     [[nodiscard]] bool flip_context_abi_byte(::std::vector<unsigned char>& bytes)
     {
-        auto const needle{::std::string_view{"uwvm2-runtime-abi-v4"}};
-        auto const iter{::std::search(bytes.begin(), bytes.end(), needle.begin(), needle.end())};
+        auto const prefix{::std::string_view{"uwvm2-runtime-abi-v"}};
+        auto const iter{::std::search(bytes.begin(), bytes.end(), prefix.begin(), prefix.end())};
         if(iter == bytes.end()) { return false; }
-        auto const offset{static_cast<::std::size_t>(iter - bytes.begin())};
-        bytes[offset + needle.size() - 1uz] ^= 0x01u;
+        auto const version_iter{iter + static_cast<::std::ptrdiff_t>(prefix.size())};
+        if(version_iter == bytes.end()) { return false; }
+        *version_iter ^= 0x01u;
         return true;
     }
 
@@ -488,6 +526,55 @@ namespace
     {
         return run_uwvm_from(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args, label, {});
     }
+
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    [[nodiscard]] bool test_untrusted_source_cache_fail_closed(::std::filesystem::path const& uwvm_path,
+                                                               ::std::filesystem::path const& artifact_dir,
+                                                               ::std::filesystem::path const& wasm_path)
+    {
+        // An explicit path must not override the build-identity guard. Running twice proves that the first run neither
+        // publishes an object nor leaves anything that the second run can reuse. Zero extra compile workers keeps this
+        // focused check on the ordinary MCJIT ObjectCache path for both Full materialization strategies.
+        struct untrusted_cache_mode
+        {
+            ::std::string_view label;
+            ::std::string_view runtime_args;
+        };
+        constexpr ::std::array modes{untrusted_cache_mode{"aot", "-Raot -Rct 0 -Rclog out"},
+                                     untrusted_cache_mode{"lazy", "-Rjit -Rct 0 -Rclog out"}};
+        for(auto const& mode: modes)
+        {
+            auto const cache_dir{artifact_dir / (::std::string{"cache-untrusted-source-fail-closed-"} + ::std::string{mode.label})};
+            ::std::filesystem::remove_all(cache_dir);
+            ::std::filesystem::create_directories(cache_dir);
+            auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+
+            for(auto const ordinal: {::std::string_view{"first"}, ::std::string_view{"second"}})
+            {
+                auto const label{::std::string{"untrusted_source_cache_"} + ::std::string{mode.label} + "_" + ::std::string{ordinal}};
+                if(!run_uwvm(uwvm_path, artifact_dir, wasm_path, mode.runtime_args, cache_args, label)) { return false; }
+                if(output_contains(artifact_dir, label, "object-cache-hit"))
+                {
+                    ::std::cerr << "untrusted-source build unexpectedly reused a persistent native object in " << mode.label << " mode\n";
+                    return false;
+                }
+                if(!output_contains(artifact_dir, label, "status=disabled"))
+                {
+                    ::std::cerr << "untrusted-source cache decision was not reported as disabled in " << mode.label << " mode\n";
+                    return false;
+                }
+            }
+            if(!snapshot_cache(cache_dir).empty())
+            {
+                ::std::cerr << "untrusted-source build wrote a persistent native object in " << mode.label
+                            << " mode despite the fail-closed policy\n";
+                return false;
+            }
+        }
+        return true;
+    }
+#endif
 
     [[nodiscard]] bool run_cached_mode_twice_with_cache_arg(::std::filesystem::path const& uwvm_path,
                                                             ::std::filesystem::path const& artifact_dir,
@@ -616,6 +703,15 @@ namespace
         if(snapshot_cache(cache_dir).empty())
         {
             ::std::cerr << "signed cache integrity setup produced no cache file\n";
+            return false;
+        }
+        if(!first_cache_context_contains(cache_dir, "uwvm2-runtime-abi-v") ||
+           !first_cache_context_contains(cache_dir, "llvm-wasm-typed-result-abi") ||
+           !first_cache_context_contains(cache_dir, "void-scalar-tuple-struct-v1") ||
+           !first_cache_context_contains(cache_dir, "ssa-byte-vector16-v1") ||
+           !first_cache_context_contains(cache_dir, "cross-custom-page-last-byte-preflight-v1"))
+        {
+            ::std::cerr << "cache context is missing the typed result/vector ABI or guarded-store fingerprint\n";
             return false;
         }
         if(!expect_clean_cache_hit(uwvm_path, artifact_dir, wasm_path, cache_args, "signed_integrity_clean_hit")) { return false; }
@@ -961,6 +1057,78 @@ namespace
         return true;
     }
 
+    [[nodiscard]] bool test_generated_ir_shape_cache_invalidation(::std::filesystem::path const& uwvm_path,
+                                                                  ::std::filesystem::path const& artifact_dir)
+    {
+        auto const wasm_path{artifact_dir / "cache-ir-shape-same-path.wasm"};
+        constexpr ::std::array modes{
+            // One explicit extra worker exercises lazy grouped materialization and the full parallel-object key without
+            // allowing this focused regression to inherit an unbounded host-dependent thread policy.
+            cache_runtime_mode{"lazy_ir_shape", "-Rjit -Rct 1"},
+            cache_runtime_mode{"full_ir_shape", "-Raot -Rct 1"}};
+
+        for(auto const& mode: modes)
+        {
+            auto const cache_dir{artifact_dir / (::std::string{"cache-"} + ::std::string{mode.label})};
+            ::std::filesystem::remove_all(cache_dir);
+            ::std::filesystem::create_directories(cache_dir);
+            auto const cache_args{::std::string{"--runtime-llvm-jit-cache-path path "} + quote_argument(cache_dir)};
+            auto const runtime_args{::std::string{mode.args} + " -Rclog out"};
+
+            if(!write_fixture(wasm_path, memory_max_one_wasm.data(), memory_max_one_wasm.size()) ||
+               !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args,
+                         ::std::string{mode.label} + "_max_one"))
+            {
+                return false;
+            }
+            auto const first{snapshot_cache(cache_dir)};
+            if(first.empty())
+            {
+                ::std::cerr << "memory-max cache setup produced no object for " << mode.label << '\n';
+                return false;
+            }
+
+            if(!write_fixture(wasm_path, memory_max_two_wasm.data(), memory_max_two_wasm.size()) ||
+               !run_uwvm(uwvm_path, artifact_dir, wasm_path, runtime_args, cache_args,
+                         ::std::string{mode.label} + "_max_two"))
+            {
+                return false;
+            }
+            auto const second_label{::std::string{mode.label} + "_max_two"};
+            if(output_contains(artifact_dir, second_label, "object-cache-hit"))
+            {
+                ::std::cerr << "changed memory limits incorrectly reused stale generated code for " << mode.label << '\n';
+                return false;
+            }
+            if(!output_contains(artifact_dir, second_label, "object-cache-store"))
+            {
+                ::std::cerr << "changed memory limits did not store a distinct cache object for " << mode.label << '\n';
+                return false;
+            }
+            auto const second{snapshot_cache(cache_dir)};
+            if(second.size() <= first.size())
+            {
+                ::std::cerr << "generated-IR cache identity did not grow after the memory-limit change for " << mode.label
+                            << "; before=" << first.size() << " after=" << second.size() << '\n';
+                return false;
+            }
+
+            if(!run_uwvm(uwvm_path,
+                         artifact_dir,
+                         wasm_path,
+                         runtime_args,
+                         cache_args,
+                         ::std::string{mode.label} + "_max_two_reuse") ||
+               !output_contains(artifact_dir, ::std::string{mode.label} + "_max_two_reuse", "object-cache-hit"))
+            {
+                ::std::cerr << "new memory-limit cache object was not reusable for " << mode.label << '\n';
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     [[nodiscard]] bool test_wasm1p1_feature_cache_smoke(::std::filesystem::path const& uwvm_path,
                                                         ::std::filesystem::path const& artifact_dir)
     {
@@ -1108,8 +1276,16 @@ int main(int argc, char** argv)
     }
     auto const& wasm_path{fixtures.front().path};
 
+#if (defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS) && !defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)) || \
+    (!defined(UWVM_GIT_COMMIT_ID) && !defined(UWVM2_BUILD_SOURCE_ID) && !defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE))
+    // The normal integration matrix deliberately requires cache stores and hits. Dirty or unidentified source builds
+    // forbid those operations, so validate the fail-closed contract directly instead of reporting false failures.
+    return test_untrusted_source_cache_fail_closed(uwvm_path, artifact_dir, wasm_path) ? 0 : 1;
+#endif
+
     if(!test_cache_path_modes(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_wasm_cache_matrix(uwvm_path, artifact_dir, fixtures)) { return 1; }
+    if(!test_generated_ir_shape_cache_invalidation(uwvm_path, artifact_dir)) { return 1; }
     if(!test_wasm1p1_feature_cache_smoke(uwvm_path, artifact_dir)) { return 1; }
     if(!test_default_tiered_smoke(uwvm_path, artifact_dir, wasm_path)) { return 1; }
     if(!test_signed_cache_integrity(uwvm_path, artifact_dir, wasm_path)) { return 1; }

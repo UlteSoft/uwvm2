@@ -8,7 +8,7 @@ namespace details
 
 template <typename allocator_type, typename instmtype, typename indecotype, ::std::integral input_char_type>
 inline constexpr input_char_type *
-decoread_some_underflow_define_sz_impl(instmtype instm, indecotype indeco,
+decoread_some_underflow_define_sz_impl(instmtype &instm, indecotype &indeco,
 									   basic_io_buffer_pointers<typename instmtype::input_char_type> &input_buffer,
 									   input_char_type *first, input_char_type *last, ::std::size_t sz)
 {
@@ -34,7 +34,7 @@ decoread_some_underflow_define_sz_impl(instmtype instm, indecotype indeco,
 				return first;
 			}
 		}
-		auto ret{::fast_io::operations::decay::read_some_decay(instm, bufbg, bufbg + sz)};
+		auto ret{::fast_io::operations::decay::read_some_decay_dispatch(instm, bufbg, bufbg + sz)};
 		input_buffer.buffer_curr = bufcur = bufbg;
 		input_buffer.buffer_end = bufed = ret;
 		if (ret == bufbg)
@@ -47,7 +47,7 @@ decoread_some_underflow_define_sz_impl(instmtype instm, indecotype indeco,
 template <typename allocator_type, ::std::size_t sz, typename instmtype, typename indecotype,
 		  ::std::integral input_char_type>
 inline constexpr input_char_type *
-decoread_some_underflow_define_impl(instmtype instm, indecotype indeco,
+decoread_some_underflow_define_impl(instmtype &instm, indecotype &indeco,
 									basic_io_buffer_pointers<typename instmtype::input_char_type> &input_buffer,
 									input_char_type *first, input_char_type *last)
 {
@@ -65,10 +65,13 @@ read_some_underflow_define(basic_io_deco_filter_ref<io_buffer_type> filter,
 {
 	auto &idoref{*filter.idoptr};
 	using traits_type = typename io_buffer_type::traits_type;
+	// A decorator proxy and its underlying observer are independently normalized owners. Both remain stable for the
+	// complete refill loop; copying either per chunk adds work and can split stateful decoder or device cursor identity.
+	decltype(auto) inref = ::fast_io::operations::input_stream_ref(idoref.handle);
+	decltype(auto) indeco = ::fast_io::operations::refs::input_decorators_ref(idoref.decorators);
 	return ::fast_io::details::decoread_some_underflow_define_impl<typename traits_type::allocator_type,
 																   traits_type::input_buffer_size>(
-		::fast_io::operations::input_stream_ref(idoref.handle),
-		::fast_io::operations::refs::input_decorators_ref(idoref.decorators), idoref.input_buffer, first, last);
+		inref, indeco, idoref.input_buffer, first, last);
 }
 
 } // namespace fast_io

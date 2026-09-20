@@ -316,7 +316,7 @@ FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline peb *nt_get_current_peb() noex
 #elif defined(_MSC_VER)
 #if defined(_M_ARM64) || defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::arm::__getReg(18))->ProcessEnvironmentBlock;
-#elif defined(_M_AMD64) && !defined(_M_ARM64EC)
+#elif defined(_M_AMD64) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::peb *>(::fast_io::intrinsics::msvc::x86::__readgsqword(0x60));
 #elif defined(_M_IX86)
 	return reinterpret_cast<::fast_io::win32::nt::peb *>(::fast_io::intrinsics::msvc::x86::__readfsdword(0x30));
@@ -365,7 +365,7 @@ FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline teb *nt_current_teb() noexcept
 #elif defined(_MSC_VER)
 #if defined(_M_ARM64) || defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::arm::__getReg(18));
-#elif defined(_M_AMD64) && !defined(_M_ARM64EC)
+#elif defined(_M_AMD64) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::x86::__readgsqword(0x30));
 #elif defined(_M_IX86)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::x86::__readfsdword(0x18));

@@ -114,6 +114,9 @@ inline constexpr void write_all_bytes_overflow_define(basic_crypto_hash_as_file<
 namespace manipulators
 {
 
+/// @brief Encodes the object representation of a contiguous iterator range as lowercase hexadecimal.
+/// @details Elements must be trivially copyable; every byte in `[first, last)` is encoded in memory order as two hex
+///          digits. The view is borrowed and the source must remain valid through formatting.
 template <::std::contiguous_iterator Iter>
 	requires ::std::is_trivially_copyable_v<::std::iter_value_t<Iter>>
 inline constexpr ::fast_io::basic_hex_encode<false> hex_encode(Iter first, Iter last) noexcept
@@ -129,6 +132,8 @@ inline constexpr ::fast_io::basic_hex_encode<false> hex_encode(Iter first, Iter 
 	}
 }
 
+/// @brief Encodes the object representation of a contiguous iterator range as uppercase hexadecimal.
+/// @details Byte order and lifetime semantics match `hex_encode`; only `A-F` case changes.
 template <::std::contiguous_iterator Iter>
 	requires ::std::is_trivially_copyable_v<::std::iter_value_t<Iter>>
 inline constexpr ::fast_io::basic_hex_encode<true> hex_encode_upper(Iter first, Iter last) noexcept
@@ -144,6 +149,9 @@ inline constexpr ::fast_io::basic_hex_encode<true> hex_encode_upper(Iter first, 
 	}
 }
 
+/// @brief Encodes a contiguous trivially-copyable range as lowercase hexadecimal bytes.
+/// @details The complete object representation, including padding bytes if present, is observed in memory order. The
+///          range is borrowed and must outlive formatting.
 template <::std::ranges::contiguous_range rg>
 	requires ::std::is_trivially_copyable_v<::std::ranges::range_value_t<rg>>
 inline constexpr ::fast_io::basic_hex_encode<false> hex_encode(rg &&r) noexcept
@@ -151,6 +159,8 @@ inline constexpr ::fast_io::basic_hex_encode<false> hex_encode(rg &&r) noexcept
 	return hex_encode(::std::to_address(::std::ranges::begin(r)), ::std::to_address(::std::ranges::end(r)));
 }
 
+/// @brief Encodes a contiguous trivially-copyable range as uppercase hexadecimal bytes.
+/// @details Semantics match the lowercase range overload except for alphabetic digit case.
 template <::std::ranges::contiguous_range rg>
 	requires ::std::is_trivially_copyable_v<::std::ranges::range_value_t<rg>>
 inline constexpr ::fast_io::basic_hex_encode<true> hex_encode_upper(rg &&r) noexcept
@@ -158,36 +168,49 @@ inline constexpr ::fast_io::basic_hex_encode<true> hex_encode_upper(rg &&r) noex
 	return hex_encode_upper(::std::to_address(::std::ranges::begin(r)), ::std::to_address(::std::ranges::end(r)));
 }
 
+/// @brief Adapts a hash context to a byte sink with an explicitly selected character type.
+/// @details Writes update `hashctx` rather than producing ordinary file output. The context is borrowed and must remain
+///          alive; finalization is not performed automatically by the adapter.
 template <::std::integral char_type, typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<char_type, T> basic_as_file(T &hashctx) noexcept
 {
 	return {__builtin_addressof(hashctx)};
 }
 
+/// @brief Adapts a hash context to a `char` byte sink.
+/// @details The returned observer forwards written bytes to `hashctx.update` and does not own or finalize the context.
 template <typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<char, T> as_file(T &hashctx) noexcept
 {
 	return {__builtin_addressof(hashctx)};
 }
 
+/// @brief Adapts a hash context to a `wchar_t` byte sink.
+/// @details Character type selects the IO observer surface; hashing still consumes raw bytes.
 template <typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<wchar_t, T> was_file(T &hashctx) noexcept
 {
 	return {__builtin_addressof(hashctx)};
 }
 
+/// @brief Adapts a hash context to a `char8_t` byte sink.
+/// @details The context is borrowed and receives raw write bytes without implicit finalization.
 template <typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<char8_t, T> u8as_file(T &hashctx) noexcept
 {
 	return {__builtin_addressof(hashctx)};
 }
 
+/// @brief Adapts a hash context to a `char16_t` byte sink.
+/// @details The adapter changes only the observer's character type; hash updates remain byte-oriented.
 template <typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<char16_t, T> u16as_file(T &hashctx) noexcept
 {
 	return {__builtin_addressof(hashctx)};
 }
 
+/// @brief Adapts a hash context to a `char32_t` byte sink.
+/// @details The returned observer borrows `hashctx` and forwards raw written bytes to it.
 template <typename T>
 inline constexpr ::fast_io::basic_crypto_hash_as_file<char32_t, T> u32as_file(T &hashctx) noexcept
 {
@@ -199,20 +222,30 @@ inline constexpr ::fast_io::basic_crypto_hash_as_file<char32_t, T> u32as_file(T 
 namespace manipulators
 {
 
+/// @brief Models a mutable hash context with incremental update and finalization operations.
+/// @details The concept checks syntax only; algorithms using it may impose stronger state-machine requirements such as
+///          forbidding updates after finalization.
 template <typename T>
 concept crypto_hash_context = requires(T t, ::std::byte *ptr) {
 	t.update(ptr, ptr);
 	t.do_final();
 };
 
+/// @brief Models a hash context whose digest size is a compile-time member.
+/// @details `digest_size` is interpreted as a byte count by digest formatting.
 template <typename T>
 concept compile_time_size_crypto_hash_context = requires(T t) { ::std::remove_cvref_t<T>::digest_size; };
 
+/// @brief Models a hash context that reports its digest size at run time.
+/// @details `runtime_digest_size()` must yield a byte count convertible to `size_t`.
 template <typename T>
 concept runtime_size_crypto_hash_context = requires(T t) {
 	{ t.runtime_digest_size() } -> ::std::convertible_to<::std::size_t>;
 };
 
+/// @brief Selects the external representation of a finalized hash digest.
+/// @details `lower` and `upper` encode each digest byte as two hexadecimal digits; `raw_bytes` emits the digest bytes
+///          directly and can therefore contain zero and non-text code units.
 enum class digest_format
 {
 	lower,
@@ -220,6 +253,9 @@ enum class digest_format
 	raw_bytes
 };
 
+/// @brief Non-owning request to print the current/finalized digest of a hash context.
+/// @details The context lifetime and required finalization state are the caller's responsibility. `d` determines text
+///          hexadecimal versus raw-byte output.
 template <digest_format d, typename T>
 struct hash_digest_t
 {
@@ -228,24 +264,34 @@ struct hash_digest_t
 	reference_type reference;
 };
 
+/// @brief Emits a hash context's digest as lowercase hexadecimal.
+/// @details The context is borrowed; the manipulator does not imply ownership and callers must satisfy its digest-state
+///          contract before formatting.
 template <crypto_hash_context ctx>
 inline constexpr hash_digest_t<digest_format::lower, ctx const &> hash_digest(ctx const &r) noexcept
 {
 	return {r};
 }
 
+/// @brief Emits a hash context's digest as uppercase hexadecimal.
+/// @details Digest bytes and ordering match `hash_digest`; only hexadecimal case differs.
 template <crypto_hash_context ctx>
 inline constexpr hash_digest_t<digest_format::upper, ctx const &> hash_digest_upper(ctx const &r) noexcept
 {
 	return {r};
 }
 
+/// @brief Emits a hash context's digest as raw bytes.
+/// @details Output is binary, not textual, and may contain null bytes. The context is borrowed.
 template <crypto_hash_context ctx>
 inline constexpr hash_digest_t<digest_format::raw_bytes, ctx const &> hash_digest_raw_bytes(ctx const &r) noexcept
 {
 	return {r};
 }
 
+/// @brief Hidden carrier for hashing/compressing a borrowed byte range and formatting the resulting digest.
+/// @details `base`/`len` describe raw bytes; `d` selects lowercase, uppercase, or raw digest output. The producing
+///          factory does not own the range.
 template <digest_format d, crypto_hash_context T>
 struct hash_compress_t
 {
@@ -255,6 +301,9 @@ struct hash_compress_t
 	::std::size_t len{};
 };
 
+/// @brief Hashes a contiguous trivially-copyable range and emits the digest as lowercase hexadecimal.
+/// @details The range's complete object representation is consumed in memory order; padding bytes are included. The
+///          range remains borrowed through formatting.
 template <crypto_hash_context ctx, ::std::ranges::contiguous_range T>
 	requires(::std::is_trivially_copyable_v<::std::ranges::range_value_t<T>> && !::std::is_array_v<T>)
 inline constexpr hash_compress_t<digest_format::lower, ctx> hash_compress(T const &t) noexcept
@@ -270,6 +319,8 @@ inline constexpr hash_compress_t<digest_format::lower, ctx> hash_compress(T cons
 	}
 }
 
+/// @brief Hashes a contiguous trivially-copyable range and emits the digest as uppercase hexadecimal.
+/// @details Input bytes match `hash_compress`; only digest hex case differs.
 template <crypto_hash_context ctx, ::std::ranges::contiguous_range T>
 	requires(::std::is_trivially_copyable_v<::std::ranges::range_value_t<T>> && !::std::is_array_v<T>)
 inline constexpr hash_compress_t<digest_format::upper, ctx> hash_compress_upper(T const &t) noexcept
@@ -285,6 +336,8 @@ inline constexpr hash_compress_t<digest_format::upper, ctx> hash_compress_upper(
 	}
 }
 
+/// @brief Hashes a contiguous trivially-copyable range and emits the digest bytes directly.
+/// @details The output is binary and may contain arbitrary byte values; the source range is borrowed.
 template <crypto_hash_context ctx, ::std::ranges::contiguous_range T>
 	requires(::std::is_trivially_copyable_v<::std::ranges::range_value_t<T>> && !::std::is_array_v<T>)
 inline constexpr hash_compress_t<digest_format::raw_bytes, ctx> hash_compress_raw_bytes(T const &t) noexcept
@@ -540,6 +593,7 @@ inline constexpr char_type *prv_srv_hash_compress_df_impl(char_type *iter, ::std
 
 } // namespace details
 
+/// @feature concept:static_precise_size
 template <::std::integral char_type, ::fast_io::manipulators::digest_format d,
 		  ::fast_io::manipulators::compile_time_size_crypto_hash_context T>
 	requires(static_cast<::std::size_t>(d) < static_cast<::std::size_t>(3))

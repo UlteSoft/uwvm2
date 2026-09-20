@@ -208,6 +208,53 @@ namespace test
         return mod;
     }
 
+    [[nodiscard]] inline u8string build_imported_and_defined_table_module() noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string import_payload;
+        append_uleb128(import_payload, 1u);
+        append_uleb128(import_payload, 1u);
+        append_byte(import_payload, static_cast<::std::uint8_t>('m'));
+        append_uleb128(import_payload, 1u);
+        append_byte(import_payload, static_cast<::std::uint8_t>('t'));
+        append_byte(import_payload, 0x01u);
+        append_byte(import_payload, 0x70u);
+        append_byte(import_payload, 0x00u);
+        append_uleb128(import_payload, 1u);
+        append_section_with_payload(mod, 2u, import_payload);
+
+        append_table_section(mod);
+        return mod;
+    }
+
+    [[nodiscard]] inline u8string build_externref_table_module() noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string payload;
+        append_uleb128(payload, 1u);
+        append_byte(payload, 0x6Fu);
+        append_byte(payload, 0x00u);
+        append_uleb128(payload, 1u);
+        append_section_with_payload(mod, 4u, payload);
+        return mod;
+    }
+
+    [[nodiscard]] inline u8string build_element_flag_prefix_module(::std::uint32_t flag) noexcept
+    {
+        u8string mod;
+        append_wasm_header(mod);
+
+        u8string payload;
+        append_uleb128(payload, 1u);
+        append_uleb128(payload, flag);
+        append_section_with_payload(mod, 9u, payload);
+        return mod;
+    }
+
     [[nodiscard]] inline u8string build_data_count_zero_module() noexcept
     {
         u8string mod;
@@ -277,6 +324,8 @@ namespace test
         auto& p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
         p1_para.disable_multi_value = false;
         p1_para.disable_reference_types = false;
+        p1_para.disable_table_instructions = false;
+        p1_para.disable_multiple_tables = false;
         p1_para.disable_bulk_memory = false;
         p1_para.disable_sign_extension = false;
         p1_para.disable_nontrapping_float_to_int = false;
@@ -331,6 +380,56 @@ namespace test
         }
     }
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline void expect_feature_error(u8string const& wasm,
+                                     ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                     ::uwvm2::parser::wasm::base::wasm1p1_feature_kind expected_feature,
+                                     char const* label)
+    {
+        auto const* const begin{reinterpret_cast<::std::byte const*>(wasm.data())};
+        auto const* const end{begin + wasm.size()};
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        try
+        {
+            static_cast<void>(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Fs...>(begin, end, err, fs_para));
+            fail(label);
+        }
+        catch(::fast_io::error const&)
+        {
+        }
+
+        if(err.err_code != ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_feature_required ||
+           err.err_selectable.wasm1p1_feature_required.feature != expected_feature) [[unlikely]]
+        {
+            fail(label);
+        }
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline void expect_wasm2_feature_error(u8string const& wasm,
+                                           ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                           ::uwvm2::parser::wasm::base::wasm2_feature_kind expected_feature,
+                                           char const* label)
+    {
+        auto const* const begin{reinterpret_cast<::std::byte const*>(wasm.data())};
+        auto const* const end{begin + wasm.size()};
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        try
+        {
+            static_cast<void>(::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Fs...>(begin, end, err, fs_para));
+            fail(label);
+        }
+        catch(::fast_io::error const&)
+        {
+        }
+
+        if(err.err_code != ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm2_feature_required ||
+           err.err_selectable.wasm2_feature_required.feature != expected_feature) [[unlikely]]
+        {
+            fail(label);
+        }
+    }
+
     inline void test_mvp_feature_rejections()
     {
         using wasm1 = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
@@ -349,6 +448,16 @@ namespace test
         expect_parse_error<wasm1, wasm1p1>(
             multi_result_module, mvp_multi_para, error_code::wasm1_not_allow_multi_value, "mvp parser accepted multi-result type");
 
+        feature_para_t canonical_multi_disable_para{};
+        auto& canonical_multi_disable_p1{
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(canonical_multi_disable_para)};
+        canonical_multi_disable_p1.disable_multi_value = true;
+        canonical_multi_disable_p1.controllable_allow_multi_result_vector = false;
+        expect_parse_error<wasm1, wasm1p1>(multi_result_module,
+                                           canonical_multi_disable_para,
+                                           error_code::wasm1_not_allow_multi_value,
+                                           "canonical multi-value disable was ignored unless the legacy control was also set");
+
         feature_para_t multi_value_para{};
         auto& multi_value_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(multi_value_para)};
         multi_value_p1.disable_multi_value = false;
@@ -361,15 +470,106 @@ namespace test
 
         feature_para_t mvp_table_para{};
         auto& mvp_table_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(mvp_table_para)};
-        mvp_table_p1.disable_reference_types = true;
-        mvp_table_p1.controllable_allow_multi_table = true;
+        mvp_table_p1.disable_multiple_tables = true;
         expect_parse_error<wasm1, wasm1p1>(two_table_module, mvp_table_para, error_code::wasm1_not_allow_multi_table, "mvp parser accepted multiple tables");
 
-        feature_para_t reference_types_para{};
-        auto& reference_types_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(reference_types_para)};
-        reference_types_p1.disable_reference_types = false;
-        reference_types_p1.controllable_allow_multi_table = false;
-        expect_parse_success<wasm1, wasm1p1>(two_table_module, reference_types_para, "reference-types parser switch did not allow multiple tables");
+        feature_para_t multiple_tables_para{};
+        auto& multiple_tables_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(multiple_tables_para)};
+        multiple_tables_p1.disable_multiple_tables = false;
+        expect_parse_success<wasm1, wasm1p1>(two_table_module, multiple_tables_para, "multiple-tables parser switch did not allow multiple tables");
+
+        auto imported_and_defined_table_module{build_imported_and_defined_table_module()};
+        expect_parse_error<wasm1, wasm1p1>(imported_and_defined_table_module,
+                                           mvp_table_para,
+                                           error_code::wasm1_not_allow_multi_table,
+                                           "multiple-tables disable missed imported+defined table total");
+
+        feature_para_t legacy_single_table_para{};
+        auto& legacy_single_table_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(legacy_single_table_para)};
+        legacy_single_table_p1.controllable_allow_multi_table = true;
+        expect_parse_error<wasm1, wasm1p1>(two_table_module,
+                                           legacy_single_table_para,
+                                           error_code::wasm1_not_allow_multi_table,
+                                           "legacy controllable multi-table switch stopped enforcing one table");
+
+        auto externref_table_module{build_externref_table_module()};
+        feature_para_t no_table_instructions_para{};
+        auto& no_table_instructions_p1{
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(no_table_instructions_para)};
+        no_table_instructions_p1.disable_table_instructions = true;
+        expect_wasm2_feature_error<wasm1, wasm1p1>(externref_table_module,
+                                                   no_table_instructions_para,
+                                                   ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                                   "table-instructions disable accepted generalized table type");
+
+        feature_para_t no_reference_types_para{};
+        auto& no_reference_types_p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(no_reference_types_para)};
+        no_reference_types_p1.disable_reference_types = true;
+        expect_feature_error<wasm1, wasm1p1>(externref_table_module,
+                                             no_reference_types_para,
+                                             ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                             "reference-types disable accepted externref table type");
+
+        auto expect_element_flag_feature = [&](::std::uint32_t flag,
+                                               ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
+                                               auto set_disabled,
+                                               char const* label)
+        {
+            feature_para_t para{};
+            auto& p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(para)};
+            set_disabled(p1);
+            expect_feature_error<wasm1, wasm1p1>(build_element_flag_prefix_module(flag), para, feature, label);
+        };
+        auto expect_wasm2_element_flag_feature = [&](::std::uint32_t flag,
+                                                     ::uwvm2::parser::wasm::base::wasm2_feature_kind feature,
+                                                     auto set_disabled,
+                                                     char const* label)
+        {
+            feature_para_t para{};
+            auto& p1{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(para)};
+            set_disabled(p1);
+            expect_wasm2_feature_error<wasm1, wasm1p1>(build_element_flag_prefix_module(flag), para, feature, label);
+        };
+        expect_element_flag_feature(1u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                    [](auto& p1) { p1.disable_bulk_memory = true; },
+                                    "element flag 1 was not gated by bulk-memory");
+        expect_wasm2_element_flag_feature(2u,
+                                          ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                                          [](auto& p1) { p1.disable_multiple_tables = true; },
+                                          "element flag 2 was not gated by multiple-tables");
+        expect_element_flag_feature(3u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                    [](auto& p1) { p1.disable_bulk_memory = true; },
+                                    "element flag 3 was not gated by bulk-memory");
+        expect_element_flag_feature(4u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                    [](auto& p1) { p1.disable_reference_types = true; },
+                                    "element flag 4 was not gated by reference-types");
+        expect_element_flag_feature(5u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                    [](auto& p1) { p1.disable_bulk_memory = true; },
+                                    "element flag 5 was not gated by bulk-memory");
+        expect_element_flag_feature(5u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                    [](auto& p1) { p1.disable_reference_types = true; },
+                                    "element flag 5 was not gated by reference-types");
+        expect_wasm2_element_flag_feature(6u,
+                                          ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                                          [](auto& p1) { p1.disable_multiple_tables = true; },
+                                          "element flag 6 was not gated by multiple-tables");
+        expect_element_flag_feature(6u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                    [](auto& p1) { p1.disable_reference_types = true; },
+                                    "element flag 6 was not gated by reference-types");
+        expect_element_flag_feature(7u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
+                                    [](auto& p1) { p1.disable_bulk_memory = true; },
+                                    "element flag 7 was not gated by bulk-memory");
+        expect_element_flag_feature(7u,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                    [](auto& p1) { p1.disable_reference_types = true; },
+                                    "element flag 7 was not gated by reference-types");
 
         auto data_count_module{build_data_count_zero_module()};
         feature_para_t default_bulk_para{};

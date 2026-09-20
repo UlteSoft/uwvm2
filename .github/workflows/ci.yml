@@ -90,7 +90,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-backend-tests:
-    if: ${{ !always() }}
     name: Linux (x86_64) uwvm-int + llvm-jit
     runs-on: ubuntu-latest
     env:
@@ -106,7 +105,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 wabt xmake
       - name: Configure
         run: |
           mkdir -p .github/tools
@@ -123,7 +122,9 @@ jobs:
             --execution-int=uwvm-int \
             --execution-jit=llvm \
             --enable-test-uwvm-int=y \
-            --enable-test-llvm-jit=y
+            --enable-test-llvm-jit=y \
+            --enable-test-backend-fuzzer=n \
+            --test-libfuzzer=n
       - name: Check UWVM version
         run: |
           xmake b -rv -j "${XMAKE_JOBS}" uwvm
@@ -133,7 +134,7 @@ jobs:
       - name: Run uwvm-int strict tests
         run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/strict/run_strict_basic_full.sh
       - name: Run llvm-jit tests
-        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0014.llvm_jit/run_llvm_jit_full.sh
+        run: UWVM_XMAKE_JOBS=1 bash test/0014.llvm_jit/run_llvm_jit_full.sh
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-sde-dmr:

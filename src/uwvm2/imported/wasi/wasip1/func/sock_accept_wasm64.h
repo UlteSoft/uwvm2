@@ -117,6 +117,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto& memory{*env.wasip1_memory};
 
+        // fd remains a 32-bit handle in the mirrored wasm64 ABI.
+        check_wasip1_guest_pointer_alignment<4uz>(ro_fd_ptrsz, u8"sock_accept_wasm64.ro_fd (fd)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

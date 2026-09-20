@@ -47,7 +47,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             ") `if` with non-empty result requires an `else` branch: expected ",
+                                                             ") `if` without `else` requires identical parameter and result types: result count ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
                                                              ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
@@ -73,7 +73,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      "(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     ") `if` with non-empty result requires an `else` branch: expected ",
+                                                     ") `if` without `else` requires identical parameter and result types: result count ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
                                                      ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE));
@@ -107,7 +107,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             L") `if` with non-empty result requires an `else` branch: expected ",
+                                                             L") `if` without `else` requires identical parameter and result types: result count ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
                                                              ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
@@ -133,7 +133,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     L") `if` with non-empty result requires an `else` branch: expected ",
+                                                     L") `if` without `else` requires identical parameter and result types: result count ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
                                                      ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
@@ -167,7 +167,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u8") `if` with non-empty result requires an `else` branch: expected ",
+                                                             u8") `if` without `else` requires identical parameter and result types: result count ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
                                                              ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
@@ -193,7 +193,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u8") `if` with non-empty result requires an `else` branch: expected ",
+                                                     u8") `if` without `else` requires identical parameter and result types: result count ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_YELLOW),
                                                      ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE));
@@ -227,7 +227,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u") `if` with non-empty result requires an `else` branch: expected ",
+                                                             u") `if` without `else` requires identical parameter and result types: result count ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
                                                              ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
@@ -253,7 +253,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u") `if` with non-empty result requires an `else` branch: expected ",
+                                                     u") `if` without `else` requires identical parameter and result types: result count ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
                                                      ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
@@ -287,7 +287,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             U") `if` with non-empty result requires an `else` branch: expected ",
+                                                             U") `if` without `else` requires identical parameter and result types: result count ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
                                                              ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
@@ -313,7 +313,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     U") `if` with non-empty result requires an `else` branch: expected ",
+                                                     U") `if` without `else` requires identical parameter and result types: result count ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
                                                      ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));

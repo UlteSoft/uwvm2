@@ -437,7 +437,23 @@ namespace details
 #if __has_cpp_attribute(__gnu__::__pure__)
 [[__gnu__::__pure__]]
 #endif
-#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && defined(TARGET_OS_VISION) && TARGET_OS_VISION
+#if (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) &&        \
+	(!defined(__cpp_constexpr) || __cpp_constexpr < 202207L) && \
+	(FAST_IO_HAS_BUILTIN(__builtin_available) ||                \
+	 (defined(TARGET_OS_VISION) && TARGET_OS_VISION))
+/*
+The Darwin branch below contains a run-time availability predicate.  Its
+mapping invariant is unchanged: each `posix_clock_id` still selects exactly the
+same native clock or error path.  Before C++23, a non-template constexpr
+function had to admit at least one constant-evaluated execution, while
+`__builtin_available` is a run-time-only operation.  P2448R2 removed that
+diagnostic requirement and is first represented by
+`__cpp_constexpr >= 202207L`; the final C++23 working draft raises the
+cumulative value further to `202211L`.  Therefore only Darwin
+configurations below the P2448R2 feature level which form the availability (or
+visionOS error) branch drop constexpr; implementations at or above that level
+retain it, as do targets whose switch is entirely constant-expression-capable.
+*/
 inline auto
 #else
 inline constexpr auto
@@ -1380,6 +1396,7 @@ inline win32_timezone_t timezone_name(bool is_dst = posix_daylight())
 	return tzt;
 }
 
+/// @feature concept:runtime_precise_size
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char, win32_timezone_t>,
 												  win32_timezone_t tzt) noexcept
 {
@@ -1545,7 +1562,10 @@ inline void posix_clock_settime([[maybe_unused]] posix_clock_id pclk_id, [[maybe
 	struct timespec res{
 		static_cast<::std::time_t>(timestamp.seconds), static_cast<long>(timestamp.subseconds / mul_factor)};
 	auto clk{details::posix_clock_id_to_native_value(pclk_id)};
-#ifdef __linux__
+// New 32-bit Linux ABIs (e.g. RV32) only expose clock_settime64. Its kernel
+// timespec layout must not be guessed from a userspace timespec or aliased to
+// the old syscall number; libc performs the ABI conversion in the fallback.
+#if defined(__linux__) && defined(__NR_clock_settime)
 	system_call_throw_error(system_call<__NR_clock_settime, int>(clk, __builtin_addressof(res)));
 #else
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)

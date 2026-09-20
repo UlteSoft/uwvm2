@@ -169,6 +169,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         missing_code_body_end,
         exceed_the_max_parser_limit,
         wasm1p1_feature_required,
+        wasm2_feature_required,
         wasm1p1_invalid_data_count_section_count,
         wasm1p1_data_count_section_resolved_not_match_the_actual_number,
         wasm1p1_invalid_element_segment_flag,
@@ -291,6 +292,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         wasm1p1_error_subject subject;
     };
 
+    /// @brief WebAssembly 2.0 feature groups used by wasm2_feature_required.
+    enum class wasm2_feature_kind : ::std::uint_least8_t
+    {
+        table_instructions,
+        multiple_tables
+    };
+
+    /// @brief WebAssembly 2.0 syntax/semantic site used by wasm2-specific diagnostics.
+    enum class wasm2_error_subject : ::std::uint_least8_t
+    {
+        element_segment,
+        table_type,
+        instruction
+    };
+
+    /// @brief Used to set the output of wasm2_feature_required errors.
+    struct wasm2_feature_required_t
+    {
+        ::std::uint_least32_t value;
+        wasm2_feature_kind feature;
+        wasm2_error_subject subject;
+    };
+
     /// @brief Used to set the output of wasm1p1 data count mismatch errors.
     struct wasm1p1_data_count_mismatch_t
     {
@@ -358,6 +382,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         static_assert(::std::is_trivially_copyable_v<exceed_the_max_parser_limit_t> && ::std::is_trivially_destructible_v<exceed_the_max_parser_limit_t>);
         wasm1p1_feature_required_t wasm1p1_feature_required;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_feature_required_t> && ::std::is_trivially_destructible_v<wasm1p1_feature_required_t>);
+        wasm2_feature_required_t wasm2_feature_required;
+        static_assert(::std::is_trivially_copyable_v<wasm2_feature_required_t> && ::std::is_trivially_destructible_v<wasm2_feature_required_t>);
         wasm1p1_data_count_mismatch_t wasm1p1_data_count_mismatch;
         static_assert(::std::is_trivially_copyable_v<wasm1p1_data_count_mismatch_t> && ::std::is_trivially_destructible_v<wasm1p1_data_count_mismatch_t>);
         wasm1p1_reference_type_t wasm1p1_reference_type;

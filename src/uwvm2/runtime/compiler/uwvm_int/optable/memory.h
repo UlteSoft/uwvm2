@@ -23,12 +23,15 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <atomic>
+# include <concepts>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
 # include <bit>
 # include <limits>
 # include <memory>
+# include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -37,8 +40,10 @@
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/mutex/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
+# include <uwvm2/object/memory/flags/impl.h>
 # include "define.h"
 # include "storage.h"
 # include "register_ring.h"
@@ -103,6 +108,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename T>
+        UWVM_ALWAYS_INLINE inline constexpr void read_imm(::std::byte const*& ip, T& out) noexcept
+        {
+            ::std::memcpy(::std::addressof(out), ip, sizeof(out));
+            ip += sizeof(out);
+        }
+
+        template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr T read_imm(::std::byte const*& ip) noexcept
         {
             T v;  // no init
@@ -138,12 +150,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return ::std::bit_cast<wasm_i64>(tmp);
         }
 
+        // Decode little-endian bytes through an integer, then copy to the caller's
+        // storage. A correct bit_cast<Float> representation can still be lost in the
+        // helper's FP return ABI (GCC -O0/i386 ST0, including SSE2 arithmetic builds).
+        // Keeping the destination by reference avoids that return altogether; callers
+        // must also use byte copies on uncached stacks. Value-return overloads are
+        // for numerical consumers, not an end-to-end sNaN transport guarantee.
+        // The output-reference form is used by bit-preserving transport. A native FP return
+        // can quiet sNaNs even when the caller only intends to copy the representation.
+        UWVM_ALWAYS_INLINE inline constexpr void load_f32_le(::std::byte const* p, wasm_f32& out) noexcept
+        {
+            auto const bits{load_i32_le(p)};
+            ::std::memcpy(::std::addressof(out), ::std::addressof(bits), sizeof(out));
+        }
+
         UWVM_ALWAYS_INLINE inline constexpr wasm_f32 load_f32_le(::std::byte const* p) noexcept
         {
             ::std::uint_least32_t tmp;  // no init
             ::std::memcpy(::std::addressof(tmp), p, sizeof(tmp));
             tmp = ::fast_io::little_endian(tmp);
             return ::std::bit_cast<wasm_f32>(tmp);
+        }
+
+        // Decode little-endian bytes through an integer, then copy to the caller's
+        // storage. A correct bit_cast<Float> representation can still be lost in the
+        // helper's FP return ABI (GCC -O0/i386 ST0, including SSE2 arithmetic builds).
+        // Keeping the destination by reference avoids that return altogether; callers
+        // must also use byte copies on uncached stacks. Value-return overloads are
+        // for numerical consumers, not an end-to-end sNaN transport guarantee.
+        // The output-reference form is used by bit-preserving transport. A native FP return
+        // can quiet sNaNs even when the caller only intends to copy the representation.
+        UWVM_ALWAYS_INLINE inline constexpr void load_f64_le(::std::byte const* p, wasm_f64& out) noexcept
+        {
+            auto const bits{load_i64_le(p)};
+            ::std::memcpy(::std::addressof(out), ::std::addressof(bits), sizeof(out));
         }
 
         UWVM_ALWAYS_INLINE inline constexpr wasm_f64 load_f64_le(::std::byte const* p) noexcept
@@ -180,11 +220,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr void store_i64_le(::std::byte* p, wasm_i64 v) noexcept
         { store_u64_le(p, ::std::bit_cast<::std::uint_least64_t>(v)); }
 
-        UWVM_ALWAYS_INLINE inline constexpr void store_f32_le(::std::byte* p, wasm_f32 v) noexcept
-        { store_u32_le(p, ::std::bit_cast<::std::uint_least32_t>(v)); }
+        // Both stores accept storage by reference and copy to integer carriers before
+        // endian conversion. This avoids native FP argument/copy instructions (also
+        // seen in GCC's unoptimized _Float64 bit_cast path); memcpy itself is not
+        // arithmetic. A caller that already returned Float by value may have lost
+        // the signaling bit, so uncached store opfuncs copy directly from stack bytes.
+        UWVM_ALWAYS_INLINE inline constexpr void store_f32_le(::std::byte* p, wasm_f32 const& v) noexcept
+        {
+            ::std::uint_least32_t bits;
+            ::std::memcpy(::std::addressof(bits), ::std::addressof(v), sizeof(bits));
+            store_u32_le(p, bits);
+        }
 
-        UWVM_ALWAYS_INLINE inline constexpr void store_f64_le(::std::byte* p, wasm_f64 v) noexcept
-        { store_u64_le(p, ::std::bit_cast<::std::uint_least64_t>(v)); }
+        UWVM_ALWAYS_INLINE inline constexpr void store_f64_le(::std::byte* p, wasm_f64 const& v) noexcept
+        {
+            // GCC's unoptimized bit_cast<_Float64 -> u64> can use fld/fst.
+            // Explicit byte copying keeps even signaling NaNs unchanged.
+            ::std::uint_least64_t bits;
+            ::std::memcpy(::std::addressof(bits), ::std::addressof(v), sizeof(bits));
+            store_u64_le(p, bits);
+        }
 
         // Use integer arithmetic for byte-pointer offsetting on the runtime path to avoid UB when the effective offset is intentionally
         // outside the logical bounds (fault-based bounds checks rely on guard pages).
@@ -210,6 +265,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 return base + static_cast<::std::size_t>(offset);
             }
+        }
+
+        // Call only AFTER the reservation/bounds proof and while holding any required allocation pin.
+        // Guard faults are not transactional stores: a split/unaligned store can alter the in-bounds prefix first.
+        // The committed prefix ends on a custom-page boundary; page-local stores need no additional memory access.
+        template <typename MemoryT>
+        UWVM_ALWAYS_INLINE inline constexpr void prepare_memory_store_unlocked(MemoryT const& memory,
+            ::std::uint_least64_t effective_offset, ::std::size_t wasm_bytes) noexcept
+        {
+            if constexpr(MemoryT::can_mmap)
+            {
+                if(wasm_bytes <= 1uz || memory.require_dynamic_determination_memory_size()) { return; }
+                auto const page{::std::uint_least64_t{1u} << memory.custom_page_size_log2};
+                if(wasm_bytes > page || (effective_offset & (page - 1u)) > page - wasm_bytes) [[unlikely]]
+                {
+                    if UWVM_IF_NOT_CONSTEVAL
+                    {
+                        auto const last{ptr_add_u64(memory.memory_begin, effective_offset + wasm_bytes - 1uz)};
+                        auto const probe{*static_cast<::std::byte const volatile*>(last)};
+                        static_cast<void>(probe);
+                        // Keep non-volatile memcpy stores after the faulting probe without a CPU memory fence.
+                        ::std::atomic_signal_fence(::std::memory_order_seq_cst);
+                    }
+                }
+            }
+        }
+
+        template <::std::size_t WasmBytes, typename MemoryT>
+        UWVM_ALWAYS_INLINE inline constexpr ::std::byte* prepare_memory_store_pointer(MemoryT const& memory,
+            ::std::uint_least64_t effective_offset) noexcept
+        {
+            prepare_memory_store_unlocked(memory, effective_offset, WasmBytes);
+            return ptr_add_u64(memory.memory_begin, effective_offset);
         }
 
         // Mirror the JIT's "definitely fail" front-end for native memories: if the current page count already exceeds
@@ -340,6 +428,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
+        // Unlike a wasm64 carry, a wasm32 overflow flag accompanies the full widened sum on 64-bit hosts. Reject a
+        // wrapped/foreign carrier whose flag is set but whose stored offset is low; it is outside this proof's contract.
+# if defined(UWVM_SUPPORT_MMAP)
+        UWVM_ALWAYS_INLINE inline constexpr bool wasm32_full_mmap_can_use_hardware_bounds(memory_offset_t effective_offset,
+                                                                                         ::std::size_t wasm_bytes) noexcept
+        {
+            return ::uwvm2::object::memory::linear::wasm32_full_protection_covers_access(effective_offset.offset, wasm_bytes) &&
+                   (!effective_offset.offset_65_bit || effective_offset.offset > 0xffffffffull);
+        }
+# endif
+
         template <typename MemoryT>
         UWVM_ALWAYS_INLINE inline constexpr void check_memory_bounds_unlocked(MemoryT const& memory,
                                                                               ::std::size_t memory_idx,
@@ -356,7 +455,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
 
                 // mmap backend:
-                // - Full protection: no check on hot path, rely on page protection.
+                // - Full protection: the unsigned u32+u32 domain and supported access width fit entirely in the reservation.
                 // - Partial fixed protection: only check the fixed max (power-of-two) to avoid UB pointer overflow; the rest relies on page protection.
                 // - custom_page < platform_page: must do per-access dynamic bounds check using the atomic memory length.
                 if(memory.require_dynamic_determination_memory_size())
@@ -376,7 +475,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
                     {
                         // 64-bit platform:
-                        // - wasm32: full protection → no check
+                        // - wasm32: full protection covers widened u32+u32, including logical overflow into its back guard
                         // - wasm64: partial fixed protection (1<<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index)
 # if defined(UWVM_SUPPORT_MMAP)
                         if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64) [[unlikely]]
@@ -388,6 +487,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                 if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
                                 auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
+                                memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                            }
+                        }
+                        else if(!wasm32_full_mmap_can_use_hardware_bounds(effective_offset, wasm_bytes))
+                        {
+                            // Defensive fallback for future wider accesses or callers outside the proven u32+u32 domain.
+                            // Normal scalar/SIMD offsets and constant widths make this predicate disappear after inlining.
+                            auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
+                            if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
+                               effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
+                            {
                                 memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                             }
                         }
@@ -451,6 +561,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         return effective_offset.offset_65_bit ||
                                !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index>(effective_offset.offset);
+                    }
+                    if(!wasm32_full_mmap_can_use_hardware_bounds(effective_offset, wasm_bytes))
+                    {
+                        if(effective_offset.offset_65_bit) { return true; }
+                        auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
+                        return wasm_bytes > memory_length ||
+                               effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes);
                     }
 # endif
                     return false;
@@ -568,17 +685,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { check_memory_bounds_unlocked(memory, memory_idx, memory_static_offset, effective_offset, wasm_bytes); }
 
 # if defined(UWVM_SUPPORT_MMAP)
-        UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_full([[maybe_unused]] native_memory_t const& memory,
-                                                                        [[maybe_unused]] ::std::size_t memory_idx,
-                                                                        [[maybe_unused]] ::std::uint_least64_t memory_static_offset,
-                                                                        [[maybe_unused]] memory_offset_t effective_offset,
-                                                                        [[maybe_unused]] ::std::size_t wasm_bytes) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_full(native_memory_t const& memory,
+                                                                        ::std::size_t memory_idx,
+                                                                        ::std::uint_least64_t memory_static_offset,
+                                                                        memory_offset_t effective_offset,
+                                                                        ::std::size_t wasm_bytes) noexcept
         {
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const memory_begin{memory.memory_begin};
             if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
+            // The translator selects this entry only for a 64-bit full wasm32 reservation with custom_page >= platform_page.
+            // Both u32 operands were widened before addition; the complete sum and every supported scalar/SIMD access
+            // fit in its guard mapping. Keep a checked fallback for wider/future callers, not a per-access u32 overflow gate.
+            if(!wasm32_full_mmap_can_use_hardware_bounds(effective_offset, wasm_bytes)) [[unlikely]]
+            {
+                auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
+                if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
+                   effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
+                {
+                    memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                }
+            }
         }
 
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_path(native_memory_t const& memory,
@@ -655,13 +784,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         UWVM_ALWAYS_INLINE inline constexpr memory_offset_t wasm32_effective_offset(wasm_i32 addr, wasm_u32 static_offset) noexcept
         {
-            // uwvm2 memory addressing rule for wasm32:
-            //   effective = (i64)dynamic_offset(i32 signed) + (i64)static_offset(u32)
-            // and the result must be within [0, UINT32_MAX]; otherwise trap (overflow/underflow).
+            // WebAssembly interprets an i32 memory address by its unsigned bit pattern:
+            //   effective = (u64)(u32)dynamic_offset + (u64)static_offset
+            // and the result must be within [0, UINT32_MAX]; otherwise trap on overflow.
             //
             // Important: we intentionally forbid wrapped effective addresses from re-entering the protected range in fault-based bounds schemes.
             //
-            // On 64-bit ISAs it is typically cheaper to compute the signed sum in 64-bit and test the upper 32 bits once.
+            // On 64-bit ISAs it is typically cheaper to compute the unsigned sum in 64-bit and compare against UINT32_MAX once.
             // On 32-bit ISAs we keep a carry/borrow based implementation to avoid synthesizing 64-bit arithmetic.
             //
             // `offset_65_bit` is used as the effective-address out-of-range trap flag:
@@ -669,32 +798,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // - wasm64: carry/borrow beyond [0, UINT64_MAX]
             if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
             {
-                auto const dyn{static_cast<::std::int_least64_t>(addr)};
-                auto const stat{static_cast<::std::int_least64_t>(static_cast<::std::uint_least32_t>(static_offset))};
-                auto const sum_u64{static_cast<::std::uint_least64_t>(dyn + stat)};
-                bool const out_of_range{(sum_u64 & 0xffffffff00000000ull) != 0ull};
+                auto const dyn{static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(addr))};
+                auto const stat{static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(static_offset))};
+                auto const sum_u64{dyn + stat};
+                bool const out_of_range{sum_u64 > 0xffffffffull};
                 // Keep the full u64 sum in `.offset` to improve codegen: the caller can use the same 64-bit register for the address
-                // after checking `offset_65_bit`, avoiding extra masking/moves on 64-bit ISAs.
+                // after software checking or directly inside the proven full mmap reservation, avoiding extra masking/moves.
                 return memory_offset_t{.offset = sum_u64, .offset_65_bit = out_of_range};
             }
             else
             {
+                auto const dyn{static_cast<::std::uint_least32_t>(addr)};
                 auto const stat{static_cast<::std::uint_least32_t>(static_offset)};
-                ::std::uint_least32_t low{};  // no init
-                bool out_of_range{};          // no init
-
-                if(addr >= 0) [[likely]]
-                {
-                    auto const dyn{static_cast<::std::uint_least32_t>(addr)};
-                    out_of_range = add_overflow(dyn, stat, low);
-                }
-                else
-                {
-                    // effective = stat - abs(addr). Use unsigned arithmetic to avoid UB on INT32_MIN.
-                    auto const abs_dyn{static_cast<::std::uint_least32_t>(0u - static_cast<::std::uint_least32_t>(addr))};
-                    low = static_cast<::std::uint_least32_t>(stat - abs_dyn);
-                    out_of_range = stat < abs_dyn;
-                }
+                ::std::uint_least32_t low{};
+                auto const out_of_range{add_overflow(dyn, stat, low)};
 
                 return memory_offset_t{.offset = static_cast<::std::uint_least64_t>(low), .offset_65_bit = out_of_range};
             }
@@ -702,26 +819,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         UWVM_ALWAYS_INLINE inline constexpr memory_offset_t wasm64_effective_offset(wasm_i64 addr, ::std::uint_least64_t static_offset) noexcept
         {
-            // uwvm2 memory addressing rule for wasm64:
-            //   effective = (i128)dynamic_offset(i64 signed) + (i128)static_offset(u64)
-            // and the result must be within [0, UINT64_MAX]; otherwise trap (overflow/underflow).
-            //
-            // We keep this in terms of u64 add-with-carry / subtract-with-borrow to preserve clean codegen on targets without native i128.
-            ::std::uint_least64_t low{};  // no init
-            bool out_of_range{};          // no init
-
-            if(addr >= 0) [[likely]]
-            {
-                auto const dyn{static_cast<::std::uint_least64_t>(addr)};
-                out_of_range = add_overflow(dyn, static_offset, low);
-            }
-            else
-            {
-                auto const abs_dyn{static_cast<::std::uint_least64_t>(0ull - static_cast<::std::uint_least64_t>(addr))};
-                low = static_cast<::std::uint_least64_t>(static_offset - abs_dyn);
-                out_of_range = static_offset < abs_dyn;
-            }
-
+            // Future memory64 addresses, like memory32 addresses, are UNSIGNED bit patterns, not signed displacements.
+            // For example i64(-1) + offset 1 carries out of 64 bits; it must never wrap back to byte zero.
+            ::std::uint_least64_t low{};
+            auto const out_of_range{add_overflow(static_cast<::std::uint_least64_t>(addr), static_offset, low)};
             return memory_offset_t{.offset = low, .offset_65_bit = out_of_range};
         }
     }  // namespace details
@@ -734,7 +835,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         template <::std::size_t WasmBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
+        // Cold trap helpers are still called from interpreter opfuncs. The cold
+        // macro retains their platform calling convention (notably i386 fastcall);
+        // replacing it with a bare cold attribute can make a tail call ABI-invalid.
+        // Cold placement is only a layout hint, not a different argument ABI.
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_u32 = details::wasm_u32;
@@ -762,7 +867,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i32_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_u32 = details::wasm_u32;
@@ -812,7 +917,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i64_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_i64_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_i64 = details::wasm_i64;
@@ -867,7 +972,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f32_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_f32_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_f32 = details::wasm_f32;
@@ -922,7 +1027,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f64_store(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_INTERPRETER_OPFUNC_COLD_MACRO inline constexpr void trap_oob_f64_store(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_f64 = details::wasm_f64;
@@ -1140,7 +1245,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f32 out;
+            details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -1210,7 +1316,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            wasm_f64 out;
+            details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
             details::exit_memory_operation_memory_lock(memory);
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -1977,7 +2084,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2057,7 +2164,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+            details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2087,7 +2194,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
-            wasm_f32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
+            wasm_f32 value;
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
+            { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...); }
+            else
+            {
+                type...[1u] -= sizeof(value);
+                ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
+            }
 
             wasm_i32 addr{};
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
@@ -2137,7 +2251,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2167,7 +2281,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
-            wasm_f64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
+            wasm_f64 value;
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
+            { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...); }
+            else
+            {
+                type...[1u] -= sizeof(value);
+                ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
+            }
 
             wasm_i32 addr{};
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
@@ -2217,7 +2338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2289,12 +2410,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             if constexpr(StoreBytes == 1u)
             {
-                details::store_u8(details::ptr_add_u64(memory.memory_begin, eff),
+                details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff),
                                   static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least32_t>(value)));
             }
             else
             {
-                details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff),
+                details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff),
                                       static_cast<::std::uint_least16_t>(::std::bit_cast<::std::uint_least32_t>(value)));
             }
             details::exit_memory_operation_memory_lock(memory);
@@ -2385,17 +2506,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             if constexpr(StoreBytes == 1u)
             {
-                details::store_u8(details::ptr_add_u64(memory.memory_begin, eff),
+                details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff),
                                   static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             else if constexpr(StoreBytes == 2u)
             {
-                details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff),
+                details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff),
                                       static_cast<::std::uint_least16_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             else
             {
-                details::store_u32_le(details::ptr_add_u64(memory.memory_begin, eff),
+                details::store_u32_le(details::prepare_memory_store_pointer<4uz>(memory, eff),
                                       static_cast<::std::uint_least32_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             details::exit_memory_operation_memory_lock(memory);
@@ -2887,7 +3008,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f32 out;
+        details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -2918,7 +3040,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        wasm_f64 const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f64 out;
+        details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -3144,7 +3267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[maybe_unused]] auto guard{details::lock_memory(memory)};
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+        details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -3172,7 +3295,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[maybe_unused]] auto guard{details::lock_memory(memory)};
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_i64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+        details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -3192,7 +3315,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
-        wasm_f32 const value{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+        wasm_f32 value;
+        typeref...[1u] -= sizeof(value);
+        ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -3200,7 +3325,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[maybe_unused]] auto guard{details::lock_memory(memory)};
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_f32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+        details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -3220,7 +3345,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
-        wasm_f64 const value{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+        wasm_f64 value;
+        typeref...[1u] -= sizeof(value);
+        ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -3228,7 +3355,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         [[maybe_unused]] auto guard{details::lock_memory(memory)};
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        details::store_f64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
+        details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
     }
 
     template <unsigned StoreBytes, uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -3259,11 +3386,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         if constexpr(StoreBytes == 1u)
         {
-            details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least32_t>(value)));
+            details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least32_t>(value)));
         }
         else
         {
-            details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff),
+            details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff),
                                   static_cast<::std::uint_least16_t>(::std::bit_cast<::std::uint_least32_t>(value)));
         }
     }
@@ -3296,11 +3423,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
 
         auto const bits{::std::bit_cast<::std::uint_least64_t>(value)};
-        if constexpr(StoreBytes == 1u) { details::store_u8(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least8_t>(bits)); }
-        else if constexpr(StoreBytes == 2u) { details::store_u16_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least16_t>(bits)); }
+        if constexpr(StoreBytes == 1u) { details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff), static_cast<::std::uint_least8_t>(bits)); }
+        else if constexpr(StoreBytes == 2u) { details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff), static_cast<::std::uint_least16_t>(bits)); }
         else
         {
-            details::store_u32_le(details::ptr_add_u64(memory.memory_begin, eff), static_cast<::std::uint_least32_t>(bits));
+            details::store_u32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), static_cast<::std::uint_least32_t>(bits));
         }
     }
 

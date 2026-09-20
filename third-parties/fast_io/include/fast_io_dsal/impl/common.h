@@ -112,18 +112,21 @@ inline constexpr ::std::size_t cal_grow_twice_size(::std::size_t cap) noexcept
 	}
 	else if (cap > mx_half_value)
 	{
-		if constexpr (trivial)
-		{
-			return mx_value;
-		}
-		else
-		{
-			return 1;
-		}
+		// Formal growth invariant: for every non-maximum live capacity, the
+		// returned capacity is strictly larger than `cap` and no greater than
+		// `mx_value`. Doubling above the half-maximum boundary would overflow;
+		// saturating preserves that invariant for both byte-counted trivial
+		// storage and element-counted non-trivial storage.
+		return mx_value;
 	}
 	else if (cap == 0)
 	{
-		return size;
+		// `cap` is a byte count in the type-erased trivial path but an
+		// element count in the typed non-trivial path. Therefore the same
+		// one-element initial allocation is `size` bytes in the former and
+		// exactly one allocator unit in the latter; returning `size` elements
+		// for a non-trivial T makes initial capacity grow with sizeof(T).
+		return trivial ? size : 1u;
 	}
 	return static_cast<::std::size_t>(cap << 1);
 }

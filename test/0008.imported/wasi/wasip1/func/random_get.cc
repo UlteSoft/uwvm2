@@ -69,7 +69,8 @@ int main()
         constexpr ::std::size_t GUARD_SIZE{16u};
         constexpr ::std::size_t BUF_LEN{64u};
 
-        constexpr wasi_void_ptr_t guard_before_ptr{4096u};
+        // Pointer<u8> has alignment 1.  Keep the whole guarded region odd-addressed to catch accidental generic alignment enforcement.
+        constexpr wasi_void_ptr_t guard_before_ptr{4097u};
         constexpr wasi_void_ptr_t buf{static_cast<wasi_void_ptr_t>(guard_before_ptr + static_cast<wasi_void_ptr_t>(GUARD_SIZE))};
         constexpr wasi_void_ptr_t guard_after_ptr{static_cast<wasi_void_ptr_t>(buf + static_cast<wasi_void_ptr_t>(BUF_LEN))};
 

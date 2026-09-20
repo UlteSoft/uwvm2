@@ -24,6 +24,8 @@ module;
 #include <concepts>
 #include <limits>
 #include <memory>
+#include <type_traits>
+#include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 
@@ -32,8 +34,10 @@ export module uwvm2.validation.standard.wasm1p1:validator;
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.utils.intrinsics;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
+import uwvm2.parser.wasm.utils;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard;
 import uwvm2.validation.error;

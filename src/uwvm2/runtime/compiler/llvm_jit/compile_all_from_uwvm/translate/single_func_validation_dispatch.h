@@ -95,6 +95,9 @@ for(;;)
     {
         // Most opcode cases validate only and leave IR emission to the single-instruction emitter.  Cases that need
         // validation-local data may emit inline and set `llvm_jit_instruction_emitted_inline` themselves.
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]] { emit_llvm_jit_active = false; }
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 }

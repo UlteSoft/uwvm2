@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Cmp == int_cmp::ge_u) { return static_cast<UnsignedT>(lhs) >= static_cast<UnsignedT>(rhs); }
             else
             {
-                static_assert(Cmp != Cmp, "unhandled integer compare opcode");
+                static_assert(dependent_false_v<Cmp>, "unhandled integer compare opcode");
             }
         }
 
@@ -118,7 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Cmp == float_cmp::ge) { return lhs >= rhs; }
             else
             {
-                static_assert(Cmp != Cmp, "unhandled float compare opcode");
+                static_assert(dependent_false_v<Cmp>, "unhandled float compare opcode");
             }
         }
 

@@ -103,6 +103,32 @@ io_bytes_stream_ref_define(basic_win32_family_socket_io_observer<family, char_ty
 	return {value.hsocket};
 }
 
+template <win32_family family, ::std::integral char_type>
+inline constexpr ::std::true_type print_semantic_optional_scatter_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_win32_family_socket_io_observer<family, char_type>>) noexcept
+{
+	// This closed observer has no associated status-print customization. It intentionally declares neither native
+	// scatter output nor a fallback-coalescing threshold, so the consumer cannot merge separate WSASend operations or
+	// change datagram message boundaries. The marker only supplies the destination proof needed by an otherwise
+	// independently valid plan; every available path retains the ordinary ordered nonempty write sequence.
+	return {};
+}
+
+template <win32_family family, ::std::integral char_type>
+inline constexpr ::std::true_type
+print_semantic_optional_scatter_barrier_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_win32_family_socket_io_observer<family, char_type>>) noexcept
+{
+	// The ordinary scanner completes the same admitted prefix before a direct-only barrier and resumes on the same
+	// immutable socket handle afterward. Repeating that existing boundary preserves WSASend call order, partial-write
+	// exception prefixes, line ownership, and stream or datagram framing because this proof adds no coalescing policy.
+	return {};
+}
+
 namespace win32::details
 {
 inline ::std::byte const *win32_socket_write_bytes_impl(::std::size_t socket, ::std::byte const *first,

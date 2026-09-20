@@ -5,11 +5,11 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Release 2.0 (Draft 2025-01-30)
+ * @brief       WebAssembly Release 2.0 (2024-08-09)
  * @details     antecedent dependency: WebAssembly Release 1.1 (Draft 2021-11-16)
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-02
+ * @date        2026-07-11
  * @copyright   APL-2.0 License
  */
 
@@ -25,4 +25,5 @@
 #pragma once
 #ifndef UWVM_MODULE
 # include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm2/features/impl.h>
 #endif

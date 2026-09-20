@@ -37,6 +37,7 @@
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
+# include <uwvm2/utils/container/impl.h>  // Direct dependency, matching loader.cppm.
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/madvise/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>

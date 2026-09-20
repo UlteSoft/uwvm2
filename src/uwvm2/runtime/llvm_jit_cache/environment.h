@@ -30,6 +30,7 @@
 # include <cstdint>
 # include <cstring>
 # include <memory>
+# include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
@@ -54,6 +55,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+
+#include "source_provenance_policy.h"
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
@@ -433,7 +436,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         auto out{details::make_cache_key(u8"uwvm-runtime-abi")};
         // The schema version separates intentional ABI-fingerprint changes from ordinary project version changes.
-        details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v4");
+        details::append_cache_key_value(out, u8"schema", u8"uwvm2-runtime-abi-v12");
+        // Do not rely on git/source ids to distinguish products: both builds
+        // may deliberately receive the same id from an embedding application.
+        details::append_cache_key_value(out, u8"product", cache_product_name);
+        // v128 now crosses private Wasm-to-Wasm calls as an LLVM byte vector, not an i128 integer pair.
+        // Also reject old objects that could partially write a crossing store before its guard fault.
+        details::append_cache_key_value(out, u8"llvm-wasm-v128-abi", u8"ssa-byte-vector16-v1");
+        // Reject objects emitted before the no-NEON AArch64 bitmask, i386
+        // no-x87/PPC32 minmax, and SPARC demotion repairs. Identical Wasm,
+        // LLVM version and CPU features alone do not identify a safe lowering.
+        // Keep this independent of project version/source-id discipline.
+        // v3 additionally excludes x86_64 no-SSE FP-return libcalls and VE's
+        // unsupported short-vector VPU lowering. A source-id escape hatch must
+        // not let a previously cached unsafe object bypass these repairs.
+        details::append_cache_key_value(out, u8"llvm-simd-scalar-lowering", u8"scalar-target-contract-v3");
+        details::append_cache_key_value(out, u8"guarded-store", u8"cross-custom-page-last-byte-preflight-v1");
+        // Native objects may omit the u32-sum overflow branch only with the matching unsigned-domain mmap layout.
+        // Never reuse such code with the former 2-GiB-front-guard reservation, even when project version fields match.
+        details::append_cache_key_value(out, u8"wasm32-mmap-layout", u8"unsigned-8g-domain-tail64-v1");
+        // Older native policies retained logical instrumentation; never reuse those objects as native-only code.
+        details::append_cache_key_value(out, u8"native-call-stack", u8"physical-activation-no-logical-jit-v1");
+        // The successful live probe now uses unique ELF temporary labels on
+        // RISC-V/LoongArch. Replaying an older object with aliased FDE labels
+        // after that probe would lose frames. Key this independently of source
+        // IDs and external LLVM's unchanged version string, for full AND lazy.
+        details::append_cache_key_value(out, u8"llvm-elf-local-symbols", u8"unique-temporary-labels-v1");
+        // Full/lazy native MIPS selection requires full-width register calls.
+        // v2 adds noabicalls: O32/N32 ignored v1's long-calls alone, retaining
+        // non-t9 loader stubs. A new probe must not admit those cached objects.
+        details::append_cache_key_value(out, u8"llvm-mips-call-relocations", u8"full-width-noabicalls-c-abi-v2");
 #if defined(UWVM_VERSION_X)
         details::append_cache_key_value_u64(out, u8"version-x", static_cast<::std::uint_least64_t>(UWVM_VERSION_X));
 #else
@@ -459,6 +491,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::append_cache_key_value(out, u8"git-commit", u8"unknown");
 #endif
+#if defined(UWVM2_BUILD_SOURCE_ID)
+        details::append_cache_key_value(out, u8"build-source-id", UWVM2_BUILD_SOURCE_ID);
+#else
+        details::append_cache_key_value(out, u8"build-source-id", u8"unknown");
+#endif
 #if defined(UWVM_GIT_COMMIT_DATA)
         details::append_cache_key_value(out, u8"git-commit-date", UWVM_GIT_COMMIT_DATA);
 #else
@@ -466,8 +503,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
 #if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
         details::append_cache_key_value(out, u8"git-dirty", u8"1");
-#else
+#elif defined(UWVM_GIT_COMMIT_ID)
         details::append_cache_key_value(out, u8"git-dirty", u8"0");
+#else
+        details::append_cache_key_value(out, u8"git-dirty", u8"unknown");
 #endif
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         details::append_cache_key_value(out, u8"runtime-jit", u8"uwvm-int-llvm-jit-tiered");
@@ -478,7 +517,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         // Keep cached native objects separated when runtime bridge symbol naming or bridge-call ABI details change.
-        details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"semantic-discriminator-and-type-v1");
+        // v3 also makes generated raw-call operands and status values register-wide, avoiding target-specific narrow
+        // integer extension attributes at the handwritten LLVM/C++ ABI boundary.
+        details::append_cache_key_value(out, u8"llvm-jit-bridge-symbol-abi", u8"generated-register-wide-internal-entry-v3");
+        details::append_cache_key_value(out, u8"llvm-wasm-typed-result-abi", u8"void-scalar-tuple-struct-v1");
+        details::append_cache_key_value(out, u8"llvm-wasm-nan-arithmetic", u8"native-constrained-v1");
+        details::append_cache_key_value(out, u8"llvm-native-stack-probes", u8"inline-supported-targets-riscv-half-page-v2");
+#if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+        // Reject the old volatile-stack address workaround even without a git
+        // revision: optimization could reintroduce unsafe literal-pool fixups.
+        // Do not add this RISC-V-only revision on other ISAs.
+        details::append_cache_key_value(out, u8"llvm-riscv64-host-address", u8"inline-li-no-data-relocation-v2");
+#endif
+        // These keys invalidate machine code, not merely diagnostics. A build can
+        // lack an embedded git revision yet load old objects with ST0 returns,
+        // double rounding or unnormalized native NaNs. Keep independent ABI and
+        // arithmetic-semantic revisions so cache hits cannot bypass a source fix.
+        // Native globals use integer carriers on every target. i386 additionally
+        // uses integer FP results even on SSE2 hosts; old ST0 objects are incompatible.
+        // The x86_64 no-SSE byte-buffer path now also excludes x87 transport
+        // and FP-return rounding libcalls. Keep ordinary host C FP ABIs intact.
+        details::append_cache_key_value(out, u8"llvm-wasm-fp-bit-abi", u8"integer-globals-x86-no-sse-transport-v2");
+        details::append_cache_key_value(out, u8"llvm-wasm-native-nan", u8"canonical-native-rounding-v1");
+        // RV32 f64 nearest must not reload an object requiring an unavailable
+        // C23 roundeven libcall (e.g. musl), even without a git revision in the key.
+        details::append_cache_key_value(out, u8"llvm-wasm-rv32-nearest", u8"fixed-rne-d-or-integer-v1");
+        // Separates pre-fix objects even when a build has no embedded git revision.
+        details::append_cache_key_value(out, u8"llvm-wasm-fp-rounding", u8"extended-round-to-odd-v1");
+        details::append_cache_key_value(out, u8"llvm-wasm-fp-rounding-mode",
+            ::uwvm2::runtime::compiler::shared::strict_float::needs_extended_rounding
+                ? ::uwvm2::utils::container::u8string_view{u8"extended"}
+                : ::uwvm2::utils::container::u8string_view{u8"native"});
 #endif
         return out;
     }
@@ -487,7 +556,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         cache_context const& ctx) noexcept
     {
         ::fast_io::sha256_context sha{};
-        details::seed_sha256_update_literal(sha, u8"uwvm2-llvm-jit-cache-ed25519-seed-v1");
+        // Separate the deterministic integrity domains as well as disk paths.
+        // This is not a secret-key boundary against a same-account attacker.
+        details::seed_sha256_update_literal(sha, u8"uwvm2-llvm-jit-cache-ed25519-seed-v2");
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
         // The user id prevents one local account from producing cache signatures accepted as another account.
         details::seed_sha256_update_literal(sha, u8"posix-user");
@@ -529,6 +600,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         policy.generate_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_sign;
         policy.verify_signature = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_no_verify;
 #endif
+        constexpr source_provenance_policy_inputs provenance_policy{
+#if defined(UWVM_GIT_COMMIT_ID)
+            .has_git_commit = true,
+#endif
+#if defined(UWVM2_BUILD_SOURCE_ID)
+            .has_verified_build_source_id = true,
+#endif
+#if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
+            .git_worktree_is_dirty = true,
+#endif
+#if defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)
+            .allow_unsafe_dirty_cache = true,
+#endif
+#if defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE)
+            .allow_unsafe_unprovenanced_cache = true,
+#endif
+        };
+        // The generated module hash does not cover host bridge/runtime/unwind semantics. Likewise, a deterministic
+        // signature provides integrity and context binding, not source provenance. Therefore dirty or unidentified
+        // source builds cannot publish or reuse persistent native objects unless their distinct developer-only
+        // escape hatch was explicitly selected at build time.
+        if(!source_provenance_allows_persistent_cache(provenance_policy)) { policy.enable = false; }
         // If signing support is missing, disabling the whole cache is safer than silently accepting unsigned native code.
         if(policy.enable && (policy.generate_signature || policy.verify_signature) && !cache_ed25519_identity_signature_available) { policy.enable = false; }
         return policy;

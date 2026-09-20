@@ -121,6 +121,29 @@ inline constexpr io_type_t<scan_string_context> scan_context_type(
 	return {};
 }
 
+/// The string scanner obtains its cursor only from the bounded whitespace/line-feed searches above. Assigning or
+/// appending to the destination cannot alter the supplied input span, so every transition returns a member of the
+/// original closed range for every supported character type.
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename traits,
+		  typename allocator_type>
+inline constexpr ::std::true_type scan_context_result_in_range(
+	io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<
+									 flags, ::std::basic_string<char_type, traits, allocator_type> &>>) noexcept
+{
+	return {};
+}
+
+/// Default `std::basic_string` token scanning appends every character up to the first C whitespace and accepts that
+/// accumulated token at EOF. For a source-proved nonempty whitespace-free fragment, range construction therefore has
+/// the identical value while avoiding a redundant delimiter search and context transition.
+template <::std::integral char_type, typename traits, typename allocator_type>
+inline constexpr ::std::true_type scan_c_space_free_fragment_constructible(
+	io_reserve_type_t<char_type,
+		::std::basic_string<char_type, traits, allocator_type>>) noexcept
+{
+	return {};
+}
+
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename traits,
 		  typename allocator_type>
 inline constexpr parse_result<char_type const *> scan_context_define(
@@ -139,24 +162,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(
 	io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<
 									 flags, ::std::basic_string<char_type, traits, allocator_type> &>>,
 	scan_string_context skip_space_done,
-	::fast_io::manipulators::scalar_manip_t<flags, ::std::basic_string<char_type, traits, allocator_type> &>
-		str) noexcept
+	::fast_io::manipulators::scalar_manip_t<flags, ::std::basic_string<char_type, traits, allocator_type> &>) noexcept
 {
-	if constexpr (flags.line || flags.noskipws)
-	{
-		if (str.reference.empty())
-		{
-			return ::fast_io::parse_code::end_of_file;
-		}
-		else
-		{
-			return ::fast_io::parse_code::ok;
-		}
-	}
-	else
-	{
-		return ::fast_io::details::scan_context_eof_string_define_impl(skip_space_done.copying);
-	}
+	return ::fast_io::details::scan_context_eof_string_define_impl(skip_space_done.copying);
 }
 
 template <::std::integral char_type, typename traits, typename allocator_type>
@@ -198,6 +206,10 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(
 namespace manipulators
 {
 
+/// @brief Reads one line into a `std::basic_string` destination.
+/// @details Characters up to the line-feed delimiter are stored; ordinary spaces are preserved. The destination is
+///          borrowed and modified by the scan. The line feed is consumed but not stored, and a preceding carriage
+///          return remains part of the resulting string.
 template <::std::integral char_type, typename traits, typename allocator_type>
 inline constexpr ::fast_io::manipulators::scalar_manip_t<::fast_io::details::string_default_scalar_flags<false, true>,
 														 ::std::basic_string<char_type, traits, allocator_type> &>
@@ -206,6 +218,8 @@ line_get(::std::basic_string<char_type, traits, allocator_type> &line_str) noexc
 	return {line_str};
 }
 
+/// @brief Reads the complete remaining input into a `std::basic_string` destination.
+/// @details Whitespace and line breaks are treated as data; completion is determined by the whole-input scan protocol.
 template <::std::integral char_type, typename traits, typename allocator_type>
 inline constexpr ::fast_io::manipulators::whole_get_t<::std::basic_string<char_type, traits, allocator_type> &>
 whole_get(::std::basic_string<char_type, traits, allocator_type> &whole_str) noexcept

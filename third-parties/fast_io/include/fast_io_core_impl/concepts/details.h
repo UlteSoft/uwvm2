@@ -1,5 +1,14 @@
 ﻿#pragma once
 
+/*
+ * Internal witnesses used to validate protocol composition.
+ *
+ * Dummy streams and related helpers let concepts instantiate printable and
+ * buffer expressions without requiring a real device. They exist solely to
+ * prove structural compatibility among CPO families and must never be treated
+ * as run-time fallback devices or public IO entry points.
+ */
+
 namespace fast_io::details
 {
 

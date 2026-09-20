@@ -18,6 +18,9 @@ namespace fast_io
 namespace manipulators
 {
 
+/// @brief Concatenates arguments using legacy narrow C++ `operator<<` formatting and returns `std::string`.
+/// @details This intentionally uses `std::ostringstream`, so locale, sentry, allocation, and user-defined stream
+///          insertion semantics apply; it is an interoperability adapter rather than fast_io formatting.
 template <typename... Args>
 	requires(sizeof...(Args) != 0)
 inline ::std::string operator_output(Args const &...args)
@@ -38,6 +41,8 @@ inline ::std::string operator_output(Args const &...args)
 }
 
 #if (!defined(_LIBCPP_VERSION)) || _LIBCPP_HAS_WIDE_CHARACTERS
+/// @brief Concatenates arguments using legacy wide C++ `operator<<` formatting and returns `std::wstring`.
+/// @details Semantics match `operator_output` in the wide-character iostream domain.
 template <typename... Args>
 	requires(sizeof...(Args) != 0)
 inline ::std::basic_string<wchar_t> woperator_output(Args const &...args)

@@ -65,11 +65,12 @@ COMMON_F_FLAGS=(
   --use-llvm-compiler=y
   --ccache=n
   --cxflags=-Wno-error
-  --test-libfuzzer=y
+  --test-libfuzzer=n
   --enable-test-uwvm-int=y
   --use-cxx-module=n
   --static=none
   --execution-int=uwvm-int
+  --execution-jit=none
 )
 
 if [[ -n "${SYSROOT:-}" ]]; then

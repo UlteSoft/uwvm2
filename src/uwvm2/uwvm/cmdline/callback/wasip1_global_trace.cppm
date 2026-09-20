@@ -27,6 +27,9 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+#endif
 
 export module uwvm2.uwvm.cmdline.callback:wasip1_global_trace;
 
@@ -38,6 +41,7 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.cmdline.params;
+import uwvm2.imported.wasi.wasip1.environment;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;
 
 #ifndef UWVM_MODULE

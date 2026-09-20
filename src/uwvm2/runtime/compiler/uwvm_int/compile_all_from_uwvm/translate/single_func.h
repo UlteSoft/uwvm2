@@ -34,6 +34,7 @@ namespace details
         using table_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>;
         using memory_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>;
         using global_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>;
+        using export_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>;
         using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
         using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
         using data_count_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>;
@@ -199,6 +200,8 @@ namespace details
             validation_module.sections)};
         auto& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::global_section_storage_t>(
             validation_module.sections)};
+        auto& exportsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::export_section_storage_t>(
+            validation_module.sections)};
         auto& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::element_section_storage_t>(
             validation_module.sections)};
         auto& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_section_storage_t>(
@@ -303,6 +306,18 @@ namespace details
             globalsec.local_globals.push_back_unchecked(*local_global.local_global_type_ptr);
         }
 
+        // The standard validators derive the declared ref.func set from exports, globals, and element segments.
+        // Runtime storage already keeps that exact union; synthetic function exports preserve export-only declarations.
+        exportsec.exports.reserve(curr_module.declared_ref_funcidx_vec_storage.size());
+        using synthetic_export_t = ::std::remove_cvref_t<decltype(exportsec.exports.front_unchecked())>;
+        for(auto const func_index: curr_module.declared_ref_funcidx_vec_storage)
+        {
+            synthetic_export_t synthetic_export{};
+            synthetic_export.exports.type = validation_module_traits_t::external_types::func;
+            synthetic_export.exports.storage.func_idx = func_index;
+            exportsec.exports.push_back_unchecked(::std::move(synthetic_export));
+        }
+
         elemsec.elems.reserve(curr_module.local_defined_element_vec_storage.size());
         for(auto const& local_element: curr_module.local_defined_element_vec_storage)
         {
@@ -317,16 +332,13 @@ namespace details
             datasec.datas.push_back_unchecked(*local_data.data_type_ptr);
         }
 
-        if(!curr_module.local_defined_data_vec_storage.empty())
-        {
-            datacountsec.present = true;
-            datacountsec.count = checked_cast_size_to_wasm_u32(curr_module.local_defined_data_vec_storage.size());
-        }
+        datacountsec.present = curr_module.data_count_section_present;
+        datacountsec.count = curr_module.data_count_section_count;
 
         return validation_module;
     }
 
-    inline constexpr void validate_runtime_module_with_standard_wasm1p1_validator(
+    inline constexpr void validate_runtime_module_with_standard_validator(
         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
         ::uwvm2::validation::error::code_validation_error_impl& err,
         parser_feature_parameter_t const* wasm_feature_parameter) UWVM_THROWS
@@ -342,8 +354,7 @@ namespace details
             if(local_func.wasm_code_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
             auto const code_begin{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.expr_begin)};
             auto const code_end{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.code_end)};
-            ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                                  validation_module,
+            ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(validation_module,
                                                                   import_func_count + local_function_idx,
                                                                   code_begin,
                                                                   code_end,
@@ -707,7 +718,7 @@ inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter
 
     auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
     details::initialize_local_defined_call_info(curr_module, options, storage);
-    details::validate_runtime_module_with_standard_wasm1p1_validator(curr_module, err, wasm_feature_parameter);
+    details::validate_runtime_module_with_standard_validator(curr_module, err, wasm_feature_parameter);
 
     split_config = resolve_effective_compile_task_split_config(curr_module, split_config, extra_compile_threads);
 

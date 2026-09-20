@@ -34,10 +34,7 @@ function mingw_target()
 
     add_cxflags("-fno-rtti") -- disable rtti
     
-    if not is_mode("debug") then
-        add_cxflags("-fno-unwind-tables") -- disable unwind tables
-        add_cxflags("-fno-asynchronous-unwind-tables") -- disable asynchronous unwind tables
-    end
+    uwvm_add_native_unwind_cxflags()
 
     if is_kind("binary") then
         set_extension(".exe")

@@ -36,6 +36,14 @@ inline ::std::byte const *posix_pwrite_bytes_impl(int fd, ::std::byte const *fir
 inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::fast_io::io_scatter_t const *pscatter,
 																	 ::std::size_t n, ::fast_io::intfpos_t off)
 {
+	// preadv has the same IOV_MAX contract as readv. In particular, Linux's raw syscall rejects more than UIO_MAXIOV
+	// descriptors even though raw Linux and WASI wrappers transport iovcnt as size_t; libc paths require an int iovcnt.
+	// Treat the cap as one positional "some" prefix. The generic positional read-all loop derives the consumed byte
+	// count from the returned status before advancing both off and the descriptor span, so a following call resumes at
+	// exactly the first unread byte rather than truncating the request at this boundary. If the admitted prefix is all
+	// empty, scatter_size_to_status maps the zero-byte result to {n,0}; advancing n descriptors and zero bytes preserves
+	// off and prevents that legal boundary from being mistaken for EOF.
+	n = ::std::min(n, ::fast_io::details::posix_scatter_maximum_count);
 #if defined(__linux__) && defined(__NR_preadv)
 	auto ret{system_call<__NR_preadv, ::std::ptrdiff_t>(fd, pscatter, n, off)};
 	::fast_io::linux_system_call_throw_error(ret);
@@ -82,7 +90,8 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::f
 #elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.16, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
 	{
-		ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+		ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter),
+										 static_cast<int>(n), off);
 	}
 	else
 	{
@@ -106,7 +115,8 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::f
 		return {n, 0};
 	}
 #else
-	ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+	ret = ::fast_io::noexcept_call(::preadv, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter),
+									 static_cast<int>(n), off);
 #endif
 	if (ret == -1)
 	{
@@ -117,8 +127,13 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pread_bytes_impl(int fd, ::f
 }
 
 inline ::fast_io::io_scatter_status_t posix_scatter_pwrite_bytes_impl(int fd, ::fast_io::io_scatter_t const *pscatter,
-																	  ::std::size_t n, ::fast_io::intfpos_t off)
+																		  ::std::size_t n, ::fast_io::intfpos_t off)
 {
+	// Enforce the iovec limit again where pwritev is entered. Although the generic all-operation batches and its
+	// some-operation clamps, syscall adapters are a trust boundary: keeping this guard local prevents an oversized
+	// iovcnt from reaching an int-based libc ABI or the kernel if another adapter bypasses the generic dispatcher.
+	// Clamping descriptors does not alter off; this one positional some-call still describes the legal input prefix.
+	n = ::std::min(n, ::fast_io::details::posix_scatter_maximum_count);
 #if defined(__linux__) && defined(__NR_pwritev)
 	auto ret{system_call<__NR_pwritev, ::std::ptrdiff_t>(fd, pscatter, n, off)};
 	::fast_io::linux_system_call_throw_error(ret);
@@ -165,7 +180,8 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pwrite_bytes_impl(int fd, ::
 #elif (defined(__APPLE__) || defined(__DARWIN_C_LEVEL)) && FAST_IO_HAS_BUILTIN(__builtin_available)
 	if (__builtin_available(macOS 10.16, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) [[likely]]
 	{
-		ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+		ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter),
+										  static_cast<int>(n), off);
 	}
 	else
 	{
@@ -189,7 +205,8 @@ inline ::fast_io::io_scatter_status_t posix_scatter_pwrite_bytes_impl(int fd, ::
 		return {n, 0};
 	}
 #else
-	ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter), n, off);
+	ret = ::fast_io::noexcept_call(::pwritev, fd, reinterpret_cast<iovec_may_alias_const_ptr>(pscatter),
+									  static_cast<int>(n), off);
 #endif
 	if (ret == -1)
 	{

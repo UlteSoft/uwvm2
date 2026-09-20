@@ -15,23 +15,21 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 
 	constexpr ::std::size_t tocopybytes{sizeof(char_type) * 2u};
 
-	constexpr ::std::uint_least32_t mask24{(UINT32_C(1) << UINT32_C(24)) - UINT32_C(1)};
+	constexpr ::std::uint_least32_t mask24{(static_cast<::std::uint_least32_t>(1) << static_cast<::std::uint_least32_t>(24)) - static_cast<::std::uint_least32_t>(1)};
 
-	constexpr ::std::uint_least32_t magic24{(UINT32_C(1) << UINT32_C(24)) / UINT32_C(100) + UINT32_C(1)};
+	constexpr ::std::uint_least32_t magic24{(static_cast<::std::uint_least32_t>(1) << static_cast<::std::uint_least32_t>(24)) / static_cast<::std::uint_least32_t>(100) + static_cast<::std::uint_least32_t>(1)};
 
-	constexpr ::std::uint_least32_t magic32{UINT32_C(429497)};
+	constexpr ::std::uint_least32_t magic32{static_cast<::std::uint_least32_t>(429497)};
 
-	constexpr ::std::uint_least64_t magic48{UINT32_C(281474977)};
+	constexpr ::std::uint_least64_t magic48{static_cast<::std::uint_least32_t>(281474977)};
 	if constexpr (isfirst)
 	{
-#if __has_cpp_attribute(assume)
-		[[assume(first8 < UINT32_C(100000000))]];
-#endif
-		if (first8 < UINT32_C(10000))
+		FAST_IO_ASSUME(first8 < static_cast<::std::uint_least32_t>(100000000));
+		if (first8 < static_cast<::std::uint_least32_t>(10000))
 		{
-			if (first8 < UINT32_C(100))
+			if (first8 < static_cast<::std::uint_least32_t>(100))
 			{
-				bool const lessthan10{first8 < UINT32_C(10)};
+				bool const lessthan10{first8 < static_cast<::std::uint_least32_t>(10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan10 + (first8 << 1), tocopybytes);
 				iter += 1 + (!lessthan10);
 			}
@@ -39,12 +37,10 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 			{
 				::std::uint_least32_t const f0{static_cast<::std::uint_least32_t>(first8 * magic24)};
 				::std::uint_least32_t const f2{
-					static_cast<::std::uint_least32_t>(((f0 & mask24) * UINT32_C(100)) >> UINT32_C(24))};
-				::std::uint_least32_t const f01{static_cast<::std::uint_least32_t>(f0 >> UINT32_C(24))};
-#if __has_cpp_attribute(assume)
-				[[assume(f01 < UINT32_C(100))]];
-#endif
-				bool const lessthan10{f01 < UINT32_C(10)};
+					static_cast<::std::uint_least32_t>(((f0 & mask24) * static_cast<::std::uint_least32_t>(100)) >> static_cast<::std::uint_least32_t>(24))};
+				::std::uint_least32_t const f01{static_cast<::std::uint_least32_t>(f0 >> static_cast<::std::uint_least32_t>(24))};
+				FAST_IO_ASSUME(f01 < static_cast<::std::uint_least32_t>(100));
+				bool const lessthan10{f01 < static_cast<::std::uint_least32_t>(10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan10 + (f01 << 1), tocopybytes);
 				iter += 1 + (!lessthan10);
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (f2 << 1), tocopybytes);
@@ -54,13 +50,11 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 		else
 		{
 			::std::uint_least32_t low, high;
-			if (first8 < UINT32_C(1000000))
+			if (first8 < static_cast<::std::uint_least32_t>(1000000))
 			{
 				low = ::fast_io::details::intrinsics::umul_least_32(first8, magic32, high);
-#if __has_cpp_attribute(assume)
-				[[assume(high < UINT32_C(100))]];
-#endif
-				bool const lessthan10{high < UINT32_C(10)};
+				FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
+				bool const lessthan10{high < static_cast<::std::uint_least32_t>(10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan10 + (high << 1), tocopybytes);
 				iter += 1 + (!lessthan10);
 			}
@@ -68,30 +62,22 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 			{
 				::std::uint_least64_t const temp{(magic48 * first8) >> 16};
 				low = ::fast_io::details::intrinsics::unpack_generic(temp, high);
-#if __has_cpp_attribute(assume)
-				[[assume(high < UINT32_C(100))]];
-#endif
-				bool const lessthan10{high < UINT32_C(10)};
+				FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
+				bool const lessthan10{high < static_cast<::std::uint_least32_t>(10)};
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + lessthan10 + (high << 1), tocopybytes);
 				iter += 1 + (!lessthan10);
-				low = ::fast_io::details::intrinsics::umul_least_32(low, UINT32_C(100), high);
-#if __has_cpp_attribute(assume)
-				[[assume(high < UINT32_C(100))]];
-#endif
+				low = ::fast_io::details::intrinsics::umul_least_32(low, static_cast<::std::uint_least32_t>(100), high);
+				FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 				::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (high << 1), tocopybytes);
 				iter += 2;
 			}
 
-			low = ::fast_io::details::intrinsics::umul_least_32(low, UINT32_C(100), high);
-#if __has_cpp_attribute(assume)
-			[[assume(high < UINT32_C(100))]];
-#endif
+			low = ::fast_io::details::intrinsics::umul_least_32(low, static_cast<::std::uint_least32_t>(100), high);
+			FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 			::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (high << 1), tocopybytes);
 
-			high = ::fast_io::details::intrinsics::umulh_least_32(low, UINT32_C(100));
-#if __has_cpp_attribute(assume)
-			[[assume(high < UINT32_C(100))]];
-#endif
+			high = ::fast_io::details::intrinsics::umulh_least_32(low, static_cast<::std::uint_least32_t>(100));
+			FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 			::fast_io::details::intrinsics::typed_memcpy(iter + 2, digitstb + (high << 1), tocopybytes);
 
 			iter += 4;
@@ -102,27 +88,19 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 		::std::uint_least64_t temp{(magic48 * first8) >> 16};
 		::std::uint_least32_t high;
 		::std::uint_least32_t low{::fast_io::details::intrinsics::unpack_generic(temp, high)};
-#if __has_cpp_attribute(assume)
-		[[assume(high < UINT32_C(100))]];
-#endif
+		FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 		::fast_io::details::intrinsics::typed_memcpy(iter, digitstb + (high << 1), tocopybytes);
 
-		low = ::fast_io::details::intrinsics::umul_least_32(low, UINT32_C(100), high);
-#if __has_cpp_attribute(assume)
-		[[assume(high < UINT32_C(100))]];
-#endif
+		low = ::fast_io::details::intrinsics::umul_least_32(low, static_cast<::std::uint_least32_t>(100), high);
+		FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 		::fast_io::details::intrinsics::typed_memcpy(iter + 2, digitstb + (high << 1), tocopybytes);
 
-		low = ::fast_io::details::intrinsics::umul_least_32(low, UINT32_C(100), high);
-#if __has_cpp_attribute(assume)
-		[[assume(high < UINT32_C(100))]];
-#endif
+		low = ::fast_io::details::intrinsics::umul_least_32(low, static_cast<::std::uint_least32_t>(100), high);
+		FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 		::fast_io::details::intrinsics::typed_memcpy(iter + 4, digitstb + (high << 1), tocopybytes);
 
-		high = ::fast_io::details::intrinsics::umulh_least_32(low, UINT32_C(100));
-#if __has_cpp_attribute(assume)
-		[[assume(high < UINT32_C(100))]];
-#endif
+		high = ::fast_io::details::intrinsics::umulh_least_32(low, static_cast<::std::uint_least32_t>(100));
+		FAST_IO_ASSUME(high < static_cast<::std::uint_least32_t>(100));
 		::fast_io::details::intrinsics::typed_memcpy(iter + 6, digitstb + (high << 1), tocopybytes);
 
 		iter += 8;
@@ -133,7 +111,7 @@ inline constexpr char_type *uprsv_handle8_impl(char_type *iter, ::std::uint_leas
 template <::std::integral char_type>
 inline constexpr char_type *uprsv32_impl(char_type *iter, ::std::uint_least32_t value) noexcept
 {
-	constexpr ::std::uint_least32_t onee8{UINT32_C(100000000)};
+	constexpr ::std::uint_least32_t onee8{static_cast<::std::uint_least32_t>(100000000)};
 
 	bool const lessthan1e8{value < onee8};
 
@@ -143,9 +121,7 @@ inline constexpr char_type *uprsv32_impl(char_type *iter, ::std::uint_least32_t 
 
 	if (!lessthan1e8)
 	{
-#if __has_cpp_attribute(assume)
-		[[assume(first8 < UINT32_C(4296))]];
-#endif
+		FAST_IO_ASSUME(first8 < static_cast<::std::uint_least32_t>(4296));
 		::std::uint_least32_t const f0{value - first8 * onee8};
 		iter = uprsv_handle8_impl<false>(iter, f0);
 	}
@@ -155,7 +131,7 @@ inline constexpr char_type *uprsv32_impl(char_type *iter, ::std::uint_least32_t 
 template <::std::integral char_type>
 inline constexpr char_type *uprsv64_impl(char_type *iter, ::std::uint_least64_t value) noexcept
 {
-	constexpr ::std::uint_least32_t onee8{UINT32_C(100000000)};
+	constexpr ::std::uint_least32_t onee8{static_cast<::std::uint_least32_t>(100000000)};
 #if 0
 	constexpr
 		::std::uint_least64_t onee16{static_cast<::std::uint_least64_t>(onee8)*static_cast<::std::uint_least64_t>(onee8)};
@@ -176,16 +152,12 @@ inline constexpr char_type *uprsv64_impl(char_type *iter, ::std::uint_least64_t 
 		if (!lessthan1e16)
 		{
 			::std::uint_least64_t const f0{first16 % onee8};
-#if __has_cpp_attribute(assume)
-			[[assume(f0 < UINT32_C(100000000))]];
-#endif
+			FAST_IO_ASSUME(f0 < static_cast<::std::uint_least32_t>(100000000));
 			::std::uint_least32_t const f032{static_cast<::std::uint_least32_t>(f0)};
 			iter = uprsv_handle8_impl<false>(iter, f032);
 		}
 		::std::uint_least64_t f0{value - first16 * onee8};
-#if __has_cpp_attribute(assume)
-		[[assume(f0 < UINT32_C(100000000))]];
-#endif
+		FAST_IO_ASSUME(f0 < static_cast<::std::uint_least32_t>(100000000));
 		::std::uint_least32_t const f032{static_cast<::std::uint_least32_t>(f0)};
 		iter = uprsv_handle8_impl<false>(iter, f032);
 	}
@@ -201,16 +173,14 @@ inline constexpr char_type *uprsv128_18digits_impl(char_type *iter, ::std::uint_
 
 	constexpr ::std::size_t tocopybytes{sizeof(char_type) * 2u};
 
-	constexpr ::std::uint_least32_t onee8{UINT32_C(100000000)};
+	constexpr ::std::uint_least32_t onee8{static_cast<::std::uint_least32_t>(100000000)};
 
 	::std::uint_least64_t a12{value / onee8};
 	::std::uint_least32_t a3{static_cast<::std::uint_least32_t>(value % onee8)};
 
 	::std::uint_least64_t a1u64{static_cast<::std::uint_least32_t>(a12 / onee8)};
 
-#if __has_cpp_attribute(assume)
-	[[assume(a1u64 < UINT32_C(100))]];
-#endif
+	FAST_IO_ASSUME(a1u64 < static_cast<::std::uint_least32_t>(100));
 
 	::std::uint_least32_t a1{static_cast<::std::uint_least32_t>(a1u64)};
 	::std::uint_least32_t a2{static_cast<::std::uint_least32_t>(a12 % onee8)};
@@ -239,9 +209,7 @@ inline constexpr char_type *uprsv128_impl(char_type *iter, __uint128_t value) no
 	if (value < onee36)
 	{
 		auto vdiv1_u128{value / onee18};
-#if __has_cpp_attribute(assume)
-		[[assume(vdiv1_u128 < onee18)]];
-#endif
+		FAST_IO_ASSUME(vdiv1_u128 < onee18);
 		low = static_cast<::std::uint_least64_t>(value % onee18);
 
 		iter = uprsv64_impl(iter, static_cast<::std::uint_least64_t>(vdiv1_u128));
@@ -250,17 +218,13 @@ inline constexpr char_type *uprsv128_impl(char_type *iter, __uint128_t value) no
 	{
 		auto vdiv{value / onee36};
 		auto vmod{value % onee36};
-#if __has_cpp_attribute(assume)
-		[[assume(vdiv < UINT32_C(1000))]];
-#endif
+		FAST_IO_ASSUME(vdiv < static_cast<::std::uint_least32_t>(1000));
 		::std::uint_least32_t vvv{static_cast<::std::uint_least32_t>(vdiv)};
 		iter = uprsv32_impl(iter, vvv);
 
 		auto vdiv1_u128{vmod / onee18};
-#if __has_cpp_attribute(assume)
 		constexpr auto pow10val{::fast_io::details::compile_time_pow<::std::uint_least64_t>(10, 18)};
-		[[assume(vdiv1_u128 < pow10val)]];
-#endif
+		FAST_IO_ASSUME(vdiv1_u128 < pow10val);
 
 		low = static_cast<::std::uint_least64_t>(vmod % onee18);
 		iter = uprsv128_18digits_impl(iter, static_cast<::std::uint_least64_t>(vdiv1_u128));

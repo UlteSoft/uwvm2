@@ -62,16 +62,41 @@ template <bool ctzero, ::std::integral T, ::std::size_t n>
 inline constexpr unsigned
 vector_mask_countr_common_no_intrinsics_impl(::fast_io::intrinsics::simd_vector<T, n> const &vec) noexcept
 {
-	constexpr ::std::size_t N{sizeof(::fast_io::intrinsics::simd_vector<T, n>) / sizeof(::std::uint_least64_t)};
-	unsigned d{vector_mask_countr_recursive_impl<ctzero, 0>(
-		static_cast<::fast_io::intrinsics::simd_vector<::std::uint_least64_t, N>>(vec))};
-	constexpr unsigned shift{
-		static_cast<unsigned>(::std::bit_width(sizeof(T) * (::std::numeric_limits<char unsigned>::digits - 1u)))};
-	d >>= shift;
-#if __has_cpp_attribute(assume)
-	[[assume(d <= n)]];
-#endif
-	return d;
+	if constexpr (::std::endian::native != ::std::endian::little)
+	{
+		// Native-integer bit scans visit memory lanes in address order only on little-endian targets. Inspecting mask
+		// elements directly preserves the API's lane-order contract on big- and mixed-endian implementations. C++
+		// comparison vectors represent true with every value bit set, so -1 is the exact countr-one sentinel.
+		constexpr T all_ones{static_cast<T>(-1)};
+		for (::std::size_t position{}; position != n; ++position)
+		{
+			T const element{vec[position]};
+			if constexpr (ctzero)
+			{
+				if (element != T{})
+				{
+					return static_cast<unsigned>(position);
+				}
+			}
+			else if (element != all_ones)
+			{
+				return static_cast<unsigned>(position);
+			}
+		}
+		return static_cast<unsigned>(n);
+	}
+	else
+	{
+		constexpr ::std::size_t N{sizeof(::fast_io::intrinsics::simd_vector<T, n>) /
+								  sizeof(::std::uint_least64_t)};
+		unsigned d{vector_mask_countr_recursive_impl<ctzero, 0>(
+			static_cast<::fast_io::intrinsics::simd_vector<::std::uint_least64_t, N>>(vec))};
+		constexpr unsigned shift{static_cast<unsigned>(
+			::std::bit_width(sizeof(T) * (::std::numeric_limits<char unsigned>::digits - 1u)))};
+		d >>= shift;
+		FAST_IO_ASSUME(d <= n);
+		return d;
+	}
 }
 
 inline constexpr bool calculate_can_intrinsics_accelerate_mask_countr(::std::size_t sizeofsimdvector) noexcept
@@ -184,9 +209,10 @@ inline
 	}
 	else
 	{
-		constexpr unsigned shift{
-			static_cast<unsigned>(::std::bit_width(sizeof(T) * ::std::numeric_limits<char>::digits) - 3)};
-		return d >> shift;
+		// pmovmskb and the WASM bitmask emit one predicate bit per byte, whereas this API reports element lanes.
+		// A true comparison lane contributes exactly `sizeof(T)` adjacent one-bits, so byte-count division recovers
+		// the element index for every supported integral width without an off-by-one logarithmic shift.
+		return d / static_cast<unsigned>(sizeof(T));
 	}
 }
 

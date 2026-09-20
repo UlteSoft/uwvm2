@@ -53,6 +53,8 @@ export import :runtime_custom_compiler;
 export import :runtime_compiler_log;
 export import :runtime_compile_threads;
 export import :runtime_scheduling_policy;
+// Named-module imports do not make macros visible ([module.import]). Keep this
+// partition graph unconditional; backend #if guards belong in each partition's .h.
 export import :runtime_llvm_jit_policy;
 export import :runtime_llvm_jit_lazy_policy;
 export import :runtime_llvm_jit_full_policy;

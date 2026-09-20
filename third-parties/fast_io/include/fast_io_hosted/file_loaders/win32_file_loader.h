@@ -107,7 +107,15 @@ inline ::std::size_t win32_file_loader_get_page_size() noexcept
 	return 4096u;
 }
 
+// The Win32 current-process pseudo-handle is a runtime bit-pattern, not a pre-C++23 constant expression: converting
+// its signed sentinel to a pointer is rejected while defining a constexpr function under the older constexpr rules.
+// P2448R2 deliberately relaxes that definition rule, advertised by __cpp_constexpr >= 202207L, so retain constexpr
+// exactly where the language permits it without weakening the C++20 Windows build.
+#if defined(__cpp_constexpr) && __cpp_constexpr >= 202207L
 inline constexpr void *win32_file_loader_current_process() noexcept
+#else
+inline void *win32_file_loader_current_process() noexcept
+#endif
 {
 	return reinterpret_cast<void *>(static_cast<::std::ptrdiff_t>(-1));
 }
@@ -647,6 +655,12 @@ public:
 	}
 	inline constexpr ::std::size_t padding_size() const noexcept
 	{
+		if (this->storage.address_end == this->storage.address_capacity)
+		{
+			// The equality case includes both ordinary mappings without extra bytes and the null disengaged state.
+			// Returning first keeps the query defined without pointer subtraction outside an array object.
+			return 0u;
+		}
 		return static_cast<::std::size_t>(storage.address_capacity - storage.address_end);
 	}
 	inline constexpr bool has_padding(::std::size_t n) const noexcept
@@ -835,9 +849,32 @@ public:
 
 template <win32_family family>
 inline constexpr basic_io_scatter_t<char> print_alias_define(io_alias_t,
-															 win32_family_file_loader<family> const &load) noexcept
+														 win32_family_file_loader<family> const &load) noexcept
 {
 	return {load.data(), load.size()};
+}
+
+/// @brief Reports the readable suffix reserved after a Win32 loader's semantic EOF.
+/// @details `address_capacity` excludes incidental allocation-granularity slack and names only the file size plus the
+///          requested extra character count. The family-independent difference from `address_end` is therefore the
+///          exact `contiguous_range_with_padding` value, while all ordinary range operations continue to stop at the
+///          true file end.
+template <win32_family family>
+inline constexpr ::std::size_t
+contiguous_range_padding_size(win32_family_file_loader<family> const &load) noexcept
+{
+	return load.padding_size();
+}
+
+/// @brief Marks a Win32-family file loader as the owner of its print-alias mapping.
+/// @details All family variants expose the loader's persistent mapped range; the alias does not allocate a conversion
+///          buffer or call an operation that can unmap it. Since source lifetime encloses print dispatch, retaining the
+///          scatter until the final write is valid for every family specialization.
+template <win32_family family>
+inline constexpr ::std::true_type
+print_borrowed_scatter_source(io_reserve_type_t<char, win32_family_file_loader<family>>) noexcept
+{
+	return {};
 }
 
 using win32_file_loader_9xa = win32_family_file_loader<win32_family::ansi_9x>;

@@ -19,26 +19,36 @@ using u32qt_qdebug = basic_qt_qdebug<char32_t>;
 namespace manipulators
 {
 
+/// @brief Wraps `QDebug` as a narrow-character fast_io output sink.
+/// @details The `QDebug` handle is copied into the observer; fast_io writes are forwarded as Qt debug data.
 inline ::fast_io::qt_qdebug qtdbg(QDebug qdbg)
 {
 	return {qdbg};
 }
 
+/// @brief Wraps `QDebug` as a `wchar_t` fast_io output sink.
+/// @details Character conversion follows the adapter's Qt write implementation.
 inline ::fast_io::wqt_qdebug wqtdbg(QDebug qdbg)
 {
 	return {qdbg};
 }
 
+/// @brief Wraps `QDebug` as a UTF-8-code-unit fast_io output sink.
+/// @details The returned observer owns its copied `QDebug` handle.
 inline ::fast_io::u8qt_qdebug u8qtdbg(QDebug qdbg)
 {
 	return {qdbg};
 }
 
+/// @brief Wraps `QDebug` as a UTF-16-code-unit fast_io output sink.
+/// @details Writes are forwarded through the Qt adapter without exposing a file descriptor.
 inline ::fast_io::u16qt_qdebug u16qtdbg(QDebug qdbg)
 {
 	return {qdbg};
 }
 
+/// @brief Wraps `QDebug` as a UTF-32-code-unit fast_io output sink.
+/// @details The adapter performs the required Qt-side conversion during writes.
 inline ::fast_io::u32qt_qdebug u32qtdbg(QDebug qdbg)
 {
 	return {qdbg};

@@ -43,9 +43,12 @@
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/call_indirect_immediate.h>
+# include <uwvm2/parser/wasm/standard/wasm2/features/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
+# include <uwvm2/validation/standard/wasm2/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
@@ -320,6 +323,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
+        [[noreturn]] inline constexpr void fail_lazy_wasm2_feature_required(
+            ::std::byte const* op_begin,
+            ::uwvm2::validation::error::code_validation_error_impl& err,
+            ::std::uint_least32_t value,
+            ::uwvm2::parser::wasm::base::wasm2_feature_kind feature,
+            ::uwvm2::parser::wasm::base::wasm2_error_subject subject) UWVM_THROWS
+        {
+            err.err_curr = op_begin;
+            err.err_selectable.wasm2_feature_required.value = value;
+            err.err_selectable.wasm2_feature_required.feature = feature;
+            err.err_selectable.wasm2_feature_required.subject = subject;
+            err.err_code = code_validation_error_code::wasm2_feature_required;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
         template <typename T>
         inline constexpr T read_leb128_immediate(::std::byte const*& code_curr,
                                                  ::std::byte const* code_end,
@@ -423,11 +441,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
             }
 
+            // control_op blocktype ...
+            // [  safe  ] unsafe (could be the section_end)
+            //            ^^ code_curr
+
             auto const blocktype_begin{code_curr};
             auto const blocktype{
                 read_leb128_immediate<wasm_i64>(code_curr, code_end, op_begin, code_validation_error_code::illegal_block_type, err)};
             auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
 
+            // control_op blocktype ...
+            // [       safe       ] unsafe (could be the section_end)
+            //                      ^^ code_curr
+
+            // read_leb128_immediate commits code_curr only after validating the complete immediate. A decode failure
+            // throws with code_curr still equal to blocktype_begin; grammar failures below occur after the commit.
             auto const fail_illegal_block_type{[&]() constexpr UWVM_THROWS
                                                {
                                                    wasm_byte first_blocktype_byte{};
@@ -442,9 +470,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                                }};
 
-            if(blocktype_encoded_size > 5uz) [[unlikely]] { fail_illegal_block_type(); }
+            if(blocktype_encoded_size > 5uz || (blocktype < 0 && blocktype_encoded_size != 1uz)) [[unlikely]]
+            {
+                fail_illegal_block_type();
+            }
 
             auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+            using wasm2_feature_kind = ::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind;
+            auto const wasm2_feature_enabled{[&](wasm2_feature_kind const feature) constexpr noexcept
+                                             { return ::uwvm2::parser::wasm::standard::wasm2::features::feature_enabled(wasm1p1_para, feature); }};
             switch(blocktype)
             {
                 case -64:
@@ -457,7 +491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 }
                 case -5:
                 {
-                    if(wasm1p1_para.disable_simd) [[unlikely]]
+                    if(!wasm2_feature_enabled(wasm2_feature_kind::simd)) [[unlikely]]
                     {
                         fail_lazy_feature_required(op_begin,
                                                    err,
@@ -471,7 +505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 case -16:
                 case -17:
                 {
-                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                    if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
                     {
                         auto const vt{blocktype == -16 ? ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref
                                                        : ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref};
@@ -491,7 +525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             if(blocktype >= 0)
             {
-                if(wasm1p1_para.disable_multi_value) [[unlikely]]
+                if(!wasm2_feature_enabled(wasm2_feature_kind::multi_value)) [[unlikely]]
                 {
                     fail_lazy_feature_required(op_begin,
                                                err,
@@ -703,13 +737,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::std::byte const* code_end,
                                                                    ::std::byte const* op_begin,
                                                                    wasm1_code curr_opbase,
+                                                                   runtime_module_storage_t const& curr_module,
                                                                    parser_feature_parameter_t const& wasm_feature_parameter,
                                                                    ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             // Non-structural immediates are skipped precisely so the scanner can continue finding block/loop/if/else/end opcodes
-            // without performing full stack validation or semantic checks.
+            // without performing full stack validation.  Where this indexing pass can reject an instruction, it preserves the
+            // eager validator's immediate-first semantic diagnostic order.
             /// @warning Extension point: every opcode with immediates must be listed here or lazy structural splitting will desynchronize.
             auto const& wasm1p1_para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+            using wasm2_feature_kind = ::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind;
+            auto const wasm2_feature_enabled{[&](wasm2_feature_kind const feature) constexpr noexcept
+                                             { return ::uwvm2::parser::wasm::standard::wasm2::features::feature_enabled(wasm1p1_para, feature); }};
+            auto const read_table_index = [&](wasm_u32 opcode) constexpr UWVM_THROWS -> wasm_u32
+            {
+                auto const table_index{
+                    read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err)};
+                if(!wasm2_feature_enabled(wasm2_feature_kind::multiple_tables) && table_index != 0u) [[unlikely]]
+                {
+                    fail_lazy_wasm2_feature_required(op_begin,
+                                                     err,
+                                                     opcode,
+                                                     ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                                                     ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
+                }
+                return table_index;
+            };
             switch(curr_opbase)
             {
                 case wasm1_code::br:
@@ -754,8 +807,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 }
                 case wasm1_code::call_indirect:
                 {
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_type_index, err);
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                    // call_indirect type_index table_index ...
+                    // [    safe   ] unsafe (could be the section_end)
+                    //               ^^ code_curr
+
+                    auto const type_index{
+                        read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_type_index, err)};
+
+                    // call_indirect type_index table_index ...
+                    // [          safe        ] unsafe (could be the section_end)
+                    //                          ^^ code_curr
+
+                    auto const mvp_reserved_zero_byte{
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_call_indirect_reserved_byte(wasm1p1_para)};
+                    wasm_u32 table_index{};
+                    if(!::uwvm2::parser::wasm::standard::wasm1p1::features::parse_call_indirect_trailing_immediate(
+                           code_curr, code_end, mvp_reserved_zero_byte, table_index)) [[unlikely]]
+                    {
+                        // The transactional decoder leaves code_curr at the trailing-immediate start on failure.
+                        // The splitter has already consumed the opcode and type index and does not rewind the whole instruction.
+                        fail_lazy_split(op_begin, code_validation_error_code::invalid_table_index, err);
+                    }
+
+                    // call_indirect type_index table_index ...
+                    // [                safe              ] unsafe (could be the section_end)
+                    //                                      ^^ code_curr
+
+                    // Both immediate fields are now completely decoded.  Match eager uwvm-int/LLVM/AOT for compound-invalid
+                    // operands: type bounds precede the multiple-tables feature gate; table cardinality remains the next check in
+                    // whole-function materialization.  Every semantic failure still identifies the opcode through err_curr.
+                    auto const types_begin{curr_module.type_section_storage.type_section_begin};
+                    auto const types_end{curr_module.type_section_storage.type_section_end};
+                    auto const all_type_count_uz{
+                        (types_begin == nullptr || types_end == nullptr) ? 0uz : static_cast<::std::size_t>(types_end - types_begin)};
+                    if(static_cast<::std::size_t>(type_index) >= all_type_count_uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_type_index.type_index = type_index;
+                        err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
+                        err.err_code = code_validation_error_code::illegal_type_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Reference Types/Core 2.0 keep the u32 grammar even when policy restricts the decoded value to zero.
+                    if(!mvp_reserved_zero_byte && !wasm2_feature_enabled(wasm2_feature_kind::multiple_tables) && table_index != 0u)
+                        [[unlikely]]
+                    {
+                        fail_lazy_wasm2_feature_required(
+                            op_begin,
+                            err,
+                            static_cast<wasm_u32>(static_cast<wasm_byte>(wasm1_code::call_indirect)),
+                            ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                            ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
+                    }
+
                     return;
                 }
                 case wasm1_code::local_get:
@@ -832,14 +937,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     {
                         case static_cast<wasm_byte>(wasm1p1_code::select_t):
                         {
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin,
+                                                           err,
+                                                           opcode_u32(wasm1p1_code::select_t),
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
+                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                            }
                             auto const result_type_count{
                                 read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_const_immediate, err)};
-                            if(result_type_count == 0u) { return; }
+
+                            // select_t result_type_count result_type ...
+                            // [           safe         ] unsafe (could be the section_end)
+                            //                            ^^ code_curr
+
                             if(result_type_count != 1u) [[unlikely]]
                             {
                                 fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err);
                             }
                             auto const result_type_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+
+                            // select_t result_type_count result_type ...
+                            // [                 safe               ] unsafe (could be the section_end)
+                            //                                        ^^ code_curr
+
+                            // Field commits are transactional: a count-LEB decode failure leaves the cursor after the opcode;
+                            // a decoded-count arity rejection or type decode failure leaves it after the count, and a
+                            // type-policy rejection follows the type byte.
                             ensure_lazy_wasm1p1_value_type_enabled(op_begin,
                                                                     result_type_byte,
                                                                     wasm_feature_parameter,
@@ -850,15 +975,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         case static_cast<wasm_byte>(wasm1p1_code::table_get):
                         case static_cast<wasm_byte>(wasm1p1_code::table_set):
                         {
-                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::table_instructions)) [[unlikely]]
                             {
-                                fail_lazy_feature_required(op_begin,
-                                                           err,
-                                                           static_cast<::std::uint_least32_t>(op_byte),
-                                                           ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                                           ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                fail_lazy_wasm2_feature_required(op_begin,
+                                                                 err,
+                                                                 static_cast<::std::uint_least32_t>(op_byte),
+                                                                 ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                                                 ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
                             }
-                            (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                            (void)read_table_index(static_cast<wasm_u32>(op_byte));
                             return;
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::i32_extend8_s):
@@ -867,7 +992,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         case static_cast<wasm_byte>(wasm1p1_code::i64_extend16_s):
                         case static_cast<wasm_byte>(wasm1p1_code::i64_extend32_s):
                         {
-                            if(wasm1p1_para.disable_sign_extension) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::sign_extension)) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -879,7 +1004,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_null):
                         {
-                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -907,7 +1032,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
                         {
-                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -919,7 +1044,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::ref_func):
                         {
-                            if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -950,7 +1075,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
                                 case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
                                 {
-                                    if(wasm1p1_para.disable_nontrapping_float_to_int) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::nontrapping_float_to_int)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -962,7 +1087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_init:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -976,7 +1101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::data_drop:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -989,7 +1114,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_copy:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1003,7 +1128,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::memory_fill:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1016,7 +1141,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::table_init:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1029,12 +1154,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                           op_begin,
                                                                           code_validation_error_code::illegal_element_index,
                                                                           err);
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    (void)read_table_index(subopcode);
                                     return;
                                 }
                                 case wasm1p1_numeric_code::elem_drop:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1051,7 +1176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 case wasm1p1_numeric_code::table_copy:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1059,27 +1184,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                                     }
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    (void)read_table_index(subopcode);
+                                    (void)read_table_index(subopcode);
                                     return;
                                 }
                                 case wasm1p1_numeric_code::table_grow:
                                 case wasm1p1_numeric_code::table_size:
                                 {
-                                    if(wasm1p1_para.disable_reference_types) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::table_instructions)) [[unlikely]]
                                     {
-                                        fail_lazy_feature_required(op_begin,
-                                                                   err,
-                                                                   subopcode,
-                                                                   ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
-                                                                   ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                        fail_lazy_wasm2_feature_required(op_begin,
+                                                                         err,
+                                                                         subopcode,
+                                                                         ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
+                                                                         ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
                                     }
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    (void)read_table_index(subopcode);
                                     return;
                                 }
                                 case wasm1p1_numeric_code::table_fill:
                                 {
-                                    if(wasm1p1_para.disable_bulk_memory) [[unlikely]]
+                                    if(!wasm2_feature_enabled(wasm2_feature_kind::bulk_memory)) [[unlikely]]
                                     {
                                         fail_lazy_feature_required(op_begin,
                                                                    err,
@@ -1087,7 +1212,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                                     }
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_table_index, err);
+                                    (void)read_table_index(subopcode);
                                     return;
                                 }
                                 [[unlikely]] default:
@@ -1101,7 +1226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::simd_prefix):
                         {
-                            if(wasm1p1_para.disable_simd) [[unlikely]]
+                            if(!wasm2_feature_enabled(wasm2_feature_kind::simd)) [[unlikely]]
                             {
                                 fail_lazy_feature_required(op_begin,
                                                            err,
@@ -1566,7 +1691,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     }
                     default:
                     {
-                        skip_wasm1_non_structural_immediates(code_curr, code_end, op_begin, curr_opbase, wasm_feature_parameter, err);
+                        skip_wasm1_non_structural_immediates(code_curr, code_end, op_begin, curr_opbase, curr_module, wasm_feature_parameter, err);
                         break;
                     }
                 }
@@ -1625,17 +1750,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
+        struct lazy_compile_state_notifier
+        {
+            inline constexpr void operator()(::uwvm2::utils::thread::lazy_compile_unit_state& unit) const noexcept
+            { ::uwvm2::utils::thread::lazy_compile_notify_unit(unit); }
+        };
+
+        template <typename Notify = lazy_compile_state_notifier>
         inline constexpr void mark_function_compile_units_state(lazy_module_storage_t& storage,
                                                                 lazy_function_storage_t& fn,
-                                                                ::uwvm2::utils::thread::lazy_compile_state state) noexcept
+                                                                ::uwvm2::utils::thread::lazy_compile_state state,
+                                                                Notify notify = {}) noexcept
         {
-            // Publish the function state first because whole-function materialization is currently authoritative for execution.
-            fn.materialization_state.state.store(state, ::std::memory_order_release);
+            static_assert(noexcept(notify(fn.materialization_state)), "lazy terminal-state notifiers must not throw");
+            // Publish and wake every compile-unit observer before the authoritative function state.  A waiter that acquires a
+            // terminal function state then also observes all sibling mirrors, while explicit notify calls wake Linux atomic::wait
+            // users instead of leaving them asleep after a plain atomic store.
             for(::std::size_t i{fn.first_cu_index}; i != fn.first_cu_index + fn.cu_count; ++i)
             {
-                // Mirror the state onto child compile units so diagnostics and future per-range scheduling observe a consistent view.
-                storage.compile_units.index_unchecked(i).state.state.store(state, ::std::memory_order_release);
+                auto& cu_state{storage.compile_units.index_unchecked(i).state};
+                cu_state.state.store(state, ::std::memory_order_release);
+                notify(cu_state);
             }
+            fn.materialization_state.state.store(state, ::std::memory_order_release);
+            notify(fn.materialization_state);
         }
 
         inline constexpr void validate_function_if_needed(runtime_module_storage_t const& curr_module,
@@ -1647,8 +1785,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             // structural metadata while preserving a strict validation barrier before code becomes executable.
             if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
             {
-                // Lazy validation must use the standard wasm1p1 validator directly. This keeps the lazy path aligned with
-                // src/uwvm2/validation/standard/wasm1p1/validator.h, including its memory-safety boundary comments and parse checks.
+                // Lazy validation uses the parser-composed code-version strategy immediately before materialization.
                 if(options.validator_module_storage == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                 if(options.validator_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -1659,8 +1796,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
                 auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
-                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                                      *options.validator_module_storage,
+                ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(*options.validator_module_storage,
                                                                       function_index,
                                                                       code_begin,
                                                                       code_end,
@@ -1956,8 +2092,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
 
         // Once this thread owns compilation, emit the full function and publish completion to all sibling compile units.
-        details::compile_lazy_local_function<CompileOption>(curr_module, storage, options, cu.local_function_index, err);
-        details::mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            details::compile_lazy_local_function<CompileOption>(curr_module, storage, options, cu.local_function_index, err);
+            details::mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(...)
+        {
+            // This synchronous entry point has already published `compiling`.  Publish failure to the function and every sibling CU
+            // before preserving the original exception; otherwise concurrent waiters can spin forever on an abandoned owner.
+            details::mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::failed);
+            throw;
+        }
+# endif
         ::fast_io::unix_timestamp compile_end_time{};
         if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
         {

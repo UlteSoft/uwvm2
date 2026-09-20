@@ -114,7 +114,7 @@ namespace test
         expect(!p1_para.disable_simd, "reference-types switch disabled simd");
         expect(p1_para.explicit_disable_reference_types, "reference-types explicit disable flag was not set");
         expect(!p1_para.controllable_allow_multi_result_vector, "reference-types disable should not restore the MVP single-result check");
-        expect(p1_para.controllable_allow_multi_table, "reference-types disable should restore the MVP single-table check");
+        expect(!p1_para.controllable_allow_multi_table, "reference-types disable must not change the independent multiple-tables check");
     }
 
     inline void expect_only_bulk_memory_disabled(auto const& p1_para)
@@ -223,16 +223,18 @@ namespace test
 
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 collection callback failed");
-        expect_default_wasm1p1_feature_state(cli_wasm1p1_parameter());
+        expect_all_wasm1p1_features_enabled(cli_wasm1p1_parameter());
+        expect(cli_wasm1p1_parameter().explicit_feature_wasm1p1, "wasm1p1 collection explicit flag was not set");
 
         reset_cli_wasm_parameter();
         expect_callback_success(callbacks::wasm_feature_mvp_callback, "mvp collection callback failed");
         expect_mvp_feature_state(cli_wasm1p1_parameter());
 
-        expect_callback_success(callbacks::wasm_feature_wasm1p1_callback, "wasm1p1 re-enable callback failed");
-        expect_all_wasm1p1_features_enabled(cli_wasm1p1_parameter());
-        expect(!cli_wasm1p1_parameter().controllable_allow_multi_result_vector, "wasm1p1 re-enable should relax the MVP single-result check");
-        expect(!cli_wasm1p1_parameter().controllable_allow_multi_table, "wasm1p1 re-enable should relax the MVP single-table check");
+        ::uwvm2::utils::cmdline::parameter_parsing_results args[1]{};
+        auto const conflict{callbacks::wasm_feature_wasm1p1_callback(args, args, args + 1uz)};
+        expect(conflict == ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme,
+               "wasm1p1 collection must conflict with an already-selected MVP collection");
+        expect_mvp_feature_state(cli_wasm1p1_parameter());
     }
 
     inline void test_parser_feature_defaults()

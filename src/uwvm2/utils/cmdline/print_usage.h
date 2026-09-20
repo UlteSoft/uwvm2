@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
                 ::fast_io::io::perr(::std::forward<Stm>(stream), u8"|", *curr_base);
             }
 
-            ::fast_io::io::perr(::std::forward<Stm>(stream), u8"] ", p->usage, );
+            ::fast_io::io::perr(::std::forward<Stm>(stream), u8"] ", p->usage);
 #endif
         }
     }  // namespace details

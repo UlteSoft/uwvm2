@@ -132,7 +132,7 @@ inline constexpr char_type *win32_get_locale_encoding_from_code_page(::std::uint
 template <::fast_io::win32_family family>
 inline void *win32_family_load_l10n_common_impl(
 	::std::conditional_t<family == ::fast_io::win32_family::wide_nt, char16_t, char8_t> const *cstr, ::std::size_t n,
-	lc_locale &loc)
+	lc_locale_owner &owner)
 {
 	constexpr ::std::size_t size_restriction{256u};
 	constexpr ::std::size_t encoding_size_restriction{128u};
@@ -297,30 +297,38 @@ inline void *win32_family_load_l10n_common_impl(
 	auto p{buffer};
 	win32_family_dll_file<family> dllfile(::fast_io::mnp::os_c_str(p), ::fast_io::dll_mode::none);
 	auto func{reinterpret_cast<void(
-#if defined(__CYGWIN__)
+#if (defined(_WIN32) || defined(__CYGWIN__)) && !defined(__WINE__)
 #if !__has_cpp_attribute(__gnu__::__fastcall__) && defined(_MSC_VER)
 		__fastcall
 #elif __has_cpp_attribute(__gnu__::__fastcall__)
 		__attribute__((__fastcall__))
 #endif
 #endif
-			*)(lc_locale *) noexcept>(dll_load_symbol(dllfile,
+			*)(::fast_io::i18n_module_v1::export_descriptor const **) noexcept>(dll_load_symbol(dllfile,
 #if SIZE_MAX <= UINT_LEAST32_MAX && (defined(__x86__) || defined(_M_IX86) || defined(__i386__))
-													  u8"@export_v0@4"
+													  u8"@fast_io_i18n_export_v1@4"
 #else
-													  u8"export_v0"
+													  ::fast_io::i18n_module_v1::export_symbol
 #endif
 													  ))};
-	func(__builtin_addressof(loc));
+	::fast_io::i18n_module_v1::export_descriptor const *descriptor{};
+	func(__builtin_addressof(descriptor));
+	if (!lc_module_descriptor_compatible(descriptor)) [[unlikely]]
+	{
+		throw_win32_error(0x00000057);
+	}
+	// Import while the DLL is pinned.  No exported pointer or allocator-owned
+	// object is retained after this conversion completes.
+	lc_module_import(*descriptor, owner);
 	return dllfile.release();
 }
 
 template <::fast_io::win32_family family, ::fast_io::constructible_to_os_c_str path_type>
-inline void *win32_family_load_l10n_impl(path_type const &p, lc_locale &loc)
+inline void *win32_family_load_l10n_impl(path_type const &p, lc_locale_owner &owner)
 {
 	return ::fast_io::win32_family_api_common<family>(
 		p,
-		[&loc](auto const *cstr_ptr, ::std::size_t n) {
+		[&owner](auto const *cstr_ptr, ::std::size_t n) {
 			using native_char_type =
 				::std::conditional_t<family == ::fast_io::win32_family::wide_nt, char16_t, char8_t>;
 			using native_char_type_may_alias_const_ptr
@@ -329,7 +337,7 @@ inline void *win32_family_load_l10n_impl(path_type const &p, lc_locale &loc)
 #endif
 				= native_char_type const *;
 			return win32_family_load_l10n_common_impl<family>(
-				reinterpret_cast<native_char_type_may_alias_const_ptr>(cstr_ptr), n, loc);
+				reinterpret_cast<native_char_type_may_alias_const_ptr>(cstr_ptr), n, owner);
 		});
 }
 
@@ -340,6 +348,7 @@ class win32_family_l10n
 {
 public:
 	using native_handle_type = void *;
+	lc_locale_owner owner{};
 	lc_locale loc{};
 	native_handle_type hmodule{};
 	constexpr win32_family_l10n() noexcept = default;
@@ -347,7 +356,8 @@ public:
 	template <::fast_io::constructible_to_os_c_str path_type>
 	explicit win32_family_l10n(path_type const &p)
 	{
-		this->hmodule = ::fast_io::details::win32_family_load_l10n_impl<family>(p, loc);
+		this->hmodule = ::fast_io::details::win32_family_load_l10n_impl<family>(p, owner);
+		loc = owner.view();
 	}
 
 	explicit constexpr operator bool() const noexcept
@@ -375,10 +385,19 @@ public:
 
 	win32_family_l10n &operator=(win32_family_l10n const &) = delete;
 	win32_family_l10n(win32_family_l10n const &) = delete;
+	win32_family_l10n(win32_family_l10n &&__restrict other) noexcept
+		: owner(::std::move(other.owner)), loc(owner.view()), hmodule(other.hmodule)
+	{
+		// The imported storage moves, but its published view must be rebuilt from
+		// this object's addresses rather than copied from the source wrapper.
+		other.hmodule = nullptr;
+		other.loc = {};
+	}
 	win32_family_l10n &operator=(win32_family_l10n &&__restrict other) noexcept
 	{
 		close();
-		loc = other.loc;
+		owner = ::std::move(other.owner);
+		loc = owner.view();
 		hmodule = other.hmodule;
 		other.hmodule = nullptr;
 		other.loc = {};
@@ -390,19 +409,31 @@ public:
 	}
 };
 
-template <::std::integral char_type, ::fast_io::win32_family family>
+template <::fast_io::lc_character_type char_type, ::fast_io::win32_family family>
 inline constexpr ::fast_io::parameter<basic_lc_all<char_type> const &>
 status_io_print_forward(io_alias_type_t<char_type>, win32_family_l10n<family> const &loc) noexcept
 {
-	return status_io_print_forward(io_alias_type<char_type>, loc.loc);
+	// Select the character-specific owning object before exposing its facet aggregate through the reference wrapper.
+	return {get_lc<char_type>(loc.loc)->all};
 }
 
 template <::fast_io::win32_family family, typename stm>
-	requires(::std::is_lvalue_reference_v<stm> || ::std::is_trivially_copyable_v<stm>)
-inline constexpr auto imbue(win32_family_l10n<family> &loc, stm &&out) noexcept
+	requires((::std::is_lvalue_reference_v<stm> || ::std::is_trivially_copyable_v<stm>) &&
+			 ::fast_io::operations::defines::has_output_or_io_stream_ref_define<stm> &&
+			 requires {
+				requires ::fast_io::lc_character_type<typename ::std::remove_cvref_t<decltype(
+					::fast_io::operations::output_stream_ref(::std::declval<stm>()))>::output_char_type>;
+			 })
+inline constexpr auto imbue(win32_family_l10n<family> &loc, stm &&out)
+	noexcept(noexcept(::fast_io::operations::output_stream_ref(::std::forward<stm>(out))))
 {
-	using char_type = typename ::std::remove_cvref_t<stm>::char_type;
-	return imbue(get_lc<char_type>(loc.loc), ::std::forward<stm>(out));
+	using output_reference_type = decltype(
+		::fast_io::operations::output_stream_ref(::std::declval<stm>()));
+	using char_type = typename ::std::remove_cvref_t<output_reference_type>::output_char_type;
+	// `get_lc` returns the owning locale object pointer; the core imbuer takes the object by reference and stores a
+	// non-owning pointer whose lifetime is covered by `loc`. Devices need not expose a `char_type`; the normalized output
+	// observer is the authoritative source of `output_char_type`.
+	return imbue(*get_lc<char_type>(loc.loc), ::std::forward<stm>(out));
 }
 
 using win32_l10n_9xa = win32_family_l10n<::fast_io::win32_family::ansi_9x>;

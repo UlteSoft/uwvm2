@@ -156,9 +156,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         using char8_t_const_ptr_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const* const*;
         auto const argv_u8{reinterpret_cast<char8_t_const_ptr_const_may_alias_ptr>(argv)};
 
-# if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
-        // fast_io network service (on win9x = wsa, on linux = dummy)
-        ::fast_io::net_service service{};
+# if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
+        // Native Windows needs WSAStartup/WSACleanup for the entire run (also
+        // on Win9x). Use the concrete RAII type exported by fast_io's module:
+        // its net_service alias is header-only. POSIX/Cygwin/Wine select an
+        // empty dummy service, so there is no initialization to omit there.
+        ::fast_io::win32_wsa_service service{};
 # endif
 
         // u8main
@@ -192,9 +195,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         auto const argc_uz{u8_cmdline.argc};
         auto const argv_u8{u8_cmdline.argv.data()};
 
-# if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
-        // fast_io network service
-        ::fast_io::net_service service{};
+# if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
+        // Keep the same native-Windows WSA lifetime as the non-NT entry above;
+        // the exported concrete type works in both header and module builds.
+        ::fast_io::win32_wsa_service service{};
 # endif
 
         // u8main

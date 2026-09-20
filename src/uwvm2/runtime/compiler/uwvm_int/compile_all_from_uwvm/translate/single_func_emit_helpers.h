@@ -1795,6 +1795,9 @@ auto const stacktop_fill_one_from_memory_to{[&](bytecode_vec_t& dst) constexpr U
 
                                                 // Fill consecutive same-typed values from memory into cache in one opfunc when possible.
                                                 auto const vt{codegen_operand_stack.index_unchecked(stacktop_memory_count - 1uz).type};
+                                                // Reference values are memory-only. They form a barrier: values below them cannot be
+                                                // moved into a stack-top register without changing the mixed-type stack order.
+                                                if(!stacktop_enabled_for_vt(vt)) { return; }
                                                 ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                                 ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
                                                 ::std::size_t const group_cnt{stacktop_cache_count_for_range(begin_pos, end_pos)};
@@ -2063,6 +2066,9 @@ auto const stacktop_fill_to_canonical{[&](bytecode_vec_t& dst) constexpr UWVM_TH
                                               while(stacktop_memory_count != 0uz)
                                               {
                                                   auto const vt{codegen_operand_stack.index_unchecked(stacktop_memory_count - 1uz).type};
+                                                  // Keep memory-only reference values at the top of the materialized prefix. A
+                                                  // canonical fill may resume after a later opcode consumes that barrier value.
+                                                  if(!stacktop_enabled_for_vt(vt)) { break; }
                                                   ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                                   ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
                                                   ::std::size_t const ring_size{end_pos - begin_pos};
@@ -3103,9 +3109,14 @@ auto const emit_local_get_typed_to{
         if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
     }};
 
+// Both f32/f64 emitters accept same-sized raw integers as well as finite FP
+// constants by const reference. Do not narrow this to a by-value Float API:
+// the NaN literal path intentionally avoids a native floating return/copy,
+// including GCC -O0/i386. Size checks retain the bytecode width invariant.
 [[maybe_unused]] auto const emit_const_f32_to{
-    [&](bytecode_vec_t& dst, wasm_f32 imm) constexpr UWVM_THROWS
+    [&](bytecode_vec_t& dst, auto const& imm) constexpr UWVM_THROWS
     {
+        static_assert(sizeof(imm) == sizeof(wasm_f32));
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
         bool fused_spill_and_const{};
@@ -3188,8 +3199,9 @@ auto const emit_local_get_typed_to{
     }};
 
 [[maybe_unused]] auto const emit_const_f64_to{
-    [&](bytecode_vec_t& dst, wasm_f64 imm) constexpr UWVM_THROWS
+    [&](bytecode_vec_t& dst, auto const& imm) constexpr UWVM_THROWS
     {
+        static_assert(sizeof(imm) == sizeof(wasm_f64));
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
         bool fused_spill_and_const{};

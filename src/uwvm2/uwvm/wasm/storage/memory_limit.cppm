@@ -23,6 +23,7 @@
 module;
 
 // std
+#include <cstddef>
 #include <memory>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>

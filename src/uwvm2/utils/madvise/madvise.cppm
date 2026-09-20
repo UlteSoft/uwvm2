@@ -33,6 +33,9 @@ module;
 # include <unistd.h>
 # include <sys/mman.h>
 #endif
+// Named-module imports do not propagate preprocessor macros. The paired
+// header uses UWVM_HAS_BUILTIN on Darwin, so establish it in this partition.
+#include <uwvm2/utils/macro/push_macros.h>
 
 export module uwvm2.utils.madvise:madvise;
 

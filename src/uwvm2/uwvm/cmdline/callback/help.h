@@ -159,6 +159,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
 
             // display other parameter
+#if defined(UWVM2_USE_HUGE_FAST_IO_CPO_OUTPUT)
             ::fast_io::io::perr(u8log_output_ul,
                                 // ln
                                 u8"\n",
@@ -226,6 +227,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
                                 // endl
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#else
+            // Keep the ordinary build's fast_io CPO arity bounded.  One giant perr call makes Clang instantiate a
+            // single type graph containing every help row and can require tens of GiB on cross targets.  The huge-CPO
+            // opt-in above preserves the original one-call form; this path emits byte-identical rows through one
+            // reusable, fixed-signature instantiation.
+            ::fast_io::io::perr(u8log_output_ul, u8"\n");
+            auto const output_category_hint{[&](::fast_io::u8string_view display_name, ::fast_io::u8string_view argument_name) constexpr noexcept {
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
+                                    u8"  ",
+                                    ::fast_io::mnp::left(display_name, ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size));
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    u8"  -----  ");
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Use \"");
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    u8"--help ",
+                                    argument_name);
+                ::fast_io::io::perr(u8log_output_ul,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\" to display the ");
+                ::fast_io::io::perr(u8log_output_ul, argument_name, u8" arguments.\n\n");
+            }};
+            output_category_hint(u8"<debug>", u8"debug");
+            output_category_hint(u8"<wasm>", u8"wasm");
+            output_category_hint(u8"<runtime>", u8"runtime");
+            output_category_hint(u8"<log>", u8"log");
+#if defined(UWVM_IMPORT_WASI)
+            output_category_hint(u8"<wasi>", u8"wasi");
+#endif
+            ::fast_io::io::perr(u8log_output_ul,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#endif
 
             // Here, guard will perform destructors.
             return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;

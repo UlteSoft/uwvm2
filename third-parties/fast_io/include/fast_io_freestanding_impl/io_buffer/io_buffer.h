@@ -126,4 +126,29 @@ public:
 	}
 };
 
+/// @brief Marks the owned input cache of an exact `basic_io_buffer` specialization as a cacheable read source.
+/// @details The underlying handle is deliberately irrelevant to this proof: underflow may read from a file, socket,
+///          pipe, or decorator, but the range later exposed by `ibuffer_curr`/`ibuffer_end` is the separately owned
+///          allocation selected by `iobuffertraits`. The traits refinement proves that allocation's memory domain and
+///          the input direction; the scan path must still reject null/empty state and keep the owner alive.
+template <typename handletype, typename iobuffertraits>
+	requires(::fast_io::details::prfch_cacheable_input_io_buffer_traits<iobuffertraits>)
+inline constexpr ::std::true_type prfch_cacheable_read_provenance_define(
+	io_type_t<basic_io_buffer<handletype, iobuffertraits>>) noexcept
+{
+	return {};
+}
+
+/// @brief Marks the independently proved output cache of an exact `basic_io_buffer` specialization.
+/// @details This opt-in covers only the owner-managed put area. It neither marks `handletype` nor changes the
+///          semantics of a flush into a raw file observer. Keeping that distinction prevents an ordinary buffered-file
+///          alias from laundering its OS handle into a generic cacheable-memory destination.
+template <typename handletype, typename iobuffertraits>
+	requires(::fast_io::details::prfch_cacheable_output_io_buffer_traits<iobuffertraits>)
+inline constexpr ::std::true_type prfch_cacheable_write_provenance_define(
+	io_type_t<basic_io_buffer<handletype, iobuffertraits>>) noexcept
+{
+	return {};
+}
+
 } // namespace fast_io

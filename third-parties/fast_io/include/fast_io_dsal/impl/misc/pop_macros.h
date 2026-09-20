@@ -1,7 +1,16 @@
 ﻿// Please keep it in reverse order with the macros in push_macros.h
 
+#pragma pop_macro("FAST_IO_HERBCEPTIONS_NOEXCEPT")
+#pragma pop_macro("FAST_IO_HERBCEPTIONS_NOTHROWS")
+#pragma pop_macro("FAST_IO_HERBCEPTIONS_THROWS_OR_NOEXCEPT")
+#pragma pop_macro("FAST_IO_HERBCEPTIONS_THROWS")
 #pragma pop_macro("FAST_IO_CPP_EXCEPTIONS")
 #pragma pop_macro("FAST_IO_CPP_RTTI")
+#pragma pop_macro("FAST_IO_ASSUME")
+#pragma pop_macro("FAST_IO_IF_NOT_CONSTEVAL")
+#pragma pop_macro("FAST_IO_IF_CONSTEVAL")
+#pragma pop_macro("FAST_IO_HAS_STATIC_CALL_OPERATOR_IN_LANGUAGE_MODE")
+#pragma pop_macro("FAST_IO_HAS_ATTRIBUTE")
 #pragma pop_macro("FAST_IO_HAS_BUILTIN")
 #pragma pop_macro("FAST_IO_ASSERT")
 #pragma pop_macro("FAST_IO_GNU_RETURNS_NONNULL")

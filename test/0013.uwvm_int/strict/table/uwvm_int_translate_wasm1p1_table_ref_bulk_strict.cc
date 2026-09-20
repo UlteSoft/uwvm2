@@ -235,7 +235,7 @@ namespace
         optable::call_indirect_func = strict_terminate_call_indirect;
 
         auto wasm = build_wasm1p1_table_ref_bulk_module();
-        auto features = make_wasm1p1_feature_parameter();
+        auto features = make_wasm2_feature_parameter();
 
         if(abi_mode_enabled("byref"))
         {

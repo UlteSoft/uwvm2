@@ -85,6 +85,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
     namespace posix
     {
+# if defined(__linux__)
+        /// Linux UAPI `AT_EMPTY_PATH`; used with raw *at syscalls and therefore independent of libc feature-test macros.
+        /// @see https://github.com/torvalds/linux/blob/master/include/uapi/linux/fcntl.h
+        inline constexpr int linux_at_empty_path{0x1000};
+
+        /// @brief Test the Linux raw-syscall error interval without depending on fast_io's non-exported implementation helpers.
+        /// @details Linux encodes syscall failures as return values in [-4095, -1]. The unsigned formulation avoids
+        ///          signed overflow and remains correct for every integral return type used by the architecture shims.
+        template <::std::integral int_type>
+        [[nodiscard]] inline constexpr bool linux_raw_system_call_failed(int_type value) noexcept
+        {
+            using unsigned_type = ::std::make_unsigned_t<int_type>;
+            return static_cast<unsigned_type>(static_cast<unsigned_type>(value) + static_cast<unsigned_type>(4095)) <
+                   static_cast<unsigned_type>(4095);
+        }
+# endif
+
         // https://github.com/torvalds/linux/blob/07e27ad16399afcd693be20211b0dfae63e0615f/include/uapi/linux/time_types.h#L7
         // https://github.com/qemu/qemu/blob/ab8008b231e758e03c87c1c483c03afdd9c02e19/linux-user/syscall_defs.h#L251
         // https://github.com/bminor/glibc/blob/b7e0ec907ba94b6fcc6142bbaddea995bcc3cef3/include/struct___timespec64.h#L15

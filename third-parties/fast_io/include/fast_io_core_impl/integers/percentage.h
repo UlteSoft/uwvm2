@@ -6,6 +6,10 @@ namespace fast_io
 namespace manipulators
 {
 
+/// @brief Stores the integral numerator and denominator used by ratio-formatting manipulators.
+/// @details The carrier performs no validation; formatting defines zero-denominator spelling and rounds the derived
+///          ratio to the manipulator's fixed two radix-fraction digits. The scaling factor is the square of the selected
+///          radix (`100` for decimal).
 template <typename T, typename U>
 struct percentage_conventional_t
 {
@@ -16,6 +20,9 @@ struct percentage_conventional_t
 };
 
 #if 0
+/// @brief Reserved carrier for a future run-time-precision percentage manipulator.
+/// @details The disabled template records numerator, denominator, and requested precision but currently has no public
+///          formatting contract and must not be treated as supported API.
 template<typename T,typename U>
 struct percentage_precision_t
 {
@@ -27,6 +34,9 @@ struct percentage_precision_t
 };
 #endif
 
+/// @brief Formats `num / deno * 100` as a decimal percentage with two fractional digits and `%`.
+/// @details Results use nearest-even integer-ratio rounding. `upper` affects alphabetic special spellings, `fll`
+///          requests full-width integral output, and `showpos` adds a positive sign where applicable.
 template <bool upper = false, bool fll = false, bool showpos = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto percentage_conventional(T num, U deno) noexcept
@@ -39,6 +49,8 @@ inline constexpr auto percentage_conventional(T num, U deno) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{num, deno}};
 }
 
+/// @brief Formats a conventional decimal percentage using comma as the radix separator.
+/// @details Ratio, rounding, flags, and trailing `%` match `percentage_conventional`; only `,` replaces `.`.
 template <bool upper = false, bool fll = false, bool showpos = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto comma_percentage_conventional(T num, U deno) noexcept
@@ -51,6 +63,9 @@ inline constexpr auto comma_percentage_conventional(T num, U deno) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{num, deno}};
 }
 
+/// @brief Formats a percentage in radix `base` with two fractional radix digits and `%`.
+/// @details `base` must be 2..36. Case, prefix, full-width, sign, and modern-octal options apply to the integral part;
+///          the displayed value is `num / deno * base^2`, i.e. it is relative to `100` interpreted in that radix.
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
 		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
@@ -64,6 +79,8 @@ inline constexpr auto base_percentage_conventional(T num, U deno) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{num, deno}};
 }
 
+/// @brief Formats a radix-selected percentage using comma as the radix separator.
+/// @details Semantics match `base_percentage_conventional`; comma replaces the radix point.
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
 		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
@@ -83,6 +100,10 @@ Why Sex Is Binary
 Idpols are reactionary anti-scientific trash.
 */
 
+/// @brief Formats `male / female * 100` using the library's decimal `value:100` sex-ratio spelling.
+/// @details Two fractional digits are produced with nearest-even rounding. The integral flags affect case, width, and
+///          explicit sign. A zero denominator is represented as the numerator with `.00:0` (or `,00:0` in the comma
+///          variant), preserving both sides of the ratio instead of emitting NaN.
 template <bool upper = false, bool fll = false, bool showpos = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto percentage_sex_ratio(T male, U female) noexcept
@@ -95,6 +116,8 @@ inline constexpr auto percentage_sex_ratio(T male, U female) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{male, female}};
 }
 
+/// @brief Formats the decimal `value:100` sex ratio using comma as the radix separator.
+/// @details Mathematical value and rounding match `percentage_sex_ratio`; only the fractional separator changes.
 template <bool upper = false, bool fll = false, bool showpos = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto comma_percentage_sex_ratio(T male, U female) noexcept
@@ -107,6 +130,9 @@ inline constexpr auto comma_percentage_sex_ratio(T male, U female) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{male, female}};
 }
 
+/// @brief Formats the `male / female * base^2` sex ratio in radix `base` followed by radix `:100`.
+/// @details The two `100` spellings are radix values (so `100` means `base^2`), not decimal 100. Case, prefix,
+///          full-width, sign, and modern-octal options apply to the radix representation.
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
 		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
@@ -120,6 +146,8 @@ inline constexpr auto base_percentage_sex_ratio(T male, U female) noexcept
 			typename ::fast_io::details::integer_alias_type_traits<U>::alias_type>>{{male, female}};
 }
 
+/// @brief Formats a radix-selected `value:100` sex ratio using comma as the fractional separator.
+/// @details It is otherwise identical to `base_percentage_sex_ratio`.
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
 		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
@@ -135,6 +163,7 @@ inline constexpr auto comma_base_percentage_sex_ratio(T male, U female) noexcept
 
 } // namespace manipulators
 
+/// @feature concept:runtime_precise_size
 template <::std::integral chartype, ::fast_io::manipulators::scalar_flags flags, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr ::std::size_t print_reserve_size(
@@ -296,9 +325,7 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 					::fast_io::intrinsics::udivmod<udivmodtype>(numerator10000low, numerator10000high, denominator,
 																zero);
 
-#if __has_cpp_attribute(assume)
-				[[assume(remainderhigh == 0)]];
-#endif
+				FAST_IO_ASSUME(remainderhigh == 0);
 				if ((denominatordiv2 < remainderlow) ||
 					(remainderlow == denominatordiv2 && denominatoriseven && ((quotientlow & 1u) != 0u))) // round
 				{
@@ -319,10 +346,8 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 					constexpr auto mxval{::fast_io::details::base_ul64_max_val<base, T>};
 					auto [quotientlowlow, quotientlowhigh, remainderlowlow, remainderlowhigh] =
 						::fast_io::intrinsics::udivmod<udivmodtype>(quotientlow, quotienthigh, mxval, zero);
-#if __has_cpp_attribute(assume)
-					[[assume(quotientlowhigh == 0)]];
-					[[assume(remainderlowhigh == 0)]];
-#endif
+					FAST_IO_ASSUME(quotientlowhigh == 0);
+					FAST_IO_ASSUME(remainderlowhigh == 0);
 					constexpr ::std::size_t toprint{4u};
 					if constexpr (full)
 					{

@@ -711,6 +711,9 @@ scn_ctx_define_in6addr_impl(ipv6_scan_state_t<char_type> &state, char_type const
 namespace manipulators
 {
 
+/// @brief Applies an expert-supplied compile-time IP grammar to an address or endpoint destination.
+/// @details The result borrows `ipaddr`. Flags constrain accepted IPv6 compression/case/brackets/full forms, port
+///          requirements, and mapped-IPv6 syntax; they do not control post-parse output formatting.
 template <ip_scan_flags flags, ::fast_io::details::iptypesimpl iptype>
 inline constexpr ip_scan_manip_t<flags, ::std::remove_cvref_t<iptype> *> ip_scan_generic(iptype &ipaddr) noexcept
 {

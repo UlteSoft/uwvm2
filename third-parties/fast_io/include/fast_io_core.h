@@ -1,4 +1,18 @@
 ﻿#pragma once
+
+/*
+ * Core environment/package umbrella.
+ *
+ * The `core`, `freestanding`, and `hosted` headers describe which language,
+ * allocation, exception, standard-library, and platform facilities are
+ * available. That packaging axis is orthogonal to the architectural
+ * FMT/IO/CPO responsibility axis. In particular, core already contains the
+ * public protocol vocabulary, semantic objects, primitive operations,
+ * freestanding print/scan engines, and concat; "core" does not mean "CPO only".
+ * Higher package umbrellas add implementations and devices without redefining
+ * those operation boundaries.
+ */
+
 // fast_io_core.h is required to be usable in freestanding environment with EVEN dynamic memory allocation and
 // exceptions are disabled.
 
@@ -35,6 +49,7 @@
 #include "fast_io_core_impl/terminate.h"
 #include "fast_io_dsal/impl/freestanding.h"
 #include "fast_io_core_impl/allocation/impl.h"
+#include "fast_io_core_impl/scan_context_state.h"
 
 #include "fast_io_core_impl/error.h"
 #include "fast_io_core_impl/asan_support.h"
@@ -42,8 +57,10 @@
 #include "fast_io_core_impl/utils.h"
 #include "fast_io_core_impl/intrinsics/impl.h"
 #include "fast_io_core_impl/intrinsics.h"
+#include "fast_io_core_impl/prfch/impl.h"
 #include "fast_io_core_impl/parse_code.h"
 
+#include "fast_io_core_impl/literals/none_ascii.h"
 #include "fast_io_core_impl/ebcdic.h"
 #include "fast_io_core_impl/literals/literal.h"
 #include "fast_io_core_impl/char_category/impl.h"
@@ -54,6 +71,7 @@
 
 #include "fast_io_core_impl/alias.h"
 #include "fast_io_core_impl/pr_rsv.h"
+#include "fast_io_core_impl/io_print_source.h"
 
 #include "fast_io_core_impl/secure_clear_guard.h"
 #include "fast_io_core_impl/local_new_array_ptr.h"
@@ -82,8 +100,10 @@
 #endif
 
 #include "fast_io_core_impl/simd/impl.h"
+#include "fast_io_core_impl/operations/printimpl/scatter_copy_simd.h"
 #include "fast_io_core_impl/simd_find.h"
 #include "fast_io_core_impl/integers/sto/sto_contiguous.h"
+#include "fast_io_core_impl/charconv/impl.h"
 
 #include "fast_io_core_impl/integers/chrono.h"
 #include "fast_io_core_impl/iso/isos.h"

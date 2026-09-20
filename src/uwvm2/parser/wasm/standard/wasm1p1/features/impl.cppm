@@ -8,6 +8,7 @@ module;
 
 export module uwvm2.parser.wasm.standard.wasm1p1.features;
 export import :parser_limit;
+export import :call_indirect_immediate;
 export import :def;
 export import :feature_def;
 export import :types;

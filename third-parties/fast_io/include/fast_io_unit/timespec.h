@@ -21,6 +21,7 @@ inline constexpr bool denom_is_natural_pow10(::std::int_least64_t denom) noexcep
 } // namespace details
 #if !defined(__MSDOS__) && !defined(__AVR__) && (!defined(__MINGW32__) || __has_include(<_mingw_stat64.h>))
 
+/// @feature concept:runtime_precise_size
 template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, struct timespec>) noexcept
 {

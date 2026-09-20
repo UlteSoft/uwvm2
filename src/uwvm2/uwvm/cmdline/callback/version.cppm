@@ -21,8 +21,12 @@
 
 module;
 
+// platform
+#include <uwvm2/runtime/compiler/llvm_jit/native_unwind_platform.h>
 // std
+#include <cstddef>
 #include <memory>
+#include <type_traits>
 #include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
@@ -60,7 +64,6 @@ module;
 export module uwvm2.uwvm.cmdline.callback:version;
 
 import fast_io;
-import fast_io_crypto;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
@@ -70,6 +73,7 @@ import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.custom;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm.feature;
+import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.uwvm.utils.install_path;
 
 #ifndef UWVM_MODULE

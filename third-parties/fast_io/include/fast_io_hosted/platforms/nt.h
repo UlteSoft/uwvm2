@@ -692,6 +692,25 @@ public:
 	}
 };
 
+/**
+ * @brief Proves that an NT handle observer is substitutable under value transport.
+ * @details The observer contains one non-owning handle value. NT stream
+ *          primitives mutate state owned by the referenced kernel object and do
+ *          not publish progress through the observer's `handle` member. A copy
+ *          therefore denotes the same stream state without duplicating or
+ *          transferring handle ownership. The proof is deliberately unavailable
+ *          to adapters and buffers that maintain an object-local cursor.
+ */
+template <::fast_io::nt_family family, ::std::integral ch_type>
+	requires(family == ::fast_io::nt_family::nt ||
+			 family == ::fast_io::nt_family::zw)
+inline constexpr ::std::true_type stream_ref_value_transport_safe_define(
+	::fast_io::io_type_t<
+		::fast_io::basic_nt_family_io_observer<family, ch_type>>) noexcept
+{
+	return {};
+}
+
 template <nt_family family, ::std::integral ch_type>
 inline ::std::byte *read_some_bytes_underflow_define(basic_nt_family_io_observer<family, ch_type> niob,
 													 ::std::byte *first, ::std::byte *last)
@@ -762,6 +781,46 @@ inline constexpr basic_nt_family_io_observer<family, char>
 io_bytes_stream_ref_define(basic_nt_family_io_observer<family, ch_type> other) noexcept
 {
 	return {other.handle};
+}
+
+template <nt_family family, ::std::integral char_type>
+inline constexpr ::std::true_type print_semantic_optional_scatter_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_nt_family_io_observer<family, char_type>>) noexcept
+{
+	// The exact NT observer owns no status-print overload for the admitted closed leaf set. Its descriptor fallback
+	// compacts empty entries, coalesces the ordinary small record into one NtWriteFile operation, and preserves ordered
+	// direct writes for a record outside that declared policy. Owners, mutexes, buffers, and decorators are not marked.
+	return {};
+}
+
+template <nt_family family, ::std::integral char_type>
+inline constexpr ::std::true_type
+print_semantic_optional_scatter_barrier_plan_stream(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::basic_nt_family_io_observer<family, char_type>>) noexcept
+{
+	// The exact NT observer owns no whole-record status operation involving a marked direct-only barrier. Its ordinary
+	// control scanner already completes the preceding descriptor/coalesced prefix before direct printing and resumes on
+	// the same handle observer afterward. Splitting only there retains NtWriteFile order, exception prefixes, and line
+	// ownership; file owners, buffers, mutexes, decorators, and transcoders do not inherit this marker.
+	return {};
+}
+
+template <nt_family family, ::std::integral char_type>
+inline constexpr ::std::size_t scatter_fallback_full_output_threshold(
+	::fast_io::io_reserve_type_t<char_type,
+								 ::fast_io::basic_nt_family_io_observer<family, char_type>>) noexcept
+{
+	// Native Windows temporary-file measurements keep complete coalescing profitable beyond the hosted Windows
+	// 32 KiB stack budget: three writes still win at 48 KiB and sixteen writes still win at 256 KiB. The platform
+	// policy exposes no more than the active stack budget; custom streams may still request a larger dynamic threshold.
+	constexpr ::std::size_t default_value{32u * 1024u / sizeof(char_type)};
+	constexpr ::std::size_t stack_value{
+		::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
+	return (::std::min)(default_value, stack_value);
 }
 
 namespace win32::nt::details

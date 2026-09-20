@@ -199,6 +199,40 @@ inline constexpr ::fast_io::basic_io_scatter_t<char_type> print_alias_define(::f
 	return {str.ptr, str.n};
 }
 
+/// @brief Proves that a stored fast_io C-string view may participate in retained-scatter range output.
+/// @details Its alias is a direct view of externally owned characters. Range dispatch still requires the source to be
+///          an lvalue element, so this marker supplies provenance without claiming that arbitrary alias results are
+///          borrowed.
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_borrowed_scatter_source(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>) noexcept
+{
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_eager_materialization_safe(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>) noexcept
+{
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_scatter_output_state_independent(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>) noexcept
+{
+	// The counted C-string view exposes its stored pointer and length without observing any output cursor.
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type print_scatter_direct_print_equivalent(
+	::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>) noexcept
+{
+	// Its counted character range is the entire fast_io print meaning of the view.
+	return {};
+}
+
 template <::std::integral char_type>
 inline constexpr ::std::size_t
 print_reserve_size(::fast_io::io_reserve_type_t<char_type, ::fast_io::containers::basic_cstring_view<char_type>>,

@@ -23,6 +23,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <algorithm>
 # include <bit>
 # include <cmath>
 # include <cstddef>
@@ -31,6 +32,8 @@
 # include <concepts>
 # include <limits>
 # include <memory>
+# include <type_traits>
+# include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -238,7 +241,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled integer unary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled integer unary opcode");
             }
         }
 
@@ -345,7 +348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled integer binary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled integer binary opcode");
             }
         }
 
@@ -378,9 +381,66 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         }
 
-        template <float_unop Op, typename FloatT>
-        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
+        // Sign-only Wasm operations are representation operations, not FP arithmetic. In particular,
+        // loading an sNaN into x87 before masking its sign already loses an observable payload bit.
+        // Unlike arithmetic, abs/neg/copysign must retain every non-sign bit, including
+        // the Wasm signaling bit. Do not replace these byte/integer helpers with a
+        // FloatT-returning wrapper around bit_cast/fabs/copysign: an unoptimized native
+        // ABI round-trip may quiet the operand before the mask is applied. Read both
+        // copysign operands before writing so local/stack aliases remain valid.
+        template <typename FloatT> using float_bits = ::std::conditional_t<sizeof(FloatT) == 4uz, wasm_u32, wasm_u64>;
+
+        template <float_unop Op, typename UInt>
+        UWVM_ALWAYS_INLINE inline constexpr UInt eval_float_sign_bits(UInt value) noexcept
         {
+            constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+            if constexpr(Op == float_unop::abs) { return value & ~sign; }
+            else { static_assert(Op == float_unop::neg); return value ^ sign; }
+        }
+
+        template <typename UInt>
+        UWVM_ALWAYS_INLINE inline constexpr UInt eval_float_copysign_bits(UInt left, UInt right) noexcept
+        {
+            constexpr UInt sign{UInt{1} << (sizeof(UInt) * 8u - 1u)};
+            return (left & ~sign) | (right & sign);
+        }
+
+        template <typename FloatT, float_unop Op>
+        UWVM_ALWAYS_INLINE inline constexpr void float_sign_memory(::std::byte* destination, ::std::byte const* source) noexcept
+        {
+            float_bits<FloatT> bits;
+            ::std::memcpy(::std::addressof(bits), source, sizeof(bits));
+            bits = eval_float_sign_bits<Op>(bits);
+            ::std::memcpy(destination, ::std::addressof(bits), sizeof(bits));
+        }
+
+        template <typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr void float_copysign_memory(::std::byte* destination, ::std::byte const* left, ::std::byte const* right) noexcept
+        {
+            float_bits<FloatT> lhs, rhs;
+            ::std::memcpy(::std::addressof(lhs), left, sizeof(lhs));
+            ::std::memcpy(::std::addressof(rhs), right, sizeof(rhs));
+            auto const result{eval_float_copysign_bits(lhs, rhs)};
+            ::std::memcpy(destination, ::std::addressof(result), sizeof(result));
+        }
+
+        template <float_unop Op, typename FloatT>
+        // Native builtins implement host semantics, not automatically Wasm semantics.
+        // RISC-V's conversion-based rounding can return a large/sNaN input
+        // unchanged; arithmetic rounding must quiet it. This includes nearest:
+        // GCC 15 + RV32 glibc nearbyintf preserves sNaNs at both O0 and O3,
+        // although the previously tested RV64 configuration quieted them. Do not
+        // infer libc/compiler behavior from the ISA or from one optimization
+        // level. Classify only NaNs; finite inputs retain native rounding and
+        // fused/byref/tail paths all share this evaluator. The outer evaluator also
+        // selects integer rounding on SSE2-without-SSE4.1/legacy-NaN builds and
+        // normalizes affected arithmetic results. Sign-only operations are excluded.
+        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop_native(FloatT v) noexcept
+        {
+# if defined(__riscv)
+            if constexpr(Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc || Op == float_unop::nearest)
+            { v = ::uwvm2::runtime::compiler::shared::strict_float::quiet_arithmetic_nan(v); }
+# endif
             if constexpr(Op == float_unop::abs)
             {
 # if defined(__GNUC__) || defined(__clang__)
@@ -551,8 +611,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if UWVM_HAS_BUILTIN(__builtin_neon_vrndn_v)
                     return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(__builtin_neon_vrndn_v(::std::bit_cast<int8x8_t>(v), 10));
 #  elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevendf)
-                    return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(
-                        __builtin_aarch64_roundevendf(::std::bit_cast<float64x1_t>(v)));
+                    // GCC's `df` builtin operates on a scalar DF-mode value.  Do not pass the ACLE
+                    // `float64x1_t` vector wrapper; the vector builtin is named `roundevenv2df`.
+                    return __builtin_aarch64_roundevendf(v);
 #  else
                     // Implementation for msvc is not currently being considered; revert to the default implementation.
 #   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -616,6 +677,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else if constexpr(Op == float_unop::sqrt)
             {
+                if constexpr(::uwvm2::runtime::compiler::shared::strict_float::needs_extended_rounding)
+                { return ::uwvm2::runtime::compiler::shared::strict_float::square_root(v); }
 # if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_sqrtf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_sqrt(v); }
@@ -631,8 +694,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                static_assert(Op != Op, "unhandled float unary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled float unary opcode");
             }
+        }
+
+        template <float_unop Op, typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
+        {
+            namespace strict = ::uwvm2::runtime::compiler::shared::strict_float;
+            if constexpr(strict::uses_integer_rounding &&
+                         (Op == float_unop::ceil || Op == float_unop::floor || Op == float_unop::trunc || Op == float_unop::nearest))
+            {
+                constexpr auto mode{Op == float_unop::ceil ? strict::integral_rounding::ceil : Op == float_unop::floor ? strict::integral_rounding::floor :
+                                    Op == float_unop::trunc ? strict::integral_rounding::trunc : strict::integral_rounding::nearest};
+                return ::std::bit_cast<FloatT>(strict::round_integral_bits<mode>(::std::bit_cast<strict::bits_t<FloatT>>(v)));
+            }
+            auto result{eval_float_unop_native<Op>(v)};
+            // abs/neg are bit operations, not arithmetic: do not canonicalize them.
+            if constexpr(Op != float_unop::abs && Op != float_unop::neg)
+            { return ::uwvm2::runtime::compiler::shared::strict_float::canonicalize_native_nan(result); }
+            else { return result; }
         }
 
         template <float_binop Op, typename FloatT>
@@ -657,10 +738,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // controlled ordering) so that NaN and signed-zero behavior exactly matches
             // the WebAssembly specification.
 
-            if constexpr(Op == float_binop::add) { return lhs + rhs; }
-            else if constexpr(Op == float_binop::sub) { return lhs - rhs; }
-            else if constexpr(Op == float_binop::mul) { return lhs * rhs; }
-            else if constexpr(Op == float_binop::div) { return lhs / rhs; }
+            namespace strict = ::uwvm2::runtime::compiler::shared::strict_float;
+            if constexpr(Op == float_binop::add) { return strict::binary<strict::operation::add>(lhs, rhs); }
+            else if constexpr(Op == float_binop::sub) { return strict::binary<strict::operation::sub>(lhs, rhs); }
+            else if constexpr(Op == float_binop::mul) { return strict::binary<strict::operation::mul>(lhs, rhs); }
+            else if constexpr(Op == float_binop::div) { return strict::binary<strict::operation::div>(lhs, rhs); }
             else if constexpr(Op == float_binop::copysign)
             {
 # if defined(__GNUC__) || defined(__clang__)
@@ -678,19 +760,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else if constexpr(Op == float_binop::min)
             {
-                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return strict::canonical_nan<FloatT>(); }
                 if(lhs == rhs) { return float_signbit(lhs) ? lhs : rhs; }
                 return ::std::min(lhs, rhs);
             }
             else if constexpr(Op == float_binop::max)
             {
-                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return strict::canonical_nan<FloatT>(); }
                 if(lhs == rhs) { return float_signbit(lhs) ? rhs : lhs; }
                 return ::std::max(lhs, rhs);
             }
             else
             {
-                static_assert(Op != Op, "unhandled float binary opcode");
+                static_assert(dependent_false_v<Op>, "unhandled float binary opcode");
             }
         }
 
@@ -840,10 +922,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                OperandT const v{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const out{eval_float_unop<Op, OperandT>(v)};
-                ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-                typeref...[1u] += sizeof(out);
+                if constexpr(Op == float_unop::abs || Op == float_unop::neg)
+                {
+                    auto const address{typeref...[1u] - sizeof(OperandT)};
+                    float_sign_memory<OperandT, Op>(address, address);
+                }
+                else
+                {
+                    OperandT const v{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const out{eval_float_unop<Op, OperandT>(v)};
+                    ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+                    typeref...[1u] += sizeof(out);
+                }
             }
         }
 
@@ -886,11 +976,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             else
             {
-                OperandT const rhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const lhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
-                OperandT const out{eval_float_binop<Op, OperandT>(lhs, rhs)};
-                ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-                typeref...[1u] += sizeof(out);
+                if constexpr(Op == float_binop::copysign)
+                {
+                    typeref...[1u] -= sizeof(OperandT);
+                    float_copysign_memory<OperandT>(typeref...[1u] - sizeof(OperandT), typeref...[1u] - sizeof(OperandT), typeref...[1u]);
+                }
+                else
+                {
+                    OperandT const rhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const lhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
+                    OperandT const out{eval_float_binop<Op, OperandT>(lhs, rhs)};
+                    ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+                    typeref...[1u] += sizeof(out);
+                }
             }
         }
 
@@ -1595,10 +1693,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const out{numeric_details::eval_float_unop<Op, wasm_f32>(v)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg)
+        {
+            auto const address{typeref...[1u] - sizeof(wasm_f32)};
+            numeric_details::float_sign_memory<wasm_f32, Op>(address, address);
+        }
+        else
+        {
+            wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const out{numeric_details::eval_float_unop<Op, wasm_f32>(v)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, uwvm_int_stack_top_type... TypeRef>
@@ -1618,11 +1724,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_binop::copysign)
+        {
+            typeref...[1u] -= sizeof(wasm_f32);
+            numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u] - sizeof(wasm_f32), typeref...[1u] - sizeof(wasm_f32), typeref...[1u]);
+        }
+        else
+        {
+            wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+            wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     // f32 unary wrappers
@@ -1672,10 +1786,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const out{numeric_details::eval_float_unop<Op, wasm_f64>(v)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg)
+        {
+            auto const address{typeref...[1u] - sizeof(wasm_f64)};
+            numeric_details::float_sign_memory<wasm_f64, Op>(address, address);
+        }
+        else
+        {
+            wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const out{numeric_details::eval_float_unop<Op, wasm_f64>(v)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, uwvm_int_stack_top_type... TypeRef>
@@ -1695,11 +1817,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        if constexpr(Op == numeric_details::float_binop::copysign)
+        {
+            typeref...[1u] -= sizeof(wasm_f64);
+            numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u] - sizeof(wasm_f64), typeref...[1u] - sizeof(wasm_f64), typeref...[1u]);
+        }
+        else
+        {
+            wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+            wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
+            ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+            typeref...[1u] += sizeof(out);
+        }
     }
 
     // f64 unary wrappers

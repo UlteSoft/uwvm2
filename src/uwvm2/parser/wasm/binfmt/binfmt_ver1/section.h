@@ -132,16 +132,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
 
         auto const& all_sections{*section_details_wrapper.section_storage_ptr};
 
-#if __cpp_structured_bindings >= 202411L
-        auto const& [... secs]{all_sections};
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), section_details<Fs...>(secs, all_sections)...);
-#else
         /// @throws maybe throw fast_io::error, see the implementation of the stream
         [&all_sections]<::std::size_t... I> UWVM_ALWAYS_INLINE(::std::index_sequence<I...>, Stm&& stream) constexpr -> void
         {
             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), section_details<Fs...>(get<I>(all_sections), all_sections)...);
         }(::std::make_index_sequence<::std::tuple_size_v<::std::remove_cvref_t<decltype(all_sections)>>>{}, ::std::forward<Stm>(stream));
-#endif
     }
 }
 

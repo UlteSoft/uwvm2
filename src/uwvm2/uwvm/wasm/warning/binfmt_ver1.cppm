@@ -63,6 +63,7 @@ import :start_section;
 import :element_section;
 import :code_section;
 import :data_section;
+import :data_count_section;
 import :custom_section;
 import :final_check;
 

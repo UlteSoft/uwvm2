@@ -31,6 +31,8 @@
 # include <exception>
 # include <limits>
 # include <memory>
+# include <string>
+# include <type_traits>
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -39,6 +41,7 @@
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Analysis/TargetTransformInfo.h>
+#  include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -46,10 +49,13 @@
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/MC/TargetRegistry.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h>
 #  include <llvm/PassRegistry.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
 #  include <llvm/TargetParser/Host.h>
+#  include <llvm/TargetParser/Triple.h>
 #  include <llvm/Transforms/InstCombine/InstCombine.h>
 #  include <llvm/Transforms/Scalar.h>
 #  include <llvm/Transforms/Scalar/GVN.h>
@@ -67,12 +73,15 @@
 # include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/features/call_indirect_immediate.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
+# include <uwvm2/validation/standard/wasm2/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <uwvm2/runtime/llvm_jit_cache/impl.h>
@@ -320,6 +329,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // Raw ABI entry point used by the runtime bridge and tiered dispatcher.
         ::std::uintptr_t raw_entry_address{};
 
+        // The internal Tiered body is the Wasm activation; public/raw/OSR entries only adapt its ABI. Publish its
+        // concrete address with the other entries so native backtraces never infer body identity from a nearby wrapper.
+        ::std::uintptr_t tiered_core_entry_address{};
+
         // Reentry descriptors and their raw native entry addresses, kept in matching index order.
         ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
         ::uwvm2::utils::container::vector<::std::uintptr_t> tiered_loop_reentry_raw_entry_addresses{};
@@ -517,24 +530,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         // Publishes a function-level terminal state and mirrors it to the primary compile unit so both scheduler waiters
         // and compile-unit observers are notified.
+        struct lazy_compile_state_notifier
+        {
+            inline constexpr void operator()(::uwvm2::utils::thread::lazy_compile_unit_state& unit) const noexcept
+            { ::uwvm2::utils::thread::lazy_compile_notify_unit(unit); }
+        };
+
+        template <typename Notify = lazy_compile_state_notifier>
         inline constexpr void mark_function_compile_units_state(lazy_module_storage_t& storage,
                                                                 lazy_function_storage_t& fn,
-                                                                ::uwvm2::utils::thread::lazy_compile_state state) noexcept
+                                                                ::uwvm2::utils::thread::lazy_compile_state state,
+                                                                Notify notify = {}) noexcept
         {
-            // This release store is the function-level publication barrier.  By the time a waiter observes `compiled`
-            // with an acquire load/wait, the materialized record, its `ready` publication, and any runtime target-table
-            // stores sequenced before this call are visible.  `failed` is also published with release so waiters never
-            // miss diagnostics or cleanup state written before failure.
-            fn.materialization_state.state.store(state, ::std::memory_order_release);
-            ::uwvm2::utils::thread::lazy_compile_notify_unit(fn.materialization_state);
+            static_assert(noexcept(notify(fn.materialization_state)), "lazy terminal-state notifiers must not throw");
             if(fn.primary_cu_index < storage.compile_units.size())
             {
                 auto& cu_state{storage.compile_units.index_unchecked(fn.primary_cu_index).state};
-                // The compile-unit state is a mirror for observers that do not hold the function record directly.  Use the
-                // same release order so either state object can be used as the synchronization point for terminal states.
+                // Publish the compile-unit mirror first.  Acquiring the authoritative function state below then also
+                // observes this mirror, in addition to all materialized payload written before this call.
                 cu_state.state.store(state, ::std::memory_order_release);
-                ::uwvm2::utils::thread::lazy_compile_notify_unit(cu_state);
+                notify(cu_state);
             }
+            // This release store is the function-level publication barrier.  By the time a waiter observes `compiled`
+            // with an acquire load/wait, the materialized record, its `ready` publication, runtime target-table stores,
+            // and the compile-unit mirror are visible.  `failed` likewise publishes diagnostics and cleanup state.
+            fn.materialization_state.state.store(state, ::std::memory_order_release);
+            notify(fn.materialization_state);
         }
 
         // Runs standard Wasm code validation for one local function when the lazy mode requires it.
@@ -555,8 +576,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
                 auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
-                ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                                      *options.validator_module_storage,
+                ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(*options.validator_module_storage,
                                                                       function_index,
                                                                       code_begin,
                                                                       code_end,
@@ -567,36 +587,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline constexpr bool initialize_llvm_jit_process_target() noexcept
         {
-# if defined(__APPLE__)
-            // Cross-built JIT binaries must register the target of the running process, not the target baked into llvm-config's
-            // LLVM_NATIVE_TARGET. This is especially important for x86_64 Darwin binaries executed through Rosetta on Apple Silicon.
-#  if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+# if (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !defined(__arm64ec__) && !defined(_M_ARM64EC)
+            // Register the target selected by the compiler for this executable. LLVM's InitializeNativeTarget() follows the
+            // LLVM_NATIVE_TARGET recorded in llvm-config's generated headers, which can describe the build host instead when uwvm2
+            // is cross-compiled (for example, x86_64 Linux -> AArch64 Linux) and then makes MCJIT target selection fail at runtime.
             ::LLVMInitializeX86TargetInfo();
             ::LLVMInitializeX86Target();
             ::LLVMInitializeX86TargetMC();
             ::LLVMInitializeX86AsmPrinter();
             return true;
-#  elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+# elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             ::LLVMInitializeAArch64TargetInfo();
             ::LLVMInitializeAArch64Target();
             ::LLVMInitializeAArch64TargetMC();
             ::LLVMInitializeAArch64AsmPrinter();
             return true;
-#  elif defined(__arm__) || defined(_M_ARM)
+# elif defined(__arm__) || defined(_M_ARM)
             ::LLVMInitializeARMTargetInfo();
             ::LLVMInitializeARMTarget();
             ::LLVMInitializeARMTargetMC();
             ::LLVMInitializeARMAsmPrinter();
             return true;
-#  elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
+# elif defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)
             ::LLVMInitializePowerPCTargetInfo();
             ::LLVMInitializePowerPCTarget();
             ::LLVMInitializePowerPCTargetMC();
             ::LLVMInitializePowerPCAsmPrinter();
             return true;
-#  else
-            return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
-#  endif
+# elif defined(__riscv)
+            ::LLVMInitializeRISCVTargetInfo();
+            ::LLVMInitializeRISCVTarget();
+            ::LLVMInitializeRISCVTargetMC();
+            ::LLVMInitializeRISCVAsmPrinter();
+            return true;
+# elif defined(__s390x__)
+            ::LLVMInitializeSystemZTargetInfo();
+            ::LLVMInitializeSystemZTarget();
+            ::LLVMInitializeSystemZTargetMC();
+            ::LLVMInitializeSystemZAsmPrinter();
+            return true;
+# elif defined(__loongarch__)
+            ::LLVMInitializeLoongArchTargetInfo();
+            ::LLVMInitializeLoongArchTarget();
+            ::LLVMInitializeLoongArchTargetMC();
+            ::LLVMInitializeLoongArchAsmPrinter();
+            return true;
+# elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+            ::LLVMInitializeMipsTargetInfo();
+            ::LLVMInitializeMipsTarget();
+            ::LLVMInitializeMipsTargetMC();
+            ::LLVMInitializeMipsAsmPrinter();
+            return true;
+# elif defined(__sparc__)
+            ::LLVMInitializeSparcTargetInfo();
+            ::LLVMInitializeSparcTarget();
+            ::LLVMInitializeSparcTargetMC();
+            ::LLVMInitializeSparcAsmPrinter();
+            return true;
 # else
             return !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
 # endif
@@ -670,6 +717,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                         ::uwvm2::utils::container::u8concat_uwvm(feature_enabled ? u8"+" : u8"-", all_details::get_uwvm_u8string_view(feature_name)));
                 }
             }
+# if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && !defined(__mips_msa)
+            // The runtime must protect MSACSR and use an MSA-compatible ABI before native JIT enables MSA.
+            mattrs.emplace_back(u8"-msa");
+# endif
+# if defined(__riscv) && !defined(__riscv_flen)
+            mattrs.emplace_back(u8"-f");
+            mattrs.emplace_back(u8"-d");
+            mattrs.emplace_back(u8"-v");
+# endif
+# if (defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__)) && !defined(__ALTIVEC__) && !defined(__linux__)
+            mattrs.emplace_back(u8"-altivec");
+            mattrs.emplace_back(u8"-vsx");
+# endif
             return mattrs;
         }
 
@@ -698,6 +758,74 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             for(auto const& attr: attr_storage) { attr_refs.push_back(all_details::get_llvm_string_ref(attr)); }
         }
 
+        inline void
+            append_llvm_jit_host_target_attribute_strings(::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& attr_storage,
+                                                          ::llvm::SmallVector<::std::string, 16>& attr_strings)
+        {
+            attr_strings.clear();
+            attr_strings.reserve(attr_storage.size());
+            for(auto const& attr: attr_storage)
+            {
+                auto const attr_ref{all_details::get_llvm_string_ref(attr)};
+                attr_strings.emplace_back(attr_ref.data(), attr_ref.size());
+            }
+        }
+
+        [[nodiscard]] inline ::llvm::Triple get_llvm_jit_mcjit_target_triple()
+        {
+            // N32/x32 have 32-bit pointers but execute a 64-bit ISA. Do not
+            // regress to EngineBuilder's implicit getProcessTriple() narrowing.
+            ::llvm::Triple triple{::llvm::Triple::normalize(::llvm::sys::getDefaultTargetTriple())};
+#  if defined(__aarch64__) && defined(__linux__) && !defined(__ANDROID__)
+            if(triple.getArch() == ::llvm::Triple::aarch64 && triple.isOSLinux())
+            {
+                // Keep lazy MCJIT aligned with the full-module path: Alpine's
+                // aarch64-alpine-linux-musl triple can fault in LLVM 22 RuntimeDyld under qemu-user.
+                triple.setVendor(::llvm::Triple::UnknownVendor);
+                triple.setEnvironment(::llvm::Triple::GNU);
+            }
+#  endif
+            return triple;
+        }
+
+        [[nodiscard]] inline ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>
+            select_llvm_jit_target(::llvm::EngineBuilder& target_builder, llvm_jit_native_target_config const& target_config)
+        {
+            ::llvm::SmallVector<::std::string, 16> host_target_attribute_strings{};
+            append_llvm_jit_host_target_attribute_strings(target_config.feature_storage, host_target_attribute_strings);
+            auto target_triple{get_llvm_jit_mcjit_target_triple()};
+            // Match full/probe selection. RuntimeDyld's MIPS far-call stubs
+            // jump through $at, not the PIC host callee's required $t9. Use
+            // full-width C-ABI register calls. O32/N32 ignore long-calls while
+            // ABICalls is enabled, so both features are required for MCJIT's
+            // static model. This also avoids relying on separately allocated
+            // lazy objects sharing one JAL 256-MiB address region.
+            if(target_triple.isMIPS())
+            {
+                host_target_attribute_strings.emplace_back("+noabicalls");
+                host_target_attribute_strings.emplace_back("+long-calls");
+            }
+            // Match full materialization: an AOT backend is not automatically
+            // an in-process MCJIT loader. Refuse before unsupported relocations
+            // can abort LLVM; never turn this into an AOT inventory skip.
+            // LLVM's EngineBuilder warning on !hasJIT() does not stop creation.
+            ::std::string error{};
+            // The empty-architecture overload preserves the explicit triple
+            // and is also available before LLVM 23's two-argument API change.
+            auto const target{::llvm::TargetRegistry::lookupTarget({}, target_triple, error)};
+            // BPF bytecode needs a different loader/execution ABI despite its JIT flag.
+            if(target_triple.isBPF() || target == nullptr || !target->hasJIT() || !target->hasMCAsmBackend() ||
+               !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_object_format_supported(target_triple)) { return {}; }
+            auto machine{::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine>{target_builder.selectTarget(
+                target_triple, {}, all_details::get_llvm_string_ref(target_config.cpu_name), host_target_attribute_strings)}};
+            if(machine != nullptr && !::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_subtarget_supported(*machine)) { return {}; }
+            // Match full/probe emission: an external RuntimeDyld must not alias
+            // repeated ELF local labels when lazy modules are materialized.
+            if(machine != nullptr && ::uwvm2::runtime::compiler::llvm_jit::details::llvm_jit_mcjit_needs_unique_temp_labels(target_triple))
+            { machine->Options.MCOptions.MCSaveTempLabels = true; }
+            return machine;
+        }
+
         inline constexpr void apply_llvm_jit_native_target_function_attrs(::llvm::Module& module,
                                                                           llvm_jit_native_target_config const& target_config,
                                                                           ::llvm::TargetMachine const& target_machine) noexcept
@@ -723,28 +851,501 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(policy, u8"tune-cpu", target_config.tune_cpu_name);
         }
 
-        // Advances over one Wasm instruction while scanning for direct `call` opcodes.  Structured control opcodes need
-        // special handling because their block-result immediate is parsed by a different helper.
-        [[nodiscard]] inline constexpr bool skip_wasm_instruction_for_direct_call_scan(::std::byte const*& code_curr, ::std::byte const* code_end) noexcept
+        struct call_indirect_scan_policy_t
         {
+            bool mvp_reserved_byte{};
+        };
+
+        [[nodiscard]] inline constexpr call_indirect_scan_policy_t
+            get_call_indirect_scan_policy(parser_feature_parameter_t const* validator_feature_parameter) noexcept
+        {
+            parser_feature_parameter_t const default_validator_feature_parameter{};
+            auto const& effective_validator_feature_parameter{
+                validator_feature_parameter == nullptr ? default_validator_feature_parameter : *validator_feature_parameter};
+            auto const& wasm1p1_para{
+                ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(effective_validator_feature_parameter)};
+            return {.mvp_reserved_byte =
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_call_indirect_reserved_byte(wasm1p1_para)};
+        }
+
+        [[nodiscard]] inline constexpr bool parse_call_indirect_table_index_for_scan(
+            ::std::byte const*& code_curr,
+            ::std::byte const* code_end,
+            parser_feature_parameter_t const* validator_feature_parameter,
+            all_details::validation_module_traits_t::wasm_u32& table_index) noexcept
+        {
+            auto const policy{get_call_indirect_scan_policy(validator_feature_parameter)};
+            // The scanner caller has already consumed and decoded the opcode/type-index prefix. At entry, the trailing
+            // immediate may already be section_end:
+            // call_indirect type_index table_index ...
+            // [          safe        ] unsafe (could be the section_end)
+            //                          ^^ code_curr
+            // On success the complete trailing immediate has been consumed:
+            // call_indirect type_index table_index ...
+            // [                safe              ] unsafe (could be the section_end)
+            //                                      ^^ code_curr
+            // This wrapper commits only that complete trailing immediate. On failure the shared decoder leaves code_curr
+            // at the entry position above and leaves table_index unchanged.
+            return ::uwvm2::parser::wasm::standard::wasm1p1::features::parse_call_indirect_trailing_immediate(
+                code_curr, code_end, policy.mvp_reserved_byte, table_index);
+        }
+
+        // Decode one blocktype only far enough to establish its byte boundary. Direct value forms are literal one-byte
+        // alternatives; the remaining grammar is a non-negative s33 type index. Runtime type-section bounds belong to
+        // validation and are deliberately not consulted by this raw-body scanner. Failure leaves code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_blocktype_for_callee_scan(::std::byte const*& code_curr,
+                                                                                ::std::byte const* code_end) noexcept
+        {
+            // control_op blocktype ...
+            // [  safe  ] unsafe (could be the section_end)
+            //            ^^ code_curr
+
+            auto cursor{code_curr};
+            auto const blocktype_begin{cursor};
+            ::std::int_least64_t blocktype{};
+            if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, blocktype)) [[unlikely]] { return false; }
+
+            auto const encoded_size{static_cast<::std::size_t>(cursor - blocktype_begin)};
+            if(encoded_size > 5uz) [[unlikely]] { return false; }
+            if(blocktype < 0)
+            {
+                if(encoded_size != 1uz) [[unlikely]] { return false; }
+                switch(blocktype)
+                {
+                    case -64:  // empty
+                    case -1:   // i32
+                    case -2:   // i64
+                    case -3:   // f32
+                    case -4:   // f64
+                    case -5:   // v128
+                    case -16:  // funcref
+                    case -17:  // externref
+                        break;
+                    [[unlikely]] default: return false;
+                }
+            }
+            else if(static_cast<::std::uint_least64_t>(blocktype) >
+                    static_cast<::std::uint_least64_t>((::std::numeric_limits<all_details::validation_module_traits_t::wasm_u32>::max)()))
+                [[unlikely]]
+            {
+                return false;
+            }
+
+            code_curr = cursor;
+
+            // control_op blocktype ...
+            // [       safe       ] unsafe (could be the section_end)
+            //                      ^^ code_curr
+            return true;
+        }
+
+        // Fixed-width fields first prove the complete range. Truncation leaves code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_fixed_immediate_for_callee_scan(::std::byte const*& code_curr,
+                                                                                      ::std::byte const* code_end,
+                                                                                      ::std::size_t byte_count) noexcept
+        {
+            // fixed_immediate[byte_count] ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
+            if(static_cast<::std::size_t>(code_end - code_curr) < byte_count) [[unlikely]] { return false; }
+            code_curr += byte_count;
+
+            // instruction fixed_immediate[byte_count] ...
+            // [                safe                 ] unsafe (could be the section_end)
+            //                                         ^^ code_curr
+            return true;
+        }
+
+        // MVP memory instructions and the bulk-memory encodings below use literal reserved zero bytes, not u32 indices.
+        // At entry, the immediate may already be section_end:
+        // reserved_zero ...
+        // unsafe (could be the section_end)
+        // ^^ code_curr
+        // A missing/nonzero byte fails without advancing code_curr. On success:
+        // reserved_zero ...
+        // [   safe    ] unsafe (could be the section_end)
+        //               ^^ code_curr
+        [[nodiscard]] inline constexpr bool parse_wasm_reserved_zero_for_callee_scan(::std::byte const*& code_curr,
+                                                                                     ::std::byte const* code_end) noexcept
+        {
+            if(code_curr == code_end || *code_curr != ::std::byte{}) [[unlikely]] { return false; }
+            ++code_curr;
+            return true;
+        }
+
+        // Both u32 fields are decoded through a local cursor; either failure leaves code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_memarg_for_callee_scan(::std::byte const*& code_curr,
+                                                                             ::std::byte const* code_end) noexcept
+        {
+            // alignment offset ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
+            auto cursor{code_curr};
+            all_details::validation_module_traits_t::wasm_u32 alignment{};
+            all_details::validation_module_traits_t::wasm_u32 offset{};
+            if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, alignment) ||
+               !all_details::parse_wasm_leb128_immediate(cursor, code_end, offset)) [[unlikely]]
+            {
+                return false;
+            }
+
+            code_curr = cursor;
+
+            // memory_op alignment offset ...
+            // [          safe          ] unsafe (could be the section_end)
+            //                            ^^ code_curr
+            return true;
+        }
+
+        // Decode the vector immediate of typed select. The binary vector may have any encoded count; the validator owns
+        // the current semantic restriction to exactly one result type. Every element must still be a grammatical valtype.
+        // Count truncation, insufficient remaining bytes, or an invalid valtype leaves code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_typed_select_for_callee_scan(::std::byte const*& code_curr,
+                                                                                   ::std::byte const* code_end) noexcept
+        {
+            using wasm_u32 = all_details::validation_module_traits_t::wasm_u32;
+            using value_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
+
+            // result_type_count result_type ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
+            auto cursor{code_curr};
+            wasm_u32 result_type_count{};
+            if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, result_type_count)) [[unlikely]] { return false; }
+
+            auto const result_type_count_uz{static_cast<::std::size_t>(result_type_count)};
+            if(static_cast<wasm_u32>(result_type_count_uz) != result_type_count ||
+               result_type_count_uz > static_cast<::std::size_t>(code_end - cursor)) [[unlikely]]
+            {
+                return false;
+            }
+
+            for(::std::size_t i{}; i != result_type_count_uz; ++i)
+            {
+                auto const type_byte{::std::to_integer<::std::uint_least8_t>(cursor[i])};
+                if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(static_cast<value_type>(type_byte))) [[unlikely]]
+                {
+                    return false;
+                }
+            }
+            cursor += result_type_count_uz;
+            code_curr = cursor;
+
+            // select_t result_type_count result_type ...
+            // [                safe                ] unsafe (could be the section_end)
+            //                                        ^^ code_curr
+            return true;
+        }
+
+        // Decode one 0xfc instruction. Feature gates and index bounds are semantic checks performed by the validator;
+        // this helper recognizes every retained subopcode and consumes only its binary immediates. Unknown/truncated
+        // subopcodes or immediates leave code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_numeric_prefix_for_callee_scan(::std::byte const*& code_curr,
+                                                                                     ::std::byte const* code_end) noexcept
+        {
+            using wasm_u32 = all_details::validation_module_traits_t::wasm_u32;
+            using numeric_code = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_numeric;
+
+            // subopcode immediates ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
+            auto cursor{code_curr};
+            wasm_u32 subopcode{};
+            if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, subopcode)) [[unlikely]] { return false; }
+
+            wasm_u32 index{};
+            switch(static_cast<numeric_code>(subopcode))
+            {
+                case numeric_code::i32_trunc_sat_f32_s:
+                case numeric_code::i32_trunc_sat_f32_u:
+                case numeric_code::i32_trunc_sat_f64_s:
+                case numeric_code::i32_trunc_sat_f64_u:
+                case numeric_code::i64_trunc_sat_f32_s:
+                case numeric_code::i64_trunc_sat_f32_u:
+                case numeric_code::i64_trunc_sat_f64_s:
+                case numeric_code::i64_trunc_sat_f64_u: break;
+                case numeric_code::memory_init:
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, index) ||
+                       !parse_wasm_reserved_zero_for_callee_scan(cursor, code_end)) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    break;
+                case numeric_code::data_drop:
+                case numeric_code::elem_drop:
+                case numeric_code::table_grow:
+                case numeric_code::table_size:
+                case numeric_code::table_fill:
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, index)) [[unlikely]] { return false; }
+                    break;
+                case numeric_code::memory_copy:
+                    if(!parse_wasm_reserved_zero_for_callee_scan(cursor, code_end) ||
+                       !parse_wasm_reserved_zero_for_callee_scan(cursor, code_end)) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    break;
+                case numeric_code::memory_fill:
+                    if(!parse_wasm_reserved_zero_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    break;
+                case numeric_code::table_init:
+                case numeric_code::table_copy:
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, index) ||
+                       !all_details::parse_wasm_leb128_immediate(cursor, code_end, index)) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    break;
+                [[unlikely]] default: return false;
+            }
+
+            code_curr = cursor;
+
+            // numeric_prefix subopcode immediates ...
+            // [              safe               ] unsafe (could be the section_end)
+            //                                     ^^ code_curr
+            return true;
+        }
+
+        // Decode one 0xfd instruction through the same exhaustive opcode visitor used by LLVM lowering. The visitor
+        // supplies the immediate shape; lane/alignment ranges remain validator semantics and do not affect boundaries.
+        // Unknown/truncated subopcodes or immediates leave code_curr at entry.
+        [[nodiscard]] inline constexpr bool skip_wasm_simd_prefix_for_callee_scan(::std::byte const*& code_curr,
+                                                                                  ::std::byte const* code_end) noexcept
+        {
+            using wasm_u32 = all_details::validation_module_traits_t::wasm_u32;
+            namespace shared_simd = ::uwvm2::runtime::compiler::shared;
+
+            // subopcode immediates ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
+            auto cursor{code_curr};
+            wasm_u32 subopcode{};
+            if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, subopcode)) [[unlikely]] { return false; }
+
+            auto const valid_instruction{shared_simd::visit_wasm1p1_simd_instruction(
+                static_cast<shared_simd::wasm1p1_simd_details::simd_code>(subopcode),
+                [&]<shared_simd::wasm1p1_simd_details::simd_code Op,
+                    shared_simd::wasm1p1_simd_instruction_kind Kind,
+                    shared_simd::wasm1p1_simd_scalar_kind ScalarKind,
+                    ::std::size_t LaneCount,
+                    ::std::uint_least32_t MaxAlign>() constexpr noexcept -> bool
+                {
+                    static_cast<void>(Op);
+                    static_cast<void>(ScalarKind);
+                    static_cast<void>(MaxAlign);
+                    if constexpr(Kind == shared_simd::wasm1p1_simd_instruction_kind::memory_load ||
+                                 Kind == shared_simd::wasm1p1_simd_instruction_kind::memory_store)
+                    {
+                        if(!skip_wasm_memarg_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                        if constexpr(LaneCount != 0uz)
+                        {
+                            return skip_wasm_fixed_immediate_for_callee_scan(cursor, code_end, 1uz);
+                        }
+                    }
+                    else if constexpr(Kind == shared_simd::wasm1p1_simd_instruction_kind::constant ||
+                                      Kind == shared_simd::wasm1p1_simd_instruction_kind::shuffle)
+                    {
+                        return skip_wasm_fixed_immediate_for_callee_scan(cursor, code_end, 16uz);
+                    }
+                    else if constexpr(Kind == shared_simd::wasm1p1_simd_instruction_kind::extract_lane ||
+                                      Kind == shared_simd::wasm1p1_simd_instruction_kind::replace_lane)
+                    {
+                        return skip_wasm_fixed_immediate_for_callee_scan(cursor, code_end, 1uz);
+                    }
+                    return true;
+                })};
+            if(!valid_instruction) [[unlikely]] { return false; }
+
+            code_curr = cursor;
+
+            // simd_prefix subopcode immediates ...
+            // [             safe             ] unsafe (could be the section_end)
+            //                                  ^^ code_curr
+            return true;
+        }
+
+        // Advance over exactly one raw Wasm instruction while scanning a complete function body. The outer cursor is
+        // committed only after the opcode and all of its immediates have been decoded; malformed or unknown opcodes leave
+        // it at the instruction start so a caller can fail closed without interpreting immediate bytes as opcodes.
+        [[nodiscard]] inline constexpr bool skip_wasm_instruction_for_direct_call_scan(
+            ::std::byte const*& code_curr,
+            ::std::byte const* code_end,
+            parser_feature_parameter_t const* validator_feature_parameter) noexcept
+        {
+            // instruction opcode immediates ...
+            // unsafe (could be the section_end)
+            // ^^ code_curr
+
             if(code_curr == code_end) [[unlikely]] { return false; }
 
-            all_details::wasm1_code op;  // no init necessary
-            ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
-            switch(op)
+            using wasm1_code = all_details::wasm1_code;
+            using wasm1p1_code = all_details::wasm1p1_code;
+            using wasm_u32 = all_details::validation_module_traits_t::wasm_u32;
+
+            auto cursor{code_curr};
+            auto const opcode{::std::to_integer<::std::uint_least8_t>(*cursor)};
+            ++cursor;
+
+            auto const commit{[&]() constexpr noexcept
+                              {
+                                  code_curr = cursor;
+
+                                  // instruction opcode immediates ...
+                                  // [           safe            ] unsafe (could be the section_end)
+                                  //                               ^^ code_curr
+                                  return true;
+                              }};
+
+            if(opcode >= static_cast<::std::uint_least8_t>(wasm1_code::i32_load) &&
+               opcode <= static_cast<::std::uint_least8_t>(wasm1_code::i64_store32))
             {
-                case all_details::wasm1_code::block:
-                case all_details::wasm1_code::loop:
-                case all_details::wasm1_code::if_:
+                if(!skip_wasm_memarg_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                return commit();
+            }
+
+            // MVP scalar comparisons, numeric operators, conversions, and reinterpretations are one-byte instructions.
+            if(opcode >= static_cast<::std::uint_least8_t>(wasm1_code::i32_eqz) &&
+               opcode <= static_cast<::std::uint_least8_t>(wasm1_code::f64_reinterpret_i64))
+            {
+                return commit();
+            }
+
+            // The sign-extension proposal adds a contiguous no-immediate range immediately after MVP numeric opcodes.
+            if(opcode >= static_cast<::std::uint_least8_t>(wasm1p1_code::i32_extend8_s) &&
+               opcode <= static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend32_s))
+            {
+                return commit();
+            }
+
+            switch(opcode)
+            {
+                case static_cast<::std::uint_least8_t>(wasm1_code::unreachable):
+                case static_cast<::std::uint_least8_t>(wasm1_code::nop):
+                case static_cast<::std::uint_least8_t>(wasm1_code::else_):
+                case static_cast<::std::uint_least8_t>(wasm1_code::end):
+                case static_cast<::std::uint_least8_t>(wasm1_code::return_):
+                case static_cast<::std::uint_least8_t>(wasm1_code::drop):
+                case static_cast<::std::uint_least8_t>(wasm1_code::select):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_is_null): return commit();
+                case static_cast<::std::uint_least8_t>(wasm1_code::block):
+                case static_cast<::std::uint_least8_t>(wasm1_code::loop):
+                case static_cast<::std::uint_least8_t>(wasm1_code::if_):
+                    if(!skip_wasm_blocktype_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    return commit();
+                case static_cast<::std::uint_least8_t>(wasm1_code::br):
+                case static_cast<::std::uint_least8_t>(wasm1_code::br_if):
+                case static_cast<::std::uint_least8_t>(wasm1_code::call):
+                case static_cast<::std::uint_least8_t>(wasm1_code::local_get):
+                case static_cast<::std::uint_least8_t>(wasm1_code::local_set):
+                case static_cast<::std::uint_least8_t>(wasm1_code::local_tee):
+                case static_cast<::std::uint_least8_t>(wasm1_code::global_get):
+                case static_cast<::std::uint_least8_t>(wasm1_code::global_set):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_get):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_set):
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_func):
                 {
-                    ++code_curr;
-                    all_details::runtime_block_result_type block_result{};
-                    return all_details::parse_wasm_block_result_type(code_curr, code_end, block_result);
+                    wasm_u32 index{};
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, index)) [[unlikely]] { return false; }
+                    return commit();
                 }
-                default:
+                case static_cast<::std::uint_least8_t>(wasm1_code::call_indirect):
                 {
-                    return all_details::skip_wasm_unreachable_noncontrol_instruction(code_curr, code_end);
+                    // call_indirect type_index table_index ...
+                    // [    safe   ] unsafe (could be the section_end)
+                    //               ^^ cursor
+
+                    wasm_u32 type_index{};
+                    wasm_u32 table_index{};
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, type_index) ||
+                       !parse_call_indirect_table_index_for_scan(cursor, code_end, validator_feature_parameter, table_index)) [[unlikely]]
+                    {
+                        return false;
+                    }
+
+                    // call_indirect type_index table_index ...
+                    // [                safe              ] unsafe (could be the section_end)
+                    //                                      ^^ cursor
+                    return commit();
                 }
+                case static_cast<::std::uint_least8_t>(wasm1_code::br_table):
+                {
+                    wasm_u32 target_count{};
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, target_count)) [[unlikely]] { return false; }
+
+                    auto const target_count_uz{static_cast<::std::size_t>(target_count)};
+                    auto const remaining_bytes{static_cast<::std::size_t>(code_end - cursor)};
+                    if(static_cast<wasm_u32>(target_count_uz) != target_count || target_count_uz >= remaining_bytes) [[unlikely]]
+                    {
+                        // Each target and the mandatory default label need at least one byte. This guard also makes
+                        // `target_count + 1` safe in size_t before the bounded decode loop below.
+                        return false;
+                    }
+
+                    auto const label_count{target_count_uz + 1uz};
+                    for(::std::size_t i{}; i != label_count; ++i)
+                    {
+                        wasm_u32 label_index{};
+                        if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, label_index)) [[unlikely]] { return false; }
+                    }
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::memory_size):
+                case static_cast<::std::uint_least8_t>(wasm1_code::memory_grow):
+                    if(!parse_wasm_reserved_zero_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    return commit();
+                case static_cast<::std::uint_least8_t>(wasm1_code::i32_const):
+                {
+                    ::std::int_least32_t immediate{};
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, immediate)) [[unlikely]] { return false; }
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::i64_const):
+                {
+                    ::std::int_least64_t immediate{};
+                    if(!all_details::parse_wasm_leb128_immediate(cursor, code_end, immediate)) [[unlikely]] { return false; }
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::f32_const):
+                {
+                    ::std::uint_least32_t immediate{};
+                    if(!all_details::parse_wasm_little_endian_immediate(cursor, code_end, immediate)) [[unlikely]] { return false; }
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1_code::f64_const):
+                {
+                    ::std::uint_least64_t immediate{};
+                    if(!all_details::parse_wasm_little_endian_immediate(cursor, code_end, immediate)) [[unlikely]] { return false; }
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::select_t):
+                    if(!skip_wasm_typed_select_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    return commit();
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_null):
+                {
+                    using value_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type;
+                    if(cursor == code_end) [[unlikely]] { return false; }
+                    auto const reference_type_byte{::std::to_integer<::std::uint_least8_t>(*cursor)};
+                    auto const reference_type{static_cast<value_type>(reference_type_byte)};
+                    if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_reference_type(reference_type)) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    ++cursor;
+                    return commit();
+                }
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::numeric_prefix):
+                    if(!skip_wasm_numeric_prefix_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    return commit();
+                case static_cast<::std::uint_least8_t>(wasm1p1_code::simd_prefix):
+                    if(!skip_wasm_simd_prefix_for_callee_scan(cursor, code_end)) [[unlikely]] { return false; }
+                    return commit();
+                [[unlikely]] default: return false;
             }
         }
 
@@ -759,7 +1360,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         // calls and calls to imports are not grouped because they do not identify a single local materialization target.
         [[nodiscard]] inline constexpr bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
                                                                            ::std::size_t local_function_index,
-                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees,
+                                                                           parser_feature_parameter_t const* validator_feature_parameter) noexcept
         {
             callees.clear();
             if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]] { return false; }
@@ -782,8 +1384,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 if(op == all_details::wasm1_code::call)
                 {
                     ++code_curr;
+
+                    // call     func_index ...
+                    // [ safe ] unsafe (could be the section_end)
+                    //          ^^ code_curr
+
                     all_details::validation_module_traits_t::wasm_u32 function_index{};
-                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]] { return false; }
+                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]]
+                    {
+                        // The LEB decoder does not commit a partial field; failure leaves code_curr at func_index above.
+                        return false;
+                    }
+
+                    // call func_index ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
 
                     auto const function_index_uz{static_cast<::std::size_t>(function_index)};
                     if(function_index_uz >= import_count && function_index_uz < all_function_count)
@@ -793,7 +1408,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     continue;
                 }
 
-                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end, validator_feature_parameter)) [[unlikely]]
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -827,7 +1445,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline constexpr bool collect_unwind_defined_callees(runtime_module_storage_t const& curr_module,
                                                                            ::std::size_t local_function_index,
-                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+                                                                           ::uwvm2::utils::container::vector<::std::size_t>& callees,
+                                                                           parser_feature_parameter_t const* validator_feature_parameter) noexcept
         {
             callees.clear();
             if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]] { return false; }
@@ -851,8 +1470,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 if(op == all_details::wasm1_code::call)
                 {
                     ++code_curr;
+
+                    // call     func_index ...
+                    // [ safe ] unsafe (could be the section_end)
+                    //          ^^ code_curr
+
                     all_details::validation_module_traits_t::wasm_u32 function_index{};
-                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]] { return false; }
+                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]]
+                    {
+                        // The LEB decoder does not commit a partial field; failure leaves code_curr at func_index above.
+                        return false;
+                    }
+
+                    // call func_index ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
 
                     auto const function_index_uz{static_cast<::std::size_t>(function_index)};
                     if(function_index_uz >= import_count && function_index_uz < all_function_count)
@@ -865,23 +1497,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 if(op == all_details::wasm1_code::call_indirect)
                 {
                     ++code_curr;
+
+                    // call_indirect type_index table_index ...
+                    // [    safe   ] unsafe (could be the section_end)
+                    //               ^^ code_curr
+
                     all_details::validation_module_traits_t::wasm_u32 type_index{};
                     all_details::validation_module_traits_t::wasm_u32 table_index{};
                     if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, type_index) ||
-                       !all_details::parse_wasm_leb128_immediate(code_curr, code_end, table_index)) [[unlikely]]
+                       !parse_call_indirect_table_index_for_scan(code_curr, code_end, validator_feature_parameter, table_index)) [[unlikely]]
                     {
+                        // The failing immediate itself is not committed.  A preceding type index may already be consumed,
+                        // and this scanner intentionally does not restore code_curr to the call_indirect opcode.
                         return false;
                     }
 
+                    // call_indirect type_index table_index ...
+                    // [                safe              ] unsafe (could be the section_end)
+                    //                                      ^^ code_curr
+
                     if(static_cast<::std::size_t>(table_index) >= all_table_count) [[unlikely]] { return false; }
                     // Native unwind mode must not discover a table target by entering the lazy raw trampoline from an
-                    // active JIT frame: Rosetta and libunwind may then see only the callee object.  Pre-materialize all
+                    // active JIT frame: a native walk may then see only the callee object. Pre-materialize all
                     // current-module targets of the selected table so call_indirect can take the typed native entry.
                     if(!collect_call_indirect_defined_targets(curr_module, table_index, callees)) [[unlikely]] { return false; }
                     continue;
                 }
 
-                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end, validator_feature_parameter)) [[unlikely]]
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -893,9 +1539,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                           ::llvm::CodeGenOptLevel codegen_opt_level,
                                                                           bool verify_llvm_jit_ir) noexcept
         {
+            // Lazy materialization is another code-generation entry, not exempt
+            // from strict rounding, native-NaN repair or the i386 private FP-bit ABI.
+            // Run the same module-level lowering used by eager/raw-wrapper code.
+            ::uwvm2::runtime::compiler::shared::strict_float_jit::lower(module);
             if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
-            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None)
+            {
+                all_details::legalize_llvm_jit_native_vectors(module);
+                return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
+            }
 
             ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
             function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
@@ -912,6 +1566,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
             function_pass_manager.doFinalization();
 
+            all_details::legalize_llvm_jit_native_vectors(module);
             return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
         }
 
@@ -947,6 +1602,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
+            materialized.tiered_core_entry_address = 0u;
             materialized.tiered_loop_reentries.clear();
             materialized.tiered_loop_reentry_raw_entry_addresses.clear();
             materialized.llvm_jit_engine.reset();
@@ -978,7 +1634,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                 .setMAttrs(host_target_attributes);
 
-            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{select_llvm_jit_target(target_builder, target_config)};
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
@@ -1018,34 +1674,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
-            llvm_jit_cache_context.cache_key_is_complete = true;
+            // The source-level lazy key intentionally stays compact, but it does not encode imported globals,
+            // memories/tables, proposal metadata, or every declaration copied into this compilation unit. Let the
+            // ObjectCache append the complete emitted-module bitcode hash before accepting a persistent object.
+            llvm_jit_cache_context.cache_key_is_complete = false;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
                                                                                           lazy_llvm_jit_object_cache_policy()};
 
+            auto memory_manager{
+                ::uwvm2::utils::container::make_delete_owned<
+                    ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()};
+            auto const memory_manager_observer{memory_manager.get()};
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                            .release()})
-                    .create(target_machine.get())};
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                    .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
-            static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
 
             engine->setObjectCache(::std::addressof(llvm_jit_object_cache));
             if(options.jit_event_listener != nullptr)
             {
-                // Lazy unwind call-stack mode needs DWARF sections as well as executable sections so optimized inline
-                // Wasm frames can be reconstructed from the generated object.
-                engine->setProcessAllSections(true);
+                // The runtime listener records executable ranges; MCJIT registers unwind metadata independently.
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            if(memory_manager_observer->has_finalization_failure()) [[unlikely]]
+            {
+                engine->setObjectCache(nullptr);
+                return false;
+            }
             engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -1058,7 +1721,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
             auto const& runtime_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
             if(runtime_func.function_type_ptr == nullptr) [[unlikely]] { return false; }
-            auto const typed_entry_required{all_details::is_runtime_wasm_function_type_inline_llvm_jit_supported(*runtime_func.function_type_ptr)};
+            auto const typed_entry_required{all_details::is_runtime_wasm_function_type_llvm_typed_entry_abi_supported(*runtime_func.function_type_ptr)};
             auto const entry_address{typed_entry_required ? resolve_llvm_function_address(*engine, function_name) : 0u};
             auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
             if(raw_entry_address == 0u || (typed_entry_required && entry_address == 0u)) [[unlikely]] { return false; }
@@ -1077,8 +1740,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
             }
 
+            ::std::uintptr_t core_address{};
+            if(typed_entry_required && options.compile_options.emit_tiered_loop_reentry_entries)
+            {
+                auto const core_name{all_details::get_llvm_wasm_tiered_core_function_name(curr_module, function_index_u32)};
+                core_address = resolve_llvm_function_address(*engine, core_name);
+                if(core_address == 0u) [[unlikely]] { return false; }
+            }
             materialized.entry_address = entry_address;
             materialized.raw_entry_address = raw_entry_address;
+            materialized.tiered_core_entry_address = core_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
             materialized.llvm_jit_engine = ::std::move(engine);
             // Publish the fully resolved single-function record.  Acquire readers can now safely consume the addresses
@@ -1108,6 +1779,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 store_lazy_materialized_ready(materialized, false, ::std::memory_order_relaxed);
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
+                materialized.tiered_core_entry_address = 0u;
                 materialized.tiered_loop_reentries.clear();
                 materialized.tiered_loop_reentry_raw_entry_addresses.clear();
                 materialized.llvm_jit_engine.reset();
@@ -1139,7 +1811,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                 .setMAttrs(host_target_attributes);
 
-            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{select_llvm_jit_target(target_builder, target_config)};
             if(target_machine == nullptr) [[unlikely]] { return false; }
             if(options.codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
@@ -1208,34 +1880,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_key.data(), llvm_jit_cache_key.size()},
                 ::uwvm2::utils::container::u8string_view{llvm_jit_cache_codegen_policy.data(), llvm_jit_cache_codegen_policy.size()},
                 *target_machine)};
-            llvm_jit_cache_context.cache_key_is_complete = true;
+            // Keep the coroutine materialization path identical to the synchronous path: the surrounding key is only
+            // a namespace hint, while the ObjectCache's bitcode hash is the authoritative native-code identity.
+            llvm_jit_cache_context.cache_key_is_complete = false;
             ::uwvm2::runtime::llvm_jit_cache::llvm_jit_object_cache llvm_jit_object_cache{::std::move(llvm_jit_cache_context),
                                                                                           lazy_llvm_jit_object_cache_policy()};
 
+            auto memory_manager{
+                ::uwvm2::utils::container::make_delete_owned<
+                    ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()};
+            auto const memory_manager_observer{memory_manager.get()};
             auto raw_engine{
                 ::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                     .setEngineKind(::llvm::EngineKind::JIT)
                     .setOptLevel(options.codegen_opt_level)
                     .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                     .setMAttrs(host_target_attributes)
-                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{
-                        ::uwvm2::utils::container::make_delete_owned<::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>()
-                            .release()})
-                    .create(target_machine.get())};
+                    .setMCJITMemoryManager(llvm_jit_memory_manager_owner_t{memory_manager.release()})
+                    .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
-            static_cast<void>(target_machine.release());
 
             ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
 
             engine->setObjectCache(::std::addressof(llvm_jit_object_cache));
             if(options.jit_event_listener != nullptr)
             {
-                // Lazy group materialization can inline or split functions across one MCJIT object; keep DWARF metadata
-                // available to the listener so traps can recover the logical Wasm stack.
-                engine->setProcessAllSections(true);
+                // Group materialization uses the same executable-range listener as single-function lazy compilation.
                 engine->RegisterJITEventListener(options.jit_event_listener);
             }
             engine->finalizeObject();
+            if(memory_manager_observer->has_finalization_failure()) [[unlikely]]
+            {
+                engine->setObjectCache(nullptr);
+                return false;
+            }
             engine->setObjectCache(nullptr);
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -1250,7 +1928,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
                 auto const& runtime_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
                 if(runtime_func.function_type_ptr == nullptr) [[unlikely]] { return false; }
-                auto const typed_entry_required{all_details::is_runtime_wasm_function_type_inline_llvm_jit_supported(*runtime_func.function_type_ptr)};
+                auto const typed_entry_required{all_details::is_runtime_wasm_function_type_llvm_typed_entry_abi_supported(*runtime_func.function_type_ptr)};
                 auto const entry_address{typed_entry_required ? resolve_llvm_function_address(*engine, function_name) : 0u};
                 auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
                 if(raw_entry_address == 0u || (typed_entry_required && entry_address == 0u)) [[unlikely]] { return false; }
@@ -1267,8 +1945,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     if(reentry_address == 0u) [[unlikely]] { return false; }
                     materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
                 }
+                ::std::uintptr_t core_address{};
+                if(typed_entry_required && options.compile_options.emit_tiered_loop_reentry_entries)
+                {
+                    auto const core_name{all_details::get_llvm_wasm_tiered_core_function_name(curr_module, function_index_u32)};
+                    core_address = resolve_llvm_function_address(*engine, core_name);
+                    if(core_address == 0u) [[unlikely]] { return false; }
+                }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
+                materialized.tiered_core_entry_address = core_address;
             }
 
             // Store the shared LLVM owners on one record before publishing any member as ready.  Other records contain
@@ -1381,7 +2067,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         inline constexpr void collect_lazy_direct_call_group(runtime_module_storage_t const& curr_module,
                                                              lazy_module_storage_t& storage,
                                                              ::std::size_t entry_local_function_index,
-                                                             ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+                                                             ::uwvm2::utils::container::vector<::std::size_t>& out,
+                                                             parser_feature_parameter_t const* validator_feature_parameter) noexcept
         {
             constexpr ::std::size_t group_function_budget{16uz};
             constexpr ::std::size_t group_code_size_budget{8uz * 1024uz};
@@ -1396,7 +2083,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             for(::std::size_t cursor{}; cursor < out.size() && out.size() < group_function_budget && total_code_size < group_code_size_budget; ++cursor)
             {
                 callees.clear();
-                if(!collect_direct_defined_callees(curr_module, out.index_unchecked(cursor), callees)) { continue; }
+                if(!collect_direct_defined_callees(curr_module, out.index_unchecked(cursor), callees, validator_feature_parameter)) { continue; }
 
                 for(auto remaining{callees.size()}; remaining != 0uz && out.size() < group_function_budget && total_code_size < group_code_size_budget;)
                 {
@@ -1425,7 +2112,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         inline constexpr void collect_lazy_unwind_direct_call_group(runtime_module_storage_t const& curr_module,
                                                                     lazy_module_storage_t& storage,
                                                                     ::std::size_t entry_local_function_index,
-                                                                    ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+                                                                    ::uwvm2::utils::container::vector<::std::size_t>& out,
+                                                                    parser_feature_parameter_t const* validator_feature_parameter) noexcept
         {
             out.clear();
             auto const local_count{curr_module.local_defined_function_vec_storage.size()};
@@ -1447,7 +2135,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 out.push_back(local_index);
 
                 callees.clear();
-                if(!collect_unwind_defined_callees(curr_module, local_index, callees)) { continue; }
+                if(!collect_unwind_defined_callees(curr_module, local_index, callees, validator_feature_parameter)) { continue; }
 
                 for(auto remaining{callees.size()}; remaining != 0uz;)
                 {
@@ -1473,7 +2161,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             ::uwvm2::utils::container::vector<::std::size_t> candidate_group{};
             if(options.compile_options.emit_unwind_call_stack_frames)
             {
-                collect_lazy_unwind_direct_call_group(curr_module, storage, entry_local_function_index, candidate_group);
+                collect_lazy_unwind_direct_call_group(
+                    curr_module, storage, entry_local_function_index, candidate_group, options.validator_feature_parameter);
             }
             else if(lazy_llvm_jit_object_cache_policy().enable)
             {
@@ -1483,7 +2172,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
             else
             {
-                collect_lazy_direct_call_group(curr_module, storage, entry_local_function_index, candidate_group);
+                collect_lazy_direct_call_group(
+                    curr_module, storage, entry_local_function_index, candidate_group, options.validator_feature_parameter);
             }
             if(candidate_group.empty()) { candidate_group.push_back(entry_local_function_index); }
 
@@ -1822,8 +2512,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     // Public wrapper for direct-callee discovery, primarily used by runtime prefetch/tiering heuristics.
     [[nodiscard]] inline constexpr bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
                                                                        ::std::size_t local_function_index,
-                                                                       ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
-    { return details::collect_direct_defined_callees(curr_module, local_function_index, callees); }
+                                                                       ::uwvm2::utils::container::vector<::std::size_t>& callees,
+                                                                       parser_feature_parameter_t const* validator_feature_parameter) noexcept
+    { return details::collect_direct_defined_callees(curr_module, local_function_index, callees, validator_feature_parameter); }
 
     // Synchronously compiles the compile unit identified by `compile_unit_index`.  Invalid indices and failed
     // materialization are fatal because callers use this path when execution cannot proceed without native code.

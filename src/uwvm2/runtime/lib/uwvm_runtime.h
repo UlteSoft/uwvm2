@@ -35,7 +35,14 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type { struct uwvm_preload_memory_descriptor_t; }
+#ifndef UWVM_MODULE
+// Textual consumers need only an incomplete descriptor for the pointer API.
+// In named-module builds its definition is imported from uwvm2.uwvm.wasm.type:
+// repeating this declaration inside uwvm2.runtime would attach the same type
+// to two modules, rejected when a host API consumer imports both. Keep the
+// descriptor's layout and ABI in preload_api.h; do not duplicate it here.
+namespace uwvm2::uwvm::wasm::type { struct uwvm_preload_memory_descriptor_t; }
+#endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
@@ -51,9 +58,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     {
         /// @brief The first function index to enter in the main module.
         /// @note  This is the WASM function index space (imports first, then local-defined).
-        /// @note  Imported entries are only supported when they resolve to a wasm-defined `() -> ()` function.
+        /// @note  Conventional imported entries must resolve to Wasm; module_start also permits a void host import.
         ::std::size_t entry_function_index{};
         entry_function_abi_buffers entry_abi_buffers{};
+        /// @brief A validated start-section invocation may target a host import with signature () -> ().
+        bool module_start{};
     };
 
     struct lazy_compile_run_config
@@ -64,26 +73,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::size_t entry_function_index{};
         entry_function_abi_buffers entry_abi_buffers{};
         bool assume_full_code_verified{};
+        /// @brief A validated start section may invoke a void host import.
+        bool module_start{};
     };
 
     /// @brief Full-compile and run the main module using the configured runtime backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
+    /// @note  After a runtime registry is published, changing full/lazy mode or backend configuration requires a quiescent
+    ///        reset_runtime_state_host_api() call before the next run; incompatible reuse fails closed.
+    /// @note  This entry is not reentrant on one thread. Host callbacks that need generated-Wasm re-entry must use
+    ///        llvm_jit_call_raw_host_api().
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config) noexcept;
 
     /// @brief Lazily compile and run the main module using the configured lazy-capable backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
+    /// @note  After a runtime registry is published, changing full/lazy mode or backend configuration requires a quiescent
+    ///        reset_runtime_state_host_api() call before the next run; incompatible reuse fails closed.
+    /// @note  This entry is not reentrant on one thread. Host callbacks that need generated-Wasm re-entry must use
+    ///        llvm_jit_call_raw_host_api().
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 
-    /// @brief Stop lazy background compilation before a WASI proc_exit leaves the normal run loop.
-    /// @note WASI proc_exit can terminate the process directly. Lazy compiler workers must be joined before that
-    ///       happens, otherwise they may still be inside LLVM or runtime-log code while global objects are being
-    ///       destroyed by the host process exit path.
+    /// @brief Stop every runtime-owned background worker before a WASI proc_exit leaves the normal run loop.
+    /// @note On Linux the fast exit path terminates the calling thread directly. Compiler and JIT-cache workers must therefore be
+    ///       joined explicitly, otherwise a surviving worker can keep the process alive indefinitely.
+    extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept;
+
+    /// @brief Compatibility spelling for callers built against the original lazy-worker shutdown API.
     extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept;
 
+    /// @brief Clear backend-neutral and selected-backend runtime state before loading a fresh module set in the same process.
+    /// @note  Embedders must call this before destroying or replacing runtime storage referenced by compiled or lazy caches.
+    /// @note  The caller must first quiesce wasm execution and host API calls. Reset joins internal workers but is not a barrier for
+    ///        caller-owned execution threads; their surviving TLS caches are invalidated by the runtime generation on next entry.
+    /// @note  Same-thread reset during any active runtime execution entry fails closed.
+    /// @note  Reset also fails closed from provider callbacks made while this thread owns runtime publication.
+    extern "C++" void reset_runtime_state_host_api() noexcept;
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-    /// @brief Clear compiled runtime state before loading a fresh module set in the same process.
+    /// @brief Compatibility spelling retained for existing LLVM embedding callers.
     extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept;
 
+    /// @brief Invoke one generated function through the public raw ABI; this is the sole same-thread execution-callback re-entry API.
+    /// @note  Re-entry from provider callbacks during registry publication fails closed because the registry is incomplete.
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,
@@ -91,12 +122,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
                                                  void const* param_buffer,
                                                  ::std::size_t param_bytes) noexcept;
 
-    extern "C++" void llvm_jit_call_interpreter_defined_raw_api(void const* runtime_module_ptr,
-                                                                ::std::uint_least32_t func_index,
-                                                                void* result_buffer,
-                                                                ::std::size_t result_bytes,
-                                                                void const* param_buffer,
-                                                                ::std::size_t param_bytes) noexcept;
 #endif
 
     extern "C++" ::std::size_t preload_memory_descriptor_count_host_api() noexcept;

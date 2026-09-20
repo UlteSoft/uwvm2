@@ -23,33 +23,20 @@ using win32_named_pipe_internal_strvw = ::fast_io::containers::basic_string_view
 template <win32_family family, typename... Args>
 constexpr inline win32_named_pipe_internal_str<family> concat_win32_named_pipe_internal_str(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<win32_named_pipe_internal_char_type<family>>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, win32_named_pipe_internal_char_type<family>, win32_named_pipe_internal_str<family>>(
-			::fast_io::io_print_forward<win32_named_pipe_internal_char_type<family>>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::win32::details::win32_named_pipe_internal_str");
-		return {};
-	}
+	// The helper's named arguments are lvalues. Enter concat before alias/status forwarding so its exact destination
+	// proof and semantic expansion describe the same single normalization performed by the body.
+	return ::fast_io::basic_general_concat_checked<
+		false, win32_named_pipe_internal_char_type<family>,
+		win32_named_pipe_internal_str<family>>(args...);
 }
 
 template <win32_family family, typename... Args>
 constexpr inline win32_named_pipe_internal_tlc_str<family> concat_win32_named_pipe_internal_tlc_str(Args &&...args)
 {
-	constexpr bool type_error{::fast_io::operations::defines::print_freestanding_okay<::fast_io::details::dummy_buffer_output_stream<win32_named_pipe_internal_char_type<family>>, Args...>};
-	if constexpr (type_error)
-	{
-		return ::fast_io::basic_general_concat<false, win32_named_pipe_internal_char_type<family>, win32_named_pipe_internal_tlc_str<family>>(
-			::fast_io::io_print_forward<win32_named_pipe_internal_char_type<family>>(::fast_io::io_print_alias(args))...);
-	}
-	else
-	{
-		static_assert(type_error, "some types are not printable, so we cannot concat ::fast_io::win32::details::win32_named_pipe_internal_tlc_str");
-		return {};
-	}
+	// Keep thread-local path construction on the same one-normalization concat contract as the global allocator path.
+	return ::fast_io::basic_general_concat_checked<
+		false, win32_named_pipe_internal_char_type<family>,
+		win32_named_pipe_internal_tlc_str<family>>(args...);
 }
 
 using win32_client_connection_handle = void;
@@ -236,7 +223,14 @@ inline void win32_family_named_pipe_ipc_server_wait_for_connect_impl(void *pipe_
 {
 	if (!::fast_io::win32::ConnectNamedPipe(pipe_handle, nullptr)) [[unlikely]]
 	{
-		throw_win32_error();
+		auto const error{::fast_io::win32::GetLastError()};
+		// A client is allowed to open the pipe after CreateNamedPipe and before
+		// ConnectNamedPipe.  In that case the connection is already established
+		// and ConnectNamedPipe reports ERROR_PIPE_CONNECTED instead of success.
+		if (error != 535u /*ERROR_PIPE_CONNECTED*/) [[unlikely]]
+		{
+			throw_win32_error(error);
+		}
 	}
 }
 

@@ -99,11 +99,13 @@ inline constexpr char_type const *find_simd_constant_simd_common_impl(char_type 
 	constexpr char_type lfchct{char_literal_v<lfch, ::std::remove_cvref_t<char_type>>};
 	constexpr unsigned N{vec_size / sizeof(char_type)};
 	using simd_vector_type = ::fast_io::intrinsics::simd_vector<char_type, N>;
+	constexpr auto chars_array{
+		create_find_simd_vector_with_unsigned_toggle<false, char_type, N>(lfchct)};
 #if (__cpp_lib_bit_cast >= 201806L) && !defined(__clang__)
-	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(characters_array_impl<lfchct, char_type, N>)};
+	constexpr simd_vector_type charsvec{::std::bit_cast<simd_vector_type>(chars_array)};
 #else
 	simd_vector_type charsvec;
-	charsvec.load(characters_array_impl<lfchct, char_type, N>.data());
+	charsvec.load(chars_array.data());
 #endif
 	return find_simd_constant_simd_common_all_impl<findnot, vec_size>(first, last, charsvec);
 }
@@ -362,11 +364,7 @@ template <bool findnot>
 inline constexpr char unsigned const *find_characters_musl(char unsigned const *first, char unsigned const *last,
 														   char unsigned ch) noexcept
 {
-#if __cpp_if_consteval >= 202106L
-	if !consteval
-#else
-	if (!__builtin_is_constant_evaluated())
-#endif
+	FAST_IO_IF_NOT_CONSTEVAL
 	{
 		constexpr ::std::size_t diff{sizeof(::std::size_t)};
 
@@ -422,12 +420,7 @@ inline constexpr char_type const *find_simd_constant_common_cold_impl(char_type 
 																	  char_type const *last) noexcept
 {
 	constexpr char_type lfchct{char_literal_v<lfch, ::std::remove_cvref_t<char_type>>};
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-	if !consteval
-#else
-	if (!__builtin_is_constant_evaluated())
-#endif
+	FAST_IO_IF_NOT_CONSTEVAL
 	{
 		constexpr bool use_builtin_memchr{
 #if (__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1)) && !defined(_LIBCPP_FREESTANDING)
@@ -475,7 +468,6 @@ inline constexpr char_type const *find_simd_constant_common_cold_impl(char_type 
 				   firstconstptr + first;
 		}
 	}
-#endif
 	if constexpr (findnot)
 	{
 		return ::fast_io::freestanding::find_not(first, last, lfchct);
@@ -568,21 +560,18 @@ inline constexpr Iter find_space_common_iterator_generic_impl(Iter begin, Iter e
 template <bool ishtml, bool findnot, ::std::integral char_type>
 inline constexpr char_type const *find_space_common_cold_impl(char_type const *first, char_type const *last) noexcept
 {
-#if __cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L
-#if __cpp_if_consteval >= 202106L
-	if !consteval
-#else
-	if (!__builtin_is_constant_evaluated())
-#endif
+	FAST_IO_IF_NOT_CONSTEVAL
 	{
-		if constexpr (::fast_io::details::optimal_simd_vector_run_with_cpu_instruction_size)
+		if constexpr (::fast_io::details::optimal_simd_vector_run_with_cpu_instruction_size &&
+					  (::fast_io::details::is_ascii<char_type> ||
+					   (sizeof(char_type) == 1u &&
+						::fast_io::details::is_classic_ebcdic<char_type>)))
 		{
 			first = find_space_simd_common_impl<ishtml, findnot,
 												::fast_io::details::optimal_simd_vector_run_with_cpu_instruction_size>(
 				first, last);
 		}
 	}
-#endif
 	return find_space_common_iterator_generic_impl<ishtml, findnot>(first, last);
 }
 

@@ -64,11 +64,18 @@ int main()
 )cpp"};
 
     inline constexpr ::std::string_view wasm1p1_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1"};
+        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm2"};
 
     inline constexpr ::std::string_view wasm1p1_explicit_feature_args{
-        "--runtime-llvm-jit-cache-path disable --wasm-feature-wasm1.1 "
-        "--wasm-feature-wasm1.1"};
+        "--runtime-llvm-jit-cache-path disable "
+        "--wasm-feature-enable-multi-value "
+        "--wasm-feature-enable-reference-types "
+        "--wasm-feature-enable-table-instructions "
+        "--wasm-feature-enable-multiple-tables "
+        "--wasm-feature-enable-bulk-memory "
+        "--wasm-feature-enable-sign-extension "
+        "--wasm-feature-enable-nontrapping-float-to-int "
+        "--wasm-feature-enable-simd"};
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
@@ -375,13 +382,16 @@ int main()
         }
 
         auto const explicit_feature_command{make_uwvm_command(uwvm_path, "-Rjit", wasm1p1_explicit_feature_args, wasm_path)};
-        return run_command(explicit_feature_command, "explicit wasm1p1 feature subset");
+        return run_command(explicit_feature_command, "explicit wasm2 feature subset");
     }
 
     [[nodiscard]] bool run_feature_gate_check(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
     {
-        auto const command{make_uwvm_command(uwvm_path, "-Rcm full -Rcc jit", "--runtime-llvm-jit-cache-path disable", wasm_path)};
-        return run_expect_failure(command, "missing wasm1p1 feature flags");
+        auto const command{make_uwvm_command(uwvm_path,
+                                             "-Rcm full -Rcc jit",
+                                             "--runtime-llvm-jit-cache-path disable --wasm-feature-disable-sign-extension",
+                                             wasm_path)};
+        return run_expect_failure(command, "disabled wasm2 sign-extension feature");
     }
 
     [[nodiscard]] bool run_policy_matrix(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)

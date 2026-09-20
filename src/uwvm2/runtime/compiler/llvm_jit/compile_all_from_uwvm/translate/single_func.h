@@ -48,18 +48,11 @@ struct llvm_jit_module_storage_t
     // True after finalization succeeds and the module/context pair is ready for optimization or execution.
     bool emitted{};
 
-    // LLVM context must outlive the module, DIBuilder, functions, and all LLVM types/values owned by the module.
+    // LLVM context must outlive the module, functions, and all LLVM types/values owned by the module.
     ::uwvm2::utils::container::delete_owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
 
     // LLVM IR module for a full compile or a per-task fragment.
     ::uwvm2::utils::container::delete_owned_ptr<::llvm::Module> llvm_module{};
-
-    // Optional debug-info builder used for trap/unwind frame reconstruction.
-    ::uwvm2::utils::container::delete_owned_ptr<::llvm::DIBuilder> llvm_di_builder{};
-
-    // Debug metadata nodes are owned by `llvm_module`; these are borrowed convenience handles.
-    ::llvm::DIFile* llvm_di_file{};
-    ::llvm::DICompileUnit* llvm_di_compile_unit{};
 
     inline constexpr llvm_jit_module_storage_t() noexcept = default;
     inline constexpr llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) noexcept = delete;
@@ -70,21 +63,15 @@ struct llvm_jit_module_storage_t
     {
         if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
 
-        // Destroy dependent LLVM objects before replacing the context.  LLVM IR objects keep context-owned uniqued types
-        // and metadata, so resetting in dependency order avoids dangling ownership during move assignment.
+        // Destroy dependent LLVM objects before replacing the context. LLVM IR objects keep context-owned uniqued types,
+        // so resetting in dependency order avoids dangling ownership during move assignment.
         llvm_module.reset();
-        llvm_di_builder.reset();
         llvm_context_holder.reset();
 
         emitted = other.emitted;
         llvm_context_holder = ::std::move(other.llvm_context_holder);
         llvm_module = ::std::move(other.llvm_module);
-        llvm_di_builder = ::std::move(other.llvm_di_builder);
-        llvm_di_file = other.llvm_di_file;
-        llvm_di_compile_unit = other.llvm_di_compile_unit;
         other.emitted = false;
-        other.llvm_di_file = nullptr;
-        other.llvm_di_compile_unit = nullptr;
         return *this;
     }
 };
@@ -120,7 +107,8 @@ struct compile_option
     // Runtime module id used by generated diagnostics.
     ::std::size_t curr_wasm_id{};
 
-    // Parser feature switches used by the built-in wasm1p1 validator gates. Null means the default disabled feature set.
+    // Parser feature switches used by the authoritative WebAssembly 2.0 validation policy. Null means the historical
+    // wasm1p1-compatible default feature set (all release-2.0 groups enabled).
     ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t const* validator_feature_parameter{};
 
     // Enables LLVM verifier checks after function/module finalization.
@@ -144,7 +132,7 @@ struct compile_option
     // Emits logical Wasm call-stack push/pop around public entries.
     bool emit_call_stack_frames{true};
 
-    // Emits compact DWARF/unwind metadata for optimized trap-stack reconstruction.
+    // Emits native unwind metadata for concrete generated functions.
     bool emit_unwind_call_stack_frames{};
 
     // Optional per-task module callback used by optimization/linking pipelines.
@@ -199,6 +187,7 @@ namespace details
         using table_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Fs...>;
         using memory_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Fs...>;
         using global_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>;
+        using export_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>;
         using element_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Fs...>;
         using data_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1::features::data_section_storage_t<Fs...>;
         using data_count_section_storage_t = ::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>;
@@ -233,6 +222,8 @@ namespace details
     {
         // MVP scalar type.
         runtime_operand_stack_value_type type{};
+        // Validation-only bottom value; it has stack arity but no concrete type.
+        bool is_unknown{};
 
         // Monotonic id assigned when the value is produced.
         runtime_virtual_register_id virtual_register_id{invalid_runtime_virtual_register_id};
@@ -249,9 +240,7 @@ namespace details
 
     using runtime_local_virtual_register_table_t = ::uwvm2::utils::container::deque<runtime_local_virtual_register_t>;
 
-    // Runtime block result represented as a pointer pair into parser/runtime type storage or static MVP result arrays.
-    // WebAssembly 1.0/MVP blocktypes are empty or single-value; this shape can represent more values, but the current JIT
-    // emitter still documents and rejects multi-value lowering points until the multi-value proposal is enabled end to end.
+    // Runtime block tuple represented as a pointer pair into parser/runtime type storage or static inline-result arrays.
     struct runtime_block_result_type
     {
         runtime_operand_stack_value_type const* begin{};
@@ -271,6 +260,9 @@ namespace details
     // Validation-time frame for one structured-control construct.
     struct runtime_block_t
     {
+        // Parameter/start tuple re-established at the beginning of the construct. For a loop this is also its label tuple.
+        runtime_block_result_type params{};
+
         // Result values required at the construct's merge/return point.
         runtime_block_result_type result{};
 
@@ -283,8 +275,6 @@ namespace details
         // True when the construct was entered from an unreachable/polymorphic region.
         bool polymorphic_base{};
 
-        // True when an if-then arm ended polymorphically before else.
-        bool then_polymorphic_end{};
     };
 
     // Runtime module storage should already be finalized by the parser/initializer.  Violations here mean host/runtime
@@ -616,6 +606,8 @@ namespace details
             validation_module.sections)};
         auto& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::global_section_storage_t>(
             validation_module.sections)};
+        auto& exportsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::export_section_storage_t>(
+            validation_module.sections)};
         auto& elemsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::element_section_storage_t>(
             validation_module.sections)};
         auto& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_section_storage_t>(
@@ -739,6 +731,18 @@ namespace details
             globalsec.local_globals.push_back_unchecked(*local_global.local_global_type_ptr);
         }
 
+        // Runtime storage preserves the validator's complete declared-ref set, including function exports whose original
+        // export records are intentionally not retained. Synthetic function exports make wasm2's standard declared-ref
+        // collector reconstruct exactly that set without introducing a second validation-only side channel.
+        exportsec.exports.reserve(curr_module.declared_ref_funcidx_vec_storage.size());
+        for(auto const function_index: curr_module.declared_ref_funcidx_vec_storage)
+        {
+            exportsec.exports.emplace_back();
+            auto& synthetic_export{exportsec.exports.back_unchecked().exports};
+            synthetic_export.type = validation_module_traits_t::external_types::func;
+            synthetic_export.storage.func_idx = function_index;
+        }
+
         elemsec.elems.reserve(curr_module.local_defined_element_vec_storage.size());
         for(auto const& local_element: curr_module.local_defined_element_vec_storage)
         {
@@ -753,11 +757,8 @@ namespace details
             datasec.datas.push_back_unchecked(*local_data.data_type_ptr);
         }
 
-        if(!curr_module.local_defined_data_vec_storage.empty())
-        {
-            datacountsec.present = true;
-            datacountsec.count = checked_cast_size_to_wasm_u32(curr_module.local_defined_data_vec_storage.size());
-        }
+        datacountsec.present = curr_module.data_count_section_present;
+        datacountsec.count = curr_module.data_count_section_count;
 
         return validation_module;
     }
@@ -787,6 +788,9 @@ namespace details
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
         auto const code_end{local_func_storage.code_end};
+        auto const runtime_module_ptr{local_func_storage.runtime_module_ptr};
+        if(runtime_module_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+        auto const& curr_module{*runtime_module_ptr};
 
         // Module function indices include imports first.  This helper validates local defined functions only; imported
         // functions have no Wasm body to validate or emit.
@@ -873,10 +877,14 @@ namespace details
         auto const& imported_tables{importsec.importdesc.index_unchecked(1u)};
         auto const imported_table_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_tables.size())};
         auto const local_table_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(tablesec.tables.size())};
-        // MVP has at most one table in the core spec, but this runtime storage can still count imported/local table
-        // records.  Reference-types/table proposal work must revisit all_table_count consumers and call_indirect mem/table
-        // immediates together.
+        // Imported and local tables share one index space. Core 1.0/MVP encodes call_indirect's table operand as the
+        // literal reserved byte 0x00; Reference Types/Core 2.0 encode `tableidx ::= u32`. Opcode validation first decodes
+        // that versioned syntax, then applies the enabled multiple-table policy and this combined range.
         auto const all_table_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_table_count + local_table_count)};
+
+        auto const& elemsec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::element_section_storage_t>(
+                module_storage.sections)};
 
         // memory
         auto const& memsec{
@@ -888,6 +896,12 @@ namespace details
         // WebAssembly 1.0/MVP memory load/store opcodes implicitly target memory 0.  Multi-memory support must add
         // explicit memory-index validation in the memory opcode cases and the LLVM emitter's memory access cache.
         auto const all_memory_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_memory_count + local_memory_count)};
+
+        auto const& datasec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_section_storage_t>(module_storage.sections)};
+        auto const& datacountsec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<validation_module_traits_t::data_count_section_storage_t>(
+                module_storage.sections)};
 
         // Structured-control stack.  The initial frame is the implicit function block and is popped only after the final
         // `end` instruction validates the function result.
@@ -956,8 +970,8 @@ namespace details
                                              }};
 
         auto const operand_stack_push{
-            [&](curr_operand_stack_value_type type) constexpr noexcept
-            { operand_stack.push_back(runtime_operand_stack_storage_t{.type = type, .virtual_register_id = allocate_virtual_register()}); }};
+            [&](curr_operand_stack_value_type type, bool is_unknown = false) constexpr noexcept
+            { operand_stack.push_back(runtime_operand_stack_storage_t{.type = type, .is_unknown = is_unknown, .virtual_register_id = allocate_virtual_register()}); }};
 
         auto const operand_stack_pop_unchecked{[&]() constexpr noexcept -> runtime_operand_stack_storage_t
                                                {
@@ -981,6 +995,7 @@ namespace details
         {
             bool from_stack{};
             curr_operand_stack_value_type type{};
+            bool is_unknown{};
         };
 
         using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
@@ -1013,34 +1028,80 @@ namespace details
                                             {
                                                 if(concrete_operand_count() == 0uz) { return {}; }
                                                 auto const operand{operand_stack_pop_unchecked()};
-                                                return {.from_stack = true, .type = operand.type};
+                                                return {.from_stack = true, .type = operand.type, .is_unknown = operand.is_unknown};
                                             }};
 
         auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
                                              {
                                                  if(concrete_operand_count() == 0uz) { return {}; }
-                                                 return {.from_stack = true, .type = operand_stack.back().type};
+                                                 return {.from_stack = true, .type = operand_stack.back().type, .is_unknown = operand_stack.back().is_unknown};
                                              }};
 
-        // block type
-        using value_type_enum = curr_operand_stack_value_type;
-        // WebAssembly 1.0/MVP blocktype encodes either empty or one value type directly.  Multi-value blocktypes use a
-        // type index and must replace this fixed one-element-array fast path when that proposal is enabled.
-        static constexpr value_type_enum i32_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)};
-        static constexpr value_type_enum i64_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)};
-        static constexpr value_type_enum f32_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)};
-        static constexpr value_type_enum f64_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
-
-        // Function block (label/result type is the function result).  MVP functions have zero or one result; if
-        // multi-value results are enabled, the validator can already carry a pointer range but the LLVM emitter's PHI and
-        // return lowering must be extended in the same change.
+        // Function block (label/result tuple is the function result tuple).
         control_flow_stack.push_back({
+            .params = {},
             .result = {.begin = curr_func_type.result.begin, .end = curr_func_type.result.end},
             .operand_stack_base = 0uz,
             .type = block_type::function,
             .polymorphic_base = false,
-            .then_polymorphic_end = false
         });
+
+        auto const operand_stack_push_types{[&](runtime_block_result_type types) constexpr noexcept
+                                            {
+                                                for(auto curr{types.begin}; curr != types.end; ++curr) { operand_stack_push(*curr); }
+                                            }};
+
+        // Validate and consume a complete type tuple from the current frame. In polymorphic code only concrete operands
+        // above the frame base are consumed; missing operands are supplied abstractly by the validation rules.
+        auto const operand_stack_pop_expected_types{
+            [&](::std::byte const* op_begin,
+                ::uwvm2::utils::container::u8string_view op_name,
+                runtime_block_result_type expected) constexpr UWVM_THROWS
+            {
+                auto const expected_count{get_runtime_block_result_count(expected)};
+                auto const available_count{concrete_operand_count()};
+                if(!is_polymorphic && available_count < expected_count) [[unlikely]]
+                {
+                    report_operand_stack_underflow(op_begin, op_name, expected_count);
+                }
+
+                auto const concrete_to_check{available_count < expected_count ? available_count : expected_count};
+                auto const stack_size{operand_stack.size()};
+                for(::std::size_t i{}; i != concrete_to_check; ++i)
+                {
+                    auto const expected_type{expected.begin[expected_count - 1uz - i]};
+                    auto const& actual_operand{operand_stack[stack_size - 1uz - i]};
+                    auto const actual_type{actual_operand.type};
+                    if(!actual_operand.is_unknown && actual_type != expected_type) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.br_value_type_mismatch.op_code_name = op_name;
+                        err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_diagnostic_value_type(expected_type);
+                        err.err_selectable.br_value_type_mismatch.actual_type = to_wasm1_diagnostic_value_type(actual_type);
+                        err.err_code = code_validation_error_code::br_value_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+                }
+
+                operand_stack_pop_n(concrete_to_check);
+            }};
+
+        auto const enter_control_frame{
+            [&](::std::byte const* op_begin,
+                ::uwvm2::utils::container::u8string_view op_name,
+                block_type type,
+                runtime_block_signature_type signature) constexpr UWVM_THROWS
+            {
+                operand_stack_pop_expected_types(op_begin, op_name, signature.params);
+                auto const outer_stack_height{operand_stack.size()};
+                control_flow_stack.push_back({.params = signature.params,
+                                              .result = signature.results,
+                                              .operand_stack_base = outer_stack_height,
+                                              .type = type,
+                                              .polymorphic_base = is_polymorphic});
+                operand_stack_push_types(signature.params);
+                is_polymorphic = false;
+            }};
 
         // Start parsing the code body.
         auto code_curr{code_begin};
@@ -1072,6 +1133,11 @@ namespace details
             validator_feature_parameter == nullptr ? default_validator_feature_parameter : *validator_feature_parameter};
         [[maybe_unused]] auto const& wasm1p1_para{
             ::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(effective_validator_feature_parameter)};
+        auto const wasm2_feature_enabled{
+            [&](::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind feature) constexpr noexcept
+            {
+                return ::uwvm2::parser::wasm::standard::wasm2::features::feature_enabled(wasm1p1_para, feature);
+            }};
 
         auto const opcode_byte{[](wasm1p1_code opcode) constexpr noexcept -> validation_module_traits_t::wasm_u32
                                { return static_cast<validation_module_traits_t::wasm_u32>(static_cast<::std::uint_least8_t>(opcode)); }};
@@ -1090,6 +1156,20 @@ namespace details
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }};
 
+        auto const fail_wasm2_feature_required{
+            [&](::std::byte const* op_begin,
+                validation_module_traits_t::wasm_u32 value,
+                ::uwvm2::parser::wasm::base::wasm2_feature_kind feature,
+                ::uwvm2::parser::wasm::base::wasm2_error_subject subject) constexpr UWVM_THROWS
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.wasm2_feature_required.value = value;
+                err.err_selectable.wasm2_feature_required.feature = feature;
+                err.err_selectable.wasm2_feature_required.subject = subject;
+                err.err_code = code_validation_error_code::wasm2_feature_required;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }};
+
         auto const fail_invalid_immediate{
             [&](::std::byte const* op_begin,
                 ::uwvm2::utils::container::u8string_view op_name,
@@ -1099,6 +1179,104 @@ namespace details
                 err.err_selectable.invalid_const_immediate.op_code_name = op_name;
                 err.err_code = code_validation_error_code::invalid_const_immediate;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(pc);
+            }};
+
+        auto const check_data_index{
+            [&](::std::byte const* op_begin, validation_module_traits_t::wasm_u32 data_index) constexpr UWVM_THROWS
+            {
+                if(!datacountsec.present || data_index >= datacountsec.count || static_cast<::std::size_t>(data_index) >= datasec.datas.size()) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.illegal_data_index.data_index = data_index;
+                    err.err_selectable.illegal_data_index.all_data_count = datacountsec.present ? datacountsec.count : 0u;
+                    err.err_code = code_validation_error_code::illegal_data_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }};
+
+        auto const check_element_index{
+            [&](::std::byte const* op_begin, validation_module_traits_t::wasm_u32 element_index) constexpr UWVM_THROWS
+            {
+                auto const all_element_count{static_cast<validation_module_traits_t::wasm_u32>(elemsec.elems.size())};
+                if(element_index >= all_element_count) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.illegal_element_index.element_index = element_index;
+                    err.err_selectable.illegal_element_index.all_element_count = all_element_count;
+                    err.err_code = code_validation_error_code::illegal_element_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }};
+
+        auto const check_table_index{
+            [&](::std::byte const* op_begin,
+                validation_module_traits_t::wasm_u32 table_index,
+                validation_module_traits_t::wasm_u32 opcode) constexpr UWVM_THROWS
+            {
+                if(!wasm2_feature_enabled(::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind::multiple_tables) && table_index != 0u)
+                    [[unlikely]]
+                {
+                    fail_wasm2_feature_required(op_begin,
+                                                opcode,
+                                                ::uwvm2::parser::wasm::base::wasm2_feature_kind::multiple_tables,
+                                                ::uwvm2::parser::wasm::base::wasm2_error_subject::instruction);
+                }
+                if(table_index >= all_table_count) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.illegal_table_index.table_index = table_index;
+                    err.err_selectable.illegal_table_index.all_table_count = all_table_count;
+                    err.err_code = code_validation_error_code::illegal_table_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }};
+
+        auto const get_table_value_type{
+            [&](validation_module_traits_t::wasm_u32 table_index) constexpr noexcept -> curr_operand_stack_value_type
+            {
+                if(table_index < imported_table_count)
+                {
+                    auto const imported_table_ptr{imported_tables.index_unchecked(table_index)};
+                    return static_cast<curr_operand_stack_value_type>(
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(imported_table_ptr->imports.storage.table.reftype));
+                }
+
+                auto const local_table_index{table_index - imported_table_count};
+                return static_cast<curr_operand_stack_value_type>(
+                    ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(tablesec.tables.index_unchecked(local_table_index).reftype));
+            }};
+
+        auto const check_ref_func_index{
+            [&](::std::byte const* op_begin, validation_module_traits_t::wasm_u32 function_index) constexpr UWVM_THROWS
+            {
+                auto const all_function_size{static_cast<::std::size_t>(import_func_count + local_func_count)};
+                if(static_cast<::std::size_t>(function_index) >= all_function_size) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.invalid_function_index.function_index = function_index;
+                    err.err_selectable.invalid_function_index.all_function_size = all_function_size;
+                    err.err_code = code_validation_error_code::invalid_function_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+
+                auto const runtime_module_ptr{local_func_storage.runtime_module_ptr};
+                if(runtime_module_ptr == nullptr) [[unlikely]] { runtime_storage_bug(); }
+                bool declared{};
+                for(auto const declared_function_index: runtime_module_ptr->declared_ref_funcidx_vec_storage)
+                {
+                    if(declared_function_index == function_index)
+                    {
+                        declared = true;
+                        break;
+                    }
+                }
+                if(!declared) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_selectable.wasm1p1_undeclared_ref_func.function_index = function_index;
+                    err.err_code = code_validation_error_code::wasm1p1_undeclared_ref_func;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
             }};
 
         auto const read_leb128{
@@ -1161,6 +1339,128 @@ namespace details
                 }
             }};
 
+        // Internal structured-control validation deliberately repeats the authoritative Wasm2 blocktype gate ordering.
+        // The emitter helper remains the single resolver for runtime type-section pointer ranges, while this wrapper owns
+        // validation diagnostics and feature policy so internal-validator fuzzing does not depend on a standard prepass.
+        auto const parse_validation_block_signature{
+            [&](::std::byte const* op_begin, runtime_block_signature_type& block_signature) constexpr UWVM_THROWS
+            {
+                if(code_curr == code_end) [[unlikely]]
+                {
+                    err.err_curr = op_begin;
+                    err.err_code = code_validation_error_code::missing_block_type;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
+                }
+
+                auto const blocktype_begin{code_curr};
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 blocktype{};
+                auto const [blocktype_next,
+                            blocktype_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                   ::fast_io::mnp::leb128_get(blocktype))};
+                if(blocktype_err != ::fast_io::parse_code::ok) [[unlikely]]
+                {
+                    fail_invalid_immediate(op_begin, u8"blocktype", blocktype_err);
+                }
+                code_curr = reinterpret_cast<::std::byte const*>(blocktype_next);
+
+                // control_op blocktype ...
+                // [       safe       ] unsafe (could be the section_end)
+                //                      ^^ code_curr
+
+                // A decode failure leaves code_curr at blocktype_begin; the checks below run after a complete immediate
+                // was committed and therefore report any grammar/feature failure with code_curr past that immediate.
+
+                auto const fail_illegal_blocktype{[&]() constexpr UWVM_THROWS
+                                                  {
+                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte first_byte{};
+                                                      ::std::memcpy(::std::addressof(first_byte), blocktype_begin, sizeof(first_byte));
+#if CHAR_BIT > 8
+                                                      first_byte = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                                                          static_cast<::std::uint_least8_t>(first_byte) & 0xFFu);
+#endif
+                                                      err.err_curr = op_begin;
+                                                      err.err_selectable.u8 = first_byte;
+                                                      err.err_code = code_validation_error_code::illegal_block_type;
+                                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                                  }};
+
+                auto const blocktype_encoded_size{static_cast<::std::size_t>(code_curr - blocktype_begin)};
+                if(blocktype_encoded_size > 5uz || (blocktype < 0 && blocktype_encoded_size != 1uz)) [[unlikely]]
+                {
+                    fail_illegal_blocktype();
+                }
+
+                switch(blocktype)
+                {
+                    case -64:
+                    case -1:
+                    case -2:
+                    case -3:
+                    case -4:
+                    {
+                        break;
+                    }
+                    case -5:
+                    {
+                        ensure_wasm1p1_value_type_enabled(op_begin,
+                                                          runtime_operand_stack_value_type::v128,
+                                                          ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                        break;
+                    }
+                    case -16:
+                    {
+                        ensure_wasm1p1_value_type_enabled(op_begin,
+                                                          runtime_operand_stack_value_type::funcref,
+                                                          ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                        break;
+                    }
+                    case -17:
+                    {
+                        ensure_wasm1p1_value_type_enabled(op_begin,
+                                                          runtime_operand_stack_value_type::externref,
+                                                          ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                        break;
+                    }
+                    default:
+                    {
+                        if(blocktype < 0) [[unlikely]] { fail_illegal_blocktype(); }
+
+                        if(!wasm2_feature_enabled(::uwvm2::parser::wasm::standard::wasm2::features::wasm2_feature_kind::multi_value)) [[unlikely]]
+                        {
+                            fail_wasm1p1_feature_required(
+                                op_begin,
+                                static_cast<validation_module_traits_t::wasm_u32>(blocktype),
+                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_value,
+                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                        }
+
+                        auto const all_type_count_uz{typesec.types.size()};
+                        if(static_cast<::std::uint_least64_t>(blocktype) >
+                               static_cast<::std::uint_least64_t>((::std::numeric_limits<validation_module_traits_t::wasm_u32>::max)()) ||
+                           static_cast<::std::size_t>(blocktype) >= all_type_count_uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.illegal_type_index.type_index =
+                                blocktype > 0 ? static_cast<validation_module_traits_t::wasm_u32>(blocktype) : 0u;
+                            err.err_selectable.illegal_type_index.all_type_count = checked_cast_size_to_wasm_u32(all_type_count_uz);
+                            err.err_code = code_validation_error_code::illegal_type_index;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                        break;
+                    }
+                }
+
+                auto resolved_curr{blocktype_begin};
+                if(!parse_wasm_block_signature_type(resolved_curr, code_end, curr_module, block_signature) || resolved_curr != code_curr) [[unlikely]]
+                {
+                    // The validation and runtime module views were constructed from the same finalized module. A valid
+                    // validation type index that cannot resolve in runtime storage is host-state corruption.
+                    runtime_storage_bug();
+                }
+            }};
+
         // Shared validator for unary numeric opcodes.  The opcode case file supplies the expected operand/result MVP
         // scalar type, while this helper handles stack-polymorphic behavior and diagnostics.
         auto const validate_numeric_unary_stack_effect{
@@ -1178,7 +1478,7 @@ namespace details
                 // still pushed to keep later validation stack shapes consistent.
                 auto const operand{try_pop_concrete_operand()};
 
-                if(operand.from_stack && operand.type != expected_operand_type) [[unlikely]]
+                if(operand.from_stack && !operand.is_unknown && operand.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1241,7 +1541,7 @@ namespace details
                 // Check each concrete operand separately so diagnostics can report the actual mismatched type even when
                 // only one side is wrong.
                 auto const rhs{try_pop_concrete_operand()};
-                if(rhs.from_stack && rhs.type != expected_operand_type) [[unlikely]]
+                if(rhs.from_stack && !rhs.is_unknown && rhs.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1252,7 +1552,7 @@ namespace details
                 }
 
                 auto const lhs{try_pop_concrete_operand()};
-                if(lhs.from_stack && lhs.type != expected_operand_type) [[unlikely]]
+                if(lhs.from_stack && !lhs.is_unknown && lhs.type != expected_operand_type) [[unlikely]]
                 {
                     err.err_curr = op_begin;
                     err.err_selectable.numeric_operand_type_mismatch.op_code_name = op_name;
@@ -1332,7 +1632,7 @@ namespace details
                                              report_operand_stack_underflow(op_begin, op_name, 1uz);
                                          }
 
-                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && addr.type != curr_operand_stack_value_type::i32)
+                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && !addr.is_unknown && addr.type != curr_operand_stack_value_type::i32)
                                              [[unlikely]]
                                          {
                                              // MVP linear memory addresses are i32.  Memory64 must relax this to the
@@ -1418,7 +1718,7 @@ namespace details
                                           auto const value{try_pop_concrete_operand()};
                                           auto const addr{try_pop_concrete_operand()};
 
-                                          if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                          if(addr.from_stack && !addr.is_unknown && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
                                           {
                                               // MVP and current LLVM lowering require i32 addresses.  Memory64 support
                                               // must use the selected memory address type.
@@ -1429,7 +1729,7 @@ namespace details
                                               ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                           }
 
-                                          if(value.from_stack && value.type != expected_value_type) [[unlikely]]
+                                          if(value.from_stack && !value.is_unknown && value.type != expected_value_type) [[unlikely]]
                                           {
                                               // Store value type is checked after address type so diagnostics follow the
                                               // Wasm operand order: address below value on the stack.
@@ -1479,7 +1779,7 @@ namespace details
                 .runtime_module_ptr = ::std::addressof(curr_module)};
     }
 
-    inline constexpr void validate_runtime_local_func_with_standard_wasm1p1_validator(
+    inline constexpr void validate_runtime_local_func_with_code_version_strategy(
         validation_module_storage_t const& validation_module,
         local_func_storage_t const& local_func_storage,
         ::uwvm2::validation::error::code_validation_error_impl& err,
@@ -1488,175 +1788,12 @@ namespace details
         parser_feature_parameter_t const default_validator_feature_parameter{};
         auto const& effective_validator_feature_parameter{
             validator_feature_parameter == nullptr ? default_validator_feature_parameter : *validator_feature_parameter};
-        ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                              validation_module,
+        ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(validation_module,
                                                               local_func_storage.function_index,
                                                               local_func_storage.code_begin,
                                                               local_func_storage.code_end,
                                                               err,
                                                               effective_validator_feature_parameter);
-    }
-
-    [[nodiscard]] inline constexpr bool runtime_local_func_requires_interpreter_fallback(
-        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-        local_func_storage_t const& local_func_storage) noexcept
-    {
-        auto const function_type_ptr{local_func_storage.function_type_ptr};
-        auto const wasm_code_ptr{local_func_storage.wasm_code_ptr};
-        if(function_type_ptr == nullptr || wasm_code_ptr == nullptr || local_func_storage.code_begin == nullptr ||
-           local_func_storage.code_end == nullptr) [[unlikely]]
-        {
-            return true;
-        }
-        if(!is_runtime_wasm_function_type_inline_llvm_jit_supported(*function_type_ptr)) { return true; }
-
-        for(auto const& local_part: wasm_code_ptr->locals)
-        {
-            if(!is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(local_part.type))) { return true; }
-        }
-
-        auto const is_inline_scalar_blocktype_byte{[](::std::uint_least8_t blocktype_byte) constexpr noexcept
-                                                   {
-                                                       if(blocktype_byte == 0x40u) { return true; }
-                                                       auto const vt{static_cast<runtime_operand_stack_value_type>(blocktype_byte)};
-                                                       return is_runtime_wasm_value_type_inline_llvm_jit_scalar(vt);
-                                                   }};
-        auto const default_memory_supports_native_bulk_bridge{[&]() constexpr noexcept
-                                                              {
-                                                                  auto const access_info{resolve_runtime_memory_access_info(curr_module, 0u)};
-                                                                  return access_info.memory_p != nullptr;
-                                                              }};
-
-        auto code_curr{local_func_storage.code_begin};
-        auto const code_end{local_func_storage.code_end};
-        while(code_curr < code_end)
-        {
-            ::std::uint_least8_t curr_opcode_byte{};
-            ::std::memcpy(::std::addressof(curr_opcode_byte), code_curr, sizeof(curr_opcode_byte));
-
-            switch(curr_opcode_byte)
-            {
-                case static_cast<::std::uint_least8_t>(wasm1_code::block):
-                case static_cast<::std::uint_least8_t>(wasm1_code::loop):
-                case static_cast<::std::uint_least8_t>(wasm1_code::if_):
-                {
-                    ++code_curr;
-                    if(code_curr == code_end) [[unlikely]] { return true; }
-                    ::std::uint_least8_t blocktype_byte{};
-                    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
-                    ++code_curr;
-                    if(!is_inline_scalar_blocktype_byte(blocktype_byte)) { return true; }
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1_code::call):
-                {
-                    ++code_curr;
-                    validation_module_traits_t::wasm_u32 func_index{};
-                    if(!parse_wasm_leb128_immediate(code_curr, code_end, func_index)) [[unlikely]] { return true; }
-                    auto const callee_type_ptr{resolve_runtime_callee_function_type(curr_module, func_index)};
-                    if(callee_type_ptr == nullptr || !is_runtime_wasm_function_type_inline_llvm_jit_supported(*callee_type_ptr)) { return true; }
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1_code::call_indirect):
-                {
-                    ++code_curr;
-                    validation_module_traits_t::wasm_u32 type_index{};
-                    validation_module_traits_t::wasm_u32 table_index{};
-                    if(!parse_wasm_leb128_immediate(code_curr, code_end, type_index) ||
-                       !parse_wasm_leb128_immediate(code_curr, code_end, table_index)) [[unlikely]]
-                    {
-                        return true;
-                    }
-                    static_cast<void>(table_index);
-                    auto const callee_type_ptr{resolve_runtime_type_section_function_type(curr_module, type_index)};
-                    if(callee_type_ptr == nullptr || !is_runtime_wasm_function_type_inline_llvm_jit_supported(*callee_type_ptr)) { return true; }
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::select_t):
-                {
-                    ++code_curr;
-                    validation_module_traits_t::wasm_u32 result_type_count{};
-                    if(!parse_wasm_leb128_immediate(code_curr, code_end, result_type_count)) [[unlikely]] { return true; }
-                    if(result_type_count == 0u) { break; }
-                    if(result_type_count != 1u || code_curr == code_end) [[unlikely]] { return true; }
-                    ::std::uint_least8_t result_type_byte{};
-                    ::std::memcpy(::std::addressof(result_type_byte), code_curr, sizeof(result_type_byte));
-                    ++code_curr;
-                    if(!is_runtime_wasm_value_type_inline_llvm_jit_scalar(static_cast<runtime_operand_stack_value_type>(result_type_byte))) { return true; }
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::i32_extend8_s):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::i32_extend16_s):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend8_s):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend16_s):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::i64_extend32_s):
-                {
-                    ++code_curr;
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::numeric_prefix):
-                {
-                    ++code_curr;
-                    validation_module_traits_t::wasm_u32 subopcode{};
-                    if(!parse_wasm_leb128_immediate(code_curr, code_end, subopcode)) [[unlikely]] { return true; }
-                    switch(static_cast<wasm1p1_numeric_code>(subopcode))
-                    {
-                        case wasm1p1_numeric_code::i32_trunc_sat_f32_s:
-                        case wasm1p1_numeric_code::i32_trunc_sat_f32_u:
-                        case wasm1p1_numeric_code::i32_trunc_sat_f64_s:
-                        case wasm1p1_numeric_code::i32_trunc_sat_f64_u:
-                        case wasm1p1_numeric_code::i64_trunc_sat_f32_s:
-                        case wasm1p1_numeric_code::i64_trunc_sat_f32_u:
-                        case wasm1p1_numeric_code::i64_trunc_sat_f64_s:
-                        case wasm1p1_numeric_code::i64_trunc_sat_f64_u:
-                        {
-                            break;
-                        }
-                        case wasm1p1_numeric_code::memory_copy:
-                        {
-                            if(!default_memory_supports_native_bulk_bridge()) { return true; }
-                            if(code_end - code_curr < 2) [[unlikely]] { return true; }
-                            auto const dst_memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
-                            ++code_curr;
-                            auto const src_memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
-                            ++code_curr;
-                            if(dst_memory_index != 0u || src_memory_index != 0u) { return true; }
-                            break;
-                        }
-                        case wasm1p1_numeric_code::memory_fill:
-                        {
-                            if(!default_memory_supports_native_bulk_bridge()) { return true; }
-                            if(code_curr == code_end) [[unlikely]] { return true; }
-                            auto const memory_index{::std::to_integer<::std::uint_least8_t>(*code_curr)};
-                            ++code_curr;
-                            if(memory_index != 0u) { return true; }
-                            break;
-                        }
-                        default:
-                        {
-                            return true;
-                        }
-                    }
-                    break;
-                }
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_get):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::table_set):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_null):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_is_null):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::ref_func):
-                case static_cast<::std::uint_least8_t>(wasm1p1_code::simd_prefix):
-                {
-                    return true;
-                }
-                default:
-                {
-                    if(!skip_wasm_unreachable_noncontrol_instruction(code_curr, code_end)) [[unlikely]] { return true; }
-                    break;
-                }
-            }
-        }
-
-        return code_curr != code_end;
     }
 
     // Validate one local function and optionally append its LLVM IR into the supplied module storage.
@@ -1669,23 +1806,7 @@ namespace details
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
         local_func_storage.module_id = options.curr_wasm_id;
-        validate_runtime_local_func_with_standard_wasm1p1_validator(validation_module, local_func_storage, err, options.validator_feature_parameter);
-
-        auto const requires_interpreter_fallback{runtime_local_func_requires_interpreter_fallback(curr_module, local_func_storage)};
-        if(emitted_llvm_jit_ir_storage == nullptr && requires_interpreter_fallback) { return local_func_storage; }
-
-        auto const use_interpreter_fallback{emitted_llvm_jit_ir_storage != nullptr && requires_interpreter_fallback};
-        if(use_interpreter_fallback)
-        {
-            if(!emit_runtime_local_func_llvm_jit_interpreter_fallback_entries(local_func_storage,
-                                                                              *emitted_llvm_jit_ir_storage,
-                                                                              options.verify_llvm_jit_ir,
-                                                                              options.emit_unwind_call_stack_frames)) [[unlikely]]
-            {
-                ::fast_io::fast_terminate();
-            }
-            return local_func_storage;
-        }
+        validate_runtime_local_func_with_code_version_strategy(validation_module, local_func_storage, err, options.validator_feature_parameter);
 
         // Validation writes tiered loop reentry metadata back into the returned local_func_storage, so callers can publish
         // OSR entry information together with the compiled function metadata.
@@ -1881,9 +2002,6 @@ namespace details
         module_storage.emitted = module_storage.llvm_context_holder != nullptr && module_storage.llvm_module != nullptr;
         if(!module_storage.emitted) { return true; }
 
-        // DIBuilder must be finalized before module verification so debug metadata is complete.
-        if(module_storage.llvm_di_builder != nullptr) { module_storage.llvm_di_builder->finalize(); }
-
         if(!verify_llvm_jit_module(*module_storage.llvm_module, verify_llvm_jit_ir)) [[unlikely]]
         {
             module_storage = {};
@@ -1894,7 +2012,8 @@ namespace details
     }
 
     inline constexpr void validate_runtime_module_all_local_funcs(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-                                                                  ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                                  ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                                  parser_feature_parameter_t const* validator_feature_parameter) UWVM_THROWS
     {
         // Public validation-only entry used when the runtime already has finalized module storage and no LLVM output is
         // requested.
@@ -1904,7 +2023,7 @@ namespace details
         for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
         {
             auto const local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
-            validate_runtime_local_func_with_standard_wasm1p1_validator(validation_module, local_func_storage, err, nullptr);
+            validate_runtime_local_func_with_code_version_strategy(validation_module, local_func_storage, err, validator_feature_parameter);
         }
     }
 }  // namespace details
@@ -1922,15 +2041,13 @@ inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compil
                                           ::uwvm2::utils::container::u8cstring_view file_name,
                                           ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
-        details::validation_module_storage_t const& validation_module{module_storage};
-
-    auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<details::validation_module_traits_t::import_section_storage_t>(
-        validation_module.sections)};
+    auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+        ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(module_storage.sections)};
     // Function indices in Wasm validation include imported functions before local code-section bodies.
     auto const import_func_count{importsec.importdesc.index_unchecked(0u).size()};
 
-    auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<details::validation_module_traits_t::code_section_storage_t>(
-        validation_module.sections)};
+    auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+        ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>>(module_storage.sections)};
 
     for(::std::size_t local_idx{}; local_idx < codesec.codes.size(); ++local_idx)
     {
@@ -1944,8 +2061,7 @@ inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compil
         try
 #endif
         {
-            ::uwvm2::validation::standard::wasm1p1::validate_code(::uwvm2::validation::standard::wasm1p1::wasm1p1_code_version{},
-                                                                  validation_module,
+            ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(module_storage,
                                                                           import_func_count + local_idx,
                                                                           code_begin_ptr,
                                                                           code_end_ptr,
@@ -1955,12 +2071,12 @@ inline constexpr ::std::size_t aggressive_target_task_groups_per_adjusted_compil
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
         {
-            ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{validation_module.module_span.module_begin,
+            ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{module_storage.module_span.module_begin,
                                                                             v_err.err_curr,
-                                                                            validation_module.module_span.module_end};
+                                                                            module_storage.module_span.module_end};
 
             ::uwvm2::validation::error::error_output_t errout{};
-            errout.module_begin = validation_module.module_span.module_begin;
+            errout.module_begin = module_storage.module_span.module_begin;
             errout.err = v_err;
             errout.flag.enable_ansi = static_cast<::std::uint_least8_t>(::uwvm2::uwvm::utils::ansies::put_color);
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -2147,8 +2263,13 @@ inline constexpr bool validate_all_wasm_code() noexcept
 }
 
 inline constexpr void validate_runtime_wasm_code_for_module(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+                                                            ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                            details::parser_feature_parameter_t const& validator_feature_parameter) UWVM_THROWS
+{ details::validate_runtime_module_all_local_funcs(curr_module, err, ::std::addressof(validator_feature_parameter)); }
+
+inline constexpr void validate_runtime_wasm_code_for_module(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                             ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
-{ details::validate_runtime_module_all_local_funcs(curr_module, err); }
+{ details::validate_runtime_module_all_local_funcs(curr_module, err, nullptr); }
 
 // Adjust the default code-size split for small modules so parallel compilation does not create too many tiny tasks.
 [[nodiscard]] inline constexpr compile_task_split_config
@@ -2209,6 +2330,9 @@ inline constexpr full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::run
                                                               compile_task_split_config split_config = {}) UWVM_THROWS
 {
     full_function_symbol_t storage{};
+    // Establish the canonical module/function order before any parallel LLVM work begins. Besides keeping error
+    // selection deterministic, this guarantees every backend mode crosses the same runtime policy boundary first.
+    details::validate_runtime_module_all_local_funcs(curr_module, err, options.validator_feature_parameter);
     auto const validation_module{details::build_runtime_validation_module(curr_module)};
 
     split_config = resolve_effective_compile_task_split_config(curr_module, split_config, extra_compile_threads);

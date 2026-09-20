@@ -22,14 +22,20 @@
 module;
 
 // std
+#include <bit>
+#include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <type_traits>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#include <uwvm2/runtime/compiler/shared/strict_float.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.optable:combine_extra_heavy;
 
@@ -55,4 +61,3 @@ import :conbine;
 #endif
 
 #include "combine_extra_heavy.h"
-

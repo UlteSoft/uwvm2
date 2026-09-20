@@ -3,6 +3,13 @@
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
+// FP conversion has two different contracts. Reinterpret changes only the logical
+// type: equal-sized stack bytes and stack height are already correct, so the
+// uncached path intentionally does nothing. bit_cast<Float> followed by a native
+// FP return is NOT a safe substitute on x87/68881, especially at GCC -O0.
+// Numerical convert/promote/demote instead require Wasm rounding/NaN semantics;
+// they share strict_float with scalar/fused arithmetic and the LLVM bridge.
+// See documents/runtime/floating-point-change-rationale.md.
 
 /**
  * @author      MacroModel
@@ -30,6 +37,7 @@
 # include <concepts>
 # include <limits>
 # include <memory>
+# include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -264,12 +272,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // (These helpers may be inlined, but correctness must not rely on inlining.)
 
         template <typename IntOut, typename FloatIn>
+        UWVM_ALWAYS_INLINE inline constexpr FloatIn trunc_float_to_int_s_lower_exclusive() noexcept
+        {
+            static_assert(::std::numeric_limits<FloatIn>::is_iec559 && ::std::numeric_limits<FloatIn>::radix == 2);
+
+            constexpr FloatIn min_v{static_cast<FloatIn>(::std::numeric_limits<IntOut>::min())};
+            constexpr FloatIn rounded_min_minus_one{
+                static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<IntOut>::min()) - 1.0L)};
+            if constexpr(rounded_min_minus_one < min_v)
+            {
+                return rounded_min_minus_one;
+            }
+            else if constexpr(sizeof(FloatIn) == sizeof(::std::uint32_t))
+            {
+                // At a negative power-of-two boundary, incrementing the IEEE bit pattern gives the
+                // adjacent representable value toward -infinity.
+                return ::std::bit_cast<FloatIn>(::std::bit_cast<::std::uint32_t>(min_v) + 1u);
+            }
+            else if constexpr(sizeof(FloatIn) == sizeof(::std::uint64_t))
+            {
+                return ::std::bit_cast<FloatIn>(::std::bit_cast<::std::uint64_t>(min_v) + 1u);
+            }
+            else
+            {
+                static_assert(sizeof(FloatIn) == sizeof(::std::uint32_t) || sizeof(FloatIn) == sizeof(::std::uint64_t));
+            }
+        }
+
+        template <typename IntOut, typename FloatIn>
+        UWVM_ALWAYS_INLINE inline constexpr bool trunc_float_to_int_s_in_range(FloatIn x) noexcept
+        {
+            constexpr FloatIn min_exclusive{trunc_float_to_int_s_lower_exclusive<IntOut, FloatIn>()};
+            constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<IntOut>::max()) + 1.0L)};
+            return x > min_exclusive && x < max_plus_one;
+        }
+
+        template <typename UIntOut, typename FloatIn>
+        UWVM_ALWAYS_INLINE inline constexpr bool trunc_float_to_int_u_in_range(FloatIn x) noexcept
+        {
+            constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<UIntOut>::max()) + 1.0L)};
+            return x > static_cast<FloatIn>(-1) && x < max_plus_one;
+        }
+
+        template <typename IntOut, typename FloatIn>
         UWVM_ALWAYS_INLINE inline constexpr IntOut trunc_float_to_int_s(FloatIn x) noexcept
         {
-            constexpr FloatIn min_v{static_cast<FloatIn>(::std::numeric_limits<IntOut>::min())};
-            constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<IntOut>::max()) + 1.0L)};
-
-            if(x >= min_v && x < max_plus_one) [[likely]]
+            if(trunc_float_to_int_s_in_range<IntOut>(x)) [[likely]]
             {
                 return static_cast<IntOut>(x);  // trunc toward zero
             }
@@ -283,9 +331,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <typename UIntOut, typename FloatIn>
         UWVM_ALWAYS_INLINE inline constexpr UIntOut trunc_float_to_int_u(FloatIn x) noexcept
         {
-            constexpr FloatIn max_plus_one{static_cast<FloatIn>(static_cast<long double>(::std::numeric_limits<UIntOut>::max()) + 1.0L)};
-
-            if(x >= static_cast<FloatIn>(0) && x < max_plus_one) [[likely]]
+            if(trunc_float_to_int_u_in_range<UIntOut>(x)) [[likely]]
             {
                 return static_cast<UIntOut>(x);  // trunc toward zero
             }
@@ -551,7 +597,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f32>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f32) == sizeof(wasm_i32));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_f32>()};
@@ -628,7 +680,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f32>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f32) == sizeof(wasm_i32));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_i32>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_i32>()};
@@ -714,7 +772,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(v)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(v)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_f64, wasm_f32>())
@@ -740,7 +798,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(v)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(v)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -788,7 +846,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(v)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(v)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_f32, wasm_f64>())
@@ -814,7 +872,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(v)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(v)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -859,9 +917,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f32 min_v{static_cast<wasm_f32>(::std::numeric_limits<out_i32_t>::min())};
-        constexpr wasm_f32 max_plus_one{static_cast<wasm_f32>(static_cast<long double>(::std::numeric_limits<out_i32_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
@@ -869,7 +924,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -903,7 +958,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -953,8 +1008,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f32 max_plus_one{static_cast<wasm_f32>(static_cast<long double>(::std::numeric_limits<out_u32_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
@@ -962,7 +1015,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -996,7 +1049,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1046,9 +1099,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f64 min_v{static_cast<wasm_f64>(::std::numeric_limits<out_i32_t>::min())};
-        constexpr wasm_f64 max_plus_one{static_cast<wasm_f64>(static_cast<long double>(::std::numeric_limits<out_i32_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
@@ -1056,7 +1106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1090,7 +1140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1140,8 +1190,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f64 max_plus_one{static_cast<wasm_f64>(static_cast<long double>(::std::numeric_limits<out_u32_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
@@ -1149,7 +1197,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1183,7 +1231,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u32_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1235,9 +1283,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f32 min_v{static_cast<wasm_f32>(::std::numeric_limits<out_i64_t>::min())};
-        constexpr wasm_f32 max_plus_one{static_cast<wasm_f32>(static_cast<long double>(::std::numeric_limits<out_i64_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
@@ -1245,7 +1290,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1279,7 +1324,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1329,8 +1374,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f32 max_plus_one{static_cast<wasm_f32>(static_cast<long double>(::std::numeric_limits<out_u64_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f32>()};
@@ -1338,7 +1381,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1372,7 +1415,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1422,9 +1465,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f64 min_v{static_cast<wasm_f64>(::std::numeric_limits<out_i64_t>::min())};
-        constexpr wasm_f64 max_plus_one{static_cast<wasm_f64>(static_cast<long double>(::std::numeric_limits<out_i64_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
@@ -1432,7 +1472,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1466,7 +1506,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_s_in_range<out_i64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1516,8 +1556,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        constexpr wasm_f64 max_plus_one{static_cast<wasm_f64>(static_cast<long double>(::std::numeric_limits<out_u64_t>::max()) + 1.0L)};
-
         if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
@@ -1525,7 +1563,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1559,7 +1597,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
+            if(!details::trunc_float_to_int_u_in_range<out_u64_t>(v)) [[unlikely]]
             {
                 if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
                 UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
@@ -1616,7 +1654,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_i32_stack_top && curr_i32_stack_top < range_end);
 
             wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least32_t>(v))};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least32_t>(v))};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i32, wasm_f32>())
@@ -1642,7 +1680,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least32_t>(v))};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least32_t>(v))};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -1691,7 +1729,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-            wasm_f32 const out{static_cast<wasm_f32>(u32)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u32)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i32, wasm_f32>())
@@ -1718,7 +1756,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
             ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-            wasm_f32 const out{static_cast<wasm_f32>(u32)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u32)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -1766,7 +1804,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_i32_stack_top && curr_i32_stack_top < range_end);
 
             wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least32_t>(v))};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least32_t>(v))};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i32, wasm_f64>())
@@ -1792,7 +1830,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least32_t>(v))};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least32_t>(v))};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -1841,7 +1879,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-            wasm_f64 const out{static_cast<wasm_f64>(u32)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u32)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i32, wasm_f64>())
@@ -1868,7 +1906,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
             ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-            wasm_f64 const out{static_cast<wasm_f64>(u32)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u32)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -1916,7 +1954,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
 
             wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least64_t>(v))};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least64_t>(v))};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i64, wasm_f32>())
@@ -1942,7 +1980,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
-            wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least64_t>(v))};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least64_t>(v))};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -1991,7 +2029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
             ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-            wasm_f32 const out{static_cast<wasm_f32>(u64)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u64)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i64, wasm_f32>())
@@ -2018,7 +2056,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
             ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-            wasm_f32 const out{static_cast<wasm_f32>(u64)};
+            wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u64)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f32>())
             {
@@ -2066,7 +2104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
 
             wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least64_t>(v))};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least64_t>(v))};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i64, wasm_f64>())
@@ -2092,7 +2130,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
-            wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least64_t>(v))};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least64_t>(v))};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -2141,7 +2179,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
             ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-            wasm_f64 const out{static_cast<wasm_f64>(u64)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u64)};
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
                 if constexpr(details::convert_stacktop_ranges_merged<CompileOption, wasm_i64, wasm_f64>())
@@ -2168,7 +2206,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
             ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-            wasm_f64 const out{static_cast<wasm_f64>(u64)};
+            wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u64)};
 
             if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
             {
@@ -2209,7 +2247,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f64>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f64) == sizeof(wasm_i64));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_f64>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_f64>()};
@@ -2286,7 +2330,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        if constexpr(!details::convert_stacktop_enabled_for<CompileOption, wasm_f64>() &&
+                     !details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            // Memory representation is already correct; do not round-trip through an FP register.
+            static_assert(sizeof(wasm_f64) == sizeof(wasm_i64));
+        }
+        else if constexpr(details::convert_stacktop_enabled_for<CompileOption, wasm_i64>())
         {
             constexpr ::std::size_t range_begin{details::convert_stacktop_begin_pos<CompileOption, wasm_i64>()};
             constexpr ::std::size_t range_end{details::convert_stacktop_end_pos<CompileOption, wasm_i64>()};
@@ -2660,7 +2710,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least32_t>(v))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least32_t>(v))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2686,7 +2736,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-        wasm_f32 const out{static_cast<wasm_f32>(u32)};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u32)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2711,7 +2761,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
-        wasm_f32 const out{static_cast<wasm_f32>(static_cast<::std::int_least64_t>(v))};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(static_cast<::std::int_least64_t>(v))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2737,7 +2787,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
         ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-        wasm_f32 const out{static_cast<wasm_f32>(u64)};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(u64)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2762,7 +2812,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        wasm_f32 const out{static_cast<wasm_f32>(v)};
+        wasm_f32 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f32>(v)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2787,7 +2837,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least32_t>(v))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least32_t>(v))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2813,7 +2863,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         ::std::uint_least32_t const u32{details::to_u32_bits(v)};
-        wasm_f64 const out{static_cast<wasm_f64>(u32)};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u32)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2838,7 +2888,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
-        wasm_f64 const out{static_cast<wasm_f64>(static_cast<::std::int_least64_t>(v))};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::int_least64_t>(v))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2864,7 +2914,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
         ::std::uint_least64_t const u64{details::to_u64_bits(v)};
-        wasm_f64 const out{static_cast<wasm_f64>(u64)};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(u64)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2889,7 +2939,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        wasm_f64 const out{static_cast<wasm_f64>(v)};
+        wasm_f64 const out{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(v)};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
@@ -2913,12 +2963,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
-        ::std::uint_least32_t const bits{::std::bit_cast<::std::uint_least32_t>(v)};
-        wasm_i32 const out{details::from_u32_bits<wasm_i32>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i32) == sizeof(wasm_f32));
     }
 
     /// @brief `f32.reinterpret_i32` (non-tail-call/byref): bitcasts i32 to f32.
@@ -2939,12 +2985,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_i32 const v{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
-        ::std::uint_least32_t const bits{details::to_u32_bits(v)};
-        wasm_f32 const out{::std::bit_cast<wasm_f32>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i32) == sizeof(wasm_f32));
     }
 
     /// @brief `i64.reinterpret_f64` (non-tail-call/byref): bitcasts f64 to i64.
@@ -2965,12 +3007,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
-        ::std::uint_least64_t const bits{::std::bit_cast<::std::uint_least64_t>(v)};
-        wasm_i64 const out{details::from_u64_bits<wasm_i64>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i64) == sizeof(wasm_f64));
     }
 
     /// @brief `f64.reinterpret_i64` (non-tail-call/byref): bitcasts i64 to f64.
@@ -2991,12 +3029,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
-        ::std::uint_least64_t const bits{details::to_u64_bits(v)};
-        wasm_f64 const out{::std::bit_cast<wasm_f64>(bits)};
-
-        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
-        typeref...[1u] += sizeof(out);
+        // Reinterpret changes only the logical type. The operand bytes and stack height stay unchanged.
+        static_assert(sizeof(wasm_i64) == sizeof(wasm_f64));
     }
 
     /// @brief Translation helpers for convert opcodes.

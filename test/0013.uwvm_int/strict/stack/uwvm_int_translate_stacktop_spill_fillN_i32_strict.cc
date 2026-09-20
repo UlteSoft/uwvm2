@@ -9,12 +9,13 @@ namespace
 
     // Minimal local-call bridge:
     // Our module only calls a trivial local-defined `nop_void` function, so we implement only that fast path.
-    static void UWVM2TEST_WASM_ABI call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    static ::std::byte* UWVM2TEST_WASM_ABI
+        call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte* stack_top) UWVM_THROWS
     {
         using kind_t = optable::trivial_defined_call_kind;
         using info_t = optable::compiled_defined_call_info;
 
-        if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(stack_top == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const* const info = reinterpret_cast<info_t const*>(call_function);
@@ -22,12 +23,12 @@ namespace
 
         if(info->trivial_kind != kind_t::nop_void) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto* const top = *stack_top_ptr;
+        auto* const top = stack_top;
         auto const top_addr = reinterpret_cast<::std::uintptr_t>(top);
         if(top_addr < info->param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         ::std::byte* const base = reinterpret_cast<::std::byte*>(top_addr - info->param_bytes);
-        *stack_top_ptr = base;
+        return base;
     }
 
     [[nodiscard]] byte_vec build_stacktop_spill_fillN_i32_module()
@@ -189,4 +190,3 @@ int main()
 {
     return test_translate_stacktop_spill_fillN_i32();
 }
-

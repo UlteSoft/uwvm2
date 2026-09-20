@@ -22,6 +22,8 @@
 module;
 
 // std
+#include <bit>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -31,6 +33,7 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.optable:conbine;
 

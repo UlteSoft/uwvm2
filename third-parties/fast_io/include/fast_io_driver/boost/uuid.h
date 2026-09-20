@@ -6,6 +6,7 @@
 namespace fast_io
 {
 
+/// @feature concept:static_precise_size
 template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, boost::uuids::uuid>) noexcept
 {

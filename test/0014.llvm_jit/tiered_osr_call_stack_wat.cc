@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "native_unwind_test_policy.h"
 
 namespace
 {
@@ -21,7 +22,7 @@ namespace
     {
         char const* name;
         char const* args;
-        bool expect_osr_request;
+        char const* required_llvm_log_pattern;
     };
 
     struct run_result_t
@@ -38,10 +39,12 @@ namespace
     };
 
     inline constexpr ::std::array modes{
-        mode_t{"tiered",       "-Rtiered",                     true },
-        mode_t{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0", false},
-        mode_t{"tiered_no_t2", "-Rtiered -Rtiered-disable-t2", true },
+        mode_t{"tiered",       "-Rtiered",                     "tiered-osr-request"             },
+        mode_t{"tiered_no_t0", "-Rtiered -Rtiered-disable-t0", "[llvm-jit-lazy] demand-request"},
+        mode_t{"tiered_no_t2", "-Rtiered -Rtiered-disable-t2", "tiered-osr-request"             },
     };
+
+    inline constexpr ::std::array comparison_policies{"unwind", "unwind-uncheck", "auto"};
 
     [[nodiscard]] ::std::string quote_argument(::std::filesystem::path const& path)
     {
@@ -296,24 +299,101 @@ namespace
         return out;
     }
 
+    [[nodiscard]] bool probe_auto_call_stack_unwind(::std::filesystem::path const& uwvm_path,
+                                                    ::std::filesystem::path const& wasm_path,
+                                                    ::std::filesystem::path const& artifact_dir,
+                                                    bool& auto_uses_authoritative_unwind,
+                                                    bool& native_unwind_backend_available)
+    {
+        auto const output_path{artifact_dir / "default_call_stack_probe.out"};
+        auto const log_path{artifact_dir / "default_call_stack_probe.log"};
+        ::std::error_code ec{};
+        ::std::filesystem::remove(log_path, ec);
+        if(ec)
+        {
+            ::std::cerr << "failed to remove stale call-stack probe log: " << log_path << '\n';
+            return false;
+        }
+
+        auto const command{quote_argument(uwvm_path) + " -Raot -Rllvm-cache-path disable -Rllvm-call-stack auto -Rclog file " +
+                           quote_argument(log_path) + " --run " + quote_argument(wasm_path) + " > " + quote_argument(output_path) + " 2>&1"};
+        ::std::cout << "[tiered-osr-wat] " << command << '\n';
+        if(run_system_command(command) == 0)
+        {
+            ::std::cerr << "call-stack capability probe trap unexpectedly succeeded\n";
+            return false;
+        }
+
+        ::std::string output{};
+        if(!read_text_file(output_path, output)) { return false; }
+        if(strip_ansi_codes(output).find("Runtime crash (") == ::std::string::npos)
+        {
+            ::std::cerr << "call-stack capability probe did not reach a runtime trap:\n" << output << '\n';
+            return false;
+        }
+
+        ::std::string log{};
+        if(!read_text_file(log_path, log)) { return false; }
+        native_unwind_backend_available = log.find("unwind_backend=unwind.h") != ::std::string::npos ||
+                                          log.find("unwind_backend=win64-seh") != ::std::string::npos;
+        if(log.find("call_stack=unwind") != ::std::string::npos)
+        {
+            if(!::uwvm2test::native_unwind::matches_policy(log, "unwind") || log.find("unwind_check=live") == ::std::string::npos)
+            {
+                ::std::cerr << "auto selected native frame replacement without a successful live probe and omitted JIT logical frames:\n" << log << '\n';
+                return false;
+            }
+            if(log.find("call_stack=instruction") != ::std::string::npos)
+            {
+                ::std::cerr << "auto unwind also enabled instruction-frame conversion:\n" << log << '\n';
+                return false;
+            }
+            auto_uses_authoritative_unwind = true;
+            return true;
+        }
+        if(log.find("call_stack=instruction") != ::std::string::npos)
+        {
+            auto const plain_output{strip_ansi_codes(output)};
+            if(!::uwvm2test::native_unwind::matches_policy(log, "instruction") || plain_output.find(" func_idx=") == ::std::string::npos)
+            {
+                ::std::cerr << "auto call-stack policy did not preserve authoritative logical instruction frames:\n"
+                            << log << "\noutput:\n"
+                            << output << '\n';
+                return false;
+            }
+            auto_uses_authoritative_unwind = false;
+            return true;
+        }
+
+        ::std::cerr << "unable to determine default LLVM JIT call-stack policy from probe log:\n" << log << '\n';
+        return false;
+    }
+
     [[nodiscard]] run_result_t read_trap_result(::std::filesystem::path const& output_path,
                                                 ::std::filesystem::path const& log_path,
                                                 char const* label,
                                                 char const* mode,
-                                                char const* policy)
+                                                char const* policy,
+                                                bool expect_stack)
     {
         ::std::string output{};
         if(!read_text_file(output_path, output)) { return {.output_path = output_path, .log_path = log_path}; }
 
         auto const plain_output{strip_ansi_codes(output)};
         auto func_indices{parse_func_indices(plain_output)};
-        if(plain_output.find("Call stack:") != ::std::string::npos && plain_output.find(" module=") != ::std::string::npos &&
-           func_indices == ::std::vector<::std::size_t>{0uz, 1uz, 2uz})
+        auto const reached_runtime_trap{plain_output.find("Runtime crash (") != ::std::string::npos};
+        auto const stack_matches{expect_stack ? plain_output.find("Call stack:") != ::std::string::npos &&
+                                                        plain_output.find(" module=") != ::std::string::npos &&
+                                                        func_indices == ::std::vector<::std::size_t>{0uz, 1uz, 2uz}
+                                                : func_indices.empty()};
+        if(reached_runtime_trap && stack_matches)
         {
             return {.valid = true, .func_indices = ::std::move(func_indices), .output_path = output_path, .log_path = log_path};
         }
 
-        ::std::cerr << "missing tiered OSR trap call-stack frames in " << label << '/' << mode << '/' << policy << " output:\n" << output << '\n';
+        ::std::cerr << (expect_stack ? "missing tiered OSR trap call-stack frames in " : "unexpected func_idx conversion in ") << label << '/' << mode
+                    << '/' << policy << " output:\n"
+                    << output << '\n';
         return {.valid = false, .func_indices = ::std::move(func_indices), .output_path = output_path, .log_path = log_path};
     }
 
@@ -321,15 +401,32 @@ namespace
                                      char const* label,
                                      char const* mode,
                                      char const* policy,
-                                     bool expect_osr_request)
+                                     char const* required_llvm_log_pattern,
+                                     bool auto_uses_authoritative_unwind)
     {
         ::std::string log{};
         if(!read_text_file(log_path, log)) { return false; }
 
-        if(!expect_osr_request || log.find("tiered-osr-request") != ::std::string::npos) { return true; }
+        if(log.find(required_llvm_log_pattern) == ::std::string::npos)
+        {
+            ::std::cerr << "missing LLVM execution evidence in " << label << '/' << mode << '/' << policy << " log:\n" << log << '\n';
+            return false;
+        }
 
-        ::std::cerr << "missing tiered OSR request evidence in " << label << '/' << mode << '/' << policy << " log:\n" << log << '\n';
-        return false;
+        auto const policy_view{::std::string_view{policy}};
+        if(policy_view == "instruction") { return true; }
+
+        // Require policy/emission agreement whenever this lazy/OSR path emits a full-module policy record.
+        // The exact activation chain and real OSR/demand evidence above remain mandatory even without that record.
+        if(log.find("call_stack=") == ::std::string::npos) { return true; }
+        auto const expected{policy_view == "auto" ? (auto_uses_authoritative_unwind ? "unwind" : "instruction") : policy};
+        if(!::uwvm2test::native_unwind::matches_policy(log, expected))
+        {
+            ::std::cerr << "native/instruction emission policy mismatch in " << label << '/' << mode << '/' << policy << " log:\n" << log << '\n';
+            return false;
+        }
+
+        return true;
     }
 
     [[nodiscard]] run_result_t run_trap_case(::std::filesystem::path const& uwvm_path,
@@ -337,19 +434,31 @@ namespace
                                              ::std::filesystem::path const& artifact_dir,
                                              fixture_t const& fixture,
                                              mode_t const& mode,
-                                             char const* policy)
+                                             char const* policy,
+                                             bool expect_stack,
+                                             bool auto_uses_authoritative_unwind)
     {
         auto const stem{::std::string{fixture.label} + "." + mode.name + "." + policy};
         auto const output_path{artifact_dir / (stem + ".out")};
         auto const log_path{artifact_dir / (stem + ".log")};
+        ::std::error_code ec{};
+        ::std::filesystem::remove(log_path, ec);
+        if(ec)
+        {
+            ::std::cerr << "failed to remove stale OSR log: " << log_path << '\n';
+            return {.output_path = output_path, .log_path = log_path};
+        }
         auto command{quote_argument(uwvm_path) + " " + mode.args + " -Rllvm-cache-path disable -Rllvm-call-stack " + policy +
                      " -Rclog file " + quote_argument(log_path)};
         if(auto const extra_args{env_string("UWVM_LLVM_JIT_TEST_EXTRA_RUNTIME_ARGS")}; !extra_args.empty()) { command += " " + extra_args; }
         command += " --run " + quote_argument(wasm_path);
 
         if(!run_trap_command(command, output_path, stem.c_str())) { return {.output_path = output_path, .log_path = log_path}; }
-        auto result{read_trap_result(output_path, log_path, fixture.label, mode.name, policy)};
-        if(!check_osr_log(log_path, fixture.label, mode.name, policy, mode.expect_osr_request)) { result.valid = false; }
+        auto result{read_trap_result(output_path, log_path, fixture.label, mode.name, policy, expect_stack)};
+        if(!check_osr_log(log_path, fixture.label, mode.name, policy, mode.required_llvm_log_pattern, auto_uses_authoritative_unwind))
+        {
+            result.valid = false;
+        }
         return result;
     }
 
@@ -357,7 +466,10 @@ namespace
                                    ::std::filesystem::path const& wat2wasm_path,
                                    ::std::filesystem::path const& wat_dir,
                                    ::std::filesystem::path const& artifact_dir,
-                                   fixture_t const& fixture)
+                                   fixture_t const& fixture,
+                                   bool& call_stack_capability_probed,
+                                   bool& auto_uses_authoritative_unwind,
+                                   bool& native_unwind_backend_available)
     {
         auto const wat_path{wat_dir / fixture.wat_name};
         auto const generated_wat_path{artifact_dir / (::std::string{fixture.label} + ".padded.wat")};
@@ -365,17 +477,41 @@ namespace
 
         if(!compile_wat(wat2wasm_path, wat_path, generated_wat_path, wasm_path, fixture.label)) { return false; }
 
+        if(!call_stack_capability_probed)
+        {
+            if(!probe_auto_call_stack_unwind(
+                   uwvm_path, wasm_path, artifact_dir, auto_uses_authoritative_unwind, native_unwind_backend_available))
+            {
+                return false;
+            }
+            call_stack_capability_probed = true;
+            if(!auto_uses_authoritative_unwind)
+            {
+                ::std::cout << "[tiered-osr-wat] checked native unwind is unavailable; auto retains logical instruction frames\n";
+            }
+        }
+
         for(auto const& mode: modes)
         {
-            auto const instruction{run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "instruction")};
-            auto const unwind{run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "unwind")};
-            if(!instruction.valid || !unwind.valid) { return false; }
-            if(instruction.func_indices == unwind.func_indices) { continue; }
+            auto const instruction{
+                run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, "instruction", true, auto_uses_authoritative_unwind)};
+            if(!instruction.valid) { return false; }
 
-            ::std::cerr << "tiered OSR unwind stack mismatch for " << fixture.label << '/' << mode.name << '\n';
-            ::std::cerr << "  instruction output: " << instruction.output_path << '\n';
-            ::std::cerr << "  unwind output: " << unwind.output_path << '\n';
-            return false;
+            for(auto const* policy: comparison_policies)
+            {
+                auto const policy_view{::std::string_view{policy}};
+                if(policy_view == "unwind" && !auto_uses_authoritative_unwind) { continue; }
+                if(policy_view == "unwind-uncheck" && !native_unwind_backend_available) { continue; }
+                auto const compared{
+                    run_trap_case(uwvm_path, wasm_path, artifact_dir, fixture, mode, policy, true, auto_uses_authoritative_unwind)};
+                if(!compared.valid) { return false; }
+                if(instruction.func_indices == compared.func_indices) { continue; }
+
+                ::std::cerr << "tiered OSR call-stack mismatch for " << fixture.label << '/' << mode.name << '/' << policy << '\n';
+                ::std::cerr << "  instruction output: " << instruction.output_path << '\n';
+                ::std::cerr << "  " << policy << " output: " << compared.output_path << '\n';
+                return false;
+            }
         }
 
         return true;
@@ -419,9 +555,22 @@ int main(int argc, char** argv)
         return dir / "test-artifacts" / "0014.llvm_jit" / "tiered_osr_wat";
     }(executable_dir)};
 
+    bool call_stack_capability_probed{};
+    bool auto_uses_authoritative_unwind{};
+    bool native_unwind_backend_available{};
     for(auto const& fixture: fixtures)
     {
-        if(!run_fixture(uwvm_path, wat2wasm_path, wat_dir, artifact_dir, fixture)) { return 1; }
+        if(!run_fixture(uwvm_path,
+                        wat2wasm_path,
+                        wat_dir,
+                        artifact_dir,
+                        fixture,
+                        call_stack_capability_probed,
+                        auto_uses_authoritative_unwind,
+                        native_unwind_backend_available))
+        {
+            return 1;
+        }
     }
 
     return 0;

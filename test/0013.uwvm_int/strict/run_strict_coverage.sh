@@ -94,11 +94,12 @@ COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
   --ccache=n
-  --test-libfuzzer=y
+  --test-libfuzzer=n
   --enable-test-uwvm-int=y
   --use-cxx-module=n
   --static=none
   --execution-int=uwvm-int
+  --execution-jit=none
   "--enable-uwvm-int-combine-ops=${UWVM_STRICT_COVERAGE_COMBINE_MODE:-heavy}"
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}"
 )

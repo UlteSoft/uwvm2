@@ -1,5 +1,15 @@
 ﻿#pragma once
 
+/*
+ * Generic growable staging destination for concat (IO level).
+ *
+ * This buffer adapts concat's chosen printable strategy to destinations that
+ * cannot be materialized safely in one direct contiguous pass. It owns growth
+ * and final transfer into the requested strlike type, while element
+ * normalization and representation still use the ordinary print protocols.
+ * It is an IO implementation device, not a public string or formatting syntax.
+ */
+
 namespace fast_io::details
 {
 
@@ -28,6 +38,23 @@ struct basic_concat_buffer
 		}
 	}
 };
+
+/// @brief Proves concat's private staging put area only when every possible backing domain is cacheable.
+/// @details The initial array is embedded in the owner, but reserve growth uses `native_thread_local_allocator` through
+///          `allocate_iobuf_space`. That alias can name a user-supplied allocator in a configured build, so treating
+///          the inline case as a blanket proof would become false after the first growth. The allocator concept mirrors
+///          the exact backend chosen by allocation/impl.h and keeps custom/freestanding fallbacks unmarked unless they
+///          opt in explicitly. This marker is write-only because `basic_concat_buffer` is exposed as a string-like
+///          output destination. Its later range construction reads an already bounded prefix directly; a future read
+///          prefetch at that site should carry a dedicated source projection rather than widen the output adapter.
+template <::std::integral char_type>
+	requires(::fast_io::prfch_cacheable_allocator_provenance<
+			 ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type prfch_cacheable_write_provenance_define(
+	::fast_io::io_type_t<basic_concat_buffer<char_type>>) noexcept
+{
+	return {};
+}
 
 template <::std::integral char_type>
 inline constexpr char_type *
@@ -108,6 +135,23 @@ inline constexpr ::std::size_t strlike_sso_size(
 	::fast_io::io_strlike_type_t<char_type, ::fast_io::details::basic_concat_buffer<char_type>>) noexcept
 {
 	return ::fast_io::details::basic_concat_buffer<char_type>::buffer_size;
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type strlike_buffered_print_preferred(
+	::fast_io::io_strlike_type_t<char_type, ::fast_io::details::basic_concat_buffer<char_type>>) noexcept
+{
+	// This internal staging type owns a fixed inline area and grows into one retained allocation only on exhaustion.
+	return {};
+}
+
+template <::std::integral char_type>
+inline constexpr ::std::true_type strlike_deferred_obuffer_commit_safe(
+	::fast_io::io_strlike_type_t<char_type, ::fast_io::details::basic_concat_buffer<char_type>>) noexcept
+{
+	// Cursor access is a direct read/write of the three internal pointers. No output/status customization is associated
+	// with this private staging type, and no allocation can move until the ordinary overflow path is entered.
+	return {};
 }
 
 template <::std::integral char_type>

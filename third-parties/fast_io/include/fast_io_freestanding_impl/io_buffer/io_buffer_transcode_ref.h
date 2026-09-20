@@ -51,13 +51,28 @@ inline constexpr ::std::size_t compute_transcode_buffer_size(::std::size_t oldbu
 
 } // namespace details
 
+/// @brief Rebuilds a buffered stream around one exactly-forwarded transcode decorator.
+/// @details The outer transcode concept probes the decorator's original category.  Replacing that category with the
+///          named local here makes an rvalue-only underlying CPO appear valid at the wrapper boundary and then fail in
+///          this body; it can also copy an owning decorator instead of moving it.  The requires-expression, unevaluated
+///          result query, and executed call therefore use the identical forwarded expression.  The handle projection is
+///          evaluated only by the executed call; its appearance in `decltype` and the constraint has no run-time effect.
 template <typename handletype, typename iobuffertraits, typename dectref>
+	requires requires(
+		basic_io_buffer_transcode_ref<basic_io_buffer<handletype, iobuffertraits>> rf,
+		dectref &&deco) {
+		io_stream_transcode_deco_filter_define(
+			io_stream_transcode_deco_filter_ref_define(
+				::fast_io::freestanding::move(rf.iobptr->handle)),
+			::fast_io::freestanding::forward<dectref>(deco));
+	}
 inline constexpr auto
 io_stream_transcode_deco_filter_define(basic_io_buffer_transcode_ref<basic_io_buffer<handletype, iobuffertraits>> rf,
-									   dectref &&deco)
+										   dectref &&deco)
 {
 	using newtype = decltype(io_stream_transcode_deco_filter_define(
-		io_stream_transcode_deco_filter_ref_define(::fast_io::freestanding::move(rf.iobptr->handle)), deco));
+		io_stream_transcode_deco_filter_ref_define(::fast_io::freestanding::move(rf.iobptr->handle)),
+		::fast_io::freestanding::forward<dectref>(deco)));
 	return ::fast_io::basic_io_buffer<
 		newtype, ::fast_io::basic_io_buffer_traits<
 					 iobuffertraits::mode, typename iobuffertraits::allocator_type, typename newtype::input_char_type,
@@ -67,9 +82,10 @@ io_stream_transcode_deco_filter_define(basic_io_buffer_transcode_ref<basic_io_bu
 						 sizeof(typename iobuffertraits::input_char_type)),
 					 ::fast_io::details::compute_transcode_buffer_size(
 						 iobuffertraits::output_buffer_size, sizeof(typename newtype::output_char_type),
-						 sizeof(typename iobuffertraits::input_char_type))>>(
+							 sizeof(typename iobuffertraits::input_char_type))>>(
 		io_stream_transcode_deco_filter_define(
-			io_stream_transcode_deco_filter_ref_define(::fast_io::freestanding::move(rf.iobptr->handle)), deco));
+			io_stream_transcode_deco_filter_ref_define(::fast_io::freestanding::move(rf.iobptr->handle)),
+			::fast_io::freestanding::forward<dectref>(deco)));
 }
 
 template <typename handletype, typename iobuffertraits>

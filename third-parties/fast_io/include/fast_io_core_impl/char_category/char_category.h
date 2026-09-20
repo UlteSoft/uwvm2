@@ -1601,6 +1601,44 @@ EBCDIC specific: NL:21
 
 namespace details
 {
+template <::std::integral char_type>
+inline constexpr auto normalized_ebcdic_character_value(char_type ch) noexcept
+{
+	using clean_type = ::std::remove_cv_t<char_type>;
+	using unsigned_type = ::std::make_unsigned_t<clean_type>;
+	unsigned_type value{static_cast<unsigned_type>(ch)};
+	if constexpr (::std::same_as<clean_type, wchar_t> &&
+				  ::fast_io::details::wide_is_none_ebcdic_endian)
+	{
+		value = ::fast_io::byte_swap(value);
+	}
+	return value;
+}
+
+template <::std::integral char_type>
+inline constexpr bool is_c_space_target_literal_impl(char_type ch) noexcept
+{
+	return (ch == ::fast_io::char_literal_v<u8'\f', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\n', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\r', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\t', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\v', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8' ', char_type>);
+}
+
+template <::std::integral char_type>
+inline constexpr bool is_c_cntrl_target_literal_impl(char_type ch) noexcept
+{
+	return (ch == ::fast_io::char_literal_v<u8'\0', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\a', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\b', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\t', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\n', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\v', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\f', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\r', char_type>);
+}
+
 inline constexpr bool is_c_space_wide_impl(wchar_t ch) noexcept
 {
 	switch (ch)
@@ -1675,29 +1713,44 @@ inline constexpr bool is_c_space(char_type ch) noexcept
 										 ::std::numeric_limits<::std::uint_least8_t>::digits == 8};
 	if constexpr (optimize_with_spacetb)
 	{
-		if constexpr (::fast_io::details::is_ebcdic<char_type>)
+		if constexpr (::fast_io::details::is_ascii<char_type>)
+		{
+			return ::fast_io::char_category::details::is_c_space_tb<false, char8_t>[static_cast<::std::make_unsigned_t<char_type>>(ch)];
+		}
+		else if constexpr (::fast_io::details::is_classic_ebcdic<char_type>)
 		{
 			return ::fast_io::char_category::details::is_c_space_tb<true, char8_t>[static_cast<::std::make_unsigned_t<char_type>>(ch)];
 		}
 		else
 		{
-			return ::fast_io::char_category::details::is_c_space_tb<false, char8_t>[static_cast<::std::make_unsigned_t<char_type>>(ch)];
+			bool result{::fast_io::char_category::details::is_c_space_target_literal_impl(ch)};
+			if constexpr (::fast_io::details::is_ebcdic<char_type>)
+			{
+				result |= ::fast_io::char_category::details::normalized_ebcdic_character_value(ch) == 21u;
+			}
+			return result;
 		}
 	}
 	else
 	{
-		if constexpr (::fast_io::details::is_ebcdic<char_type>)
-		{
-			return ::fast_io::char_category::details::is_c_space_impl<true>(ch);
-		}
-		else if constexpr (::std::same_as<char_type, wchar_t> && ::fast_io::details::wide_is_none_utf_endian)
-		{
-			return ::fast_io::char_category::details::is_c_space_wide_impl(ch);
-		}
-		else
+		if constexpr (::fast_io::details::is_ascii<char_type>)
 		{
 			return ::fast_io::char_category::details::is_c_space_impl<false>(
 				static_cast<char32_t>(static_cast<::std::make_unsigned_t<char_type>>(ch)));
+		}
+		else if constexpr (::fast_io::details::is_classic_ebcdic<char_type>)
+		{
+			return ::fast_io::char_category::details::is_c_space_impl<true>(
+				::fast_io::char_category::details::normalized_ebcdic_character_value(ch));
+		}
+		else
+		{
+			bool result{::fast_io::char_category::details::is_c_space_target_literal_impl(ch)};
+			if constexpr (::fast_io::details::is_ebcdic<char_type>)
+			{
+				result |= ::fast_io::char_category::details::normalized_ebcdic_character_value(ch) == 21u;
+			}
+			return result;
 		}
 	}
 }
@@ -1713,15 +1766,27 @@ template <::std::integral char_type>
 inline constexpr bool is_c_cntrl(char_type ch) noexcept
 {
 	using uchar_type = ::std::make_unsigned_t<char_type>;
-	if constexpr (::fast_io::details::is_ebcdic<char_type>)
-	{
-		// Convert to unsigned type before checking EBCDIC control characters
-		return (static_cast<uchar_type>(ch) <= 0x3F) | (static_cast<uchar_type>(ch) == 0xFF);
-	}
-	else
+	if constexpr (::fast_io::details::is_ascii<char_type>)
 	{
 		// Convert to unsigned type before checking ASCII control characters
 		return (static_cast<uchar_type>(ch) <= 0x1F) | (static_cast<uchar_type>(ch) == 0x7F);
+	}
+	else if constexpr (::fast_io::details::is_classic_ebcdic<char_type>)
+	{
+		// Convert to unsigned type before checking EBCDIC control characters
+		auto const value{::fast_io::char_category::details::normalized_ebcdic_character_value(ch)};
+		return (value <= 0x3F) | (value == 0xFF);
+	}
+	else
+	{
+		bool result{
+			::fast_io::char_category::details::is_c_cntrl_target_literal_impl(ch)};
+		if constexpr (::fast_io::details::is_ebcdic<char_type>)
+		{
+			result |=
+				::fast_io::char_category::details::normalized_ebcdic_character_value(ch) == 21u;
+		}
+		return result;
 	}
 }
 
@@ -1780,6 +1845,16 @@ inline constexpr bool is_html_whitespace_ebcdic_impl(char32_t ch) noexcept
 	};
 }
 
+template <::std::integral char_type>
+inline constexpr bool is_html_whitespace_target_literal_impl(char_type ch) noexcept
+{
+	return (ch == ::fast_io::char_literal_v<u8'\t', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\n', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\f', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8'\r', char_type>) |
+		   (ch == ::fast_io::char_literal_v<u8' ', char_type>);
+}
+
 inline constexpr bool is_html_whitespace_wide_impl(wchar_t ch) noexcept
 {
 	switch (ch)
@@ -1836,11 +1911,7 @@ template <::std::integral char_type>
 inline constexpr bool is_html_whitespace(char_type ch) noexcept
 {
 	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
-	if constexpr (::fast_io::details::is_ebcdic<char_type>)
-	{
-		return details::is_html_whitespace_ebcdic_impl(static_cast<unsigned_char_type>(ch));
-	}
-	else
+	if constexpr (::fast_io::details::is_ascii<char_type>)
 	{
 		if constexpr (sizeof(char_type) <= sizeof(char32_t))
 		{
@@ -1851,13 +1922,31 @@ inline constexpr bool is_html_whitespace(char_type ch) noexcept
 			return details::is_html_whitespace_ascii_impl(static_cast<unsigned_char_type>(ch));
 		}
 	}
+	else if constexpr (::fast_io::details::is_classic_ebcdic<char_type>)
+	{
+		return details::is_html_whitespace_ebcdic_impl(
+			static_cast<char32_t>(details::normalized_ebcdic_character_value(ch)));
+	}
+	else
+	{
+		bool result{details::is_html_whitespace_target_literal_impl(ch)};
+		if constexpr (::fast_io::details::is_ebcdic<char_type>)
+		{
+			result |= details::normalized_ebcdic_character_value(ch) == 21u;
+		}
+		return result;
+	}
 }
 
 template <::std::integral char_type>
 inline constexpr bool is_c_halfwidth(char_type ch) noexcept
 {
 	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
-	if constexpr (sizeof(char_type) < sizeof(char32_t))
+	if constexpr (!::fast_io::details::is_ascii<char_type>)
+	{
+		return ::fast_io::char_category::is_c_graph(ch);
+	}
+	else if constexpr (sizeof(char_type) < sizeof(char32_t))
 	{
 		constexpr unsigned_char_type halfwidth_exclaimation_mark_val{u8'!'};
 		constexpr unsigned_char_type num{94};
@@ -1891,7 +1980,26 @@ template <::std::integral char_type>
 inline constexpr bool is_c_fullwidth(char_type ch) noexcept
 {
 	using unsigned_char_type = ::std::make_unsigned_t<char_type>;
-	if constexpr (sizeof(char_type) < sizeof(char32_t))
+	if constexpr (!::fast_io::details::is_ascii<char_type>)
+	{
+		if constexpr (::std::same_as<char_type, wchar_t> &&
+					  ::fast_io::details::wide_is_none_utf_endian)
+		{
+			constexpr unsigned_char_type fullwidth_exclaimation_mark_val{0xFF01};
+			constexpr unsigned_char_type num{94};
+			unsigned_char_type cht{::fast_io::byte_swap(static_cast<unsigned_char_type>(ch))};
+			return static_cast<unsigned_char_type>(cht - fullwidth_exclaimation_mark_val) < num;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else if constexpr (sizeof(char_type) < sizeof(char16_t))
+	{
+		return false;
+	}
+	else if constexpr (sizeof(char_type) < sizeof(char32_t))
 	{
 		constexpr unsigned_char_type fullwidth_exclaimation_mark_val{0xFF01};
 		constexpr unsigned_char_type num{94};
@@ -1928,13 +2036,33 @@ To do: to_c_fullwidth
 template <::std::integral T>
 inline constexpr bool is_dos_file_invalid_character(T ch) noexcept
 {
-	return ::fast_io::char_category::details::is_dos_file_invalid_character_impl(static_cast<char32_t>(static_cast<::std::uint_least32_t>(static_cast<::std::make_unsigned_t<T>>(ch))));
+	if constexpr (::fast_io::details::is_ascii<T>)
+	{
+		return ::fast_io::char_category::details::is_dos_file_invalid_character_impl(static_cast<char32_t>(static_cast<::std::uint_least32_t>(static_cast<::std::make_unsigned_t<T>>(ch))));
+	}
+	else
+	{
+		return ::fast_io::char_category::is_c_cntrl(ch) |
+			   (ch == ::fast_io::char_literal_v<u8'/', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'\\', T>) |
+			   (ch == ::fast_io::char_literal_v<u8':', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'*', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'?', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'"', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'<', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'>', T>) |
+			   (ch == ::fast_io::char_literal_v<u8'|', T>);
+	}
 }
 
 template <::std::integral T>
 inline constexpr bool is_dos_path_invalid_prefix_character(T ch) noexcept
 {
-	if constexpr (::std::signed_integral<T>)
+	if constexpr (!::fast_io::details::is_ascii<T>)
+	{
+		return ch == ::fast_io::char_literal_v<u8'.', T>;
+	}
+	else if constexpr (::std::signed_integral<T>)
 	{
 		return ::fast_io::char_category::details::is_dos_path_invalid_prefix_character_impl(static_cast<char32_t>(static_cast<::std::make_unsigned_t<T>>(ch)));
 	}

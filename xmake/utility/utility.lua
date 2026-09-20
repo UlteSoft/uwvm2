@@ -16,8 +16,7 @@ local llvm_jit_required_components = {
     "instcombine",
     "bitreader",
     "bitwriter",
-    "object",
-    "debuginfodwarf"
+    "object"
 }
 
 local llvm_jit_optional_components = {
@@ -34,7 +33,6 @@ local llvm_component_link_names = {
     bitreader = { "LLVMBitReader" },
     bitwriter = { "LLVMBitWriter" },
     core = { "LLVMCore" },
-    debuginfodwarf = { "LLVMDebugInfoDWARF" },
     executionengine = { "LLVMExecutionEngine" },
     instcombine = { "LLVMInstCombine" },
     linker = { "LLVMLinker" },
@@ -860,7 +858,7 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system" or static_mode == "compiler"
 
     local cache_key = table.concat({
-        "llvm-jit-v17",
+        "llvm-jit-v18",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
@@ -955,6 +953,15 @@ function get_llvm_jit_options()
         native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "native" })
         native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
             or (_run_llvm_config(llvm_config, native_codegen_args) or "")
+    end
+    if not link_static and native_codegen_linkflags and native_codegen_linkflags ~= "" and host_target_components and #host_target_components ~= 0 then
+        -- Shared component libraries carry their own transitive dependencies. Keep only the native target family here;
+        -- otherwise llvm-config's expanded closure reintroduces unrelated libraries such as DebugInfoDWARF.
+        local native_direct_link_names = _llvm_direct_link_names({}, host_target_components)
+        local native_direct_linkflags = _filter_llvm_dynamic_link_flags(native_codegen_linkflags, native_direct_link_names)
+        if native_direct_linkflags ~= "" then
+            native_codegen_linkflags = native_direct_linkflags
+        end
     end
     result.native_codegen_linkflags = native_codegen_linkflags
 

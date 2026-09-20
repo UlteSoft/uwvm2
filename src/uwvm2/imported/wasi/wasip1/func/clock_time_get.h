@@ -90,6 +90,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        check_wasip1_guest_pointer_alignment<8uz>(time_ptrsz, u8"clock_time_get.time (timestamp)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

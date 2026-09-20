@@ -30,6 +30,10 @@ module;
 export module uwvm2.runtime;
 
 import uwvm2.utils.container;
+// The preload descriptor belongs to uwvm2.uwvm.wasm.type, not this API module.
+// Import its owner before declaring functions that accept the descriptor; a
+// fresh exported forward declaration here creates a conflicting module owner.
+import uwvm2.uwvm.wasm.type;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -39,4 +43,3 @@ import uwvm2.utils.container;
 #endif
 
 #include "uwvm_runtime.h"
-

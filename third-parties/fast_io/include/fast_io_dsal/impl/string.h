@@ -55,7 +55,7 @@ inline constexpr void string_heap_dilate_uncheck(::fast_io::containers::details:
 		beginptr = nullptr;
 	}
 #if __cpp_constexpr_dynamic_alloc >= 201907L
-	if consteval
+	FAST_IO_IF_CONSTEVAL
 	{
 		auto [newptr, newcap] = typed_allocator_type::allocate_at_least(rsize + 1u);
 		if (beginptr != nullptr)
@@ -65,6 +65,14 @@ inline constexpr void string_heap_dilate_uncheck(::fast_io::containers::details:
 				::std::construct_at(newptr + i, beginptr[i]);
 			}
 			typed_allocator_type::deallocate_n(beginptr, bfsize);
+		}
+		// std::allocator::allocate provides raw storage during constant
+		// evaluation. Start every remaining character lifetime before reserve
+		// formatters write directly into the exposed capacity; run-time allocators
+		// keep their implicit-lifetime, uninitialized fast path below.
+		for (::std::size_t i{strsize}; i != newcap; ++i)
+		{
+			::std::construct_at(newptr + i, chtype{});
 		}
 		ptr = newptr;
 		rsize = newcap - 1u;
@@ -134,7 +142,10 @@ private:
 	constexpr void reset_imp() noexcept
 	{
 #if __cpp_constexpr_dynamic_alloc >= 201907L
-		if (__builtin_is_constant_evaluated())
+		// Use the project-wide syntax gate so C++23 takes the real `if consteval` branch while strict C++20 uses the
+		// audited library-query fallback. A raw compiler builtin here made the allocator split disagree with the other
+		// constant-evaluation paths on frontends which expose the syntax before changing their default language mode.
+		FAST_IO_IF_CONSTEVAL
 		{
 			using untyped_allocator_type = generic_allocator_adapter<allocator_type>;
 			using typed_allocator_type = typed_generic_allocator_adapter<untyped_allocator_type, chtype>;
@@ -282,11 +293,10 @@ public:
 		constexpr size_type n{SIZE_MAX / sizeof(value_type) * sizeof(value_type)};
 		return n;
 	}
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
+	// Keep the checked and unchecked element accessors ordinary inline. Removing their former force-inline markers was
+	// byte-identical on GCC 15--16 and Clang 17--23; GCC 11--14 emitted 16--50 fewer text bytes. A 48-sample serial ABBA
+	// access loop was neutral on every older GCC (1.47--1.72 ns), so no supported frontend has evidence for overriding
+	// its -O3 inliner here.
 	[[nodiscard]]
 	inline constexpr reference back() noexcept
 	{
@@ -298,11 +308,6 @@ public:
 		return curr_ptr[-1];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference back() const noexcept
 	{
@@ -314,11 +319,6 @@ public:
 		return curr_ptr[-1];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr reference front() noexcept
 	{
@@ -330,11 +330,6 @@ public:
 		return *begin_ptr;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference front() const noexcept
 	{
@@ -346,55 +341,30 @@ public:
 		return *begin_ptr;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr reference back_unchecked() noexcept
 	{
 		return imp.curr_ptr[-1];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference back_unchecked() const noexcept
 	{
 		return imp.curr_ptr[-1];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr reference front_unchecked() noexcept
 	{
 		return *imp.begin_ptr;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference front_unchecked() const noexcept
 	{
 		return *imp.begin_ptr;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference operator[](size_type pos) const noexcept
 	{
@@ -406,11 +376,6 @@ public:
 		return begin_ptr[pos];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr reference operator[](size_type pos) noexcept
 	{
@@ -422,22 +387,12 @@ public:
 		return begin_ptr[pos];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr const_reference index_unchecked(size_type pos) const noexcept
 	{
 		return imp.begin_ptr[pos];
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	[[nodiscard]]
 	inline constexpr reference index_unchecked(size_type pos) noexcept
 	{
@@ -756,11 +711,9 @@ public:
 		return reverse_iterator(this->imp.begin_ptr);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
+	// Mutation entry points share the same GCC 11--16 and Clang 17--23 removal audit as the accessors above. Ordinary
+	// inline retains the fast path while allowing the allocation and underflow continuations to follow each compiler's
+	// code-size policy.
 	inline constexpr void push_back(char_type ch) noexcept
 	{
 		if (this->imp.curr_ptr == this->imp.end_ptr) [[unlikely]]
@@ -771,11 +724,6 @@ public:
 		*++this->imp.curr_ptr = 0;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void pop_back() noexcept
 	{
 		if (this->imp.curr_ptr == this->imp.begin_ptr) [[unlikely]]
@@ -871,7 +819,9 @@ public:
 	}
 	inline constexpr iterator insert(const_iterator ptr, string_view_type vw) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		// Constant evaluation cannot const_cast an iterator back to mutable storage. The shared gate keeps this pointer
+		// reconstruction branch valid in C++20 and selects genuine `if consteval` wherever the language provides it.
+		FAST_IO_IF_CONSTEVAL
 		{
 			return this->insert_impl(this->imp.begin_ptr + (ptr - this->imp.begin_ptr), vw.data(), vw.size());
 		}
@@ -903,7 +853,7 @@ private:
 public:
 	inline constexpr iterator erase(const_iterator first, const_iterator last) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		FAST_IO_IF_CONSTEVAL
 		{
 			auto beginptr{this->imp.begin_ptr};
 			return this->erase_impl(beginptr + (first - beginptr), beginptr + (last - beginptr));
@@ -927,7 +877,7 @@ public:
 	}
 	inline constexpr iterator erase(const_iterator it) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		FAST_IO_IF_CONSTEVAL
 		{
 			auto beginptr{this->imp.begin_ptr};
 			return this->erase_impl(beginptr + (it - beginptr));
@@ -955,7 +905,7 @@ public:
 	}
 	inline constexpr iterator insert(const_iterator ptr, basic_string const &other) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		FAST_IO_IF_CONSTEVAL
 		{
 			return this->insert_impl(this->imp.begin_ptr + (ptr - this->imp.begin_ptr), other.data(), other.size());
 		}
@@ -1048,14 +998,12 @@ private:
 	}
 
 public:
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
+	// The replace, subview, and copy facades are ordinary inline by measured policy. Their former attributes changed no
+	// generated code from GCC 15 onward or on Clang 17--23, while older GCC objects became smaller without a hot-access
+	// regression; forcing every checked facade therefore only consumed caller inlining budget.
 	inline constexpr iterator replace(const_iterator first, const_iterator last, string_view_type view) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		FAST_IO_IF_CONSTEVAL
 		{
 			auto beginptr{this->imp.begin_ptr};
 			return this->replace_impl(beginptr + (first - beginptr), beginptr + (last - beginptr), view.data(), view.size());
@@ -1065,14 +1013,9 @@ public:
 			return this->replace_impl(const_cast<pointer>(first), const_cast<pointer>(last), view.data(), view.size());
 		}
 	}
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr iterator replace(const_iterator first, const_iterator last, basic_string const &view) noexcept
 	{
-		if (__builtin_is_constant_evaluated())
+		FAST_IO_IF_CONSTEVAL
 		{
 			auto beginptr{this->imp.begin_ptr};
 			return this->replace_impl(beginptr + (first - beginptr), beginptr + (last - beginptr), view.data(), view.size());
@@ -1082,31 +1025,16 @@ public:
 			return this->replace_impl(const_cast<pointer>(first), const_cast<pointer>(last), view.data(), view.size());
 		}
 	}
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void replace_index(size_type firstidx, size_type lastidx, string_view_type view) noexcept
 	{
 		return this->replace_index_impl(firstidx, lastidx, view.data(), view.size());
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr void replace_index(size_type firstidx, size_type lastidx, basic_string const &view) noexcept
 	{
 		return this->replace_index_impl(firstidx, lastidx, view.data(), view.size());
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr cstring_view_type subview_back(size_type count) const noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
@@ -1119,11 +1047,6 @@ public:
 		return cstring_view_type(::fast_io::containers::null_terminated, beginptr + (thisn - count), count);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr cstring_view_type subview_back_unchecked(size_type count) const noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
@@ -1132,11 +1055,6 @@ public:
 		return cstring_view_type(::fast_io::containers::null_terminated, beginptr + (thisn - count), count);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr string_view_type subview_front(size_type count) const noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
@@ -1149,21 +1067,11 @@ public:
 		return string_view_type(beginptr, count);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr string_view_type subview_front_unchecked(size_type count) const noexcept
 	{
 		return string_view_type(this->imp.begin_ptr, count);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr string_view_type subview(size_type pos, size_type count = ::fast_io::containers::npos) const noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
@@ -1185,11 +1093,6 @@ public:
 		return string_view_type(beginptr + pos, count);
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr string_view_type subview_unchecked(size_type pos, size_type count = ::fast_io::containers::npos) const noexcept
 	{
 		auto beginptr{this->imp.begin_ptr};
@@ -1264,20 +1167,10 @@ public:
 		return ::std::find(this->imp.begin_ptr, ed, ch) != ed;
 	}
 
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr size_type copy(char_type *dest, size_type count, size_type pos = 0) const noexcept
 	{
 		return string_view_type(this->data(), this->size()).copy(dest, count, pos);
 	}
-#if __has_cpp_attribute(__gnu__::__always_inline__)
-	[[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
-	[[msvc::forceinline]]
-#endif
 	inline constexpr size_type copy_unchecked(char_type *dest, size_type count, size_type pos = 0) const noexcept
 	{
 		return string_view_type(this->data(), this->size()).copy_unchecked(dest, count, pos);
@@ -1606,21 +1499,21 @@ public:
 };
 
 template <::std::integral chtype, typename allocator1, typename U>
-inline constexpr ::fast_io::containers::basic_string<chtype, allocator1>::size_type erase(::fast_io::containers::basic_string<chtype, allocator1> &c, U const &value)
+inline constexpr typename ::fast_io::containers::basic_string<chtype, allocator1>::size_type erase(::fast_io::containers::basic_string<chtype, allocator1> &c, U const &value)
 {
 	auto it = ::std::remove(c.begin(), c.end(), value);
 	auto r = c.end() - it;
 	c.erase(it, c.end());
-	return static_cast<::fast_io::containers::basic_string<chtype, allocator1>::size_type>(r);
+	return static_cast<typename ::fast_io::containers::basic_string<chtype, allocator1>::size_type>(r);
 }
 
 template <::std::integral chtype, typename allocator1, typename Pred>
-inline constexpr ::fast_io::containers::basic_string<chtype, allocator1>::size_type erase_if(::fast_io::containers::basic_string<chtype, allocator1> &c, Pred pred)
+inline constexpr typename ::fast_io::containers::basic_string<chtype, allocator1>::size_type erase_if(::fast_io::containers::basic_string<chtype, allocator1> &c, Pred pred)
 {
 	auto it = ::std::remove_if(c.begin(), c.end(), pred);
 	auto r = c.end() - it;
 	c.erase(it, c.end());
-	return static_cast<::fast_io::containers::basic_string<chtype, allocator1>::size_type>(r);
+	return static_cast<typename ::fast_io::containers::basic_string<chtype, allocator1>::size_type>(r);
 }
 
 template <::std::integral chtype, typename allocator1, typename allocator2>
@@ -1691,11 +1584,76 @@ inline constexpr auto operator<=>(char_type const (&buffer)[n], ::fast_io::conta
 
 #endif
 
+/// @brief Preserves cacheable-read provenance when aliasing a string whose allocator explicitly proves it.
+/// @details The allocator marker is build-sensitive: native aliases opt in only when they selected a known malloc,
+///          mimalloc, kernel, or Windows-heap backend, while custom and freestanding fallbacks remain unproved. A custom
+///          allocator can provide its own exact-true ADL marker. The owning string supplies lifetime; the allocator
+///          supplies the independent memory-domain proof. Returning the proof-carrying two-word descriptor preserves
+///          both facts through entry decay without changing the raw scatter ABI used after projection.
 template <::std::integral chtype, typename alloctype>
+	requires(::fast_io::prfch_cacheable_allocator_provenance<alloctype>)
+inline constexpr ::fast_io::basic_prfch_cacheable_io_scatter_t<chtype>
+print_alias_define(io_alias_t, basic_string<chtype, alloctype> const &str) noexcept
+{
+	return ::fast_io::basic_prfch_cacheable_io_scatter_t<chtype>{
+		str.imp.begin_ptr, static_cast<::std::size_t>(str.imp.curr_ptr - str.imp.begin_ptr)};
+}
+
+/// @brief Keeps allocator-defined storage outside the library's cacheability proof.
+/// @details A conforming custom allocator may obtain memory from MMIO, persistent mappings, accelerators, or another
+///          domain where processor prefetch is inappropriate. Contiguity and ownership prove neither cache policy nor
+///          device semantics, so this overload intentionally returns the unmarked raw scatter.
+template <::std::integral chtype, typename alloctype>
+	requires(!::fast_io::prfch_cacheable_allocator_provenance<alloctype>)
 inline constexpr ::fast_io::basic_io_scatter_t<chtype>
 print_alias_define(io_alias_t, basic_string<chtype, alloctype> const &str) noexcept
 {
 	return {str.imp.begin_ptr, static_cast<::std::size_t>(str.imp.curr_ptr - str.imp.begin_ptr)};
+}
+
+/// @brief Proves that a stored fast_io string may lend its direct print scatter through a range operation.
+/// @details `print_alias_define` above refers to the source object's character allocation. The range admission rule
+///          additionally requires an lvalue element, so this source-side opt-in never extends the lifetime of a
+///          temporary owning string.
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type print_borrowed_scatter_source(
+	::fast_io::io_reserve_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	// A custom allocator contributes an associated namespace to ADL and can therefore replace alias/forwarding
+	// semantics even though the container remains contiguous. Only the two library-owned allocator models have been
+	// audited to make the allocation bounds above a stable, repeatable description of the complete print operation.
+	return {};
+}
+
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type print_eager_materialization_safe(
+	::fast_io::io_reserve_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	return {};
+}
+
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type print_scatter_output_state_independent(
+	::fast_io::io_reserve_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	// The print alias reads this string's allocation bounds only; it has no destination-stream dependency.
+	return {};
+}
+
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type print_scatter_direct_print_equivalent(
+	::fast_io::io_reserve_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	// The direct allocation bounds are this type's complete character-print protocol for an unchanged string.
+	return {};
 }
 
 template <::std::integral char_type, typename alloctype>
@@ -1780,6 +1738,86 @@ inline constexpr void strlike_reserve(::fast_io::io_strlike_type_t<chtype, basic
 {
 	str.reserve(n);
 }
+
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type strlike_buffered_print_preferred(
+	::fast_io::io_strlike_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	// The two native allocator families back the string's retained geometric-growth storage. A custom allocator remains
+	// unmarked because allocation frequency and growth cost are part of this policy rather than structural conformance.
+	return {};
+}
+
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type strlike_deferred_obuffer_commit_safe(
+	::fast_io::io_strlike_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	// The native string exposes its three owned pointers directly; in-area copies cannot relocate storage and setting
+	// `curr_ptr` only publishes the logical end (plus its terminating zero). Restricting the proof to library allocators
+	// keeps user-associated output/status customizations outside this semantic opt-in.
+	return {};
+}
+
+/// @brief Opts the two native fast_io string families into concat's single-pass context staging policy.
+/// @details `basic_string` starts with zero writable capacity, so feeding a multi-window context producer directly to
+///          its output adapter performs geometric growth from an empty allocation. `basic_concat_buffer` instead owns
+///          a two-KiB inline area and range construction allocates the completed result once. The marker is deliberately
+///          restricted to the native global and thread-local allocators: a custom allocator may have different growth,
+///          copying, or publication costs, and structural string conformance alone is not a profitability proof.
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			 ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>)
+inline constexpr ::std::true_type concat_context_staging_preferred(
+	::fast_io::io_strlike_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	return {};
+}
+
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)) && \
+	defined(__clang__) && 23 <= __clang_major__
+/// @brief Selects ordered concat staging for long neutral-protocol packs on the measured native fast_io string.
+/// @details A default native string starts without writable capacity. When an unretained scatter splits an otherwise
+///          coalescible pack, direct dispatch grows that result through several leaf boundaries; concat's two-KiB inline
+///          buffer instead consumes the same CPO sequence without allocation and range-constructs the completed value
+///          once. Seven leaves is the first measured profitable cardinality on Apple M4/Clang 23. The native allocator
+///          restriction excludes user allocation/ADL policy, and concat keeps directly grouped reserve/borrowed-scatter
+///          packs out of this path so their one-reserve strategy is not replaced by an extra copy.
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<char_type, char> &&
+			 (::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			  ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>))
+[[nodiscard]] inline constexpr ::std::size_t concat_ordered_staging_minimum_leaf_count(
+	::fast_io::io_strlike_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	return 7u;
+}
+
+/// @brief Certifies one-way ordered-staging promotion into an audited native fast_io string.
+/// @details The native string starts empty, owns any reserved allocation, preserves its published prefix on growth, and
+///          exposes that allocation through its three direct cursor CPOs. Copying the bounded staging prefix and then
+///          continuing the current write is therefore byte-equivalent to final range construction without replaying or
+///          retaining a source CPO result. The marker also accepts direct-output exception ordering: an allocation
+///          failure during promotion may suppress later stateful producers, while the private partial destination is
+///          destroyed and never returned. No associated output hook observes the temporarily unpublished logical end
+///          while concat caches the native cursor triple. Its destructor uses only begin/end allocation ownership and
+///          never inspects the old terminator, so a source exception remains safe after raw output replaced that
+///          terminator but before cursor publication. Native allocator and target restrictions exclude user allocation
+///          and ADL policies from this semantic and cost proof.
+template <::std::integral char_type, typename allocator_type>
+	requires(::std::same_as<char_type, char> &&
+			 (::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			  ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>))
+[[nodiscard]] inline constexpr ::std::true_type
+concat_ordered_staging_adaptive_promotion_safe(
+	::fast_io::io_strlike_type_t<char_type, basic_string<char_type, allocator_type>>) noexcept
+{
+	return {};
+}
+#endif
 
 template <::std::integral chtype, typename alloctype>
 inline constexpr ::fast_io::io_strlike_reference_wrapper<chtype, basic_string<chtype, alloctype>> io_strlike_ref(::fast_io::io_alias_t, basic_string<chtype, alloctype> &str) noexcept
@@ -1923,31 +1961,119 @@ template <::fast_io::manipulators::scalar_flags flags, ::std::integral char_type
 inline constexpr ::fast_io::parse_code scan_context_eof_define(
 	io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &>>,
 	scan_fast_io_string_context skip_space_done,
-	::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &> str) noexcept
+	::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &>) noexcept
 {
-	if constexpr (flags.line || flags.noskipws)
-	{
-		if (str.reference.empty())
-		{
-			return ::fast_io::parse_code::end_of_file;
-		}
-		else
-		{
-			return ::fast_io::parse_code::ok;
-		}
-	}
-	else
-	{
-		return details::scan_context_eof_fast_io_string_define_impl(skip_space_done.copying);
-	}
+	return details::scan_context_eof_fast_io_string_define_impl(skip_space_done.copying);
 }
 
 template <::std::integral char_type, typename allocator_type>
-inline constexpr ::fast_io::manipulators::scalar_manip_t<details::fast_io_string_default_scalar_flags<false, false>,
-														 basic_string<char_type, allocator_type> &>
+inline constexpr ::fast_io::manipulators::scalar_manip_t<
+	details::fast_io_string_default_scalar_flags<false, false>,
+	basic_string<char_type, allocator_type> &>
 scan_alias_define(io_alias_t, basic_string<char_type, allocator_type> &t) noexcept
 {
 	return {t};
+}
+
+namespace details
+{
+
+template <::std::integral char_type>
+inline constexpr bool inplace_to_direct_ranges_overlap(
+	char_type const *target_begin, char_type const *target_end,
+	char_type const *source_begin, ::std::size_t source_size) noexcept
+{
+	if (source_size == 0u || source_begin == nullptr || target_begin == nullptr || target_end == nullptr)
+		return false;
+	// Pointer ordering across unrelated allocations is not a portable C++ operation. Compare byte addresses instead and
+	// conservatively reject arithmetic wraparound; a false negative would make clear() invalidate a borrowed source.
+	auto const tb{reinterpret_cast<::std::uintptr_t>(target_begin)};
+	auto const te{reinterpret_cast<::std::uintptr_t>(target_end)};
+	auto const sb{reinterpret_cast<::std::uintptr_t>(source_begin)};
+	if (te < tb || te > UINTPTR_MAX - sizeof(char_type) ||
+		source_size > (UINTPTR_MAX - sb) / sizeof(char_type))
+		return true;
+	auto const se{sb + source_size * sizeof(char_type)};
+	return sb < te + sizeof(char_type) && tb < se;
+}
+
+template <::std::integral char_type, typename allocator_type, typename T>
+inline constexpr bool inplace_to_direct_source_overlaps(
+	basic_string<char_type, allocator_type> const &target, T const &value) noexcept
+{
+	using value_type = ::std::remove_cvref_t<T>;
+	char_type const *source_begin{};
+	::std::size_t source_size{};
+	if constexpr (::std::same_as<value_type, ::fast_io::basic_io_scatter_t<char_type>> ||
+				  ::std::same_as<value_type, ::fast_io::basic_prfch_cacheable_io_scatter_t<char_type>>)
+	{
+		source_begin = value.base;
+		source_size = value.len;
+	}
+	else if constexpr (::fast_io::details::decay::print_static_scatter_traits<char_type, value_type>::available)
+	{
+		auto const scatter{
+			::fast_io::details::decay::print_static_scatter_traits<char_type, value_type>::define(value)};
+		source_begin = scatter.base;
+		source_size = scatter.len;
+	}
+	else
+	{
+		return false;
+	}
+	return inplace_to_direct_ranges_overlap(
+		target.imp.begin_ptr, target.imp.end_ptr, source_begin, source_size);
+}
+
+template <::std::integral char_type, typename allocator_type, typename... Args>
+inline constexpr bool inplace_to_direct_source_safe_impl(
+	basic_string<char_type, allocator_type> const &target, Args const &...args) noexcept
+{
+	return (!inplace_to_direct_source_overlaps<char_type>(target, args) && ...);
+}
+
+} // namespace details
+
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename allocator_type,
+		  typename... Args>
+	requires((::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			  ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>) &&
+			 (!flags.noskipws && !flags.line))
+inline constexpr bool inplace_to_direct_print_source_safe(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &>>,
+	::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &> const &target,
+	Args const &...args) noexcept
+{
+	return details::inplace_to_direct_source_safe_impl<char_type>(target.reference, args...);
+}
+
+/// @brief Appends a proven whitespace-free `inplace_to` record in one string-output pass.
+/// @details The ordinary token scanner must search every fragment for a C-space delimiter and may therefore stop
+/// midway through a record.  `to.h` admits this customization only after the source graph has proved that every
+/// normalized leaf is either an integer spelling or a retained static scatter, and after its runtime bytes have been
+/// checked for whitespace.  Restricting the destination to the two native allocators keeps clear/append and pointer
+/// publication under the audited `basic_string` implementation; custom allocators and user target wrappers retain the
+/// established scanner path.
+template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename allocator_type,
+		  typename... Args>
+	requires((::std::same_as<allocator_type, ::fast_io::native_global_allocator> ||
+			  ::std::same_as<allocator_type, ::fast_io::native_thread_local_allocator>) &&
+			 (!flags.noskipws && !flags.line))
+inline constexpr void inplace_to_direct_print_define(
+	::fast_io::io_reserve_type_t<
+		char_type,
+		::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &>>,
+	::fast_io::manipulators::scalar_manip_t<flags, basic_string<char_type, allocator_type> &> &target,
+	Args &...args)
+{
+	// `target.reference` is the exact object mutated by the normal string token scanner. The direct path has already
+	// proved a complete nonempty token and ruled out source overlap, so let concat's string-owned planner reserve and
+	// publish that one record without re-entering the generic output-stream controller.
+	target.reference.clear();
+	::fast_io::details::decay::basic_general_concat_decay_ref_impl<false, char_type>(
+		target.reference, args...);
 }
 
 template <::std::integral char_type, typename allocator_type>
@@ -1979,6 +2105,9 @@ inline constexpr ::fast_io::parse_code scan_context_eof_define(
 
 namespace manipulators
 {
+/// @brief Reads one line into a fast_io DSAL `basic_string` destination.
+/// @details Characters up to line feed are stored and ordinary spaces are preserved; the line feed is consumed but not
+///          stored, a preceding carriage return is retained, and the destination is borrowed.
 template <::std::integral char_type, typename allocator_type>
 inline constexpr ::fast_io::manipulators::scalar_manip_t<::fast_io::containers::details::fast_io_string_default_scalar_flags<false, true>,
 														 ::fast_io::containers::basic_string<char_type, allocator_type> &>
@@ -1987,6 +2116,8 @@ line_get(::fast_io::containers::basic_string<char_type, allocator_type> &line_st
 	return {line_str};
 }
 
+/// @brief Reads the complete remaining input into a fast_io DSAL `basic_string` destination.
+/// @details No whitespace delimiter is special; completion follows the enclosing whole-input scan protocol.
 template <::std::integral char_type, typename allocator_type>
 inline constexpr ::fast_io::manipulators::whole_get_t<::fast_io::containers::basic_string<char_type, allocator_type> &>
 whole_get(::fast_io::containers::basic_string<char_type, allocator_type> &whole_str) noexcept

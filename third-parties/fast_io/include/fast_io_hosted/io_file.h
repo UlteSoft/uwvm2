@@ -27,6 +27,11 @@ template <::std::integral inchar_type, ::std::integral outchar_type, typename al
 class basic_io_io_derived : public basic_io_io_base<inchar_type, outchar_type>
 {
 public:
+	// Each virtual bridge performs stream-reference normalization exactly once. The remove_cvref_t aliases below are
+	// used only for capability and character-domain proofs; the runtime expression is retained with decltype(auto), so
+	// an ABI-small prvalue has one local owner while a non-trivial lvalue continues to denote the wrapped cursor. This
+	// separation is essential in a type-erased layer: a second normalization or an unconditional local copy could
+	// silently fork buffered position state before the primitive operation is reached.
 	T value;
 	static constexpr inline void operator delete(void *ptr, ::std::size_t n) noexcept
 	{
@@ -40,14 +45,16 @@ public:
 	inline virtual constexpr ::fast_io::io_scatter_status_t
 	scatter_read_some_underflow_def(::fast_io::basic_io_scatter_t<inchar_type> const *base, ::std::size_t n) override
 	{
-		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::input_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::input_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::input_char_type, inchar_type> &&
 						  ::fast_io::operations::decay::defines::readable<decaytype>)
 			{
-				return ::fast_io::operations::decay::scatter_read_some_decay(
-					::fast_io::operations::input_stream_ref(value), base, n);
+				decltype(auto) inref = ::fast_io::operations::input_stream_ref(value);
+				return ::fast_io::operations::decay::scatter_read_some_decay_dispatch(
+					inref, base, n);
 			}
 			else
 			{
@@ -63,14 +70,16 @@ public:
 	scatter_pread_some_underflow_def(::fast_io::basic_io_scatter_t<inchar_type> const *base, ::std::size_t n,
 									 ::fast_io::intfpos_t off) override
 	{
-		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::input_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::input_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::input_char_type, inchar_type> &&
 						  ::fast_io::operations::decay::defines::preadable<decaytype>)
 			{
-				return ::fast_io::operations::decay::scatter_pread_some_decay(
-					::fast_io::operations::input_stream_ref(value), base, n, off);
+				decltype(auto) inref = ::fast_io::operations::input_stream_ref(value);
+				return ::fast_io::operations::decay::scatter_pread_some_decay_dispatch(
+					inref, base, n, off);
 			}
 			else
 			{
@@ -85,14 +94,19 @@ public:
 	inline virtual constexpr ::fast_io::intfpos_t input_stream_seek_def(::fast_io::intfpos_t off,
 																 ::fast_io::seekdir sdir) override
 	{
-		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_input_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::input_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::input_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::input_char_type, inchar_type> &&
-						  ::fast_io::operations::decay::defines::has_input_stream_seek_define<decaytype>)
+						  ::fast_io::operations::decay::defines::input_stream_seek_dispatchable<decaytype>)
 			{
-				return ::fast_io::operations::decay::input_stream_seek_decay(
-					::fast_io::operations::input_stream_ref(value), off, sdir);
+				// Dispatchability includes a finite complete mutex chain. Testing only the terminal seek CPO here would
+				// reject a valid locked wrapper even though the borrowed decay layer can safely unwrap it. This named
+				// normalized observer uses policy dispatch so a mutable cursor cannot be copied accidentally.
+				decltype(auto) inref = ::fast_io::operations::input_stream_ref(value);
+				return ::fast_io::operations::decay::input_stream_seek_decay_dispatch(
+					inref, off, sdir);
 			}
 			else
 			{
@@ -108,14 +122,16 @@ public:
 	inline virtual constexpr ::fast_io::io_scatter_status_t
 	scatter_write_some_overflow_def(::fast_io::basic_io_scatter_t<outchar_type> const *base, ::std::size_t n) override
 	{
-		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::output_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::output_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::output_char_type, outchar_type> &&
 						  ::fast_io::operations::decay::defines::writable<decaytype>)
 			{
-				return ::fast_io::operations::decay::scatter_write_some_decay(
-					::fast_io::operations::output_stream_ref(value), base, n);
+				decltype(auto) outref = ::fast_io::operations::output_stream_ref(value);
+				return ::fast_io::operations::decay::scatter_write_some_decay_dispatch(
+					outref, base, n);
 			}
 			else
 			{
@@ -131,14 +147,16 @@ public:
 	scatter_pwrite_some_overflow_def(::fast_io::basic_io_scatter_t<outchar_type> const *base, ::std::size_t n,
 									 ::fast_io::intfpos_t off) override
 	{
-		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::output_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::output_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::output_char_type, outchar_type> &&
 						  ::fast_io::operations::decay::defines::pwritable<decaytype>)
 			{
-				return ::fast_io::operations::decay::scatter_pwrite_some_decay(
-					::fast_io::operations::output_stream_ref(value), base, n, off);
+				decltype(auto) outref = ::fast_io::operations::output_stream_ref(value);
+				return ::fast_io::operations::decay::scatter_pwrite_some_decay_dispatch(
+					outref, base, n, off);
 			}
 			else
 			{
@@ -153,14 +171,17 @@ public:
 	inline virtual constexpr ::fast_io::intfpos_t output_stream_seek_def(::fast_io::intfpos_t off,
 																  ::fast_io::seekdir sdir) override
 	{
-		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<T>)
+		if constexpr (::fast_io::operations::defines::has_output_or_io_stream_ref_define<decltype((value))>)
 		{
-			using decaytype = decltype(::fast_io::operations::output_stream_ref(value));
+			using decaytype = ::std::remove_cvref_t<decltype(
+				::fast_io::operations::output_stream_ref(value))>;
 			if constexpr (::std::same_as<typename decaytype::output_char_type, outchar_type> &&
-						  ::fast_io::operations::decay::defines::has_output_stream_seek_define<decaytype>)
+						  ::fast_io::operations::decay::defines::output_stream_seek_dispatchable<decaytype>)
 			{
-				return ::fast_io::operations::decay::output_stream_seek_decay(
-					::fast_io::operations::output_stream_ref(value), off, sdir);
+				// Keep a stateful normalized output observer borrowed unless its explicit semantic and ABI proofs admit a copy.
+				decltype(auto) outref = ::fast_io::operations::output_stream_ref(value);
+				return ::fast_io::operations::decay::output_stream_seek_decay_dispatch(
+					outref, off, sdir);
 			}
 			else
 			{
@@ -202,6 +223,33 @@ io_stream_ref_define(basic_general_io_io_observer<inchar_type, outchar_type> bio
 }
 
 template <::std::integral inchar_type, ::std::integral outchar_type>
+inline constexpr ::std::true_type print_semantic_optional_scatter_plan_stream(
+	::fast_io::io_reserve_type_t<
+		outchar_type,
+		::fast_io::basic_general_io_io_observer<
+			inchar_type, outchar_type>>) noexcept
+{
+	// Type erasure removes the underlying object's associated namespaces, and the exact observer owns no status-print
+	// overload. Its virtual scatter operation receives the same ordered nonempty descriptor sequence as ordinary active-
+	// record dispatch, so partial status, exceptions, primitive call boundaries, and line ownership remain identical.
+	return {};
+}
+
+template <::std::integral inchar_type, ::std::integral outchar_type>
+inline constexpr ::std::true_type
+print_semantic_optional_scatter_barrier_plan_stream(
+	::fast_io::io_reserve_type_t<
+		outchar_type,
+		::fast_io::basic_general_io_io_observer<
+			inchar_type, outchar_type>>) noexcept
+{
+	// The generic scanner already completes the virtual scatter prefix before a direct-only barrier and continues through
+	// the same handle pointer. Segmenting only at that boundary preserves virtual-call order, state, exception prefixes,
+	// and final-line ownership; mutex, buffer, decorator, and transcoder wrappers remain independently unmarked.
+	return {};
+}
+
+template <::std::integral inchar_type, ::std::integral outchar_type>
 inline constexpr ::fast_io::io_scatter_status_t
 scatter_read_some_underflow_define(basic_general_io_io_observer<inchar_type, outchar_type> biob,
 								   ::fast_io::basic_io_scatter_t<inchar_type> const *pst, ::std::size_t n)
@@ -229,7 +277,7 @@ input_stream_seek_define(basic_general_io_io_observer<inchar_type, outchar_type>
 template <::std::integral inchar_type, ::std::integral outchar_type>
 inline constexpr ::fast_io::io_scatter_status_t
 scatter_write_some_overflow_define(basic_general_io_io_observer<inchar_type, outchar_type> biob,
-								   ::fast_io::basic_io_scatter_t<inchar_type> const *pst, ::std::size_t n)
+								   ::fast_io::basic_io_scatter_t<outchar_type> const *pst, ::std::size_t n)
 {
 	return biob.handle->scatter_write_some_overflow_def(pst, n);
 }
@@ -237,7 +285,7 @@ scatter_write_some_overflow_define(basic_general_io_io_observer<inchar_type, out
 template <::std::integral inchar_type, ::std::integral outchar_type>
 inline constexpr ::fast_io::io_scatter_status_t
 scatter_pwrite_some_overflow_define(basic_general_io_io_observer<inchar_type, outchar_type> biob,
-									::fast_io::basic_io_scatter_t<inchar_type> const *pst, ::std::size_t n,
+									::fast_io::basic_io_scatter_t<outchar_type> const *pst, ::std::size_t n,
 									intfpos_t off)
 {
 	return biob.handle->scatter_pwrite_some_overflow_def(pst, n, off);
@@ -357,13 +405,25 @@ io_stream_transcode_deco_filter_ref_define(basic_general_io_file<inchar_type, ou
 	return {__builtin_addressof(t)};
 }
 
+/// @brief Replaces a type-erased file with an owning decorator layer.
+/// @details The add-decorator dispatcher offers its sole local owner as an rvalue whenever this consuming overload is
+///          available.  Nevertheless the CPO remains valid for a caller-owned lvalue when the decorator is copyable.
+///          `remove_cvref_t` is essential in both cases: using the forwarding type as the stored template argument makes
+///          an lvalue expression instantiate `basic_io_deco_filter<..., Decorator&>`, leaving the persistent file with a
+///          reference to a helper parameter destroyed at return.  The exact construction requirement turns an attempted
+///          move-only lvalue copy into substitution failure before this type-erased replacement body is selected.
 template <::std::integral inchar_type, ::std::integral outchar_type, typename allocatortype, typename dectref>
+	requires requires(dectref &&deco) {
+		::std::remove_cvref_t<dectref>(::fast_io::freestanding::forward<dectref>(deco));
+	}
 inline constexpr void io_stream_add_deco_filter_define(
 	basic_general_io_file_ref<basic_general_io_file<inchar_type, outchar_type, allocatortype>> rf, dectref &&deco)
 {
+	using decorator_type = ::std::remove_cvref_t<dectref>;
+	using stored_file_type = basic_general_io_file<inchar_type, outchar_type, allocatortype>;
 	*rf.giofptr = basic_general_io_file<inchar_type, outchar_type, allocatortype>(
 		::fast_io::io_cookie_type<
-			basic_io_deco_filt<basic_general_io_file<inchar_type, outchar_type, allocatortype>, dectref>>,
+			basic_io_deco_filt<stored_file_type, decorator_type>>,
 		::fast_io::freestanding::forward<dectref>(deco), ::fast_io::freestanding::move(*rf.giofptr));
 }
 

@@ -148,7 +148,7 @@ struct basic_white_hole_engine
 	inline result_type operator()()
 	{
 		result_type value;
-		auto instmref{::fast_io::operations::input_stream_ref(handle)};
+		decltype(auto) instmref = ::fast_io::operations::input_stream_ref(handle);
 		if constexpr (::fast_io::details::minimum_buffer_input_stream_require_size_impl<decltype(instmref),
 																						sizeof(result_type)>)
 		{
@@ -168,7 +168,7 @@ struct basic_white_hole_engine
 		}
 		else
 		{
-			::fast_io::operations::decay::read_all_bytes_decay(
+			::fast_io::operations::decay::read_all_bytes_decay_dispatch(
 				instmref, reinterpret_cast<::std::byte *>(__builtin_addressof(value)),
 				reinterpret_cast<::std::byte *>(__builtin_addressof(value) + 1));
 		}

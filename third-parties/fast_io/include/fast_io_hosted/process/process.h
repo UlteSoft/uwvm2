@@ -1,5 +1,4 @@
 ﻿#pragma once
 #include "process/native.h"
-#if 0
+#include "shared_memory/impl.h"
 #include "ipc/native.h"
-#endif

@@ -39,7 +39,8 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         k_fn_control_loop_mix = 11uz,
         k_fn_branch_value_mix = 12uz,
         k_fn_v128_branch_mix = 13uz,
-        k_fn_count = 14uz,
+        k_fn_simd_dot_i16x8_wrap = 14uz,
+        k_fn_count = 15uz,
     };
 
     [[nodiscard]] inline byte_vec pack_i32_i64(::std::int32_t a, ::std::int64_t b)
@@ -147,6 +148,21 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
     {
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
         return mb.build();
+    }
+
+    [[nodiscard]] inline byte_vec build_overlong_inline_blocktype_module()
+    {
+        module_builder mb{};
+        func_type ty{{}, {}};
+        func_body fb{};
+        append_op(fb.code, wasm_op::block);
+        strict::append_u8(fb.code, 0xffu);
+        strict::append_u8(fb.code, 0x7fu);  // overlong signed-LEB spelling of the one-byte i32 blocktype
+        append_i32_const(fb.code, 0);
+        append_op(fb.code, wasm_op::end);
+        append_op(fb.code, wasm_op::drop);
+        append_op(fb.code, wasm_op::end);
+        return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
     }
 
     [[nodiscard]] inline byte_vec build_full_wasm1p1_module()
@@ -1199,6 +1215,21 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        {
+            func_type ty{{}, {strict::k_val_i32}};
+            func_body fb{};
+            auto& c{fb.code};
+
+            // Each dot product is (-32768 * -32768) * 2 == 2^31 and therefore wraps to i32.min.
+            v128_i32x4_const(c, 0x80008000u, 0x80008000u, 0x80008000u, 0x80008000u);
+            v128_i32x4_const(c, 0x80008000u, 0x80008000u, 0x80008000u, 0x80008000u);
+            simd(c, wasm1p1_simd_op::i32x4_dot_i16x8_s);
+            simd(c, wasm1p1_simd_op::i32x4_extract_lane);
+            strict::append_u8(c, 0u);
+            op(c, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -1278,6 +1309,18 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         append_i32_triple(fb.code, 1, 2, 0);
         append_wasm1p1_op(fb.code, wasm1p1_op::select_t);
         strict::append_u32_leb(fb.code, 2u);
+        append_op(fb.code, wasm_op::end);
+        return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
+    }
+
+    [[nodiscard]] inline byte_vec build_invalid_select_t_empty_result_types_module()
+    {
+        module_builder mb{};
+        func_type ty{{}, {strict::k_val_i32}};
+        func_body fb{};
+        append_i32_triple(fb.code, 1, 2, 0);
+        append_wasm1p1_op(fb.code, wasm1p1_op::select_t);
+        strict::append_u32_leb(fb.code, 0u);
         append_op(fb.code, wasm_op::end);
         return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
     }
@@ -1364,6 +1407,23 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         module_builder mb{};
         mb.has_memory = true;
         mb.memory_min = 1u;
+        func_type ty{{}, {}};
+        func_body fb{};
+        append_i32_triple(fb.code, 0, 0, 1);
+        append_numeric_op(fb.code, wasm1p1_numeric_op::memory_init);
+        strict::append_u32_leb(fb.code, 0u);
+        strict::append_u8(fb.code, 0u);
+        append_op(fb.code, wasm_op::end);
+        return finish_single_func_module(::std::move(mb), ::std::move(ty), ::std::move(fb));
+    }
+
+    [[nodiscard]] inline byte_vec build_invalid_memory_init_missing_data_count_module()
+    {
+        module_builder mb{};
+        mb.has_memory = true;
+        mb.memory_min = 1u;
+        mb.passive_datas.push_back(strict::passive_data_segment{.bytes = byte_vec{::std::byte{0x2a}}});
+        mb.emit_data_count_section = false;
         func_type ty{{}, {}};
         func_body fb{};
         append_i32_triple(fb.code, 0, 0, 1);
@@ -1777,6 +1837,11 @@ namespace uwvm2test::uwvm_int_wasm1p1_full
         {
             auto rr{run_func(k_fn_v128_branch_mix, strict::pack_no_params())};
             UWVM2TEST_REQUIRE(strict::load_i32(rr.results) == 30);
+        }
+
+        {
+            auto rr{run_func(k_fn_simd_dot_i16x8_wrap, strict::pack_no_params())};
+            UWVM2TEST_REQUIRE(strict::load_i32(rr.results) == (::std::numeric_limits<::std::int32_t>::min)());
         }
 
         (void)rt;

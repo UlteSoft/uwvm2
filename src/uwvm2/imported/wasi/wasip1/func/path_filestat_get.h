@@ -108,6 +108,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         auto& memory{*env.wasip1_memory};
 
+        // path_ptrsz is ConstPointer<u8> (alignment 1).
+        check_wasip1_guest_pointer_alignment<8uz>(buf_ptrsz, u8"path_filestat_get.buf (filestat)");
+
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]

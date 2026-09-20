@@ -57,7 +57,11 @@ inline constexpr ::std::uint_least32_t FAST_IO_WINSTDCALL thread_start_routine(v
 	try
 #endif
 	{
-		::std::invoke(::fast_io::containers::get<Is>(*reinterpret_cast<Tuple *>(args))...);
+		auto &stored{*reinterpret_cast<Tuple *>(args)};
+		// Thread launch consumes the owned decay-copy once. Projecting from an xvalue tuple restores the specified
+		// post-decay rvalue categories, so rvalue-qualified callables and move-only by-value arguments remain usable while
+		// the allocation guard retains responsibility for destruction after invocation.
+		::std::invoke(::fast_io::containers::get<Is>(::std::move(stored))...);
 	}
 #ifdef FAST_IO_CPP_EXCEPTIONS
 	catch (...)
@@ -92,7 +96,7 @@ public:
 	inline constexpr nt_thread() noexcept = default;
 
 	template <typename Func, typename... Args>
-		requires(::std::invocable<Func, Args...>)
+		requires(::fast_io::details::thread_decay_invocable<Func, Args...>)
 	inline constexpr nt_thread(Func &&func, Args &&...args)
 	{
 		using start_routine_tuple_type = ::fast_io::containers::tuple<::std::decay_t<Func>, ::std::decay_t<Args>...>;
@@ -103,6 +107,8 @@ public:
 		::fast_io::win32::nt::client_id cid;
 #endif
 		auto start_routine_tuple{alloc::allocate(1u)};
+		::fast_io::details::thread_start_storage_guard<start_routine_tuple_type> storage_guard{
+			start_routine_tuple};
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
@@ -111,6 +117,7 @@ public:
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
+		storage_guard.mark_constructed();
 		auto start_routine = ::fast_io::win32::nt::details::get_thread_start_routine<start_routine_tuple_type>(
 			::std::make_index_sequence<sizeof...(Args) + 1>{});
 		::std::uint_least32_t status{::fast_io::win32::nt::RtlCreateUserThread(
@@ -127,13 +134,11 @@ public:
 
 		if (status) [[unlikely]]
 		{
-			// Creation failed; manual release is required.
-			::std::destroy_at(reinterpret_cast<start_routine_tuple_type *>(start_routine_tuple));
-			alloc::deallocate_n(start_routine_tuple, 1u);
-
+			// The guard still owns the complete tuple and releases it while the platform error propagates.
 			::fast_io::throw_nt_error(status);
 		}
 
+		(void)storage_guard.release();
 		this->id_ = cid.UniqueThread;
 	}
 
@@ -272,7 +277,8 @@ inline
 	// for reduce some warning purpose
 	constexpr
 #endif
-	::fast_io::win32::nt::nt_thread<zw>::id get_id()
+	// `nt_thread<zw>` remains dependent until instantiation, so its nested ID type requires an explicit type marker.
+	typename ::fast_io::win32::nt::nt_thread<zw>::id get_id()
 {
 	::fast_io::win32::nt::thread_basic_information tbi;
 	::std::uint_least32_t status{::fast_io::win32::nt::nt_query_information_thread<zw>(
